@@ -71,21 +71,21 @@ Questa tab viene popolata una volta sola dall'Excel esistente.
 - `ID_Rilevazione`: Type=Text, Key=✓, Initial value=`UNIQUEID()`
 - `Data_Ora_Inizio`: Type=DateTime, Initial value=`NOW()`, Show=✓
 - `Data_Ora_Fine`: Type=DateTime, lasciare vuoto (nessuna App formula). Compilato da un **Automation Bot**: Event=`When a record is updated`, Action=`Set row values` → `Data_Ora_Fine = NOW()`
-- `ID_Pianta`: Type=Number, Input mode=Text (tastiera completa con microfono per dettatura vocale). Validazione: `AND([ID_Pianta]>=1,[ID_Pianta]<=56)`
+- `ID_Pianta`: Type=Number, Input mode=Number (default). Validazione: `AND([ID_Pianta]>=1,[ID_Pianta]<=56)`
 - `Trattamento`: Type=Text, App formula=`INDEX(SELECT(Piante[Trattamento],[ID_Pianta]=[_THISROW].[ID_Pianta]),1)`, Editable=✗
-- Tutti i campi numerici (`Altezza`, `N_palchi_totali`, `N_fiori_fioriti`, `N_frutti`, `N_frutti_invaiati`, `Spad`, `Temp_Pianta`): Type=Number o Decimal, **Input mode=Text** → tastiera completa con microfono per dettatura vocale, validazione numerica mantenuta da AppSheet
-- `Temp_Aria`: Type=Decimal, Input mode=Text, Initial value=`MAXROW("Rilevazione_Principale","Data_Ora_Inizio").[Temp_Aria]`
-- `Note`: Type=LongText (dettatura vocale nativa su tutti i dispositivi)
+- Tutti i campi numerici (`Altezza`, `N_palchi_totali`, `N_fiori_fioriti`, `N_frutti`, `N_frutti_invaiati`, `Spad`, `Temp_Pianta`): Type=Number o Decimal, Input mode=Number/Decimal (default) → tastierino numerico grande
+- `Temp_Aria`: Type=Decimal, Initial value=`MAXROW("Rilevazione_Principale","Data_Ora_Inizio").[Temp_Aria]`
+- `Note`: Type=LongText (dettatura vocale nativa)
 
-> **Nota voce:** con Input mode=Text, l'utente vede la tastiera QWERTY con il tasto microfono (🎤). Dettando un numero (es. "dodici") il sistema di riconoscimento vocale del telefono lo converte automaticamente in "12". Su Android (Google keyboard) funziona su tutti i campi. Su iOS usare il tasto 🌐 per attivare la tastiera con microfono se necessario.
+> **Voce + tastierino (Android + Gboard):** su Android con Gboard il tastierino numerico include già il tasto microfono 🎤 in basso a sinistra. L'utente può quindi dettare numeri (es. "quindici" → "15") oppure toccare i tasti — senza cambiare modalità. Nessuna configurazione aggiuntiva richiesta.
 
 **Dettaglio_Palchi:**
 - `ID_Palco`: Type=Text, Key=✓, Initial value=`UNIQUEID()`
 - `ID_Rilevazione`: Type=Ref (→ Rilevazione_Principale), Is a part of=✓, Show=✗
 - `Numero_Palco`: Type=Number, Initial value=`COUNT(SELECT(Dettaglio_Palchi[ID_Palco],[ID_Rilevazione]=[_THISROW].[ID_Rilevazione]))+1`
-- `N_Foglie`: Type=Number, Input mode=Text (voce abilitata)
+- `N_Foglie`: Type=Number, Input mode=Number (default — voce disponibile via Gboard)
 
-**Dettaglio_Infiorescenze:** schema identico a Dettaglio_Palchi con `Numero_Infiorescenza` e `N_Fiori` (Input mode=Text per voce).
+**Dettaglio_Infiorescenze:** schema identico a Dettaglio_Palchi con `Numero_Infiorescenza` e `N_Fiori` (Input mode=Number, voce via Gboard).
 
 ### Relazioni (Data > Relationships)
 - `Piante` ← `Rilevazione_Principale` via `ID_Pianta`
