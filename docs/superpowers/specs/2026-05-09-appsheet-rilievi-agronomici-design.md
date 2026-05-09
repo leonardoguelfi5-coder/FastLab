@@ -33,8 +33,8 @@ Questa tab viene popolata una volta sola dall'Excel esistente.
 | ID_Rilevazione | Text | Chiave primaria, `UNIQUEID()` AppSheet |
 | Data_Ora_Inizio | DateTime | Auto: `NOW()` all'apertura |
 | Data_Ora_Fine | DateTime | Auto: `NOW()` al salvataggio |
-| ID_Pianta | Number | Input utente (Ref → Piante) |
-| Trattamento | Text | Compilato da AppSheet (App formula), nessuna formula Sheets |
+| ID_Pianta | Number | Input vocale o manuale (1–56), Input mode=Text |
+| Trattamento | Text | Compilato da AppSheet via SELECT su tab Piante, nessuna formula Sheets |
 | Altezza | Decimal | cm |
 | N_palchi_totali | Number | |
 | N_fiori_fioriti | Number | |
@@ -71,19 +71,21 @@ Questa tab viene popolata una volta sola dall'Excel esistente.
 - `ID_Rilevazione`: Type=Text, Key=✓, Initial value=`UNIQUEID()`
 - `Data_Ora_Inizio`: Type=DateTime, Initial value=`NOW()`, Show=✓
 - `Data_Ora_Fine`: Type=DateTime, lasciare vuoto (nessuna App formula). Compilato da un **Automation Bot**: Event=`When a record is updated`, Action=`Set row values` → `Data_Ora_Fine = NOW()`
-- `ID_Pianta`: Type=Ref (→ Piante), Input mode=Auto-complete
-- `Trattamento`: Type=Text, App formula=`[ID_Pianta].[Trattamento]`, Editable=✗
-- Tutti i campi numerici (`Altezza`, `N_palchi_totali`, etc.): Type=Number o Decimal → attiva tastierino numerico automaticamente
-- `Temp_Aria`: Type=Decimal, Initial value=`MAXROW("Rilevazione_Principale","Data_Ora_Inizio").[Temp_Aria]`
-- `Note`: Type=LongText
+- `ID_Pianta`: Type=Number, Input mode=Text (tastiera completa con microfono per dettatura vocale). Validazione: `AND([ID_Pianta]>=1,[ID_Pianta]<=56)`
+- `Trattamento`: Type=Text, App formula=`INDEX(SELECT(Piante[Trattamento],[ID_Pianta]=[_THISROW].[ID_Pianta]),1)`, Editable=✗
+- Tutti i campi numerici (`Altezza`, `N_palchi_totali`, `N_fiori_fioriti`, `N_frutti`, `N_frutti_invaiati`, `Spad`, `Temp_Pianta`): Type=Number o Decimal, **Input mode=Text** → tastiera completa con microfono per dettatura vocale, validazione numerica mantenuta da AppSheet
+- `Temp_Aria`: Type=Decimal, Input mode=Text, Initial value=`MAXROW("Rilevazione_Principale","Data_Ora_Inizio").[Temp_Aria]`
+- `Note`: Type=LongText (dettatura vocale nativa su tutti i dispositivi)
+
+> **Nota voce:** con Input mode=Text, l'utente vede la tastiera QWERTY con il tasto microfono (🎤). Dettando un numero (es. "dodici") il sistema di riconoscimento vocale del telefono lo converte automaticamente in "12". Su Android (Google keyboard) funziona su tutti i campi. Su iOS usare il tasto 🌐 per attivare la tastiera con microfono se necessario.
 
 **Dettaglio_Palchi:**
 - `ID_Palco`: Type=Text, Key=✓, Initial value=`UNIQUEID()`
 - `ID_Rilevazione`: Type=Ref (→ Rilevazione_Principale), Is a part of=✓, Show=✗
 - `Numero_Palco`: Type=Number, Initial value=`COUNT(SELECT(Dettaglio_Palchi[ID_Palco],[ID_Rilevazione]=[_THISROW].[ID_Rilevazione]))+1`
-- `N_Foglie`: Type=Number
+- `N_Foglie`: Type=Number, Input mode=Text (voce abilitata)
 
-**Dettaglio_Infiorescenze:** schema identico a Dettaglio_Palchi con `Numero_Infiorescenza` e `N_Fiori`.
+**Dettaglio_Infiorescenze:** schema identico a Dettaglio_Palchi con `Numero_Infiorescenza` e `N_Fiori` (Input mode=Text per voce).
 
 ### Relazioni (Data > Relationships)
 - `Piante` ← `Rilevazione_Principale` via `ID_Pianta`
@@ -132,7 +134,7 @@ Solo `Lista_Rilevazioni` e `Nuova_Rilevazione` visibili nella nav bar.
 ## Flusso operativo in campo
 
 1. Aprire app → toccare "+"
-2. Selezionare ID Pianta (autocomplete o scansione QR) → Trattamento compare automaticamente
+2. Dettare o digitare ID Pianta (es. "15") → Trattamento compare automaticamente
 3. Inserire misure pianta (8 campi numerici, tastierino grande)
 4. Toccare "+ Aggiungi palco" per ogni palco → inserire N_Foglie → Salva → ritorna inline
 5. Toccare "+ Aggiungi infiorescenza" per ogni infiorescenza → inserire N_Fiori → Salva
