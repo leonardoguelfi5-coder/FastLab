@@ -34,7 +34,7 @@ Questa tab viene popolata una volta sola dall'Excel esistente.
 | Data_Ora_Inizio | DateTime | Auto: `NOW()` all'apertura |
 | Data_Ora_Fine | DateTime | Auto: `NOW()` al salvataggio |
 | ID_Pianta | Number | Input utente (Ref → Piante) |
-| Trattamento | Text | Formula Sheets: `=IFERROR(VLOOKUP(C2,Piante!A:B,2,FALSE),"")` |
+| Trattamento | Text | Compilato da AppSheet (App formula), nessuna formula Sheets |
 | Altezza | Decimal | cm |
 | N_palchi_totali | Number | |
 | N_fiori_fioriti | Number | |
@@ -70,7 +70,7 @@ Questa tab viene popolata una volta sola dall'Excel esistente.
 **Rilevazione_Principale:**
 - `ID_Rilevazione`: Type=Text, Key=✓, Initial value=`UNIQUEID()`
 - `Data_Ora_Inizio`: Type=DateTime, Initial value=`NOW()`, Show=✓
-- `Data_Ora_Fine`: Type=DateTime, App formula=`IF(ISBLANK([_THISROW_BEFORE].[Data_Ora_Fine]),"",NOW())`
+- `Data_Ora_Fine`: Type=DateTime, lasciare vuoto (nessuna App formula). Compilato da un **Automation Bot**: Event=`When a record is updated`, Action=`Set row values` → `Data_Ora_Fine = NOW()`
 - `ID_Pianta`: Type=Ref (→ Piante), Input mode=Auto-complete
 - `Trattamento`: Type=Text, App formula=`[ID_Pianta].[Trattamento]`, Editable=✗
 - Tutti i campi numerici (`Altezza`, `N_palchi_totali`, etc.): Type=Number o Decimal → attiva tastierino numerico automaticamente
