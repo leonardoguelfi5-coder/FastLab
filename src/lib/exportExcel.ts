@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import { RilevazionePrincipale } from '@/types'
+import type { RilevazionePrincipale } from '@/types'
 
 export function exportToExcel(rilevazioni: RilevazionePrincipale[]) {
   // Sheet 1: Rilevazioni (flatten — no nested palchi/infiorescenze)

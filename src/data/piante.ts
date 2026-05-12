@@ -1,4 +1,4 @@
-import { Pianta } from '@/types'
+import type { Pianta } from '@/types'
 
 export const PIANTE: Pianta[] = [
   { id: 1, trattamento: 'Controllo' },

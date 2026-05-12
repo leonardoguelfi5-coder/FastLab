@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRilevazioneStore } from '@/store/rilevazioneStore'
-import { RilevazionePrincipale } from '@/types'
+import type { RilevazionePrincipale } from '@/types'
 import { FormPianta } from '@/components/FormPianta'
 import { FormMisure } from '@/components/FormMisure'
 import { InlinePalchi } from '@/components/InlinePalchi'

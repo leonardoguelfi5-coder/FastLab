@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { RilevazionePrincipale } from '@/types'
+import type { RilevazionePrincipale } from '@/types'
 
 interface RilevazioneStore {
   rilevazioni: RilevazionePrincipale[]

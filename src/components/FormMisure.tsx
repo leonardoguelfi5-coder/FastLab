@@ -1,5 +1,5 @@
 import { NumericField } from './NumericField'
-import { RilevazionePrincipale } from '@/types'
+import type { RilevazionePrincipale } from '@/types'
 
 type MisureKeys = 'altezza' | 'n_palchi_totali' | 'n_fiori_fioriti' | 'n_frutti' | 'n_frutti_invaiati' | 'spad' | 'temp_aria' | 'temp_pianta'
 

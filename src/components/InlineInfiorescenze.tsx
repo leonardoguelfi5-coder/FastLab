@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Infiorescenza } from '@/types'
+import type { Infiorescenza } from '@/types'
 import { Button } from '@/components/ui/button'
 import { NumericField } from './NumericField'
 

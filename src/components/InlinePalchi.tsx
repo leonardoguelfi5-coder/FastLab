@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Palco } from '@/types'
+import type { Palco } from '@/types'
 import { Button } from '@/components/ui/button'
 import { NumericField } from './NumericField'
 
