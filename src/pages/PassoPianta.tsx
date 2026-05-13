@@ -84,15 +84,28 @@ export function PassoPianta() {
     }
     setError(null)
 
-    const oggi = new Date().toISOString().slice(0, 10)
-    const esistente = rilevazioni.find(
-      (r) => r.id_pianta === idPianta && r.data_ora_inizio.slice(0, 10) === oggi
-    )
+    const now = new Date()
+    const oggi = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    const esistente = rilevazioni.find((r) => {
+      if (r.id_pianta !== idPianta) return false
+      const d = new Date(r.data_ora_inizio)
+      const dataLocale = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      return dataLocale === oggi
+    })
 
     if (esistente) {
+      // Strip null/undefined and empty palchi/infiorescenze arrays so we only overwrite
+      // fields that were actually filled in this pass, not clobber previously saved values
+      const campiDefiniti = Object.fromEntries(
+        Object.entries(campi).filter(([k, v]) => {
+          if (v === null || v === undefined) return false
+          if ((k === 'palchi' || k === 'infiorescenze') && Array.isArray(v) && v.length === 0) return false
+          return true
+        })
+      ) as Partial<CampiPassata>
       const aggiornata: RilevazionePrincipale = {
         ...esistente,
-        ...campi,
+        ...campiDefiniti,
         data_ora_fine: new Date().toISOString(),
       }
       updateRilevazione(aggiornata)
