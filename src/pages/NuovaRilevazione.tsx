@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useRilevazioneStore } from '@/store/rilevazioneStore'
 import type { RilevazionePrincipale } from '@/types'
 import { FormPianta } from '@/components/FormPianta'
@@ -36,8 +36,16 @@ function emptyForm(lastTempAria: number | null): RilevazionePrincipale {
 
 export function NuovaRilevazione() {
   const navigate = useNavigate()
-  const { lastTempAria, addRilevazione, setLastTempAria } = useRilevazioneStore()
-  const [form, setForm] = useState<RilevazionePrincipale>(() => emptyForm(lastTempAria))
+  const { id } = useParams<{ id?: string }>()
+  const { rilevazioni, lastTempAria, addRilevazione, updateRilevazione, setLastTempAria } =
+    useRilevazioneStore()
+
+  const isEditMode = Boolean(id)
+  const existing = id ? rilevazioni.find((r) => r.id === id) : undefined
+
+  const [form, setForm] = useState<RilevazionePrincipale>(() =>
+    existing ? { ...existing } : emptyForm(lastTempAria)
+  )
   const [error, setError] = useState<string | null>(null)
 
   const updateField = (key: keyof RilevazionePrincipale, value: unknown) => {
@@ -51,14 +59,21 @@ export function NuovaRilevazione() {
     }
     setError(null)
     const saved: RilevazionePrincipale = { ...form, data_ora_fine: new Date().toISOString() }
-    addRilevazione(saved)
+    if (isEditMode) {
+      updateRilevazione(saved)
+    } else {
+      addRilevazione(saved)
+    }
     if (form.temp_aria !== null) setLastTempAria(form.temp_aria)
     navigate('/')
   }
 
   return (
     <div className="max-w-lg mx-auto p-4 pb-24 flex flex-col gap-4">
-      <h1 className="text-xl font-bold">Nuova Rilevazione</h1>
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/')}>← Indietro</Button>
+        <h1 className="text-xl font-bold">{isEditMode ? 'Modifica Rilevazione' : 'Nuova Rilevazione'}</h1>
+      </div>
       <p className="text-xs text-muted-foreground">
         Inizio: {new Date(form.data_ora_inizio).toLocaleTimeString('it-IT')}
       </p>
@@ -68,8 +83,9 @@ export function NuovaRilevazione() {
           <FormPianta
             idPianta={form.id_pianta}
             trattamento={form.trattamento}
-            onIdPiantaChange={(v) => updateField('id_pianta', v)}
+            onIdPiantaChange={isEditMode ? () => {} : (v) => updateField('id_pianta', v)}
             onTrattamentoChange={(v) => updateField('trattamento', v)}
+            readOnly={isEditMode}
           />
         </CardContent>
       </Card>
@@ -86,13 +102,16 @@ export function NuovaRilevazione() {
 
       <Card>
         <CardContent className="pt-4">
-          <InlinePalchi palchi={form.palchi} onChange={(p) => updateField('palchi', p)} />
+          <InlinePalchi palchi={form.palchi ?? []} onChange={(p) => updateField('palchi', p)} />
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="pt-4">
-          <InlineInfiorescenze infiorescenze={form.infiorescenze} onChange={(i) => updateField('infiorescenze', i)} />
+          <InlineInfiorescenze
+            infiorescenze={form.infiorescenze ?? []}
+            onChange={(i) => updateField('infiorescenze', i)}
+          />
         </CardContent>
       </Card>
 
@@ -114,7 +133,7 @@ export function NuovaRilevazione() {
         className="fixed bottom-4 left-4 right-4 max-w-[calc(100%-2rem)] h-14 text-lg"
         onClick={handleSave}
       >
-        ✅ Salva Rilevazione
+        {isEditMode ? '✅ Aggiorna Rilevazione' : '✅ Salva Rilevazione'}
       </Button>
     </div>
   )

@@ -8,22 +8,31 @@ interface FormPiantaProps {
   trattamento: string
   onIdPiantaChange: (id: number | null) => void
   onTrattamentoChange: (t: string) => void
+  readOnly?: boolean
 }
 
-export function FormPianta({ idPianta, trattamento, onIdPiantaChange, onTrattamentoChange }: FormPiantaProps) {
+export function FormPianta({ idPianta, trattamento, onIdPiantaChange, onTrattamentoChange, readOnly }: FormPiantaProps) {
   useEffect(() => {
+    if (readOnly) return
     if (!idPianta) { onTrattamentoChange(''); return }
     onTrattamentoChange(getTrattamento(idPianta))
-  }, [idPianta])
+  }, [idPianta, readOnly])
 
   return (
     <div className="flex flex-col gap-3">
-      <NumericField
-        label="ID Pianta (1–56)"
-        value={idPianta}
-        onChange={onIdPiantaChange}
-        required
-      />
+      {readOnly ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium">ID Pianta</span>
+          <p className="text-lg font-semibold">#{idPianta}</p>
+        </div>
+      ) : (
+        <NumericField
+          label="ID Pianta (1–56)"
+          value={idPianta}
+          onChange={onIdPiantaChange}
+          required
+        />
+      )}
       {trattamento && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Trattamento:</span>
