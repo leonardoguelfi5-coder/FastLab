@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ArrowLeft, Save, RefreshCw } from 'lucide-react'
 
 type MisureKeys = 'altezza' | 'n_palchi_totali' | 'n_fiori_fioriti' | 'n_frutti' | 'n_frutti_invaiati' | 'spad' | 'temp_aria' | 'temp_pianta'
 
@@ -69,72 +70,103 @@ export function NuovaRilevazione() {
   }
 
   return (
-    <div className="max-w-lg mx-auto p-4 pb-24 flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/')}>← Indietro</Button>
-        <h1 className="text-xl font-bold">{isEditMode ? 'Modifica Rilevazione' : 'Nuova Rilevazione'}</h1>
+    <div className="max-w-lg mx-auto flex flex-col min-h-dvh">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-primary text-primary-foreground px-4 py-3 flex items-center gap-3 shadow-md">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 shrink-0"
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          <p className="text-lg font-bold leading-tight">
+            {isEditMode ? 'Modifica Rilevazione' : 'Nuova Rilevazione'}
+          </p>
+          <p className="text-xs text-primary-foreground/70">
+            {new Date(form.data_ora_inizio).toLocaleTimeString('it-IT')}
+          </p>
+        </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Inizio: {new Date(form.data_ora_inizio).toLocaleTimeString('it-IT')}
-      </p>
 
-      <Card>
-        <CardContent className="pt-4">
-          <FormPianta
-            idPianta={form.id_pianta}
-            trattamento={form.trattamento}
-            onIdPiantaChange={isEditMode ? () => {} : (v) => updateField('id_pianta', v)}
-            onTrattamentoChange={(v) => updateField('trattamento', v)}
-            readOnly={isEditMode}
-          />
-        </CardContent>
-      </Card>
+      {/* Content */}
+      <div className="flex-1 p-4 pb-28 flex flex-col gap-4">
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-4">
+            <FormPianta
+              idPianta={form.id_pianta}
+              trattamento={form.trattamento}
+              onIdPiantaChange={isEditMode ? () => {} : (v) => updateField('id_pianta', v)}
+              onTrattamentoChange={(v) => updateField('trattamento', v)}
+              readOnly={isEditMode}
+            />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Misure pianta</CardTitle></CardHeader>
-        <CardContent>
-          <FormMisure
-            values={form}
-            onChange={(key: MisureKeys, value) => updateField(key, value)}
-          />
-        </CardContent>
-      </Card>
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              Misure pianta
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FormMisure
+              values={form}
+              onChange={(key: MisureKeys, value) => updateField(key, value)}
+            />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="pt-4">
-          <InlinePalchi palchi={form.palchi ?? []} onChange={(p) => updateField('palchi', p)} />
-        </CardContent>
-      </Card>
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-4">
+            <InlinePalchi palchi={form.palchi ?? []} onChange={(p) => updateField('palchi', p)} />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="pt-4">
-          <InlineInfiorescenze
-            infiorescenze={form.infiorescenze ?? []}
-            onChange={(i) => updateField('infiorescenze', i)}
-          />
-        </CardContent>
-      </Card>
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-4">
+            <InlineInfiorescenze
+              infiorescenze={form.infiorescenze ?? []}
+              onChange={(i) => updateField('infiorescenze', i)}
+            />
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardContent className="pt-4 flex flex-col gap-2">
-          <Label>Note (dettatura vocale)</Label>
-          <Textarea
-            value={form.note}
-            onChange={(e) => updateField('note', e.target.value)}
-            rows={3}
-            placeholder="Note..."
-          />
-        </CardContent>
-      </Card>
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-4 flex flex-col gap-2">
+            <Label className="text-sm font-medium">Note (dettatura vocale)</Label>
+            <Textarea
+              value={form.note}
+              onChange={(e) => updateField('note', e.target.value)}
+              rows={3}
+              placeholder="Note..."
+              className="resize-none"
+            />
+          </CardContent>
+        </Card>
 
-      {error && <p className="text-destructive text-sm font-medium">{error}</p>}
+        {error && (
+          <p className="text-destructive text-sm font-medium bg-destructive/10 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+      </div>
 
-      <Button
-        className="fixed bottom-4 left-4 right-4 max-w-[calc(100%-2rem)] h-14 text-lg"
-        onClick={handleSave}
-      >
-        {isEditMode ? '✅ Aggiorna Rilevazione' : '✅ Salva Rilevazione'}
-      </Button>
+      {/* Fixed save button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent">
+        <Button
+          className="w-full max-w-lg mx-auto block h-14 text-base font-semibold shadow-lg"
+          onClick={handleSave}
+        >
+          {isEditMode ? (
+            <><RefreshCw className="w-5 h-5 inline mr-2" />Aggiorna Rilevazione</>
+          ) : (
+            <><Save className="w-5 h-5 inline mr-2" />Salva Rilevazione</>
+          )}
+        </Button>
+      </div>
     </div>
   )
 }

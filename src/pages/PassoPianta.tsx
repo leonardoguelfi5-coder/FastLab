@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Thermometer, Droplets, Ruler, Sprout, CheckCircle2, Save } from 'lucide-react'
 
 type CampiPassata = {
   temp_aria?: number | null
@@ -49,17 +50,18 @@ function campiVuoti(tipo: TipoPassata, lastTempAria: number | null): CampiPassat
   }
 }
 
-const TIPO_LABEL: Record<TipoPassata, string> = {
-  termometro: '🌡 Termometro',
-  spad: '💚 SPAD',
-  altezza: '📏 Altezza',
-  fenologici: '🌱 Fenologici',
+const TIPO_CONFIG: Record<TipoPassata, { label: string; icon: React.ElementType; color: string }> = {
+  termometro: { label: 'Termometro', icon: Thermometer, color: 'text-orange-600' },
+  spad:        { label: 'SPAD',        icon: Droplets,    color: 'text-emerald-600' },
+  altezza:     { label: 'Altezza',     icon: Ruler,       color: 'text-blue-600' },
+  fenologici:  { label: 'Fenologici',  icon: Sprout,      color: 'text-primary' },
 }
 
 export function PassoPianta() {
   const navigate = useNavigate()
   const { tipo } = useParams<{ tipo: string }>()
   const tipoPassata = (tipo ?? 'termometro') as TipoPassata
+  const { label, icon: TipoIcon, color } = TIPO_CONFIG[tipoPassata]
 
   const { rilevazioni, lastTempAria, addRilevazione, updateRilevazione, setLastTempAria } =
     useRilevazioneStore()
@@ -94,8 +96,6 @@ export function PassoPianta() {
     })
 
     if (esistente) {
-      // Strip null/undefined and empty palchi/infiorescenze arrays so we only overwrite
-      // fields that were actually filled in this pass, not clobber previously saved values
       const campiDefiniti = Object.fromEntries(
         Object.entries(campi).filter(([k, v]) => {
           if (v === null || v === undefined) return false
@@ -141,144 +141,152 @@ export function PassoPianta() {
   }
 
   return (
-    <div className="max-w-lg mx-auto p-4 pb-24 flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/scegli')}>← Indietro</Button>
-        <h1 className="text-xl font-bold">{TIPO_LABEL[tipoPassata]}</h1>
+    <div className="max-w-lg mx-auto flex flex-col min-h-dvh">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-primary text-primary-foreground px-4 py-3 flex items-center gap-3 shadow-md">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-primary-foreground hover:bg-primary-foreground/20 h-9 w-9 shrink-0"
+          onClick={() => navigate('/scegli')}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <TipoIcon className={`w-5 h-5 ${color} bg-white/20 rounded p-0.5`} />
+        <span className="text-lg font-bold">{label}</span>
       </div>
 
-      {saved !== null && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm text-green-800 font-medium">
-          ✓ Pianta #{saved} salvata
-        </div>
-      )}
+      {/* Content */}
+      <div className="flex-1 p-4 pb-24 flex flex-col gap-4">
+        {/* Success toast */}
+        {saved !== null && (
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 text-sm text-primary font-medium">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            Pianta #{saved} salvata
+          </div>
+        )}
 
-      <Card>
-        <CardContent className="pt-4 flex flex-col gap-3">
-          <NumericField
-            label="ID Pianta (1–56)"
-            value={idPianta}
-            onChange={setIdPianta}
-            required
-          />
-          {trattamento && (
-            <Badge variant="secondary" className="w-fit">{trattamento}</Badge>
-          )}
-        </CardContent>
-      </Card>
-
-      {tipoPassata === 'termometro' && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Temperature</CardTitle></CardHeader>
-          <CardContent className="flex flex-col gap-3">
+        {/* Plant ID */}
+        <Card className="border-border shadow-sm">
+          <CardContent className="pt-4 flex flex-col gap-3">
             <NumericField
-              label="Temp. aria (°C)"
-              value={campi.temp_aria ?? null}
-              onChange={(v) => updateCampo('temp_aria', v)}
+              label="ID Pianta (1–56)"
+              value={idPianta}
+              onChange={setIdPianta}
+              required
             />
-            <NumericField
-              label="Temp. pianta (°C)"
-              value={campi.temp_pianta ?? null}
-              onChange={(v) => updateCampo('temp_pianta', v)}
-            />
+            {trattamento && (
+              <Badge className="w-fit bg-primary/10 text-primary border-primary/20 font-medium">
+                {trattamento}
+              </Badge>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {tipoPassata === 'spad' && (
-        <Card>
-          <CardContent className="pt-4">
-            <NumericField
-              label="SPAD"
-              value={campi.spad ?? null}
-              onChange={(v) => updateCampo('spad', v)}
-            />
-          </CardContent>
-        </Card>
-      )}
+        {tipoPassata === 'termometro' && (
+          <Card className="border-border shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                Temperature
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <NumericField
+                label="Temp. aria (°C)"
+                value={campi.temp_aria ?? null}
+                onChange={(v) => updateCampo('temp_aria', v)}
+              />
+              <NumericField
+                label="Temp. pianta (°C)"
+                value={campi.temp_pianta ?? null}
+                onChange={(v) => updateCampo('temp_pianta', v)}
+              />
+            </CardContent>
+          </Card>
+        )}
 
-      {tipoPassata === 'altezza' && (
-        <Card>
-          <CardContent className="pt-4">
-            <NumericField
-              label="Altezza (cm)"
-              value={campi.altezza ?? null}
-              onChange={(v) => updateCampo('altezza', v)}
-            />
-          </CardContent>
-        </Card>
-      )}
+        {tipoPassata === 'spad' && (
+          <Card className="border-border shadow-sm">
+            <CardContent className="pt-4">
+              <NumericField
+                label="SPAD"
+                value={campi.spad ?? null}
+                onChange={(v) => updateCampo('spad', v)}
+              />
+            </CardContent>
+          </Card>
+        )}
 
-      {tipoPassata === 'fenologici' && (
-        <>
-          <Card>
-            <CardHeader><CardTitle className="text-base">Misure fenologiche</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
+        {tipoPassata === 'altezza' && (
+          <Card className="border-border shadow-sm">
+            <CardContent className="pt-4">
               <NumericField
                 label="Altezza (cm)"
                 value={campi.altezza ?? null}
                 onChange={(v) => updateCampo('altezza', v)}
               />
-              <NumericField
-                label="N. palchi totali"
-                value={campi.n_palchi_totali ?? null}
-                onChange={(v) => updateCampo('n_palchi_totali', v)}
-              />
-              <NumericField
-                label="N. fiori fioriti"
-                value={campi.n_fiori_fioriti ?? null}
-                onChange={(v) => updateCampo('n_fiori_fioriti', v)}
-              />
-              <NumericField
-                label="N. frutti"
-                value={campi.n_frutti ?? null}
-                onChange={(v) => updateCampo('n_frutti', v)}
-              />
-              <NumericField
-                label="N. frutti invaiati"
-                value={campi.n_frutti_invaiati ?? null}
-                onChange={(v) => updateCampo('n_frutti_invaiati', v)}
-              />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <InlinePalchi
-                palchi={campi.palchi ?? []}
-                onChange={(p) => updateCampo('palchi', p)}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <InlineInfiorescenze
-                infiorescenze={campi.infiorescenze ?? []}
-                onChange={(i) => updateCampo('infiorescenze', i)}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4 flex flex-col gap-2">
-              <Label>Note (dettatura vocale)</Label>
-              <Textarea
-                value={campi.note ?? ''}
-                onChange={(e) => updateCampo('note', e.target.value)}
-                rows={3}
-                placeholder="Note..."
-              />
-            </CardContent>
-          </Card>
-        </>
-      )}
+        )}
 
-      {error && <p className="text-destructive text-sm font-medium">{error}</p>}
+        {tipoPassata === 'fenologici' && (
+          <>
+            <Card className="border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Misure fenologiche
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3">
+                <NumericField label="Altezza (cm)" value={campi.altezza ?? null} onChange={(v) => updateCampo('altezza', v)} />
+                <NumericField label="N. palchi totali" value={campi.n_palchi_totali ?? null} onChange={(v) => updateCampo('n_palchi_totali', v)} />
+                <NumericField label="N. fiori fioriti" value={campi.n_fiori_fioriti ?? null} onChange={(v) => updateCampo('n_fiori_fioriti', v)} />
+                <NumericField label="N. frutti" value={campi.n_frutti ?? null} onChange={(v) => updateCampo('n_frutti', v)} />
+                <NumericField label="N. frutti invaiati" value={campi.n_frutti_invaiati ?? null} onChange={(v) => updateCampo('n_frutti_invaiati', v)} />
+              </CardContent>
+            </Card>
+            <Card className="border-border shadow-sm">
+              <CardContent className="pt-4">
+                <InlinePalchi palchi={campi.palchi ?? []} onChange={(p) => updateCampo('palchi', p)} />
+              </CardContent>
+            </Card>
+            <Card className="border-border shadow-sm">
+              <CardContent className="pt-4">
+                <InlineInfiorescenze infiorescenze={campi.infiorescenze ?? []} onChange={(i) => updateCampo('infiorescenze', i)} />
+              </CardContent>
+            </Card>
+            <Card className="border-border shadow-sm">
+              <CardContent className="pt-4 flex flex-col gap-2">
+                <Label className="text-sm font-medium">Note (dettatura vocale)</Label>
+                <Textarea
+                  value={campi.note ?? ''}
+                  onChange={(e) => updateCampo('note', e.target.value)}
+                  rows={3}
+                  placeholder="Note..."
+                  className="resize-none"
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
 
-      <Button
-        className="fixed bottom-4 left-4 right-4 max-w-[calc(100%-2rem)] h-14 text-lg"
-        onClick={handleSave}
-      >
-        ✅ Salva Pianta #{idPianta ?? '?'}
-      </Button>
+        {error && (
+          <p className="text-destructive text-sm font-medium bg-destructive/10 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+      </div>
+
+      {/* Fixed save button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background/95 to-transparent">
+        <Button
+          className="w-full max-w-lg mx-auto block h-14 text-base font-semibold shadow-lg gap-2"
+          onClick={handleSave}
+        >
+          <Save className="w-5 h-5 inline mr-2" />
+          Salva Pianta #{idPianta ?? '?'}
+        </Button>
+      </div>
     </div>
   )
 }
