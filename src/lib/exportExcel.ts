@@ -22,7 +22,7 @@ export function exportToExcel(rilevazioni: RilevazionePrincipale[]) {
 
   // Sheet 2: Palchi (flat, with id_rilevazione)
   const palchiSheet = rilevazioni.flatMap((r) =>
-    r.palchi.map((p) => ({
+    (r.palchi ?? []).map((p) => ({
       ID_Rilevazione: r.id,
       ID_Pianta: r.id_pianta,
       Numero_Palco: p.numero_palco,
@@ -32,7 +32,7 @@ export function exportToExcel(rilevazioni: RilevazionePrincipale[]) {
 
   // Sheet 3: Infiorescenze (flat, with id_rilevazione)
   const infSheet = rilevazioni.flatMap((r) =>
-    r.infiorescenze.map((inf) => ({
+    (r.infiorescenze ?? []).map((inf) => ({
       ID_Rilevazione: r.id,
       ID_Pianta: r.id_pianta,
       Numero_Infiorescenza: inf.numero_infiorescenza,
