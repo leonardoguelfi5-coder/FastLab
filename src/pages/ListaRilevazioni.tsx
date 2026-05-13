@@ -27,7 +27,7 @@ export function ListaRilevazioni() {
           >
             ⬇ Excel
           </Button>
-          <Button size="sm" onClick={() => navigate('/nuova')}>
+          <Button size="sm" onClick={() => navigate('/scegli')}>
             + Nuova
           </Button>
         </div>
@@ -48,8 +48,8 @@ export function ListaRilevazioni() {
               <Badge variant="secondary" className="w-fit text-xs">{r.trattamento}</Badge>
               <div className="text-xs text-muted-foreground mt-1 flex gap-3 flex-wrap">
                 {r.altezza != null && <span>📏 {r.altezza} cm</span>}
-                {r.palchi.length > 0 && <span>🌿 {r.palchi.length} palchi</span>}
-                {r.infiorescenze.length > 0 && <span>🌸 {r.infiorescenze.length} inf.</span>}
+                {(r.palchi ?? []).length > 0 && <span>🌿 {r.palchi.length} palchi</span>}
+                {(r.infiorescenze ?? []).length > 0 && <span>🌸 {r.infiorescenze.length} inf.</span>}
               </div>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
@@ -58,16 +58,26 @@ export function ListaRilevazioni() {
                   day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                 })}
               </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-destructive h-7 px-2 text-xs"
-                onClick={() => {
-                  if (confirm('Eliminare questa rilevazione?')) deleteRilevazione(r.id)
-                }}
-              >
-                Elimina
-              </Button>
+              <div className="flex gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => navigate(`/modifica/${r.id}`)}
+                >
+                  ✏️ Modifica
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive h-7 px-2 text-xs"
+                  onClick={() => {
+                    if (confirm('Eliminare questa rilevazione?')) deleteRilevazione(r.id)
+                  }}
+                >
+                  Elimina
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
