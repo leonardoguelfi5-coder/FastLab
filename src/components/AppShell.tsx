@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, CircleUser, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
@@ -12,6 +12,8 @@ interface AppShellProps {
   titolo: string
   /** Percorso a cui porta la freccia indietro (es. `/` o `/esperimenti/ID`); senza, la freccia non c'è. */
   indietro?: string
+  /** Chiamato al tocco della freccia indietro: con `evento.preventDefault()` la pagina resta (es. per chiedere conferma). */
+  onIndietro?: (evento: MouseEvent<HTMLAnchorElement>) => void
   /** Pulsanti della pagina, a destra del titolo e prima del menu. */
   azioni?: ReactNode
   children: ReactNode
@@ -20,7 +22,7 @@ interface AppShellProps {
 const VOCE_MENU = 'flex h-11 w-full items-center gap-2 rounded-md px-3 text-left text-base hover:bg-muted'
 
 /** Intestazione e menu dell'utente comuni a tutte le pagine dopo l'accesso. */
-export function AppShell({ titolo, indietro, azioni, children }: AppShellProps) {
+export function AppShell({ titolo, indietro, onIndietro, azioni, children }: AppShellProps) {
   const { sessione } = useSessione()
   const { data: amministratore } = useSonoAdmin()
 
@@ -67,6 +69,7 @@ export function AppShell({ titolo, indietro, azioni, children }: AppShellProps) 
           {indietro && (
             <Link
               to={indietro}
+              onClick={onIndietro}
               aria-label="Indietro"
               className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'size-11')}
             >

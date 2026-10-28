@@ -2,13 +2,12 @@ import { Fragment, useId, useState } from 'react'
 import type { BozzaEsperimento, Pianta } from '@/domain/tipi'
 import { generaPiante } from '@/domain/piante'
 import { EditorFattori } from '@/components/config/EditorFattori'
+import { conLivelliInSospeso, livelloAggiungibile } from '@/components/config/livelli'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { leggiIntero } from '@/lib/numeri'
+import { Conferma } from './Conferma'
 import { MAX_PIANTE, nPiante, rigeneraRighe, trattamentiInclusi, type RigaTrattamento } from './righeTrattamenti'
 
 interface PassoPianteProps {
@@ -159,10 +158,19 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
   const id = useId()
   const [inizio, setInizio] = useState('1')
   const [conferma, setConferma] = useState(false)
+  // Livelli scritti in "Nuovo livello" ma non ancora aggiunti: "Genera trattamenti" li aggiunge da sé.
+  const [inSospeso, setInSospeso] = useState<Record<string, string>>({})
 
   const cambiaRighe = (nuove: RigaTrattamento[]) => onChange({ ...bozza, trattamenti: trattamentiInclusi(nuove) }, nuove)
 
-  const senzaLivelli = bozza.fattori.find(f => f.livelli.length === 0)
+  function generaTrattamenti() {
+    const pronti = conLivelliInSospeso(bozza.fattori, inSospeso)
+    const nuove = rigeneraRighe(righe, pronti.fattori)
+    setInSospeso(pronti.testi)
+    onChange({ ...bozza, fattori: pronti.fattori, trattamenti: trattamentiInclusi(nuove) }, nuove)
+  }
+
+  const senzaLivelli = bozza.fattori.find(f => f.livelli.length === 0 && !livelloAggiungibile(f, inSospeso[f.id] ?? ''))
   const motivoTrattamenti = bozza.fattori.length === 0
     ? 'Aggiungi almeno un fattore con i suoi livelli.'
     : senzaLivelli ? `Il fattore «${senzaLivelli.nome.trim() || 'senza nome'}» non ha livelli: aggiungine almeno uno.` : null
@@ -189,7 +197,12 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
 
       <section aria-labelledby={`${id}-fattori`} className="flex flex-col gap-3">
         <h3 id={`${id}-fattori`} className="text-lg font-semibold">Fattori</h3>
-        <EditorFattori valore={bozza.fattori} onChange={(fattori) => onChange({ ...bozza, fattori }, righe)} />
+        <EditorFattori
+          valore={bozza.fattori}
+          onChange={(fattori) => onChange({ ...bozza, fattori }, righe)}
+          inSospeso={inSospeso}
+          onInSospeso={setInSospeso}
+        />
       </section>
 
       <section aria-labelledby={`${id}-trattamenti`} className="flex flex-col gap-3">
@@ -202,7 +215,7 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
           variant="outline"
           disabled={motivoTrattamenti !== null}
           aria-describedby={motivoTrattamenti ? `${id}-motivo-trattamenti` : undefined}
-          onClick={() => cambiaRighe(rigeneraRighe(righe, bozza.fattori))}
+          onClick={generaTrattamenti}
           className="h-12 self-start text-base"
         >
           Genera trattamenti
@@ -246,18 +259,15 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
         <ElencoPiante bozza={bozza} onChange={(piante) => onChange({ ...bozza, piante }, righe)} />
       </section>
 
-      <Dialog open={conferma} onOpenChange={(aperta) => { if (!aperta) setConferma(false) }}>
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>Rigenerare le piante?</DialogTitle>
-            <DialogDescription>Le etichette modificate andranno perse.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConferma(false)} className="h-11">Annulla</Button>
-            <Button variant="destructive" onClick={() => { setConferma(false); generaOra() }} className="h-11">Rigenera</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Conferma
+        aperta={conferma}
+        titolo="Rigenerare le piante?"
+        testo="Le etichette modificate andranno perse."
+        annulla="Annulla"
+        conferma="Rigenera"
+        onAnnulla={() => setConferma(false)}
+        onConferma={() => { setConferma(false); generaOra() }}
+      />
     </div>
   )
 }

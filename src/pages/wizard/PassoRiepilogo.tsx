@@ -3,28 +3,66 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { validaBozza } from '@/domain/bozza'
-import { creaEsperimento } from '@/api/esperimenti'
+import { caricaConfig, creaEsperimento } from '@/api/esperimenti'
 import { chiavi } from '@/api/query'
 import { Button } from '@/components/ui/button'
 import { messaggioErrore } from '@/lib/errori'
 
+interface PassoRiepilogoProps {
+  bozza: BozzaEsperimento
+  /** Problemi che `validaBozza` non vede (es. piante da rigenerare), elencati prima degli altri. */
+  altriErrori?: string[]
+  /** Si è già provato a creare l'esperimento con questa bozza. */
+  giaTentato: boolean
+  /** Chiamato prima di ogni tentativo di creazione. */
+  onTentativo: () => void
+  /** Chiamato quando l'esperimento esiste, prima di aprirlo. */
+  onCreato: () => void
+}
+
+const codice = (e: unknown) => (typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined)
+
+/**
+ * Crea l'esperimento. L'id viene dalla bozza: se un tentativo precedente è arrivato al database ma la
+ * risposta si è persa (rete), riprovando l'id risulta già usato (23505). In quel caso l'esperimento c'è
+ * già: se si riesce a leggerlo, la creazione è andata a buon fine.
+ */
+async function crea({ bozza, ripresa }: { bozza: BozzaEsperimento; ripresa: boolean }): Promise<string> {
+  try {
+    return await creaEsperimento(bozza)
+  } catch (e) {
+    if (ripresa && codice(e) === '23505') {
+      const esistente = await caricaConfig(bozza.esperimento.id).catch(() => null)
+      if (esistente) return bozza.esperimento.id
+    }
+    throw e
+  }
+}
+
 /** Passo 5: conteggi, problemi da sistemare e creazione dell'esperimento. */
-export function PassoRiepilogo({ bozza }: { bozza: BozzaEsperimento }) {
+export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativo, onCreato }: PassoRiepilogoProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const errori = validaBozza(bozza)
+  const errori = [...altriErrori, ...validaBozza(bozza)]
 
-  const crea = useMutation({
-    // Funzione a parte: React Query passa alla mutazione anche un contesto, che non va dato all'API.
-    mutationFn: (b: BozzaEsperimento) => creaEsperimento(b),
+  const creazione = useMutation({
+    mutationFn: crea,
     onSuccess: (id) => {
       void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
+      onCreato()
       toast.success('Esperimento creato.')
-      navigate(`/esperimenti/${id}`)
+      // Al posto della procedura: "indietro" dall'esperimento non torna al riepilogo di una bozza già creata.
+      navigate(`/esperimenti/${id}`, { replace: true })
     },
     // La bozza resta com'è: si può correggere o riprovare.
     onError: (e) => { toast.error(messaggioErrore(e)) },
   })
+
+  function creaEsperimentoOra() {
+    const ripresa = giaTentato
+    onTentativo()
+    creazione.mutate({ bozza, ripresa })
+  }
 
   const conteggi = [
     ['Trattamenti', bozza.trattamenti.length],
@@ -52,7 +90,7 @@ export function PassoRiepilogo({ bozza }: { bozza: BozzaEsperimento }) {
             {/* Lo stesso messaggio può ripetersi (es. due parametri senza nome): la chiave include la posizione. */}
             {errori.map((e, i) => <li key={`${i}-${e}`}>{e}</li>)}
           </ul>
-          <p className="text-sm text-muted-foreground">Torna indietro con "Indietro" per correggere.</p>
+          <p className="text-sm text-muted-foreground">Torna ai passi con «Passo precedente» per correggere.</p>
         </div>
       ) : (
         <p className="text-muted-foreground">Tutto pronto: puoi creare l'esperimento.</p>
@@ -62,12 +100,12 @@ export function PassoRiepilogo({ bozza }: { bozza: BozzaEsperimento }) {
         Dopo la creazione potrai ancora aggiungere piante, parametri e passate dalle impostazioni dell'esperimento.
       </p>
       <Button
-        disabled={errori.length > 0 || crea.isPending}
+        disabled={errori.length > 0 || creazione.isPending}
         aria-describedby={errori.length > 0 ? 'riepilogo-errori' : undefined}
-        onClick={() => crea.mutate(bozza)}
+        onClick={creaEsperimentoOra}
         className="h-12 text-base"
       >
-        {crea.isPending ? 'Creazione…' : 'Crea esperimento'}
+        {creazione.isPending ? 'Creazione…' : 'Crea esperimento'}
       </Button>
     </div>
   )

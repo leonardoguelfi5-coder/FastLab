@@ -4,13 +4,19 @@ import type { Fattore } from '@/domain/tipi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { conLivello, livelloDoppio } from './livelli'
 
 interface EditorFattoriProps {
   valore: Fattore[]
   onChange: (f: Fattore[]) => void
+  /**
+   * Il testo scritto in "Nuovo livello" e non ancora aggiunto, per id del fattore. Facoltativo: chi lo passa
+   * (con `onInSospeso`) può aggiungere quei livelli da sé, es. prima di generare i trattamenti.
+   */
+  inSospeso?: Record<string, string>
+  onInSospeso?: (testi: Record<string, string>) => void
 }
 
-const normalizza = (s: string) => s.trim().toLowerCase()
 const rinumera = <T extends { ordine: number }>(elementi: T[]): T[] => elementi.map((e, ordine) => ({ ...e, ordine }))
 
 interface EditorFattoreProps {
@@ -18,18 +24,19 @@ interface EditorFattoreProps {
   valore: Fattore
   onChange: (f: Fattore) => void
   onElimina: () => void
+  nuovo: string
+  onNuovo: (testo: string) => void
 }
 
-function EditorFattore({ numero, valore, onChange, onElimina }: EditorFattoreProps) {
+function EditorFattore({ numero, valore, onChange, onElimina, nuovo, onNuovo }: EditorFattoreProps) {
   const id = useId()
-  const [nuovo, setNuovo] = useState('')
-  const nome = nuovo.trim()
-  const doppio = nome !== '' && valore.livelli.some(l => normalizza(l.nome) === normalizza(nome))
+  const doppio = livelloDoppio(valore, nuovo)
 
   function aggiungiLivello() {
-    if (nome === '' || doppio) return
-    onChange({ ...valore, livelli: [...valore.livelli, { id: crypto.randomUUID(), nome, ordine: valore.livelli.length }] })
-    setNuovo('')
+    const aggiornato = conLivello(valore, nuovo)
+    if (!aggiornato) return
+    onChange(aggiornato)
+    onNuovo('')
   }
 
   return (
@@ -76,7 +83,7 @@ function EditorFattore({ numero, valore, onChange, onElimina }: EditorFattorePro
             enterKeyHint="done"
             aria-invalid={doppio || undefined}
             aria-describedby={doppio ? `${id}-doppio` : undefined}
-            onChange={(e) => setNuovo(e.target.value)}
+            onChange={(e) => onNuovo(e.target.value)}
             onKeyDown={(e) => {
               if (e.key !== 'Enter') return
               e.preventDefault()
@@ -84,7 +91,7 @@ function EditorFattore({ numero, valore, onChange, onElimina }: EditorFattorePro
             }}
             className="h-12 flex-1 text-lg"
           />
-          <Button variant="outline" onClick={aggiungiLivello} disabled={nome === '' || doppio} className="h-12">
+          <Button variant="outline" onClick={aggiungiLivello} disabled={nuovo.trim() === '' || doppio} className="h-12">
             Aggiungi livello
           </Button>
         </div>
@@ -97,7 +104,11 @@ function EditorFattore({ numero, valore, onChange, onElimina }: EditorFattorePro
 }
 
 /** Fattori sperimentali e i loro livelli (mostrati come chip). */
-export function EditorFattori({ valore, onChange }: EditorFattoriProps) {
+export function EditorFattori({ valore, onChange, inSospeso, onInSospeso }: EditorFattoriProps) {
+  const [interni, setInterni] = useState<Record<string, string>>({})
+  const testi = inSospeso ?? interni
+  const cambiaTesti = onInSospeso ?? setInterni
+
   function aggiungi() {
     onChange([...valore, { id: crypto.randomUUID(), nome: '', ordine: valore.length, livelli: [] }])
   }
@@ -117,6 +128,8 @@ export function EditorFattori({ valore, onChange }: EditorFattoriProps) {
           valore={f}
           onChange={(nuovo) => onChange(valore.map(x => (x.id === f.id ? nuovo : x)))}
           onElimina={() => onChange(rinumera(valore.filter(x => x.id !== f.id)))}
+          nuovo={testi[f.id] ?? ''}
+          onNuovo={(testo) => cambiaTesti({ ...testi, [f.id]: testo })}
         />
       ))}
       <Button variant="outline" onClick={aggiungi} className="h-11 self-start">+ Fattore</Button>

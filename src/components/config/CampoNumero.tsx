@@ -13,6 +13,7 @@ interface CampoNumeroProps {
   leggi: (testo: string) => number | null
   /** Il messaggio mostrato mentre il testo non è valido. */
   errore: string
+  /** Solo interi senza segno: tastiera numerica. Altrimenti tastiera normale, che ha anche il segno meno. */
   intero?: boolean
 }
 
@@ -41,7 +42,9 @@ export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore,
       <Input
         id={id}
         type="text"
-        inputMode={intero ? 'numeric' : 'decimal'}
+        // I decimali possono essere negativi (es. un minimo di temperatura): la tastiera "decimal"
+        // di iOS non ha il segno meno, quindi tastiera normale.
+        inputMode={intero ? 'numeric' : 'text'}
         autoComplete="off"
         value={testo}
         aria-invalid={sbagliato || undefined}

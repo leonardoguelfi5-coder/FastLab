@@ -59,6 +59,44 @@ describe('PassoPiante: trattamenti', () => {
     expect(campoN(3)).toBeDisabled()
   })
 
+  it('un livello scritto in "Nuovo livello" ma non aggiunto entra da sé con "Genera trattamenti"', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const onChange = rendi(conConcime())
+
+    await utente.type(screen.getByLabelText('Nuovo livello'), ' 150 ')
+    await utente.click(screen.getByRole('button', { name: 'Genera trattamenti' }))
+
+    const b = ultimaBozza(onChange)
+    expect(b.fattori[0].livelli.map(l => [l.nome, l.ordine])).toEqual([['0', 0], ['50', 1], ['100', 2], ['150', 3]])
+    expect(b.trattamenti.map(t => t.etichetta)).toEqual(['0', '50', '100', '150'])
+    expect(screen.getByLabelText('Nuovo livello')).toHaveValue('')
+    expect(screen.getByRole('list', { name: 'Livelli' })).toHaveTextContent('150')
+  })
+
+  it('un livello in sospeso già presente non entra e resta scritto con il suo avviso', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const onChange = rendi(conConcime())
+
+    await utente.type(screen.getByLabelText('Nuovo livello'), '50')
+    await utente.click(screen.getByRole('button', { name: 'Genera trattamenti' }))
+
+    expect(ultimaBozza(onChange).trattamenti.map(t => t.etichetta)).toEqual(['0', '50', '100'])
+    expect(screen.getByLabelText('Nuovo livello')).toHaveValue('50')
+    expect(screen.getByText('C\'è già un livello con questo nome.')).toBeInTheDocument()
+  })
+
+  it('un fattore senza livelli ma con un livello in sospeso si può già generare', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const b = bozzaVuota()
+    b.fattori = [fattore('Stress', [])]
+    const onChange = rendi(b)
+    expect(screen.getByRole('button', { name: 'Genera trattamenti' })).toBeDisabled()
+
+    await utente.type(screen.getByLabelText('Nuovo livello'), 'Controllo')
+    await utente.click(screen.getByRole('button', { name: 'Genera trattamenti' }))
+    expect(ultimaBozza(onChange).trattamenti.map(t => t.etichetta)).toEqual(['Controllo'])
+  })
+
   it('senza fattori, o con un fattore senza livelli, non si possono generare i trattamenti e lo dice', () => {
     const b = conConcime()
     b.fattori.push({ ...fattore('Stress', []), ordine: 1 })

@@ -163,6 +163,19 @@ describe('EditorParametro: campi numerici', () => {
     expect(screen.queryByText('Scrivi un numero intero da 1 a 20.')).not.toBeInTheDocument()
   })
 
+  it('Minimo e Massimo usano la tastiera normale (con il meno) e accettano valori negativi', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const onChange = rendi(parametro('Temp aria'))
+    expect(screen.getByLabelText('Minimo')).toHaveAttribute('inputmode', 'text')
+    expect(screen.getByLabelText('Massimo')).toHaveAttribute('inputmode', 'text')
+    expect(screen.getByLabelText('Letture per misura')).toHaveAttribute('inputmode', 'numeric')
+
+    await utente.type(screen.getByLabelText('Minimo'), '-5,5')
+    expect(ultimo(onChange).valore_min).toBe(-5.5)
+    await utente.type(screen.getByLabelText('Massimo'), '45.5')
+    expect(ultimo(onChange).valore_max).toBe(45.5)
+  })
+
   it('Minimo e Massimo accettano la virgola decimale e si possono svuotare', async () => {
     const utente = userEvent.setup({ delay: null })
     const onChange = rendi(parametro('Altezza', { valore_max: 300 }))
