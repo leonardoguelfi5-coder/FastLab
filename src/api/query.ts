@@ -1,6 +1,6 @@
 import { QueryClient, useQuery } from '@tanstack/react-query'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
-import { sonoAdmin } from './inviti'
+import { listaInviti, sonoAdmin } from './inviti'
 import { misureDelGiorno, misurePianta } from './misure'
 
 /** Chiavi di cache delle query. Quelle delle misure iniziano tutte con 'misure': si invalidano insieme. */
@@ -44,6 +44,10 @@ export function useMisurePianta(piantaId: string | undefined) {
     queryFn: () => misurePianta(piantaId as string),
     enabled: !!piantaId,
   })
+}
+
+export function useInviti() {
+  return useQuery({ queryKey: chiavi.inviti, queryFn: listaInviti })
 }
 
 export function useSonoAdmin() {

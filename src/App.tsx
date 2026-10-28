@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { AppShell } from '@/components/AppShell'
 import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
+import { AdminInviti } from '@/pages/AdminInviti'
 import { Registrati } from '@/pages/Registrati'
 
 /** Segnaposto delle pagine non ancora scritte: già dentro il guscio, così il menu funziona. */
@@ -26,7 +27,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<InCostruzione titolo="Scheda pianta" indietro="/" />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<InCostruzione titolo="Modifica misura" indietro="/" />} />
         <Route path="/esperimenti/:espId/impostazioni" element={<InCostruzione titolo="Impostazioni" indietro="/" />} />
-        <Route path="/admin/inviti" element={<InCostruzione titolo="Inviti" indietro="/" />} />
+        <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -5,13 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn() }))
-vi.mock('./inviti', () => ({ sonoAdmin: vi.fn() }))
+vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 
 import { caricaConfig, listaEsperimenti } from './esperimenti'
-import { sonoAdmin } from './inviti'
+import { listaInviti, sonoAdmin } from './inviti'
 import { misureDelGiorno, misurePianta } from './misure'
 import {
-  chiavi, creaQueryClient, useConfig, useEsperimenti, useMisureGiorno, useMisurePianta, useSonoAdmin,
+  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisureGiorno, useMisurePianta, useSonoAdmin,
 } from './query'
 
 function wrapper() {
@@ -78,6 +78,14 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useMisurePianta('p1'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(misurePianta).toHaveBeenCalledWith('p1')
+  })
+
+  it('useInviti legge l\'elenco degli inviti', async () => {
+    const inviti = [{ id: 'i1', email: 'a@b.it', codice: 'K7M2QX4P', creato_il: '2026-10-28T09:00:00Z', usato_il: null }]
+    vi.mocked(listaInviti).mockResolvedValue(inviti)
+    const { result } = renderHook(() => useInviti(), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toBe(inviti)
   })
 
   it('useSonoAdmin legge il ruolo', async () => {
