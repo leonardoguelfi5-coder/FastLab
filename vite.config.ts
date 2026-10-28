@@ -13,5 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['src/test/setup.ts'],
     globals: false,
+    // Su Windows+OneDrive i worker in parallelo rallentano molto: 5 s di default non bastano per il primo test di un file.
+    testTimeout: 15_000,
   },
 })

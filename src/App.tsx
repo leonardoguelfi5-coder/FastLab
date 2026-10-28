@@ -1,19 +1,43 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { ListaRilevazioni } from './pages/ListaRilevazioni'
-import { NuovaRilevazione } from './pages/NuovaRilevazione'
-import { SceltaMisurazione } from './pages/SceltaMisurazione'
-import { PassoPianta } from './pages/PassoPianta'
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { AppShell } from '@/components/AppShell'
+import { RequireAuth } from '@/components/RequireAuth'
+import { Accedi } from '@/pages/Accedi'
+import { Registrati } from '@/pages/Registrati'
+
+/** Segnaposto delle pagine non ancora scritte: già dentro il guscio, così il menu funziona. */
+function InCostruzione({ titolo, indietro }: { titolo: string; indietro?: string }) {
+  return (
+    <AppShell titolo={titolo} indietro={indietro}>
+      <p>In costruzione</p>
+    </AppShell>
+  )
+}
+
+export function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/accedi" element={<Accedi />} />
+      <Route path="/registrati" element={<Registrati />} />
+
+      <Route element={<RequireAuth><Outlet /></RequireAuth>}>
+        <Route path="/" element={<InCostruzione titolo="Esperimenti" />} />
+        <Route path="/esperimenti/nuovo" element={<InCostruzione titolo="Nuovo esperimento" indietro="/" />} />
+        <Route path="/esperimenti/:espId" element={<InCostruzione titolo="Campo" indietro="/" />} />
+        <Route path="/esperimenti/:espId/piante/:piantaId" element={<InCostruzione titolo="Scheda pianta" indietro="/" />} />
+        <Route path="/esperimenti/:espId/misure/:misuraId" element={<InCostruzione titolo="Modifica misura" indietro="/" />} />
+        <Route path="/esperimenti/:espId/impostazioni" element={<InCostruzione titolo="Impostazioni" indietro="/" />} />
+        <Route path="/admin/inviti" element={<InCostruzione titolo="Inviti" indietro="/" />} />
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<ListaRilevazioni />} />
-        <Route path="/scegli" element={<SceltaMisurazione />} />
-        <Route path="/passo/:tipo" element={<PassoPianta />} />
-        <Route path="/nuova" element={<NuovaRilevazione />} />
-        <Route path="/modifica/:id" element={<NuovaRilevazione />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   )
 }
