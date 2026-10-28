@@ -1,53 +1,86 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(18);
+select plan(28);
 
--- Fixture (superuser): inviti per un utente normale, un admin e un invitato scritto con
--- le maiuscole; poi l'utente normale e l'admin si registrano.
-insert into inviti (email) values
-  ('utente@test.it'),
-  ('admin@test.it'),
-  ('Invitato@Test.it');
+-- Fixture (superuser): inviti con codice per un utente normale, un admin, un invitato e un
+-- altro invito ancora libero; poi l'utente normale e l'admin si registrano col loro codice.
+insert into inviti (email, codice) values
+  ('utente@test.it', 'UTENTE22'),
+  ('admin@test.it', 'ADMIN222'),
+  ('invitato@test.it', 'INVITO23'),
+  ('altro@test.it', 'ALTRO222');
 
-insert into auth.users (id, email, aud, role, instance_id) values
-  ('91000000-0000-0000-0000-000000000001', 'utente@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000'),
-  ('92000000-0000-0000-0000-000000000001', 'admin@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000');
+insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data) values
+  ('91000000-0000-0000-0000-000000000001', 'utente@test.it', 'authenticated', 'authenticated',
+   '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'UTENTE22')),
+  ('92000000-0000-0000-0000-000000000001', 'admin@test.it', 'authenticated', 'authenticated',
+   '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'ADMIN222'));
 
 update profili set admin = true where id = '92000000-0000-0000-0000-000000000001';
 
--- Registrazione solo su invito
+-- Registrazione solo con email invitata e codice giusto
 select throws_ok(
-  $$ insert into auth.users (id, email, aud, role, instance_id)
-     values ('90000000-0000-0000-0000-000000000001', 'sconosciuto@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000') $$,
+  $$ insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data)
+     values ('90000000-0000-0000-0000-000000000001', 'sconosciuto@test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'ALTRO222')) $$,
   'P0001', 'INVITO_MANCANTE',
   'senza invito non ci si registra');
 
 select throws_ok(
   $$ insert into auth.users (id, phone, aud, role, instance_id)
-     values ('90000000-0000-0000-0000-000000000004', '393330000000', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000') $$,
+     values ('90000000-0000-0000-0000-000000000004', '393330000000', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000') $$,
   'P0001', 'INVITO_MANCANTE',
   'senza email (es. telefono) non ci si registra');
 
-select lives_ok(
+select throws_ok(
+  $$ insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data)
+     values ('90000000-0000-0000-0000-000000000006', 'invitato@test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'XXXX9999')) $$,
+  'P0001', 'INVITO_MANCANTE',
+  'email invitata ma codice sbagliato: rifiutata');
+
+select throws_ok(
   $$ insert into auth.users (id, email, aud, role, instance_id)
-     values ('90000000-0000-0000-0000-000000000002', 'invitato@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000') $$,
-  'con un invito ci si registra (email senza badare alle maiuscole)');
+     values ('90000000-0000-0000-0000-000000000007', 'invitato@test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000') $$,
+  'P0001', 'INVITO_MANCANTE',
+  'email invitata ma senza codice: rifiutata');
+
+select throws_ok(
+  $$ insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data)
+     values ('90000000-0000-0000-0000-000000000008', 'invitato@test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'ALTRO222')) $$,
+  'P0001', 'INVITO_MANCANTE',
+  'il codice di un altro invito non vale');
+
+select lives_ok(
+  $$ insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data)
+     values ('90000000-0000-0000-0000-000000000002', 'Invitato@Test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', ' invito23 ')) $$,
+  'email e codice giusti: ci si registra (senza badare a maiuscole e spazi)');
 
 select ok(
   exists (select 1 from profili
-           where id = '90000000-0000-0000-0000-000000000002' and email = 'invitato@test.it' and not admin),
+           where id = '90000000-0000-0000-0000-000000000002' and lower(email) = 'invitato@test.it' and not admin),
   'la registrazione crea il profilo, non admin');
 
 select isnt(
-  (select usato_il from inviti where lower(email) = 'invitato@test.it'),
+  (select usato_il from inviti where email = 'invitato@test.it'),
   null,
   'l''invito risulta usato');
 
 select throws_ok(
-  $$ insert into auth.users (id, email, aud, role, instance_id)
-     values ('90000000-0000-0000-0000-000000000003', 'invitato@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000') $$,
+  $$ insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data)
+     values ('90000000-0000-0000-0000-000000000003', 'invitato@test.it', 'authenticated', 'authenticated',
+             '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'INVITO23')) $$,
   'P0001', 'INVITO_MANCANTE',
   'un invito gia'' usato non vale una seconda volta');
+
+select ok(
+  (select bool_and(c ~ '^[A-HJ-NP-Z2-9]{8}$') and count(distinct c) = 1000
+     from (select genera_codice_invito() as c from generate_series(1, 1000)) x),
+  'genera_codice_invito: 1000 codici di 8 caratteri senza 0, O, 1, I, tutti diversi');
 
 -- Utente non admin
 set local role authenticated;
@@ -56,8 +89,12 @@ select set_config('request.jwt.claims',
 
 select is((select count(*)::int from inviti), 0, 'un utente non admin non vede gli inviti');
 
+select is_empty(
+  $$ select codice from inviti $$,
+  'un utente non admin non legge i codici degli inviti');
+
 select throws_ok(
-  $$ insert into inviti (email) values ('altro@test.it') $$,
+  $$ insert into inviti (email) values ('nuovo2@test.it') $$,
   '42501', null,
   'un utente non admin non crea inviti');
 
@@ -88,12 +125,31 @@ select lives_ok(
   $$ insert into inviti (email) values ('nuovo@test.it') $$,
   'l''admin crea un invito');
 
-select throws_ok(
-  $$ insert into inviti (email) values ('NUOVO@test.it') $$,
-  '23505', null,
-  'un''email si invita una volta sola, senza badare alle maiuscole');
+select ok(
+  (select codice ~ '^[A-HJ-NP-Z2-9]{8}$' from inviti where email = 'nuovo@test.it'),
+  'l''admin legge il codice generato per il nuovo invito');
 
-select is((select count(*)::int from inviti), 4, 'l''admin vede tutti gli inviti');
+select throws_ok(
+  $$ insert into inviti (email) values ('nuovo@test.it') $$,
+  '23505', null,
+  'un''email si invita una volta sola');
+
+select throws_ok(
+  $$ insert into inviti (email) values ('NUOVO2@test.it') $$,
+  '23514', null,
+  'l''email dell''invito va salvata in minuscolo');
+
+select throws_ok(
+  $$ insert into inviti (email) values (' nuovo2@test.it') $$,
+  '23514', null,
+  'l''email dell''invito va salvata senza spazi');
+
+select throws_ok(
+  $$ insert into inviti (email, codice) values ('nuovo3@test.it', 'INVITO23') $$,
+  '23505', null,
+  'due inviti non hanno lo stesso codice');
+
+select is((select count(*)::int from inviti), 5, 'l''admin vede tutti gli inviti');
 
 -- anon: nessun accesso
 reset role;
@@ -109,6 +165,11 @@ select throws_ok(
   $$ select count(*) from profili $$,
   '42501', null,
   'anon non legge i profili');
+
+select throws_ok(
+  $$ select genera_codice_invito() $$,
+  '42501', null,
+  'anon non genera codici');
 
 reset role;
 select * from finish();

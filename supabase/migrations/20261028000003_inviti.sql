@@ -1,7 +1,9 @@
 -- FastLab v3: registrazione solo su invito, profili e ruolo amministratore.
 --
 -- Un trigger su auth.users rifiuta la registrazione se l'email non ha un invito non
--- ancora usato (GoTrue risponde "Database error saving new user"). L'admin gestisce gli
+-- ancora usato (dalla migration 0005 serve anche il codice dell'invito). GoTrue v2.197
+-- risponde HTTP 500 con {"code":"P0001","message":"INVITO_MANCANTE"}; versioni piu'
+-- vecchie rispondono "Database error saving new user". L'admin gestisce gli
 -- inviti; non vede i dati degli altri (le sue righe di esperimenti passano dalle stesse
 -- policy di tutti). Il primo admin si imposta a mano: update profili set admin = true.
 

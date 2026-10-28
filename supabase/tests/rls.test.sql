@@ -1,12 +1,37 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(31);
+select plan(39);
+
+-- ===== Catalogo: RLS ovunque, niente per anon =====
+select is_empty(
+  $$ select c.relname from pg_class c
+      where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p') and not c.relrowsecurity $$,
+  'ogni tabella di public ha RLS attiva');
+
+select is_empty(
+  $$ select c.relname, p.privilegio
+       from pg_class c
+      cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) as p (privilegio)
+      where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p', 'v', 'm', 'f')
+        and (has_table_privilege('anon', c.oid, p.privilegio)
+             or (p.privilegio in ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
+                 and has_any_column_privilege('anon', c.oid, p.privilegio))) $$,
+  'anon non ha privilegi su nessuna tabella di public, nemmeno su singole colonne');
+
+select is_empty(
+  $$ select p.proname from pg_proc p
+      where p.pronamespace = 'public'::regnamespace
+        and p.prorettype <> 'trigger'::regtype
+        and has_function_privilege('anon', p.oid, 'execute') $$,
+  'anon non esegue nessuna funzione di public');
 
 -- Fixture (superuser): due utenti invitati, A e B.
-insert into inviti (email) values ('a.rls@test.it'), ('b.rls@test.it');
-insert into auth.users (id, email, aud, role, instance_id) values
-  ('0a000000-0000-0000-0000-000000000001', 'a.rls@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000'),
-  ('0b000000-0000-0000-0000-000000000001', 'b.rls@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000');
+insert into inviti (email, codice) values ('a.rls@test.it', 'CODICEA2'), ('b.rls@test.it', 'CODICEB2');
+insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data) values
+  ('0a000000-0000-0000-0000-000000000001', 'a.rls@test.it', 'authenticated', 'authenticated',
+   '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'CODICEA2')),
+  ('0b000000-0000-0000-0000-000000000001', 'b.rls@test.it', 'authenticated', 'authenticated',
+   '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'CODICEB2'));
 
 -- ===== A crea il proprio esperimento (bozza minima) =====
 set local role authenticated;
@@ -56,6 +81,46 @@ select is(
 select isnt_empty(
   $$ update piante set blocco = 'I' where id = 'ba000000-0000-0000-0000-000000000001' returning id $$,
   'A modifica le proprie piante');
+
+-- creato_da non si cambia; il resto si', anche con un upsert come quello di PostgREST,
+-- che mette nel SET tutte le colonne del payload.
+select isnt_empty(
+  $$ update esperimenti set nome = 'Esperimento di A', note = 'rinominato'
+      where id = 'ea000000-0000-0000-0000-000000000001' returning id $$,
+  'A modifica nome e note del proprio esperimento');
+
+select throws_ok(
+  $$ update esperimenti set creato_da = '0b000000-0000-0000-0000-000000000001'
+      where id = 'ea000000-0000-0000-0000-000000000001' $$,
+  '42501', null,
+  'creato_da di un esperimento non si modifica');
+
+select throws_ok(
+  $$ update misure set creato_da = '0b000000-0000-0000-0000-000000000001'
+      where id = 'ab000000-0000-0000-0000-000000000001' $$,
+  '42501', null,
+  'creato_da di una misura non si modifica');
+
+select lives_ok(
+  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori)
+     values ('ab000000-0000-0000-0000-000000000001', 'ea000000-0000-0000-0000-000000000001',
+             'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
+             '2026-10-28', '09:05', '{"ca000000-0000-0000-0000-000000000001": [11]}')
+     on conflict (id) do update set
+       id = excluded.id, esperimento_id = excluded.esperimento_id, pianta_id = excluded.pianta_id,
+       passata_id = excluded.passata_id, data_rilievo = excluded.data_rilievo, ora = excluded.ora,
+       valori = excluded.valori $$,
+  'upsert di una misura senza creato_da nel payload: riesce');
+
+select throws_ok(
+  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori, creato_da)
+     values ('ab000000-0000-0000-0000-000000000001', 'ea000000-0000-0000-0000-000000000001',
+             'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
+             '2026-10-28', '09:05', '{"ca000000-0000-0000-0000-000000000001": [12]}',
+             '0a000000-0000-0000-0000-000000000001')
+     on conflict (id) do update set valori = excluded.valori, creato_da = excluded.creato_da $$,
+  '42501', null,
+  'upsert con creato_da nel SET: rifiutato (il payload non deve contenere creato_da)');
 
 -- ===== B non vede e non tocca nulla di A =====
 select set_config('request.jwt.claims',

@@ -4,10 +4,11 @@ select plan(27);
 
 -- Fixture (superuser): due esperimenti, ciascuno con trattamento, pianta e passata;
 -- nel primo un parametro con dati (P), uno senza (Q) e una misura che usa P.
--- L'utente si registra solo con un invito.
-insert into inviti (email) values ('a@test.it');
-insert into auth.users (id, email, aud, role, instance_id) values
-  ('a0000000-0000-0000-0000-000000000001', 'a@test.it', 'authenticated', 'authenticated', '00000000-0000-0000-0000-000000000000');
+-- L'utente si registra solo con un invito (email e codice).
+insert into inviti (email, codice) values ('a@test.it', 'CODICEA2');
+insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data) values
+  ('a0000000-0000-0000-0000-000000000001', 'a@test.it', 'authenticated', 'authenticated',
+   '00000000-0000-0000-0000-000000000000', jsonb_build_object('codice_invito', 'CODICEA2'));
 
 insert into esperimenti (id, nome, creato_da) values
   ('e1000000-0000-0000-0000-000000000001', 'Esperimento 1', 'a0000000-0000-0000-0000-000000000001'),
