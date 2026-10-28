@@ -51,7 +51,7 @@ In più: **parametri scelti da lui** per ogni esperimento, **foto** delle piante
 
 ### 5.1 Accesso
 
-- Accesso tramite Supabase Auth. **L'utente ha lasciato la scelta a Claude** ("va bene anche registrazione se è più comodo"). Decisione: **email + password**, più **link magico via email** come alternativa. "Entra con Google" è facoltativo: va aggiunto solo se la configurazione OAuth resta gratuita e semplice.
+- Accesso tramite Supabase Auth. **L'utente ha lasciato la scelta a Claude** ("va bene anche registrazione se è più comodo"). Decisione: **email + password**. *Aggiornamento in fase di piano:* niente link magico e niente conferma via email, perché il servizio email predefinito di Supabase invia solo ai membri del team del progetto, al massimo 2 email l'ora. Il recupero della password lo fa l'amministratore (procedura nel README). "Entra con Google" è rimandato.
 - **Registrazione solo su invito** (deciso dall'utente). La registrazione libera è disattivata. Un utente **amministratore** (Leonardo) invita i colleghi dall'app: genera un link di invito, oppure inserisce l'email e l'app invia l'invito. Solo chi è stato invitato può creare l'account. Motivo: lo spazio foto gratuito è condiviso e uno sconosciuto con il link non deve poterlo consumare. Il meccanismo concreto (invito Supabase via funzione server, tabella di codici di invito, …) è lasciato al builder. Il primo amministratore si configura a mano, documentato nel README.
 - L'accesso si fa **una volta per telefono**, poi la sessione resta attiva.
 - Ognuno vede **solo i propri esperimenti**. L'amministratore non vede i dati degli altri: gestisce solo inviti e spazio (*decisione di Claude*).
