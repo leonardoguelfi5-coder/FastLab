@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/api/auth', () => ({
@@ -27,11 +26,9 @@ const PERCORSI_PRIVATI = [
 
 function vaiA(percorso: string) {
   render(
-    <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[percorso]}>
-        <AppRoutes />
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={[percorso]}>
+      <AppRoutes />
+    </MemoryRouter>,
   )
 }
 

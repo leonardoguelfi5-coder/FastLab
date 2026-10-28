@@ -13,7 +13,7 @@ export const chiavi = {
   sonoAdmin: ['sonoAdmin'] as const,
 }
 
-/** QueryClient dell'app (il collegamento in main.tsx è nel Task 5). */
+/** QueryClient dell'app (creato e collegato a React in main.tsx). */
 export function creaQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } })
 }

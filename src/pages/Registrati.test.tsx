@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/api/auth', () => ({
   accedi: vi.fn(), registrati: vi.fn(), esci: vi.fn(), useSessione: vi.fn(),
@@ -91,7 +92,7 @@ describe('Registrati', () => {
   })
 
   it('a registrazione riuscita passa i dati a registrati e va in /', async () => {
-    vi.mocked(registrati).mockResolvedValue(undefined)
+    vi.mocked(registrati).mockResolvedValue({ user: { id: 'u1' } } as Session)
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina()
     await compila(utente, { email: 'a@b.it', password: 'abcdefgh', conferma: 'abcdefgh', codice: 'k7q2' })
@@ -99,6 +100,23 @@ describe('Registrati', () => {
 
     expect(await screen.findByText('Home')).toBeInTheDocument()
     expect(registrati).toHaveBeenCalledExactlyOnceWith('a@b.it', 'abcdefgh', 'k7q2')
+  })
+
+  it('senza sessione (email da confermare) non va in /: chiede di controllare l\'email e rimanda all\'accesso', async () => {
+    vi.mocked(registrati).mockResolvedValue(null)
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina()
+    await compila(utente, { email: 'a@b.it', password: 'abcdefgh', conferma: 'abcdefgh', codice: 'K7Q2' })
+    await inviaModulo(utente)
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Controlla la tua email per confermare l\'account, poi accedi.')
+    expect(screen.queryByText('Home')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Codice invito')).not.toBeInTheDocument()
+    expect(registrati).toHaveBeenCalledOnce()
+
+    await utente.click(screen.getByRole('link', { name: 'Accedi' }))
+    expect(await screen.findByText('Pagina accesso')).toBeInTheDocument()
   })
 
   it('ha un link per chi ha già un account', async () => {

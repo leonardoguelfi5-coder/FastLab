@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import type { QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
 export async function accedi(email: string, password: string): Promise<void> {
@@ -10,14 +11,17 @@ export async function accedi(email: string, password: string): Promise<void> {
 /**
  * Registrazione solo su invito: il codice dell'invito viaggia in options.data.codice_invito
  * (finisce in raw_user_meta_data) e il trigger del database lo confronta con quello dell'invito.
+ * Restituisce la sessione se l'accesso è già attivo, `null` se prima va confermata l'email
+ * (conferma attiva sul progetto Supabase): in quel caso l'utente deve ancora accedere.
  */
-export async function registrati(email: string, password: string, codiceInvito: string): Promise<void> {
-  const { error } = await supabase.auth.signUp({
+export async function registrati(email: string, password: string, codiceInvito: string): Promise<Session | null> {
+  const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
     options: { data: { codice_invito: codiceInvito.trim().toUpperCase() } },
   })
   if (error) throw error
+  return data?.session ?? null
 }
 
 export async function esci(): Promise<void> {
@@ -51,4 +55,23 @@ export function useSessione(): { sessione: Session | null; caricamento: boolean 
   }, [])
 
   return stato
+}
+
+/**
+ * Svuota la cache delle query quando la sessione finisce o passa a un altro utente (scadenza del token,
+ * uscita da un'altra scheda, accesso con un altro account): la cache non è legata all'utente e,
+ * senza, il nuovo utente vedrebbe per un po' i dati del precedente. Un rinnovo del token dello stesso
+ * utente non la tocca. Restituisce la funzione che toglie l'ascolto.
+ */
+export function svuotaCacheAlCambioUtente(queryClient: QueryClient): () => void {
+  // undefined = ancora non si sa chi c'è: il primo evento (INITIAL_SESSION) fissa il punto di partenza.
+  let idPrecedente: string | null | undefined
+
+  const { data } = supabase.auth.onAuthStateChange((_evento, sessione) => {
+    const id = sessione?.user.id ?? null
+    if (idPrecedente !== undefined && id !== idPrecedente) queryClient.clear()
+    idPrecedente = id
+  })
+
+  return () => data.subscription.unsubscribe()
 }

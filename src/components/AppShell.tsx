@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { ArrowLeft, CircleUser, LogOut } from 'lucide-react'
 import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
@@ -22,8 +21,6 @@ const VOCE_MENU = 'flex h-11 w-full items-center gap-2 rounded-md px-3 text-left
 
 /** Intestazione e menu dell'utente comuni a tutte le pagine dopo l'accesso. */
 export function AppShell({ titolo, indietro, azioni, children }: AppShellProps) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { sessione } = useSessione()
   const { data: amministratore } = useSonoAdmin()
 
@@ -52,17 +49,15 @@ export function AppShell({ titolo, indietro, azioni, children }: AppShellProps) 
     }
   }, [aperto])
 
+  // Dopo l'uscita ci pensano gli altri pezzi, come per ogni altra fine di sessione:
+  // RequireAuth rimanda a /accedi e svuotaCacheAlCambioUtente (main.tsx) svuota la cache.
   async function uscire() {
     setAperto(false)
     try {
       await esci()
     } catch (e) {
       toast.error(messaggioErrore(e))
-      return
     }
-    // La cache delle query non è legata all'utente: va svuotata, o il prossimo vedrebbe i dati del precedente.
-    queryClient.clear()
-    navigate('/accedi', { replace: true })
   }
 
   return (

@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/api/auth', () => ({
@@ -25,20 +24,16 @@ function impostaAdmin(admin: boolean) {
   vi.mocked(useSonoAdmin).mockReturnValue({ data: admin } as never)
 }
 
-function mostra(shell: ReactElement, client = new QueryClient()) {
+function mostra(shell: ReactElement) {
   render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/campo']}>
-        <Routes>
-          <Route path="/campo" element={shell} />
-          <Route path="/" element={<p>Elenco esperimenti</p>} />
-          <Route path="/accedi" element={<p>Pagina accesso</p>} />
-          <Route path="/admin/inviti" element={<p>Pagina inviti</p>} />
-        </Routes>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={['/campo']}>
+      <Routes>
+        <Route path="/campo" element={shell} />
+        <Route path="/" element={<p>Elenco esperimenti</p>} />
+        <Route path="/admin/inviti" element={<p>Pagina inviti</p>} />
+      </Routes>
+    </MemoryRouter>,
   )
-  return client
 }
 
 const apriMenu = (utente: Utente) => utente.click(screen.getByRole('button', { name: 'Menu' }))
@@ -110,27 +105,23 @@ describe('AppShell', () => {
     expect(await screen.findByText('Pagina inviti')).toBeInTheDocument()
   })
 
-  it('"Esci" chiama esci, svuota la cache delle query e va su /accedi', async () => {
+  it('"Esci" chiama esci e chiude il menu (il resto lo fanno RequireAuth e la cache centrale)', async () => {
     vi.mocked(esci).mockResolvedValue(undefined)
-    const client = new QueryClient()
-    client.setQueryData(['esperimenti'], [{ id: 'e1' }])
     const utente = userEvent.setup({ delay: null })
-    mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>, client)
+    mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
 
     await apriMenu(utente)
     await utente.click(screen.getByRole('button', { name: 'Esci' }))
 
-    expect(await screen.findByText('Pagina accesso')).toBeInTheDocument()
     expect(esci).toHaveBeenCalledOnce()
-    expect(client.getQueryData(['esperimenti'])).toBeUndefined()
+    expect(screen.queryByRole('button', { name: 'Esci' })).not.toBeInTheDocument()
+    expect(toast.error).not.toHaveBeenCalled()
   })
 
-  it('se "esci" fallisce mostra l\'errore, resta dov\'è e non svuota la cache', async () => {
+  it('se "esci" fallisce mostra l\'errore tradotto e resta dov\'è', async () => {
     vi.mocked(esci).mockRejectedValue({ message: 'Failed to fetch' })
-    const client = new QueryClient()
-    client.setQueryData(['esperimenti'], [{ id: 'e1' }])
     const utente = userEvent.setup({ delay: null })
-    mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>, client)
+    mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
 
     await apriMenu(utente)
     await utente.click(screen.getByRole('button', { name: 'Esci' }))
@@ -138,6 +129,5 @@ describe('AppShell', () => {
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledOnce())
     expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Il server non risponde/)
     expect(screen.getByText('Corpo')).toBeInTheDocument()
-    expect(client.getQueryData(['esperimenti'])).toEqual([{ id: 'e1' }])
   })
 })
