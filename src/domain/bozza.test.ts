@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { bozzaVuota, clonaConfig, validaBozza } from './bozza'
-import { conPiante, configDiEsempio, parametro } from './test-helpers'
+import { bozzaVuota, clonaConfig, nuovaPassata, nuovoParametro, validaBozza } from './bozza'
+import { conPiante, configDiEsempio, fattore, parametro } from './test-helpers'
 
 describe('bozza', () => {
   it('bozzaVuota ha un esperimento in corso e nessun elemento', () => {
@@ -82,6 +82,45 @@ describe('bozza', () => {
     b.parametri.push(parametro('Vecchio', { archiviato: true, n_letture: 0 }))
     expect(validaBozza(b)).not.toContain('Il parametro "Vecchio" deve avere almeno una lettura.')
   })
+
+  it('n_letture non intero', () => {
+    const b = conPiante(['1'])
+    b.parametri[0].n_letture = 2.5
+    expect(validaBozza(b)).toEqual(['Il parametro "Altezza" deve avere un numero intero di letture.'])
+  })
+  it('sotto-campi senza nome o con lo stesso nome (anche con spazi o maiuscole)', () => {
+    const b = conPiante(['1'])
+    const palchi = parametro('Palchi', {
+      tipo: 'lista',
+      sotto_campi: [
+        { chiave: 'a', nome: 'N foglie', unita: null },
+        { chiave: 'b', nome: ' n FOGLIE ', unita: null },
+        { chiave: 'c', nome: '  ', unita: null },
+      ],
+    })
+    b.parametri.push(palchi)
+    b.passate[0].parametri.push({ parametro_id: palchi.id, obbligatorio: false, ordine: 1 })
+    expect(validaBozza(b)).toEqual([
+      'Il parametro "Palchi" ha un sotto-campo senza nome.',
+      'Il parametro "Palchi" ha due sotto-campi con lo stesso nome: "n foglie".',
+    ])
+  })
+  it('fattore senza nome o senza livelli', () => {
+    const b = conPiante(['1'])
+    b.fattori = [fattore(' ', ['A']), fattore('Stress', [])]
+    expect(validaBozza(b)).toEqual(['Un fattore non ha nome.', 'Il fattore "Stress" non ha livelli.'])
+  })
+
+  it('nuovoParametro: numerico, vuoto, con id nuovo e con l\'ordine dato', () => {
+    const p = nuovoParametro(3)
+    expect(p).toEqual({
+      id: expect.any(String), nome: '', unita: null, tipo: 'numero', ordine: 3, archiviato: false, progressivo: false,
+      ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+    })
+    expect(nuovoParametro(0).id).not.toBe(p.id)
+  })
+  it('nuovaPassata: senza nome, icona e parametri', () =>
+    expect(nuovaPassata(1)).toEqual({ id: expect.any(String), nome: '', icona: null, ordine: 1, parametri: [] }))
 
   it('clonaConfig genera id nuovi e rimappa i riferimenti', () => {
     const c = configDiEsempio(); const b = clonaConfig(c)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseNumero, formattaNumero } from './numeri'
+import { parseNumero, formattaNumero, leggiIntero } from './numeri'
 
 describe('numeri', () => {
   it.each([
@@ -21,4 +21,11 @@ describe('numeri', () => {
     expect(formattaNumero(24.5)).toBe('24,5')
     expect(formattaNumero(null)).toBe('')
   })
+  it.each([
+    ['1', 1], [' 20 ', 20], ['007', 7],
+  ])('leggiIntero(%s, 1, 20) = %s', (raw, n) => expect(leggiIntero(raw, 1, 20)).toBe(n))
+  it.each(['', '0', '21', '-1', '2,5', '2.5', '2,0', 'tre', '1e1', '+3'])('leggiIntero(%s, 1, 20) → null', (raw) =>
+    expect(leggiIntero(raw, 1, 20)).toBeNull(),
+  )
+  it('leggiIntero accetta lo zero se il minimo è zero', () => expect(leggiIntero('0', 0, 10)).toBe(0))
 })

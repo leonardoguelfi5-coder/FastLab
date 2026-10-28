@@ -1,4 +1,4 @@
-import type { BozzaEsperimento, ConfigEsperimento } from './tipi'
+import type { BozzaEsperimento, ConfigEsperimento, Parametro, Passata } from './tipi'
 
 /** Bozza di un nuovo esperimento: nessun fattore, trattamento, pianta, parametro o passata. */
 export function bozzaVuota(): BozzaEsperimento {
@@ -10,6 +10,29 @@ export function bozzaVuota(): BozzaEsperimento {
     parametri: [],
     passate: [],
   }
+}
+
+/** Parametro nuovo, numerico e senza opzioni, da completare nell'editor. */
+export function nuovoParametro(ordine: number): Parametro {
+  return {
+    id: crypto.randomUUID(),
+    nome: '',
+    unita: null,
+    tipo: 'numero',
+    ordine,
+    archiviato: false,
+    progressivo: false,
+    ricorda_tra_piante: false,
+    n_letture: 1,
+    valore_min: null,
+    valore_max: null,
+    sotto_campi: [],
+  }
+}
+
+/** Passata nuova, senza nome, icona né parametri. */
+export function nuovaPassata(ordine: number): Passata {
+  return { id: crypto.randomUUID(), nome: '', icona: null, ordine, parametri: [] }
 }
 
 type Rimappa = Map<string, string>
@@ -95,6 +118,12 @@ export function validaBozza(b: BozzaEsperimento): string[] {
 
   if (b.esperimento.nome.trim() === '') errori.push('Dai un nome all\'esperimento.')
 
+  for (const f of b.fattori) {
+    const nome = f.nome.trim()
+    if (nome === '') errori.push('Un fattore non ha nome.')
+    else if (f.livelli.length === 0) errori.push(`Il fattore "${nome}" non ha livelli.`)
+  }
+
   if (b.trattamenti.length === 0) errori.push('Crea almeno un trattamento.')
   if (b.trattamenti.some(t => t.etichetta.trim() === '')) errori.push('Un trattamento non ha etichetta.')
   for (const e of duplicate(b.trattamenti.map(t => t.etichetta))) errori.push(`Etichetta trattamento duplicata: "${e}".`)
@@ -110,7 +139,14 @@ export function validaBozza(b: BozzaEsperimento): string[] {
     if (nome === '') { errori.push('Un parametro non ha nome.'); continue }
     if (!(p.n_letture >= 1)) errori.push(`Il parametro "${nome}" deve avere almeno una lettura.`)
     else if (p.n_letture > 20) errori.push(`Il parametro "${nome}" può avere al massimo 20 letture.`)
-    if (p.tipo === 'lista' && p.sotto_campi.length === 0) errori.push(`Il parametro "${nome}" deve avere almeno un sotto-campo.`)
+    else if (!Number.isInteger(p.n_letture)) errori.push(`Il parametro "${nome}" deve avere un numero intero di letture.`)
+    if (p.tipo === 'lista') {
+      if (p.sotto_campi.length === 0) errori.push(`Il parametro "${nome}" deve avere almeno un sotto-campo.`)
+      if (p.sotto_campi.some(s => s.nome.trim() === '')) errori.push(`Il parametro "${nome}" ha un sotto-campo senza nome.`)
+      for (const doppio of duplicate(p.sotto_campi.map(s => s.nome))) {
+        errori.push(`Il parametro "${nome}" ha due sotto-campi con lo stesso nome: "${doppio}".`)
+      }
+    }
     if (p.valore_min !== null && p.valore_max !== null && p.valore_min > p.valore_max) {
       errori.push(`Il parametro "${nome}" ha il minimo maggiore del massimo.`)
     }

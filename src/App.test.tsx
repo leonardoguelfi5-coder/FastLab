@@ -11,6 +11,9 @@ vi.mock('@/api/query', () => ({ useSonoAdmin: vi.fn() }))
 vi.mock('@/pages/AdminInviti', () => ({
   AdminInviti: () => <h1>Pagina inviti (prova)</h1>,
 }))
+vi.mock('@/pages/NuovoEsperimento', () => ({
+  NuovoEsperimento: () => <h1>Procedura nuovo esperimento (prova)</h1>,
+}))
 
 import { useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
@@ -21,13 +24,12 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 /** Percorsi privati ancora segnaposto. */
 const PERCORSI_SEGNAPOSTO = [
   '/',
-  '/esperimenti/nuovo',
   '/esperimenti/x',
   '/esperimenti/x/piante/p',
   '/esperimenti/x/misure/m',
   '/esperimenti/x/impostazioni',
 ]
-const PERCORSI_PRIVATI = [...PERCORSI_SEGNAPOSTO, '/admin/inviti']
+const PERCORSI_PRIVATI = [...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
 
 function vaiA(percorso: string) {
   render(
@@ -67,6 +69,13 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/admin/inviti')
     expect(screen.getByRole('heading', { level: 1, name: 'Pagina inviti (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/nuovo mostra la procedura guidata', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/nuovo')
+    expect(screen.getByRole('heading', { level: 1, name: 'Procedura nuovo esperimento (prova)' })).toBeInTheDocument()
     expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 

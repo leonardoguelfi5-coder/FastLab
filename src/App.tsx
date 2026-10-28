@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell'
 import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
 import { AdminInviti } from '@/pages/AdminInviti'
+import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
 import { Registrati } from '@/pages/Registrati'
 
 /** Segnaposto delle pagine non ancora scritte: già dentro il guscio, così il menu funziona. */
@@ -22,7 +23,7 @@ export function AppRoutes() {
 
       <Route element={<RequireAuth><Outlet /></RequireAuth>}>
         <Route path="/" element={<InCostruzione titolo="Esperimenti" />} />
-        <Route path="/esperimenti/nuovo" element={<InCostruzione titolo="Nuovo esperimento" indietro="/" />} />
+        <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<InCostruzione titolo="Campo" indietro="/" />} />
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<InCostruzione titolo="Scheda pianta" indietro="/" />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<InCostruzione titolo="Modifica misura" indietro="/" />} />
