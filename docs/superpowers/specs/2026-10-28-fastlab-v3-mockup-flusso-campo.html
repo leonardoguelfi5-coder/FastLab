@@ -1,0 +1,98 @@
+<style>
+  .phones { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+  .phone { width:270px; border:2px solid #555; border-radius:22px; padding:14px 12px; background:#fff; color:#222; font-size:13px; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+  .phone h4 { margin:0 0 2px; font-size:15px; }
+  .step { text-align:center; font-weight:600; margin-bottom:8px; color:#666; font-size:12px; text-transform:uppercase; letter-spacing:.5px; }
+  .muted { color:#888; font-size:11px; }
+  .bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .chip { display:inline-block; padding:4px 8px; border-radius:12px; border:1px solid #bbb; margin:2px; font-size:11px; }
+  .chip.on { background:#2e7d32; color:#fff; border-color:#2e7d32; }
+  .bigin { border:2px solid #2e7d32; border-radius:10px; padding:10px; font-size:20px; text-align:center; margin:8px 0; color:#999; }
+  .btn { display:block; text-align:center; padding:9px; border-radius:10px; background:#2e7d32; color:#fff; font-weight:600; margin-top:8px; }
+  .btn.ghost { background:#fff; color:#2e7d32; border:1px solid #2e7d32; }
+  .grid { display:grid; grid-template-columns:repeat(8,1fr); gap:3px; margin-top:6px; }
+  .cell { font-size:9px; text-align:center; padding:4px 0; border-radius:4px; background:#eee; }
+  .cell.done { background:#a5d6a7; }
+  .card { border:1px solid #ddd; border-radius:10px; padding:8px; margin:6px 0; }
+  .field { display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding:5px 0; }
+  .field b { color:#2e7d32; }
+  .badge { background:#e3f2fd; color:#1565c0; padding:2px 6px; border-radius:8px; font-size:10px; }
+  .photo { display:inline-block; width:38px; height:38px; background:#c8e6c9; border-radius:6px; margin-right:4px; text-align:center; line-height:38px; font-size:16px; }
+  .spark { height:34px; border-left:1px solid #ccc; border-bottom:1px solid #ccc; position:relative; margin:6px 0; }
+  .tl-date { font-weight:600; font-size:12px; margin-top:6px; }
+  .legend { font-size:10px; margin-top:4px; }
+  .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:middle; margin-right:3px; }
+</style>
+
+<h2>Il flusso in campo: com'è fatto?</h2>
+<p class="subtitle">Tre schermate del telefono, da sinistra a destra. È una bozza della struttura, non della grafica finale.</p>
+
+<div class="phones">
+
+  <div>
+    <div class="step">1 · I miei esperimenti</div>
+    <div class="phone">
+      <div class="bar"><h4>FastLab</h4><span class="muted">Leonardo ▾</span></div>
+      <div class="card"><b>Hydrochar × Cuore di Bue 2027</b><br><span class="muted">56 piante · 8 trattamenti · in corso</span><br><span class="muted">Ultimo rilievo: oggi, 34/56 piante</span></div>
+      <div class="card"><b>Hydrochar × Cuore di Bue 2026</b><br><span class="muted">56 piante · concluso</span></div>
+      <div class="btn ghost">+ Nuovo esperimento</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="step">2 · Dentro l'esperimento</div>
+    <div class="phone">
+      <div class="bar"><h4>Hydrochar 2027</h4><span class="muted">📊 ⬇️ ⚙️</span></div>
+      <div class="muted">Passata di oggi</div>
+      <span class="chip on">🌡 Termometro</span><span class="chip">💚 SPAD</span><span class="chip">📏 Altezza</span><span class="chip">🌱 Fenologici</span>
+      <div class="bigin">N° pianta…</div>
+      <div class="btn">Apri scheda pianta</div>
+      <div class="muted" style="margin-top:10px">Oggi · Termometro: 34/56</div>
+      <div class="grid">
+        <div class="cell done">1</div><div class="cell done">2</div><div class="cell done">3</div><div class="cell done">4</div><div class="cell done">5</div><div class="cell done">6</div><div class="cell done">7</div><div class="cell done">8</div>
+        <div class="cell done">9</div><div class="cell done">10</div><div class="cell done">11</div><div class="cell done">12</div><div class="cell done">13</div><div class="cell done">14</div><div class="cell done">15</div><div class="cell done">16</div>
+        <div class="cell done">17</div><div class="cell done">18</div><div class="cell done">19</div><div class="cell done">20</div><div class="cell done">21</div><div class="cell done">22</div><div class="cell done">23</div><div class="cell done">24</div>
+        <div class="cell done">25</div><div class="cell done">26</div><div class="cell done">27</div><div class="cell done">28</div><div class="cell done">29</div><div class="cell done">30</div><div class="cell done">31</div><div class="cell done">32</div>
+        <div class="cell done">33</div><div class="cell done">34</div><div class="cell">35</div><div class="cell">36</div><div class="cell">37</div><div class="cell">38</div><div class="cell">39</div><div class="cell">40</div>
+        <div class="cell">41</div><div class="cell">42</div><div class="cell">43</div><div class="cell">44</div><div class="cell">45</div><div class="cell">46</div><div class="cell">47</div><div class="cell">48</div>
+        <div class="cell">49</div><div class="cell">50</div><div class="cell">51</div><div class="cell">52</div><div class="cell">53</div><div class="cell">54</div><div class="cell">55</div><div class="cell">56</div>
+      </div>
+      <div class="legend"><span style="background:#a5d6a7"></span>misurata oggi &nbsp; <span style="background:#eee"></span>mancante · tocca per aprire</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="step">3 · Scheda della pianta</div>
+    <div class="phone">
+      <div class="bar"><h4>Pianta #35</h4><span class="badge">W1</span></div>
+      <div class="card" style="border-color:#2e7d32">
+        <div class="muted">OGGI · 🌡 Termometro</div>
+        <div class="field"><span>Temp aria (°C)</span><b>24,5</b></div>
+        <div class="field"><span>Temp pianta (°C)</span><span class="muted">—</span></div>
+        <div style="margin-top:6px"><span class="photo">📷</span><span class="muted">aggiungi foto</span></div>
+        <div class="btn">Salva e vai alla #36 →</div>
+      </div>
+      <div class="muted" style="margin-top:8px">STORIA</div>
+      <div class="spark"><svg width="100%" height="34" viewBox="0 0 100 34" preserveAspectRatio="none"><polyline points="0,30 25,24 50,18 75,11 100,5" fill="none" stroke="#2e7d32" stroke-width="2"/></svg></div>
+      <div class="muted">Altezza nel tempo (cm) ▾</div>
+      <div class="tl-date">21 ott</div>
+      <div class="muted">Altezza 42 · SPAD 38,1 · Temp 23,9/25,2 · 3 palchi</div>
+      <div><span class="photo">🌿</span><span class="photo">🌿</span></div>
+      <div class="tl-date">14 ott</div>
+      <div class="muted">Altezza 35 · SPAD 36,4 · Temp 22,1/24,0</div>
+      <div class="tl-date">7 ott</div>
+      <div class="muted">Altezza 28 · SPAD 35,0</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px">
+  <h3>Cosa c'è di nuovo rispetto a oggi</h3>
+  <ul>
+    <li><b>Schermata 2:</b> scegli la passata, scrivi il numero della pianta e si apre la sua scheda. Niente ricerca tra i file vecchi.</li>
+    <li><b>La griglia</b> mostra quali piante hai già fatto oggi in questa passata. È una mia ipotesi: dimmi se ti serve.</li>
+    <li><b>Schermata 3:</b> in alto inserisci i dati di oggi, sotto c'è la storia della pianta con date, foto e un mini-grafico.</li>
+    <li><b>"Salva e vai alla #36"</b> serve per fare tutta la passata di seguito. Anche questa è una mia ipotesi.</li>
+  </ul>
+</div>
