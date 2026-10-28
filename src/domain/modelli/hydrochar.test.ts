@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { bozzaHydrochar } from './hydrochar'
 import { validaBozza } from '../bozza'
-import { PIANTE } from '@/data/piante'
 
 describe('bozzaHydrochar', () => {
   it('modello Hydrochar', () => {
@@ -18,11 +17,20 @@ describe('bozzaHydrochar', () => {
     expect(par('Temp aria').ricorda_tra_piante).toBe(true)
   })
 
-  it('piante e trattamenti coincidono con la v2 (src/data/piante.ts)', () => {
+  it('mappa piante → trattamenti come nella v2 (1–56)', () => {
     const b = bozzaHydrochar()
     const et = (id: string) => b.trattamenti.find(t => t.id === id)!.etichetta
-    expect(b.piante.map(p => [p.etichetta, et(p.trattamento_id)]))
-      .toEqual(PIANTE.map(p => [String(p.id), p.trattamento]))
+    // [prima pianta, ultima pianta, trattamento]
+    const intervalli: [number, number, string][] = [
+      [1, 14, 'Controllo'], [15, 20, 'Controllo + HC'],
+      [21, 26, 'S1'], [27, 32, 'S1 + HC'],
+      [33, 38, 'W1'], [39, 44, 'W1 + HC'],
+      [45, 50, 'S1W1'], [51, 56, 'S1W1 + HC'],
+    ]
+    const attese = intervalli.flatMap(([da, a, trattamento]) =>
+      Array.from({ length: a - da + 1 }, (_, k) => [String(da + k), trattamento]))
+    expect(attese).toHaveLength(56)
+    expect(b.piante.map(p => [p.etichetta, et(p.trattamento_id)])).toEqual(attese)
     expect(b.piante.map(p => p.ordine)).toEqual(b.piante.map((_, i) => i))
   })
 

@@ -42,7 +42,7 @@ function passata(nome: string, icona: string, ordine: number, parametri: Paramet
 }
 
 /**
- * Modello "Hydrochar × Cuore di Bue": la configurazione della v2 (src/data/piante.ts, parametri
+ * Modello "Hydrochar × Cuore di Bue": la configurazione della v2 (elenco piante, parametri
  * e passate dell'app) espressa come bozza di esperimento v3.
  * Piante 1–56: 14 di Controllo, poi 6 per ciascuno degli altri 7 trattamenti.
  */
