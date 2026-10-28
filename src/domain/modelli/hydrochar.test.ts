@@ -1,0 +1,63 @@
+import { describe, it, expect } from 'vitest'
+import { bozzaHydrochar } from './hydrochar'
+import { validaBozza } from '../bozza'
+import { PIANTE } from '@/data/piante'
+
+describe('bozzaHydrochar', () => {
+  it('modello Hydrochar', () => {
+    const b = bozzaHydrochar()
+    expect(validaBozza(b)).toEqual([])
+    expect(b.piante).toHaveLength(56)
+    expect(b.trattamenti.map(t => t.etichetta)).toEqual(
+      ['Controllo', 'Controllo + HC', 'S1', 'S1 + HC', 'W1', 'W1 + HC', 'S1W1', 'S1W1 + HC'])
+    const tratt = (et: string) => b.trattamenti.find(t => t.id === b.piante.find(p => p.etichetta === et)!.trattamento_id)!.etichetta
+    expect([tratt('14'), tratt('15'), tratt('21'), tratt('56')]).toEqual(['Controllo', 'Controllo + HC', 'S1', 'S1W1 + HC'])
+    expect(b.passate.map(p => p.nome)).toEqual(['Termometro', 'SPAD', 'Altezza', 'Fenologici'])
+    const par = (n: string) => b.parametri.find(p => p.nome === n)!
+    expect(par('Palchi').progressivo && par('Infiorescenze').progressivo && par('N palchi totali').progressivo).toBe(true)
+    expect(par('Temp aria').ricorda_tra_piante).toBe(true)
+  })
+
+  it('piante e trattamenti coincidono con la v2 (src/data/piante.ts)', () => {
+    const b = bozzaHydrochar()
+    const et = (id: string) => b.trattamenti.find(t => t.id === id)!.etichetta
+    expect(b.piante.map(p => [p.etichetta, et(p.trattamento_id)]))
+      .toEqual(PIANTE.map(p => [String(p.id), p.trattamento]))
+    expect(b.piante.map(p => p.ordine)).toEqual(b.piante.map((_, i) => i))
+  })
+
+  it('fattori Stress × Hydrochar e livelli dei trattamenti coerenti', () => {
+    const b = bozzaHydrochar()
+    expect(b.fattori.map(f => [f.nome, f.livelli.map(l => l.nome)])).toEqual([
+      ['Stress', ['Controllo', 'S1', 'W1', 'S1W1']], ['Hydrochar', ['No', 'Sì']]])
+    const livelloNome = new Map(b.fattori.flatMap(f => f.livelli.map(l => [l.id, l.nome] as const)))
+    const hc = b.trattamenti.find(t => t.etichetta === 'S1 + HC')!
+    expect(hc.livello_ids.map(id => livelloNome.get(id))).toEqual(['S1', 'Sì'])
+  })
+
+  it('parametri e passate', () => {
+    const b = bozzaHydrochar()
+    expect(b.parametri.map(p => [p.nome, p.unita, p.tipo])).toEqual([
+      ['Temp aria', '°C', 'numero'], ['Temp pianta', '°C', 'numero'], ['SPAD', null, 'numero'], ['Altezza', 'cm', 'numero'],
+      ['N palchi totali', null, 'numero'], ['N fiori fioriti', null, 'numero'], ['N frutti', null, 'numero'],
+      ['N frutti invaiati', null, 'numero'], ['Palchi', null, 'lista'], ['Infiorescenze', null, 'lista'], ['Note', null, 'testo']])
+    const par = (n: string) => b.parametri.find(p => p.nome === n)!
+    expect(par('Palchi').sotto_campi.map(s => s.nome)).toEqual(['N foglie'])
+    expect(par('Infiorescenze').sotto_campi.map(s => s.nome)).toEqual(['N fiori'])
+    expect(par('N fiori fioriti').progressivo).toBe(false)
+    expect(par('Temp pianta').ricorda_tra_piante).toBe(false)
+    const nomiParametri = (nome: string) => b.passate.find(p => p.nome === nome)!.parametri
+      .map(pp => b.parametri.find(p => p.id === pp.parametro_id)!.nome)
+    expect(nomiParametri('Termometro')).toEqual(['Temp aria', 'Temp pianta'])
+    expect(nomiParametri('SPAD')).toEqual(['SPAD'])
+    expect(nomiParametri('Altezza')).toEqual(['Altezza'])
+    expect(nomiParametri('Fenologici')).toEqual(
+      ['Altezza', 'N palchi totali', 'N fiori fioriti', 'N frutti', 'N frutti invaiati', 'Palchi', 'Infiorescenze', 'Note'])
+    expect(b.passate.map(p => p.icona)).toEqual(['🌡', '💚', '📏', '🌱'])
+    expect(b.passate.flatMap(p => p.parametri).some(pp => pp.obbligatorio)).toBe(false)
+  })
+
+  it('ogni chiamata genera id nuovi', () => {
+    expect(bozzaHydrochar().esperimento.id).not.toBe(bozzaHydrochar().esperimento.id)
+  })
+})
