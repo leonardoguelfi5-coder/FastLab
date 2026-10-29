@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import {
   chiaveBozza, leggiBozza, modificato, nuovoLavoro, rimuoviBozza, salvaBozza, type Lavoro,
 } from './wizard/bozzaSalvata'
-import { Conferma } from './wizard/Conferma'
+import { Conferma } from '@/components/Conferma'
 import { PassoGenerale } from './wizard/PassoGenerale'
 import { PassoParametri } from './wizard/PassoParametri'
 import { PassoPassate } from './wizard/PassoPassate'

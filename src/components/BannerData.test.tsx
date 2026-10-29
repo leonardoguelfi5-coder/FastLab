@@ -42,6 +42,21 @@ describe('BannerData', () => {
     expect(screen.queryByRole('button', { name: 'Usa oggi' })).not.toBeInTheDocument()
   })
 
+  it('con `conferma` la data cambia solo quando la pagina esegue il cambio', async () => {
+    const utente = userEvent.setup()
+    useCampoStore.getState().setData('E', '2026-10-27')
+    let cambia: (() => void) | undefined
+    const conferma = vi.fn((c: () => void) => { cambia = c })
+    render(<BannerData espId="E" conferma={conferma} />)
+
+    await utente.click(screen.getByRole('button', { name: 'Usa oggi' }))
+
+    expect(conferma).toHaveBeenCalledTimes(1)
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-27')
+    act(() => cambia!())
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-28')
+  })
+
   it('non è solo colore: ha un\'icona che gli assistenti vocali non leggono', () => {
     useCampoStore.getState().setData('E', '2026-10-27')
     render(<BannerData espId="E" />)

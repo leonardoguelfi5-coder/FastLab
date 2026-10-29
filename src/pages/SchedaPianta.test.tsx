@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 
 // Si prova la pagina con i veri hook e la vera cache di React Query (così si vedono anche invalidazioni e
@@ -61,24 +61,34 @@ function Posizione() {
   return <p data-testid="posizione">{pathname}</p>
 }
 
-/** Apre la scheda della pianta con la passata già scelta nella schermata in campo (`null`: nessuna passata). */
+/** Il gesto "indietro" del telefono: torna alla voce precedente della cronologia, senza passare dall'app. */
+function IndietroDiSistema() {
+  const navigate = useNavigate()
+  return <button type="button" onClick={() => navigate(-1)}>Indietro di sistema</button>
+}
+
+/**
+ * Apre la scheda della pianta con la passata già scelta nella schermata in campo (`null`: nessuna passata), arrivando
+ * dalla schermata in campo (è la voce precedente della cronologia).
+ */
 function apri(etichetta = '35', passata: string | null = 'Termometro') {
   if (passata) useCampoStore.getState().setPassata('E', idPassata(passata))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalida = vi.spyOn(client, 'invalidateQueries')
   const id = config.piante.find(p => p.etichetta === etichetta)?.id ?? etichetta
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/esperimenti/E/piante/${id}`]}>
+      <MemoryRouter initialEntries={['/esperimenti/E', `/esperimenti/E/piante/${id}`]} initialIndex={1}>
         <Routes>
           <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
           <Route path="*" element={null} />
         </Routes>
         <Posizione />
+        <IndietroDiSistema />
       </MemoryRouter>
     </QueryClientProvider>,
   )
-  return { client, invalida }
+  return { client, invalida, unmount }
 }
 
 const posizione = () => screen.getByTestId('posizione').textContent
@@ -87,6 +97,11 @@ const pulsante = (nome: string | RegExp) => screen.getByRole('button', { name: n
 /** Aspetta che la scheda sia pronta: il modulo compare solo con configurazione e misure arrivate. */
 const pronta = () => screen.findByRole('button', { name: /^Ora: / })
 const salvate = () => vi.mocked(salvaMisura).mock.calls.map(([, m]) => m)
+const dialogo = () => screen.findByRole('dialog', { name: 'Scartare i valori non salvati?' })
+const chiudiDialogo = async () => waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+/** Più tardi di un doppio tocco: il tocco che conferma un avviso deve arrivare dopo mezzo secondo. */
+const piuTardi = (secondi = 1) => vi.setSystemTime(new Date(Date.now() + secondi * 1000))
+const bozzeSalvate = () => Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:'))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -94,6 +109,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date(2026, 9, 28, 10, 0))
   localStorage.clear()
+  sessionStorage.clear()
   useCampoStore.setState({ stato: {} })
   config = bozzaHydrochar()
   config.esperimento.id = 'E'
@@ -202,6 +218,7 @@ describe('SchedaPianta: salvataggio', () => {
     expect(pulsante('Salva comunque')).toBeInTheDocument()
     expect(pulsante('Salva comunque e vai alla #36')).toBeInTheDocument()
 
+    piuTardi()
     await utente.click(pulsante('Salva comunque'))
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
@@ -350,6 +367,8 @@ describe('SchedaPianta: salvataggio', () => {
 
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Pianta #35 non salvata.'))
     expect(posizione()).toBe('/esperimenti/E')
+    // Durante il salvataggio l'uscita non chiede di scartare: i valori erano già partiti.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })
 
@@ -428,15 +447,23 @@ describe('SchedaPianta: valori precompilati', () => {
     expect(campo('Altezza')).toHaveValue('')
 
     await utente.type(campo('Altezza'), '42')
+    // Oggi c'è un palco in più.
+    await utente.click(pulsante('+ Palchi'))
+    await utente.type(within(screen.getByRole('group', { name: 'Palchi 3' })).getByLabelText('N foglie'), '9')
+    await utente.type(campo('N palchi totali'), '3')
     await utente.click(pulsante('Salva'))
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     const valori = salvate()[0].valori
-    expect(valori[par('Palchi').id]).toEqual([{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }])
+    expect(valori[par('Palchi').id]).toEqual([
+      { n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }, { n: 3, valori: { n_foglie: 9 } },
+    ])
     expect(valori[par('Altezza').id]).toEqual([42])
-    // Il modulo successivo riparte dalla misura appena salvata.
+    expect(valori[par('N palchi totali').id]).toEqual([3])
+    // Il modulo successivo riparte dalla misura appena salvata, non da quella del 21/10.
     expect(await screen.findByRole('button', { name: /^10:00 · Altezza 42 cm/ })).toBeInTheDocument()
-    expect(campo('N palchi totali')).toHaveValue('2')
+    expect(campo('N palchi totali')).toHaveValue('3')
+    expect(within(screen.getByRole('group', { name: 'Palchi 3' })).getByLabelText('N foglie')).toHaveValue('9')
   })
 })
 
@@ -585,5 +612,288 @@ describe('SchedaPianta: casi limite', () => {
     expect(screen.queryByLabelText('Temp aria')).not.toBeInTheDocument()
     await utente.click(pulsante('Riprova'))
     expect(await pronta()).toBeInTheDocument()
+  })
+})
+
+describe('SchedaPianta: data di rilievo cambiata mentre si corregge', () => {
+  function misuraDiIeri() {
+    const ieri = misura({ data_rilievo: IERI, ora: '09:00', valori: { [par('Temp aria').id]: [20] } })
+    archivio = [ieri]
+    useCampoStore.getState().setData('E', IERI)
+    return ieri
+  }
+
+  it('"Usa oggi" lascia la correzione della misura di ieri: il salvataggio crea una misura di oggi e non tocca quella di ieri', async () => {
+    const ieri = misuraDiIeri()
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: '09:00 · Temp aria 20 °C' }))
+    expect(screen.getByText('Modifica della misura delle 09:00')).toBeInTheDocument()
+
+    await utente.click(pulsante('Usa oggi'))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Misure già registrate' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Modifica della misura/)).not.toBeInTheDocument()
+    expect(pulsante('Ora: 10:00')).toBeInTheDocument()
+    await utente.type(campo('Temp aria'), '22')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].id).not.toBe(ieri.id)
+    expect(salvate()[0]).toMatchObject({ data_rilievo: OGGI, ora: '10:00' })
+    expect(archivio.find(m => m.id === ieri.id)).toEqual(ieri)
+  })
+
+  it('con una correzione in corso "Usa oggi" chiede prima se scartarla', async () => {
+    const ieri = misuraDiIeri()
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: '09:00 · Temp aria 20 °C' }))
+    await utente.type(campo('Temp aria'), '21')
+
+    await utente.click(pulsante('Usa oggi'))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Continua a modificare' }))
+    await chiudiDialogo()
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe(IERI)
+    expect(screen.getByText('Modifica della misura delle 09:00')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('21')
+
+    await utente.click(pulsante('Usa oggi'))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await chiudiDialogo()
+
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe(OGGI)
+    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(bozzeSalvate()).toEqual([])
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(archivio).toEqual([ieri])
+  })
+})
+
+describe('SchedaPianta: valori non salvati', () => {
+  function unaMisuraDiOggi() {
+    const m = misura({ ora: '09:12', valori: { [par('Temp aria').id]: [24.5], [par('Temp pianta').id]: [25.1] } })
+    archivio = [m]
+    return m
+  }
+
+  it('toccando una misura di oggi con valori scritti chiede se scartarli; "Continua a modificare" li tiene', async () => {
+    unaMisuraDiOggi()
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '30')
+    await utente.click(pulsante(/^09:12 · /))
+
+    const d = await dialogo()
+    expect(d).toHaveTextContent('I valori inseriti per questa misura andranno persi.')
+    await utente.click(within(d).getByRole('button', { name: 'Continua a modificare' }))
+    await chiudiDialogo()
+    expect(campo('Temp aria')).toHaveValue('30')
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+
+    await utente.click(pulsante(/^09:12 · /))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await chiudiDialogo()
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(bozzeSalvate()).toEqual([])
+  })
+
+  it('senza valori scritti si passa da una misura all\'altra e si esce senza domande', async () => {
+    unaMisuraDiOggi()
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(pulsante(/^09:12 · /))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    await utente.click(pulsante('+ Nuova misura'))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+    // Aprire il selettore dell'ora non è ancora una modifica.
+    await utente.click(pulsante('Ora: 10:00'))
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(posizione()).toBe('/esperimenti/E')
+  })
+
+  it('"+ Nuova misura" con una correzione scritta chiede se scartarla', async () => {
+    unaMisuraDiOggi()
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: /^09:12 · / }))
+    await utente.type(campo('Temp pianta'), '26')
+    await utente.click(pulsante('+ Nuova misura'))
+
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await chiudiDialogo()
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+    expect(campo('Temp pianta')).toHaveValue('')
+    expect(salvaMisura).not.toHaveBeenCalled()
+  })
+
+  it('la freccia indietro con l\'ora cambiata a mano chiede conferma; "Scarta" esce davvero', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await pronta())
+    fireEvent.change(screen.getByLabelText('Ora'), { target: { value: '08:30' } })
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Continua a modificare' }))
+    await chiudiDialogo()
+    expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('35')}`)
+    expect(screen.getByLabelText('Ora')).toHaveValue('08:30')
+
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+    expect(bozzeSalvate()).toEqual([])
+  })
+
+  it('chiudendo o ricaricando la pagina con valori scritti il browser chiede conferma', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    const prima = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(prima)
+    expect(prima.defaultPrevented).toBe(false)
+
+    await utente.type(campo('Temp aria'), '24,5')
+    const dopo = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(dopo)
+    expect(dopo.defaultPrevented).toBe(true)
+  })
+
+  it('uscendo senza passare dall\'app (gesto indietro) i valori restano: riaprendo la scheda tornano, con "Scarta"', async () => {
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Indietro di sistema'))
+    expect(posizione()).toBe('/esperimenti/E')
+    unmount()
+
+    apri('35')
+    await pronta()
+    const avviso = screen.getByText('Bozza ripristinata.')
+    expect(campo('Temp aria')).toHaveValue('24,5')
+
+    await utente.click(within(avviso.parentElement!).getByRole('button', { name: 'Scarta' }))
+
+    expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(bozzeSalvate()).toEqual([])
+  })
+
+  it('una bozza ripresa salva con lo stesso id e la stessa ora del tentativo fallito: niente doppioni', async () => {
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('alert')
+    unmount()
+
+    piuTardi(300)
+    apri('35')
+    await pronta()
+    expect(screen.getByText('Bozza ripristinata.')).toBeInTheDocument()
+    expect(pulsante('Ora: 10:00')).toBeInTheDocument()
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [primo, secondo] = salvate()
+    expect(secondo.id).toBe(primo.id)
+    expect(secondo.ora).toBe('10:00')
+    await waitFor(() => expect(bozzeSalvate()).toEqual([]))
+    expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
+  })
+
+  it('un numero lasciato a metà nella bozza torna non valido: non diventa un campo vuoto che si salva', async () => {
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '-')
+    await utente.type(campo('Temp pianta'), '25')
+    unmount()
+
+    apri('35')
+    await pronta()
+    await utente.click(pulsante('Salva'))
+    expect(screen.getByRole('alert')).toHaveTextContent('«Temp aria»: numero non valido.')
+    expect(salvaMisura).not.toHaveBeenCalled()
+  })
+
+  it('dopo un salvataggio riuscito non resta nessuna bozza', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    expect(bozzeSalvate()).toHaveLength(1)
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    expect(bozzeSalvate()).toEqual([])
+  })
+})
+
+describe('SchedaPianta: dettagli del passaggio tra piante', () => {
+  it('un doppio tocco sull\'avviso non vale come conferma: serve un secondo tocco più tardi', async () => {
+    par('Temp aria').valore_max = 40
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '45')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    // Il secondo tocco del doppio tocco arriva sul pulsante che ora dice "Salva comunque…".
+    await utente.click(pulsante('Salva comunque e vai alla #36'))
+    expect(salvaMisura).not.toHaveBeenCalled()
+
+    piuTardi()
+    await utente.click(pulsante('Salva comunque e vai alla #36'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+  })
+
+  it('correggere una misura vecchia non cambia i valori ricordati per la pianta dopo', async () => {
+    const ta = par('Temp aria').id
+    useCampoStore.getState().ricorda('E', config.parametri, { [ta]: [26] })
+    const mattina = misura({ ora: '09:12', valori: { [ta]: [24.5] } })
+    archivio = [mattina]
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('26')
+
+    await utente.click(pulsante(/^09:12 · /))
+    await utente.type(campo('Temp aria'), '23')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].id).toBe(mattina.id)
+    expect(useCampoStore.getState().dati('E').ricordati[ta]).toEqual([26])
+    expect(await screen.findByText('Nuova misura')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('26')
+  })
+
+  it('le misure della pianta successiva si caricano già mentre si compila questa', async () => {
+    apri('35')
+    await pronta()
+    await waitFor(() => expect(misurePianta).toHaveBeenCalledWith(idPianta('36')))
+  })
+
+  it('"Salva e vai" prende il posto della scheda: il gesto indietro torna alla schermata in campo', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+
+    await utente.click(pulsante('Indietro di sistema'))
+    expect(posizione()).toBe('/esperimenti/E')
   })
 })

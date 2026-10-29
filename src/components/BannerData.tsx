@@ -10,8 +10,11 @@ import { useCampoStore } from '@/store/campo'
  * (non una striscia laterale: al sole il fondo velato da solo non si distingue), icona (mai solo colore) e,
  * a portata di pollice, "Usa oggi". Il testo è un solo nodo di testo. "Oggi" è `useOggi()`: se l'app resta aperta
  * oltre la mezzanotte l'avviso compare o sparisce da solo.
+ *
+ * `conferma` riceve il cambio di data invece di eseguirlo: una pagina con valori non salvati che dipendono dalla
+ * data (la scheda pianta) può chiedere prima se scartarli.
  */
-export function BannerData({ espId }: { espId: string }) {
+export function BannerData({ espId, conferma }: { espId: string; conferma?: (cambiaData: () => void) => void }) {
   const oggi = useOggi()
   const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
   const setData = useCampoStore(s => s.setData)
@@ -22,7 +25,17 @@ export function BannerData({ espId }: { espId: string }) {
     <div role="status" className="flex items-center gap-2 rounded-lg border border-attenzione bg-attenzione-velato py-1 pr-1 pl-3 text-grafite">
       <TriangleAlert aria-hidden className="size-5 shrink-0 text-attenzione" />
       <p className="min-w-0 flex-1 py-2">{`Stai registrando con data ${formattaData(dataRilievo)}, non oggi.`}</p>
-      <Button variant="ghost" size="sm" onClick={() => setData(espId, oggiLocale())}>Usa oggi</Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          const usaOggi = () => setData(espId, oggiLocale())
+          if (conferma) conferma(usaOggi)
+          else usaOggi()
+        }}
+      >
+        Usa oggi
+      </Button>
     </div>
   )
 }

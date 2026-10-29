@@ -8,6 +8,9 @@ import { oraLocale } from '@/lib/date'
 interface CampoOraProps {
   /** L'ora della misura (HH:MM), o `null` per "adesso": allora si prende al momento del salvataggio. */
   ora: string | null
+  /** All'apertura del selettore: l'ora mostrata diventa quella della misura (non è ancora una modifica). */
+  onApri: (ora: string) => void
+  /** L'ora cambiata a mano. */
   onChange: (ora: string) => void
 }
 
@@ -15,7 +18,7 @@ interface CampoOraProps {
  * L'ora della misura, di solito da non toccare: un pulsante discreto "Ora: 09:12 ✎". Toccandolo l'ora mostrata
  * diventa quella della misura e compare il selettore per cambiarla.
  */
-export function CampoOra({ ora, onChange }: CampoOraProps) {
+export function CampoOra({ ora, onApri, onChange }: CampoOraProps) {
   const id = useId()
   const [aperto, setAperto] = useState(false)
   const [, ridisegna] = useReducer((n: number) => n + 1, 0)
@@ -36,7 +39,7 @@ export function CampoOra({ ora, onChange }: CampoOraProps) {
         size="sm"
         className="-mr-3 shrink-0"
         onClick={() => {
-          onChange(mostrata)
+          onApri(mostrata)
           setAperto(true)
         }}
       >
@@ -56,7 +59,10 @@ export function CampoOra({ ora, onChange }: CampoOraProps) {
         autoFocus
         value={mostrata}
         // Svuotare il selettore non è un'ora: resta quella di prima.
-        onChange={e => { if (e.target.value) onChange(e.target.value.slice(0, 5)) }}
+        onChange={e => {
+          const nuova = e.target.value.slice(0, 5)
+          if (nuova && nuova !== mostrata) onChange(nuova)
+        }}
         className="w-36"
       />
     </div>

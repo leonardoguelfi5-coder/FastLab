@@ -1,9 +1,12 @@
-import { Navigate, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useConfig, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
+import { Conferma } from '@/components/Conferma'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import type { StatoModulo } from '@/components/scheda/ModuloOggi'
 import { RiquadroOggi } from '@/components/scheda/RiquadroOggi'
 import { StoriaPianta } from '@/components/scheda/StoriaPianta'
 import { Badge } from '@/components/ui/badge'
@@ -23,10 +26,14 @@ interface SchedaCaricataProps {
   dataRilievo: string
   oggi: string
   misure: UseQueryResult<Misura[]>
+  conferma: (azione: () => void) => void
+  onModifiche: (stato: StatoModulo | null) => void
 }
 
 /** La scheda a configurazione caricata: intestazione della pianta, riquadro di oggi e storia. */
-function SchedaCaricata({ espId, config, piantaId, passataId, dataRilievo, oggi, misure }: SchedaCaricataProps) {
+function SchedaCaricata({
+  espId, config, piantaId, passataId, dataRilievo, oggi, misure, conferma, onModifiche,
+}: SchedaCaricataProps) {
   const pianta = config.piante.find(p => p.id === piantaId)
   const passata = config.passate.find(p => p.id === passataId)
   // Una passata scelta e poi cancellata dalle impostazioni è come nessuna scelta: si torna a sceglierla.
@@ -51,7 +58,7 @@ function SchedaCaricata({ espId, config, piantaId, passataId, dataRilievo, oggi,
             </p>
           )}
         </div>
-        <BannerData espId={espId} />
+        <BannerData espId={espId} conferma={conferma} />
       </div>
 
       {/* Senza la storia della pianta i progressivi (es. i palchi) partirebbero da vuoti: il modulo aspetta le misure. */}
@@ -61,7 +68,9 @@ function SchedaCaricata({ espId, config, piantaId, passataId, dataRilievo, oggi,
           : <Caricamento />
       ) : (
         <>
+          {/* Una data o una passata diversa è un riquadro nuovo: una misura in correzione non passa a un altro giorno. */}
           <RiquadroOggi
+            key={`${passata.id}:${dataRilievo}`}
             espId={espId}
             config={config}
             pianta={pianta}
@@ -70,6 +79,8 @@ function SchedaCaricata({ espId, config, piantaId, passataId, dataRilievo, oggi,
             dataRilievo={dataRilievo}
             oggi={oggi}
             successiva={piantaSuccessiva(config.piante, pianta.id)}
+            conferma={conferma}
+            onModifiche={onModifiche}
           />
           <StoriaPianta espId={espId} config={config} misure={misure.data} />
         </>
@@ -84,18 +95,55 @@ function SchedaCaricata({ espId, config, piantaId, passataId, dataRilievo, oggi,
  */
 export function SchedaPianta() {
   const { espId = '', piantaId = '' } = useParams()
+  const navigate = useNavigate()
   const config = useConfig(espId)
   // Si carica insieme alla configurazione, non dopo.
   const misure = useMisurePianta(piantaId)
   const oggi = useOggi()
   const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
 
+  // Il modulo aperto dice se ha valori non salvati; prima di chiuderlo (indietro, un'altra misura, "Usa oggi")
+  // si chiede se scartarli. Si legge al momento del tocco: un ref basta e non fa ridisegnare la pagina a ogni tasto.
+  const modulo = useRef<StatoModulo | null>(null)
+  const [inAttesa, setInAttesa] = useState<{ esegui: () => void } | null>(null)
+  const onModifiche = useCallback((stato: StatoModulo | null) => { modulo.current = stato }, [])
+  const conferma = useCallback((esegui: () => void) => {
+    if (modulo.current?.modificato) setInAttesa({ esegui })
+    else esegui()
+  }, [])
+
+  // Chiudere o ricaricare la scheda del browser con valori non salvati: il browser chiede conferma.
+  useEffect(() => {
+    const avvisa = (evento: BeforeUnloadEvent) => {
+      if (!modulo.current?.modificato) return
+      evento.preventDefault()
+      evento.returnValue = ''
+    }
+    window.addEventListener('beforeunload', avvisa)
+    return () => window.removeEventListener('beforeunload', avvisa)
+  }, [])
+
+  function scarta() {
+    const azione = inAttesa
+    modulo.current?.scarta()
+    setInAttesa(null)
+    azione?.esegui()
+  }
+
   // La scheda serve a inserire i valori di una passata: senza, si torna a sceglierla.
   if (!passataId) return <Navigate to={percorsoCampo(espId)} replace />
 
   const dati = config.data
   return (
-    <AppShell titolo={dati?.esperimento.nome ?? 'Esperimento'} indietro={percorsoCampo(espId)}>
+    <AppShell
+      titolo={dati?.esperimento.nome ?? 'Esperimento'}
+      indietro={percorsoCampo(espId)}
+      onIndietro={evento => {
+        if (!modulo.current?.modificato) return
+        evento.preventDefault()
+        setInAttesa({ esegui: () => navigate(percorsoCampo(espId)) })
+      }}
+    >
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
@@ -111,8 +159,19 @@ export function SchedaPianta() {
           dataRilievo={dataRilievo}
           oggi={oggi}
           misure={misure}
+          conferma={conferma}
+          onModifiche={onModifiche}
         />
       )}
+      <Conferma
+        aperta={inAttesa !== null}
+        titolo="Scartare i valori non salvati?"
+        testo="I valori inseriti per questa misura andranno persi."
+        annulla="Continua a modificare"
+        conferma="Scarta"
+        onAnnulla={() => setInAttesa(null)}
+        onConferma={scarta}
+      />
     </AppShell>
   )
 }

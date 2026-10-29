@@ -1,4 +1,4 @@
-import { QueryClient, useQuery } from '@tanstack/react-query'
+import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { misureDelGiorno, misurePianta } from './misure'
@@ -38,12 +38,13 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
   })
 }
 
+/** Chiave e lettura delle misure di una pianta: le stesse per `useMisurePianta` e per caricarle in anticipo. */
+export function opzioniMisurePianta(piantaId: string) {
+  return queryOptions({ queryKey: chiavi.misurePianta(piantaId), queryFn: () => misurePianta(piantaId) })
+}
+
 export function useMisurePianta(piantaId: string | undefined) {
-  return useQuery({
-    queryKey: chiavi.misurePianta(piantaId ?? ''),
-    queryFn: () => misurePianta(piantaId as string),
-    enabled: !!piantaId,
-  })
+  return useQuery({ ...opzioniMisurePianta(piantaId ?? ''), enabled: !!piantaId })
 }
 
 export function useInviti() {

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero } from '@/lib/numeri'
-import { Conferma } from './Conferma'
+import { Conferma } from '@/components/Conferma'
 import { MAX_PIANTE, nPiante, rigeneraRighe, trattamentiInclusi, type RigaTrattamento } from './righeTrattamenti'
 
 interface PassoPianteProps {
