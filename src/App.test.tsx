@@ -17,8 +17,8 @@ vi.mock('@/pages/Esperimenti', () => ({
 vi.mock('@/pages/HomeEsperimento', () => ({
   HomeEsperimento: () => <h1>Home dell'esperimento (prova)</h1>,
 }))
-vi.mock('@/pages/Campo', () => ({
-  Campo: () => <h1>Schermata in campo (prova)</h1>,
+vi.mock('@/pages/SceltaStrumento', () => ({
+  SceltaStrumento: () => <h1>Scelta dello strumento (prova)</h1>,
 }))
 vi.mock('@/pages/ElencoPiante', () => ({
   ElencoPiante: () => <h1>Elenco delle piante (prova)</h1>,
@@ -101,10 +101,10 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Home dell\'esperimento (prova)' })).toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/misura mostra per ora la schermata in campo', () => {
+  it('con la sessione /esperimenti/:espId/misura mostra la scelta dello strumento', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/misura')
-    expect(screen.getByRole('heading', { level: 1, name: 'Schermata in campo (prova)' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Scelta dello strumento (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/piante mostra l\'elenco delle piante', () => {

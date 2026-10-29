@@ -11,8 +11,16 @@ export const eUuid = (id: string): boolean => UUID.test(id)
 /** Home di un esperimento: la striscia "Nuova misura" e le icone delle sezioni. */
 export const percorsoHome = (espId: string) => `/esperimenti/${parte(espId)}`
 
-/** Da qui si fa una nuova misura (per ora la vecchia schermata in campo, poi la scelta dello strumento). */
+/** Da qui si fa una nuova misura: la scelta dello strumento. */
 export const percorsoNuovaMisura = (espId: string) => `${percorsoHome(espId)}/misura`
+
+/** La misura di una pianta con uno strumento, nel giro sequenziale. */
+export const percorsoMisura = (espId: string, strumentoId: string, piantaId: string) =>
+  `${percorsoNuovaMisura(espId)}/${parte(strumentoId)}/${parte(piantaId)}`
+
+/** La fine del giro di uno strumento: riepilogo e piante che mancano. */
+export const percorsoFineGiro = (espId: string, strumentoId: string) =>
+  `${percorsoNuovaMisura(espId)}/${parte(strumentoId)}/fine`
 
 /** Le sezioni della home che per ora sono segnaposto "In arrivo". */
 export type SezioneInArrivo = 'oggi' | 'dataset' | 'esporta' | 'diario' | 'foto'

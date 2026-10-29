@@ -219,6 +219,14 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
   })
 
+  it('senza uno strumento nello store non legge nemmeno le misure del giorno', async () => {
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    expect(misureDelGiorno).not.toHaveBeenCalled()
+    expect(striscia()).toHaveAccessibleName('Nuova misura')
+  })
+
   it('legge le misure della data di rilievo scelta, non di oggi', async () => {
     useCampoStore.getState().setStrumento('E', strumento('SPAD').id)
     useCampoStore.getState().setData('E', IERI)

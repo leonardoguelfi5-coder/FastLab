@@ -48,3 +48,14 @@ export async function eliminaMisura(id: string): Promise<void> {
   const { error } = await supabase.from('misure').delete().eq('id', id)
   if (error) throw error
 }
+
+/**
+ * La data (AAAA-MM-GG) dell'ultima misura di ogni strumento dell'esperimento, per "ultima volta 21/10" nella scelta
+ * dello strumento. Gli strumenti mai misurati non compaiono nella mappa. Calcolata dal database (`max` per strumento),
+ * così non si scaricano le misure di tutta la stagione.
+ */
+export async function ultimaMisuraPerStrumento(espId: string): Promise<Map<string, string>> {
+  const { data, error } = await supabase.rpc('ultime_misure_per_strumento', { p_esperimento: espId })
+  if (error) throw error
+  return new Map(((data ?? []) as { strumento_id: string; ultima: string }[]).map(r => [r.strumento_id, r.ultima]))
+}

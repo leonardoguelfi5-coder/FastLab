@@ -4,7 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn() }))
+vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
@@ -13,10 +13,10 @@ import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati,
+  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure,
 } from './query'
 
 function wrapper() {
@@ -40,6 +40,8 @@ describe('chiavi', () => {
     expect(chiavi.misureGiorno('E', '2026-10-28')[0]).toBe('misure')
     expect(chiavi.misurePianta('p1')[0]).toBe('misure')
     expect(chiavi.misura('m1')[0]).toBe('misure')
+    expect(chiavi.ultimeMisure('E')[0]).toBe('misure')
+    expect(chiavi.ultimeMisure('E')).not.toEqual(chiavi.ultimeMisure('F'))
     expect(chiavi.misura('m1')).not.toEqual(chiavi.misura('m2'))
     expect(chiavi.misure).toEqual(['misure'])
   })
@@ -92,6 +94,21 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useMisureGiorno(undefined, '2026-10-28'), { wrapper: wrapper() })
     expect(result.current.fetchStatus).toBe('idle')
     expect(misureDelGiorno).not.toHaveBeenCalled()
+  })
+
+  it('useUltimeMisure legge le ultime date per strumento', async () => {
+    const ultime = new Map([['s1', '2026-10-21']])
+    vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(ultime)
+    const { result } = renderHook(() => useUltimeMisure('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(ultimaMisuraPerStrumento).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe(ultime)
+  })
+
+  it('useUltimeMisure senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useUltimeMisure(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(ultimaMisuraPerStrumento).not.toHaveBeenCalled()
   })
 
   it('useMisurePianta legge la storia della pianta', async () => {

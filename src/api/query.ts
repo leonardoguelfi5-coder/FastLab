@@ -3,7 +3,7 @@ import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from './misure'
 
 /** Chiavi di cache delle query. Quelle delle misure iniziano tutte con 'misure': si invalidano insieme. */
 export const chiavi = {
@@ -18,6 +18,7 @@ export const chiavi = {
   misura: (id: string) => ['misure', 'una', id] as const,
   misureGiorno: (espId: string, data: string) => ['misure', 'giorno', espId, data] as const,
   misurePianta: (piantaId: string) => ['misure', 'pianta', piantaId] as const,
+  ultimeMisure: (espId: string) => ['misure', 'ultime', espId] as const,
   inviti: ['inviti'] as const,
   /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
   catalogo: ['catalogo'] as const,
@@ -78,6 +79,18 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
   return useQuery({
     queryKey: chiavi.misureGiorno(espId ?? '', data),
     queryFn: () => misureDelGiorno(espId as string, data),
+    enabled: !!espId,
+  })
+}
+
+/**
+ * La data dell'ultima misura di ogni strumento. Sotto il prefisso `misure`: dopo ogni salvataggio si rilegge insieme
+ * alle altre, e "ultima volta" non resta indietro.
+ */
+export function useUltimeMisure(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.ultimeMisure(espId ?? ''),
+    queryFn: () => ultimaMisuraPerStrumento(espId as string),
     enabled: !!espId,
   })
 }

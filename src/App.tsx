@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
 import { AdminInviti } from '@/pages/AdminInviti'
-import { Campo } from '@/pages/Campo'
 import { Catalogo } from '@/pages/Catalogo'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
@@ -12,6 +11,7 @@ import { InArrivo } from '@/pages/InArrivo'
 import { ModificaMisura } from '@/pages/ModificaMisura'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
 import { Registrati } from '@/pages/Registrati'
+import { SceltaStrumento } from '@/pages/SceltaStrumento'
 import { SchedaPianta } from '@/pages/SchedaPianta'
 
 export function AppRoutes() {
@@ -25,8 +25,7 @@ export function AppRoutes() {
         <Route path="/catalogo" element={<Catalogo />} />
         <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<HomeEsperimento />} />
-        {/* Per ora la vecchia schermata di campo: il Task 11 la sostituisce con la scelta dello strumento. */}
-        <Route path="/esperimenti/:espId/misura" element={<Campo />} />
+        <Route path="/esperimenti/:espId/misura" element={<SceltaStrumento />} />
         <Route path="/esperimenti/:espId/piante" element={<ElencoPiante />} />
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<ModificaMisura />} />

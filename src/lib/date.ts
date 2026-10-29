@@ -15,3 +15,9 @@ export function formattaData(iso: string): string {
   const [anno, mese, giorno] = iso.slice(0, 10).split('-')
   return `${giorno}/${mese}/${anno}`
 }
+
+/** Da AAAA-MM-GG a GG/MM (giorno e mese), per le righe dove l'anno è chiaro: "ultima volta 21/10". */
+export function formattaGiornoMese(iso: string): string {
+  const [, mese, giorno] = iso.slice(0, 10).split('-')
+  return `${giorno}/${mese}`
+}

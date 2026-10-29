@@ -28,7 +28,8 @@ function riepilogo({ esperimento, piante, trattamenti }: ConfigEsperimento): str
 function useGiroInCorso(espId: string, config: ConfigEsperimento): string | null {
   const oggi = useOggi()
   const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
-  const misure = useMisureGiorno(espId, dataRilievo)
+  // Senza uno strumento scelto non c'è giro da mostrare: non si legge nulla (la home non paga una query per niente).
+  const misure = useMisureGiorno(strumentoId ? espId : undefined, dataRilievo)
   const dati = misure.isSuccess ? misure.data : undefined
 
   return useMemo(() => {
