@@ -54,3 +54,6 @@ Ruling (T7): l'"Elimina" di uno strumento richiede di sapere se ha misure: nuova
 Task 2: implementatore (sonnet) DONE_WITH_CONCERNS 7d428d0 — 883 Vitest, 136 pgTAP (emulato); `mantenutiPer(espId, strumentoId, data)` per il riquadro (usa lo strumento del riquadro, non quello dello store); segno `mantenuto` solo finché il valore resta quello di partenza; nessun segno su una bozza ripresa; rosso visto solo per FormMisura
 Task 2: dispatched reviewer (sonnet) on 20a5d09..7d428d0
 Task 10: dispatched implementer (sonnet) in parallelo alla revisione del T2 (solo file nuovi giro.ts/giro.test.ts, add esplicito), BASE 7d428d0
+Task 10: implementatore (sonnet) DONE 45cc256 — 912 Vitest (29 nuovi); fenologica con obbligatorio vuoto ma altre voci scritte → `incompleta` (non `da_fare`)
+Ruling: accettata la scelta `incompleta` per una pianta toccata senza le voci obbligatorie: va ripresa, non saltata (focus n. 2) — cost if wrong: nessuno
+Task 10: dispatched reviewer (sonnet) on 4f24688..45cc256 (solo i due file nuovi)
