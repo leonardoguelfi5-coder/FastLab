@@ -1,5 +1,5 @@
 import { formattaNumero } from '@/lib/numeri'
-import type { ElementoLista, Misura, Parametro, ValoreParametro, ValoriMisura } from './tipi'
+import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Passata, ValoreParametro, ValoriMisura } from './tipi'
 
 const TRATTINO = '—'
 type Lettura = number | null
@@ -76,6 +76,33 @@ export function valoriIniziali(a: {
     else valori[p.id] = valoreVuoto(p)
   }
   return valori
+}
+
+/** I valori per i soli parametri del modulo (gli altri restano nella misura): quelli di una misura o di una bozza. */
+export function valoriDeiParametri(parametri: Parametro[], valori: ValoriMisura): ValoriMisura {
+  return Object.fromEntries(parametri.map(p => [p.id, valori[p.id] ?? valoreVuoto(p)]))
+}
+
+/**
+ * I parametri del modulo per correggere una misura già salvata: tutti quelli della sua passata (nel suo ordine, anche
+ * gli archiviati: il dato c'è, e per i campi obbligatori si vede) e, dopo, quelli che non sono nella passata ma hanno
+ * un valore nella misura (tolti dalla passata o archiviati), nell'ordine della configurazione. Un parametro archiviato
+ * porta " (archiviato)" nel nome: è una copia, la configurazione non cambia. Le chiavi dei valori che non sono di nessun
+ * parametro non compaiono, e chi salva le tiene com'erano. Gli obbligatori sono quelli segnati nella passata.
+ */
+export function parametriDiUnaMisura(
+  config: ConfigEsperimento, passata: Passata, valori: ValoriMisura,
+): { parametri: Parametro[]; obbligatori: Set<string> } {
+  const perId = new Map(config.parametri.map(p => [p.id, p]))
+  const dellaPassata = [...passata.parametri]
+    .sort((a, b) => a.ordine - b.ordine)
+    .map(pp => perId.get(pp.parametro_id))
+    .filter((p): p is Parametro => p !== undefined)
+  const inPassata = new Set(dellaPassata.map(p => p.id))
+  const inPiu = config.parametri.filter(p => !inPassata.has(p.id) && !eVuoto(p, valori[p.id]))
+  const parametri = [...dellaPassata, ...inPiu].map(p => (p.archiviato ? { ...p, nome: `${p.nome} (archiviato)` } : p))
+  const obbligatori = new Set(passata.parametri.filter(pp => pp.obbligatorio).map(pp => pp.parametro_id))
+  return { parametri, obbligatori }
 }
 
 /** Vero se la lettura cade fuori dall'intervallo atteso del parametro (gli estremi sono ammessi). Un numero non finito non conta: è un errore. */

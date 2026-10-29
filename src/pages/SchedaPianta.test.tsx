@@ -62,6 +62,11 @@ function Posizione() {
   return <p data-testid="posizione">{pathname}</p>
 }
 
+/** La pagina di modifica di una misura, finta: mostra lo stato con cui la storia della pianta l'ha aperta. */
+function StatoArrivo() {
+  return <p data-testid="arrivo">{JSON.stringify(useLocation().state)}</p>
+}
+
 /** Il gesto "indietro" del telefono: torna alla voce precedente della cronologia, senza passare dall'app. */
 function IndietroDiSistema() {
   const navigate = useNavigate()
@@ -82,6 +87,7 @@ function apri(etichetta = '35', passata: string | null = 'Termometro') {
       <MemoryRouter initialEntries={['/esperimenti/E', `/esperimenti/E/piante/${id}`]} initialIndex={1}>
         <Routes>
           <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
+          <Route path="/esperimenti/:espId/misure/:misuraId" element={<StatoArrivo />} />
           <Route path="*" element={null} />
         </Routes>
         <Posizione />
@@ -749,6 +755,17 @@ describe('SchedaPianta: intestazione e storia', () => {
     expect(righe[1]).toHaveAccessibleName('08:30 · Termometro · Temp aria 22 °C')
     expect(righe[2]).toHaveAccessibleName('09:00 · SPAD · SPAD (archiviato) 38,1')
     expect(righe[2]).toHaveTextContent('💚')
+  })
+
+  it('toccando una riga della storia si apre la modifica della misura, sapendo di arrivare dalla scheda', async () => {
+    const vecchia = misura({ data_rilievo: '2026-10-21', ora: '08:30', valori: { [par('Temp aria').id]: [22] } })
+    archivio = [vecchia]
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('link', { name: '08:30 · Termometro · Temp aria 22 °C' }))
+
+    expect(posizione()).toBe(`/esperimenti/E/misure/${vecchia.id}`)
+    expect(screen.getByTestId('arrivo')).toHaveTextContent('{"daScheda":true}')
   })
 
   it('senza misure la storia lo dice', async () => {

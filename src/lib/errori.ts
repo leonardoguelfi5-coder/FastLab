@@ -3,6 +3,13 @@ const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per pi�
 const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
 
+/** Il messaggio con cui `caricaMisura` dice che la misura non c'è (cancellata, o non di questo utente). */
+export const MISURA_NON_TROVATA = 'Misura non trovata.'
+
+export function eMisuraNonTrovata(e: unknown): boolean {
+  return e instanceof Error && e.message === MISURA_NON_TROVATA
+}
+
 /** Estrae campi comuni da errori di fetch, PostgREST e GoTrue (Error o oggetti semplici). */
 function leggi(e: unknown): { messaggio: string; code?: string; status?: number } {
   if (typeof e === 'string') return { messaggio: e }

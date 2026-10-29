@@ -1,4 +1,4 @@
-import type { ValoriMisura } from '@/domain/tipi'
+import type { Misura, ValoriMisura } from '@/domain/tipi'
 
 /**
  * Un modulo della scheda pianta non ancora salvato, tenuto nel sessionStorage della scheda del browser. Serve
@@ -83,6 +83,18 @@ export function scriviBozza(chiave: string, b: Bozza): void {
 
 export function cancellaBozza(chiave: string): void {
   try { sessionStorage.removeItem(chiave) } catch { /* niente da togliere */ }
+}
+
+/**
+ * Cancella la bozza di correzione di una misura, alla data con cui la scheda la apre (quella salvata), e il ricordo che
+ * quel modulo era aperto. Da chiamare quando la misura è stata corretta o eliminata altrove (la pagina di modifica):
+ * senza, la scheda riproporrebbe i valori vecchi sopra la modifica appena fatta. Le bozze di altre misure restano.
+ */
+export function cancellaBozzaCorrezione(espId: string, m: Misura): void {
+  const base = { espId, piantaId: m.pianta_id, passataId: m.passata_id, dataRilievo: m.data_rilievo }
+  cancellaBozza(chiaveBozza({ ...base, misuraId: m.id }))
+  const aperto = chiaveAperto(base)
+  if (leggiAperto(aperto) === m.id) scriviAperto(aperto, null)
 }
 
 /** Di chi sono le bozze della scheda del browser: l'id dell'ultimo utente che vi ha avuto accesso. */

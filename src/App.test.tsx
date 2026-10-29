@@ -20,6 +20,9 @@ vi.mock('@/pages/Campo', () => ({
 vi.mock('@/pages/SchedaPianta', () => ({
   SchedaPianta: () => <h1>Scheda della pianta (prova)</h1>,
 }))
+vi.mock('@/pages/ModificaMisura', () => ({
+  ModificaMisura: () => <h1>Modifica della misura (prova)</h1>,
+}))
 vi.mock('@/pages/NuovoEsperimento', () => ({
   NuovoEsperimento: () => <h1>Procedura nuovo esperimento (prova)</h1>,
 }))
@@ -32,10 +35,9 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 /** Percorsi privati ancora segnaposto. */
 const PERCORSI_SEGNAPOSTO = [
-  '/esperimenti/x/misure/m',
   '/esperimenti/x/impostazioni',
 ]
-const PERCORSI_PRIVATI = ['/', '/esperimenti/x', '/esperimenti/x/piante/p', ...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
+const PERCORSI_PRIVATI = ['/', '/esperimenti/x', '/esperimenti/x/piante/p', '/esperimenti/x/misure/m', ...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
 
 function vaiA(percorso: string) {
   render(
@@ -89,6 +91,13 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/piante/p')
     expect(screen.getByRole('heading', { level: 1, name: 'Scheda della pianta (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/misure/:misuraId mostra la modifica della misura', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/misure/m')
+    expect(screen.getByRole('heading', { level: 1, name: 'Modifica della misura (prova)' })).toBeInTheDocument()
     expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 

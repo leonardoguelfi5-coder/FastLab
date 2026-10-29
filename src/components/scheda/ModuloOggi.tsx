@@ -7,7 +7,7 @@ import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
-import { validaMisura, valoreVuoto, valoriIniziali } from '@/domain/misure'
+import { validaMisura, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta, ValoriMisura } from '@/domain/tipi'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
@@ -18,6 +18,7 @@ import { cancellaBozza, leggiBozza, scriviAperto, scriviBozza } from './bozza'
 import { CampoOra } from './CampoOra'
 import { ElencoOggi } from './ElencoOggi'
 import { ErroreSalvataggio, EsitoControllo, type Controllo } from './MessaggiSalvataggio'
+import { ATTESA_CONFERMA_MS, istante } from './salvataggio'
 
 /** Quel che la pagina deve sapere del modulo aperto per non farne perdere i valori: se è cambiato e come scartarlo. */
 export interface StatoModulo { modificato: boolean; scarta: () => void }
@@ -34,16 +35,6 @@ type Stato =
   | { tipo: 'errore'; azione: Azione; errore: unknown }
 
 /**
- * Dopo un avviso il pulsante diventa "Salva comunque" nello stesso punto: un secondo tocco troppo vicino al primo
- * (un doppio tocco) non è una conferma, è lo stesso gesto. Lo si ignora.
- */
-const ATTESA_CONFERMA_MS = 500
-
-/** L'istante di un tocco, in millisecondi (si legge solo nei gestori dei tocchi, mai disegnando). */
-const istante = (): number => Date.now()
-
-/** I valori per i soli parametri del modulo (gli altri restano nella misura): quelli di una misura o di una bozza. */
-/**
  * Il messaggio di un salvataggio fallito quando chi rileva è già uscito dalla scheda. Dice se i valori sono rimasti
  * (in una bozza) e, se la misura non è di oggi, con quale data riaprire la pianta: riaprendola si vede il giorno scelto.
  */
@@ -54,10 +45,6 @@ function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: s
     ? `I valori sono rimasti: riapri la pianta${conData} per riprovare.`
     : `Controlla i valori della pianta${conData} e salvali di nuovo.`
   return `Pianta #${etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} ${cosaFare}`
-}
-
-function soloDelModulo(parametri: Parametro[], valori: ValoriMisura): ValoriMisura {
-  return Object.fromEntries(parametri.map(p => [p.id, valori[p.id] ?? valoreVuoto(p)]))
 }
 
 interface ModuloOggiProps {
@@ -108,11 +95,11 @@ export function ModuloOggi({
   // si scrive. Prima la bozza lasciata da un'uscita senza salvare, poi la misura che si corregge, poi i precompilati.
   const [iniziale] = useState(() => {
     const bozza = leggiBozza(chiave)
-    if (bozza && bozza.id === id) return { valori: soloDelModulo(parametri, bozza.valori), ora: bozza.ora, ripresa: true }
+    if (bozza && bozza.id === id) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true }
     // I valori ricordati si leggono dallo store adesso, non dall'ultimo disegno: dopo un salvataggio sono già aggiornati.
     const ricordati = useCampoStore.getState().dati(espId, oggi).ricordati
     return {
-      valori: misura ? soloDelModulo(parametri, misura.valori) : valoriIniziali({ parametri, misurePianta, dataRilievo, ricordati }),
+      valori: misura ? valoriDeiParametri(parametri, misura.valori) : valoriIniziali({ parametri, misurePianta, dataRilievo, ricordati }),
       ora: misura?.ora ?? null,
       ripresa: false,
     }

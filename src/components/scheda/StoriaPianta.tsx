@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react'
 import { raggruppaStoria } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Passata } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
-import { percorsoMisura } from '@/lib/percorsi'
+import { percorsoMisura, type ArrivoMisura } from '@/lib/percorsi'
 import { VociMisura } from './VociMisura'
 import { vociMisura } from './voci'
 
@@ -18,6 +18,8 @@ function NomePassata({ passata }: { passata: Passata }) {
     </>
   )
 }
+
+const arrivo: ArrivoMisura = { daScheda: true }
 
 interface StoriaPiantaProps {
   espId: string
@@ -53,6 +55,7 @@ export function StoriaPianta({ espId, config, misure }: StoriaPiantaProps) {
                     <li key={m.id} className="border-b border-riga">
                       <Link
                         to={percorsoMisura(espId, m.id)}
+                        state={arrivo}
                         className="flex min-h-11 items-center gap-3 py-3 text-dato transition-colors hover:bg-carta-ombra active:bg-carta-ombra"
                       >
                         <span className="min-w-0 flex-1">

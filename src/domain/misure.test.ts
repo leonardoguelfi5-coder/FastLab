@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, ultimoValore, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
-import type { ElementoLista, Misura, ValoriMisura } from './tipi'
+import type { ConfigEsperimento, ElementoLista, Misura, Passata, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
 
 const D = '2026-10-28'
@@ -410,5 +410,49 @@ describe('fuoriIntervallo', () => {
   it('un numero non finito non è "fuori": è un errore, non un avviso', () => {
     expect(fuoriIntervallo(altezza, NaN)).toBe(false)
     expect(fuoriIntervallo(altezza, Infinity)).toBe(false)
+  })
+})
+
+describe('valoriDeiParametri', () => {
+  it('dà i valori dei soli parametri indicati, vuoti dove mancano; gli altri non compaiono', () => {
+    const valori: ValoriMisura = { [altezza.id]: [12], [note.id]: 'x', altro: 'fuori' }
+    expect(valoriDeiParametri([altezza, tempAria], valori)).toEqual({ [altezza.id]: [12], [tempAria.id]: [null] })
+  })
+})
+
+describe('parametriDiUnaMisura', () => {
+  const vecchio = { ...parametro('Vecchio'), archiviato: true }
+  const staccato = parametro('Staccato')
+  const vuoto = parametro('Mai misurato')
+  const config = { parametri: [altezza, tempAria, vecchio, staccato, vuoto, note] } as ConfigEsperimento
+  const passata: Passata = {
+    id: 'PA', nome: 'Termometro', icona: null, ordine: 0,
+    parametri: [
+      { parametro_id: tempAria.id, obbligatorio: true, ordine: 1 },
+      { parametro_id: vecchio.id, obbligatorio: false, ordine: 0 },
+    ],
+  }
+
+  it('prima i parametri della passata nel suo ordine, anche gli archiviati con "(archiviato)"', () => {
+    const { parametri } = parametriDiUnaMisura(config, passata, {})
+    expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria'])
+  })
+
+  it('poi quelli che non sono nella passata ma hanno un valore, nell\'ordine della configurazione', () => {
+    const valori: ValoriMisura = { [note.id]: 'ok', [altezza.id]: [3], [vuoto.id]: [null], 'chiave-estranea': 'x' }
+    const { parametri } = parametriDiUnaMisura(config, passata, valori)
+    expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria', 'Altezza', 'Note'])
+  })
+
+  it('un parametro archiviato che non è nella passata porta lo stesso suffisso, e la configurazione non cambia', () => {
+    const { parametri } = parametriDiUnaMisura(config, passata, { [vecchio.id]: [1], [staccato.id]: [2] })
+    expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria', 'Staccato'])
+    expect(vecchio.nome).toBe('Vecchio')
+    expect(parametri[0]).toMatchObject({ id: vecchio.id, archiviato: true })
+  })
+
+  it('gli obbligatori sono quelli segnati nella passata', () => {
+    const { obbligatori } = parametriDiUnaMisura(config, passata, { [altezza.id]: [3] })
+    expect([...obbligatori]).toEqual([tempAria.id])
   })
 })

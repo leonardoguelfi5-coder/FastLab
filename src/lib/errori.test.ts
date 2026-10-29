@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { messaggioErrore } from './errori'
+import { eMisuraNonTrovata, MISURA_NON_TROVATA, messaggioErrore } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -84,5 +84,14 @@ describe('messaggioErrore', () => {
     expect(messaggioErrore(null)).toBe('Errore imprevisto.')
     expect(messaggioErrore(undefined)).toBe('Errore imprevisto.')
     expect(messaggioErrore({})).toBe('Errore imprevisto.')
+  })
+})
+
+describe('eMisuraNonTrovata', () => {
+  it('riconosce l\'errore di caricaMisura e nessun altro', () => {
+    expect(eMisuraNonTrovata(new Error(MISURA_NON_TROVATA))).toBe(true)
+    expect(eMisuraNonTrovata(new Error('Failed to fetch'))).toBe(false)
+    expect(eMisuraNonTrovata({ message: MISURA_NON_TROVATA })).toBe(false)
+    expect(eMisuraNonTrovata(undefined)).toBe(false)
   })
 })

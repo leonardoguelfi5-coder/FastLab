@@ -1,12 +1,15 @@
 import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { misureDelGiorno, misurePianta } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 
 /** Chiavi di cache delle query. Quelle delle misure iniziano tutte con 'misure': si invalidano insieme. */
 export const chiavi = {
   esperimenti: ['esperimenti'] as const,
   config: (espId: string) => ['config', espId] as const,
+  /** Prefisso di tutte le misure: per invalidarle insieme. */
+  misure: ['misure'] as const,
+  misura: (id: string) => ['misure', 'una', id] as const,
   misureGiorno: (espId: string, data: string) => ['misure', 'giorno', espId, data] as const,
   misurePianta: (piantaId: string) => ['misure', 'pianta', piantaId] as const,
   inviti: ['inviti'] as const,
@@ -45,6 +48,20 @@ export function opzioniMisurePianta(piantaId: string) {
 
 export function useMisurePianta(piantaId: string | undefined) {
   return useQuery({ ...opzioniMisurePianta(piantaId ?? ''), enabled: !!piantaId })
+}
+
+/**
+ * Una misura per id (la pagina di modifica). Non resta in cache dopo la chiusura della pagina: il modulo parte dai
+ * valori letti all'apertura, e una copia vecchia (rimasta dopo una correzione fatta dalla scheda) li farebbe
+ * partire sbagliati, con il rischio di riscrivere sopra una modifica appena fatta.
+ */
+export function useMisura(id: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.misura(id ?? ''),
+    queryFn: () => caricaMisura(id as string),
+    enabled: !!id,
+    gcTime: 0,
+  })
 }
 
 export function useInviti() {

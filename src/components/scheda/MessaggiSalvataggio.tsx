@@ -39,18 +39,20 @@ export function EsitoControllo({ controllo, ref }: { controllo: Controllo; ref?:
 
 interface ErroreSalvataggioProps {
   etichetta: string
+  /** Il titolo, se non è un salvataggio di pianta ("Misura non eliminata."). */
+  titolo?: string
   errore: unknown
   onRiprova: () => void
   ref?: Ref<HTMLDivElement>
 }
 
 /** Il salvataggio non è riuscito: lo dice, spiega perché (in italiano, da `messaggioErrore`) e offre "Riprova". */
-export function ErroreSalvataggio({ etichetta, errore, onRiprova, ref }: ErroreSalvataggioProps) {
+export function ErroreSalvataggio({ etichetta, titolo, errore, onRiprova, ref }: ErroreSalvataggioProps) {
   return (
     <div ref={ref} role="alert" tabIndex={-1} className={cn(RIQUADRO, 'border-errore bg-errore-velato pb-0.5')}>
       <p className="flex items-start gap-1.5 font-medium text-errore">
         <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-        {`Pianta #${etichetta} non salvata.`}
+        {titolo ?? `Pianta #${etichetta} non salvata.`}
       </p>
       <p className="mt-1 text-grafite">{messaggioErrore(errore)}</p>
       <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>

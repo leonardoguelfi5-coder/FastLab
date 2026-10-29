@@ -4,14 +4,14 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn() }))
+vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { misureDelGiorno, misurePianta } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 import {
-  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisureGiorno, useMisurePianta, useSonoAdmin,
+  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta, useSonoAdmin,
 } from './query'
 
 function wrapper() {
@@ -34,6 +34,9 @@ describe('chiavi', () => {
   it('le chiavi delle misure condividono un prefisso, per invalidarle insieme', () => {
     expect(chiavi.misureGiorno('E', '2026-10-28')[0]).toBe('misure')
     expect(chiavi.misurePianta('p1')[0]).toBe('misure')
+    expect(chiavi.misura('m1')[0]).toBe('misure')
+    expect(chiavi.misura('m1')).not.toEqual(chiavi.misura('m2'))
+    expect(chiavi.misure).toEqual(['misure'])
   })
 })
 
@@ -78,6 +81,31 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useMisurePianta('p1'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(misurePianta).toHaveBeenCalledWith('p1')
+  })
+
+  it('useMisura legge una misura per id', async () => {
+    const misura = { id: 'm1' }
+    vi.mocked(caricaMisura).mockResolvedValue(misura as never)
+    const { result } = renderHook(() => useMisura('m1'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(caricaMisura).toHaveBeenCalledWith('m1')
+    expect(result.current.data).toBe(misura)
+  })
+
+  it('useMisura senza id non interroga il database', () => {
+    const { result } = renderHook(() => useMisura(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(caricaMisura).not.toHaveBeenCalled()
+  })
+
+  it('useMisura non tiene la misura in cache dopo la chiusura: riaprendola si rilegge', async () => {
+    vi.mocked(caricaMisura).mockResolvedValueOnce({ id: 'm1', ora: '09:12' } as never)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const conClient = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const prima = renderHook(() => useMisura('m1'), { wrapper: conClient })
+    await waitFor(() => expect(prima.result.current.isSuccess).toBe(true))
+    prima.unmount()
+    await waitFor(() => expect(client.getQueryData(chiavi.misura('m1'))).toBeUndefined())
   })
 
   it('useInviti legge l\'elenco degli inviti', async () => {
