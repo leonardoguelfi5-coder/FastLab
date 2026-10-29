@@ -22,7 +22,7 @@ import { parametriDiUnaMisura, validaMisura, valoriDaSalvare, valoriDeiParametri
 import type { ConfigEsperimento, Misura, Strumento, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
-import { eUuid, percorsoCampo, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
+import { eUuid, percorsoHome, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
@@ -32,7 +32,7 @@ function NonTrovata({ espId }: { espId: string }) {
     <div className="flex flex-col items-start gap-3">
       <p className="text-grafite">Misura non trovata.</p>
       <p className="text-grafite-tenue">Potrebbe essere stata eliminata, o non essere di questo esperimento.</p>
-      <Link to={percorsoCampo(espId)} className={buttonVariants({ variant: 'outline' })}>Torna alla schermata in campo</Link>
+      <Link to={percorsoHome(espId)} className={buttonVariants({ variant: 'outline' })}>Torna all'esperimento</Link>
     </div>
   )
 }
@@ -395,7 +395,7 @@ export function ModificaMisura() {
   return (
     <AppShell
       titolo="Modifica misura"
-      indietro={alla ?? percorsoCampo(espId)}
+      indietro={alla ?? percorsoHome(espId)}
       onIndietro={alla ? evento => {
         // La freccia fa lo stesso ritorno del salvataggio, dopo aver chiesto se scartare le modifiche.
         evento.preventDefault()

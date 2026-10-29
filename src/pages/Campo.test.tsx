@@ -67,9 +67,9 @@ function vaiAllaPagina() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/esperimenti/E']}>
+      <MemoryRouter initialEntries={['/esperimenti/E/misura']}>
         <Routes>
-          <Route path="/esperimenti/:espId" element={<Campo />} />
+          <Route path="/esperimenti/:espId/misura" element={<Campo />} />
           <Route path="*" element={<Posizione />} />
         </Routes>
       </MemoryRouter>
@@ -115,7 +115,7 @@ describe('Campo: intestazione', () => {
   it('ha il nome dell\'esperimento come titolo, la freccia indietro e le impostazioni', async () => {
     vaiAllaPagina()
     expect(await screen.findByRole('heading', { level: 1, name: 'Hydrochar × Cuore di Bue' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E')
     expect(screen.getByRole('link', { name: 'Impostazioni' })).toHaveAttribute('href', '/esperimenti/E/impostazioni')
   })
 })

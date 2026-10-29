@@ -10,7 +10,7 @@ import { SezioneParametri } from '@/components/impostazioni/SezioneParametri'
 import { SezioneStrumenti } from '@/components/impostazioni/SezioneStrumenti'
 import { SezionePiante } from '@/components/impostazioni/SezionePiante'
 import { SezioneTrattamenti } from '@/components/impostazioni/SezioneTrattamenti'
-import { percorsoCampo } from '@/lib/percorsi'
+import { percorsoHome } from '@/lib/percorsi'
 
 /**
  * Impostazioni di un esperimento già avviato (spec §5.3, "Modifiche a esperimento avviato"): dati generali, etichette
@@ -45,7 +45,7 @@ export function Impostazioni() {
   return (
     <AppShell
       titolo="Impostazioni"
-      indietro={percorsoCampo(espId)}
+      indietro={percorsoHome(espId)}
       onIndietro={evento => {
         if (!ciSonoModifiche()) return
         evento.preventDefault()
@@ -76,7 +76,7 @@ export function Impostazioni() {
         onAnnulla={() => setUscita(false)}
         onConferma={() => {
           setUscita(false)
-          navigate(percorsoCampo(espId))
+          navigate(percorsoHome(espId))
         }}
       />
     </AppShell>

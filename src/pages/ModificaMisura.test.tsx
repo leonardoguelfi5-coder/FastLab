@@ -772,12 +772,12 @@ describe('ModificaMisura: uscita con modifiche non salvate', () => {
 })
 
 describe('ModificaMisura: casi limite', () => {
-  it('una misura che non esiste lo dice, con il ritorno alla schermata in campo', async () => {
+  it('una misura che non esiste lo dice, con il ritorno all\'esperimento', async () => {
     apri({ id: SCONOSCIUTA })
 
     expect(await screen.findByText('Misura non trovata.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Modifica misura' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Torna alla schermata in campo' })).toHaveAttribute('href', '/esperimenti/E')
+    expect(screen.getByRole('link', { name: 'Torna all\'esperimento' })).toHaveAttribute('href', '/esperimenti/E')
     expect(screen.queryByRole('button', { name: 'Salva' })).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })

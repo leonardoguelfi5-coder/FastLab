@@ -457,14 +457,14 @@ describe('SchedaPianta: salvataggio', () => {
     await utente.type(campo('Temp aria'), '24,5')
     await utente.click(pulsante('Salva e vai alla #36'))
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
-    expect(posizione()).toBe('/esperimenti/E')
+    expect(posizione()).toBe('/esperimenti/E/misura')
 
     await act(async () => fallisci(new TypeError('Failed to fetch')))
 
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(
       /^Pianta #35 non salvata\. Il server non risponde\. .*\(vedi README\)\. I valori sono rimasti: riapri la pianta per riprovare\.$/,
     ), PERSISTENTE)
-    expect(posizione()).toBe('/esperimenti/E')
+    expect(posizione()).toBe('/esperimenti/E/misura')
     // Durante il salvataggio l'uscita non chiede di scartare: i valori erano già partiti.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -979,7 +979,7 @@ describe('SchedaPianta: intestazione e storia', () => {
     apri('35')
     await pronta()
     expect(screen.getByRole('heading', { level: 1, name: 'Hydrochar × Cuore di Bue' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E')
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/misura')
     expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' })).toBeInTheDocument()
     expect(screen.getByText('W1')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
@@ -1027,15 +1027,15 @@ describe('SchedaPianta: intestazione e storia', () => {
 })
 
 describe('SchedaPianta: casi limite', () => {
-  it('senza uno strumento scelto torna alla schermata in campo', async () => {
+  it('senza uno strumento scelto torna alla scelta della misura', async () => {
     apri('35', null)
-    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E/misura'))
   })
 
-  it('con uno strumento che non esiste più torna alla schermata in campo', async () => {
+  it('con uno strumento che non esiste più torna alla scelta della misura', async () => {
     useCampoStore.getState().setStrumento('E', 'strumento-cancellato')
     apri('35', null)
-    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E/misura'))
   })
 
   it('una pianta che non c\'è lo dice', async () => {
@@ -1248,7 +1248,7 @@ describe('SchedaPianta: valori non salvati', () => {
     await utente.click(pulsante('Ora: 10:00'))
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(posizione()).toBe('/esperimenti/E')
+    expect(posizione()).toBe('/esperimenti/E/misura')
   })
 
   it('"+ Nuova misura" con una correzione scritta chiede se scartarla', async () => {
@@ -1280,7 +1280,7 @@ describe('SchedaPianta: valori non salvati', () => {
 
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
-    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E/misura'))
     expect(bozzeSalvate()).toEqual([])
   })
 

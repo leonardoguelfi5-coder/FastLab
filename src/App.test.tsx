@@ -14,8 +14,14 @@ vi.mock('@/pages/AdminInviti', () => ({
 vi.mock('@/pages/Esperimenti', () => ({
   Esperimenti: () => <h1>Elenco esperimenti (prova)</h1>,
 }))
+vi.mock('@/pages/HomeEsperimento', () => ({
+  HomeEsperimento: () => <h1>Home dell'esperimento (prova)</h1>,
+}))
 vi.mock('@/pages/Campo', () => ({
   Campo: () => <h1>Schermata in campo (prova)</h1>,
+}))
+vi.mock('@/pages/ElencoPiante', () => ({
+  ElencoPiante: () => <h1>Elenco delle piante (prova)</h1>,
 }))
 vi.mock('@/pages/SchedaPianta', () => ({
   SchedaPianta: () => <h1>Scheda della pianta (prova)</h1>,
@@ -37,7 +43,8 @@ import { AppRoutes } from './App'
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 const PERCORSI_PRIVATI = [
-  '/', '/esperimenti/x', '/esperimenti/x/piante/p', '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni',
+  '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
+  '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/dataset',
   '/esperimenti/nuovo', '/admin/inviti',
 ]
 
@@ -79,10 +86,31 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Elenco esperimenti (prova)' })).toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId mostra la schermata in campo', () => {
+  it('con la sessione /esperimenti/:espId mostra la home dell\'esperimento', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x')
+    expect(screen.getByRole('heading', { level: 1, name: 'Home dell\'esperimento (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/misura mostra per ora la schermata in campo', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/misura')
     expect(screen.getByRole('heading', { level: 1, name: 'Schermata in campo (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/piante mostra l\'elenco delle piante', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/piante')
+    expect(screen.getByRole('heading', { level: 1, name: 'Elenco delle piante (prova)' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['oggi', 'Oggi'], ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'], ['diario', 'Diario'], ['foto', 'Foto'],
+  ])('con la sessione /esperimenti/:espId/%s mostra il segnaposto «%s»', (sezione, titolo) => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA(`/esperimenti/x/${sezione}`)
+    expect(screen.getByRole('heading', { level: 1, name: titolo })).toBeInTheDocument()
+    expect(screen.getByText('Questa sezione arriva con il prossimo aggiornamento.')).toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/piante/:piantaId mostra la scheda della pianta', () => {

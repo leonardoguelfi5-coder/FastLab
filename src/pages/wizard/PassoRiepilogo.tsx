@@ -9,6 +9,7 @@ import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { Button } from '@/components/ui/button'
 import { messaggioErrore } from '@/lib/errori'
+import { percorsoHome } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 
 interface PassoRiepilogoProps {
@@ -73,7 +74,7 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
       onCreato()
       toastSalvato('Esperimento creato.')
       // Al posto della procedura: "indietro" dall'esperimento non torna al riepilogo di una bozza già creata.
-      navigate(`/esperimenti/${id}`, { replace: true })
+      navigate(percorsoHome(id), { replace: true })
     },
     // La bozza resta com'è: si può correggere o riprovare.
     onError: (e) => { toast.error(messaggioErrore(e)) },

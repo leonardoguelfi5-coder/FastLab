@@ -12,7 +12,7 @@ import { StoriaPianta } from '@/components/scheda/StoriaPianta'
 import { Badge } from '@/components/ui/badge'
 import { piantaSuccessiva } from '@/domain/piante'
 import type { ConfigEsperimento, Misura } from '@/domain/tipi'
-import { percorsoCampo } from '@/lib/percorsi'
+import { percorsoNuovaMisura } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
 
@@ -37,7 +37,7 @@ function SchedaCaricata({
   const pianta = config.piante.find(p => p.id === piantaId)
   const strumento = config.strumenti.find(p => p.id === strumentoId)
   // Uno strumento scelto e poi cancellato dalle impostazioni è come nessuna scelta: si torna a sceglierlo.
-  if (!strumento) return <Navigate to={percorsoCampo(espId)} replace />
+  if (!strumento) return <Navigate to={percorsoNuovaMisura(espId)} replace />
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
 
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
@@ -140,17 +140,17 @@ export function SchedaPianta() {
   }
 
   // La scheda serve a inserire i valori di uno strumento: senza, si torna a sceglierlo.
-  if (!strumentoId) return <Navigate to={percorsoCampo(espId)} replace />
+  if (!strumentoId) return <Navigate to={percorsoNuovaMisura(espId)} replace />
 
   const dati = config.data
   return (
     <AppShell
       titolo={dati?.esperimento.nome ?? 'Esperimento'}
-      indietro={percorsoCampo(espId)}
+      indietro={percorsoNuovaMisura(espId)}
       onIndietro={evento => {
         if (!modulo.current?.modificato) return
         evento.preventDefault()
-        setInAttesa({ esegui: () => navigate(percorsoCampo(espId)) })
+        setInAttesa({ esegui: () => navigate(percorsoNuovaMisura(espId)) })
       }}
     >
       {dati === undefined ? (

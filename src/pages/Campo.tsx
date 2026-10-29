@@ -14,7 +14,7 @@ import { contaPerPianta } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Strumento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
-import { percorsoImpostazioni, percorsoPianta } from '@/lib/percorsi'
+import { percorsoHome, percorsoImpostazioni, percorsoPianta } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -253,7 +253,7 @@ export function Campo() {
   return (
     <AppShell
       titolo={dati?.esperimento.nome ?? 'Esperimento'}
-      indietro="/"
+      indietro={percorsoHome(espId)}
       azioni={
         <Link
           to={percorsoImpostazioni(espId)}

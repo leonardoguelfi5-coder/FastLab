@@ -608,7 +608,7 @@ describe('Impostazioni: strumenti, casi limite', () => {
 })
 
 describe('Impostazioni: uscita', () => {
-  it('senza modifiche la freccia torna subito alla schermata in campo', async () => {
+  it('senza modifiche la freccia torna subito alla home dell\'esperimento', async () => {
     const { utente } = apri()
     await pronta()
 
