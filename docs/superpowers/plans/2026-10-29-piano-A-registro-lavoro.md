@@ -80,3 +80,4 @@ Task 3: re-review fix round 1 → Approved (182 pgTAP, 945 Vitest, su copia esat
 Task 3: fix round 1/5 (4 addressed, 0 open; commits 2d41382..7e7bd47)
 Task 3: minor (deferred): intestazione `aggiornato_il` fuori posto in catalogo.test.sql; chiavi doppie nella stessa voce da impedire nell'editor (T8, già nel brief)
 Task 3: complete (commits 2d41382..7e7bd47, review clean)
+Task 5: dispatched implementer (sonnet) in parallelo al T4 (semi in src/domain/modelli/semi.ts, non tocca i file del catalogo), BASE 7e7bd47+docs
