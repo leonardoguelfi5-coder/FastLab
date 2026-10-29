@@ -155,3 +155,6 @@ Task 8: complete (commits 411d79c..9534878, review clean)
 Task 11: implementatore (sonnet) DONE aa1950a — 1250 Vitest, 189 pgTAP (emulato), build OK; `Riprendi` a inchiostro pieno nella riga dello strumento in corso; tocco su uno strumento con misure non ancora caricate → prima pianta (il T12 chiede Correggi/Nuova se ha misure); home legge le misure solo con uno strumento scelto
 Task 11: dispatched reviewer (sonnet) su copia
 Task 12: dispatched implementer (opus), BASE aa1950a (unico implementatore)
+Task 11: review (sonnet) → Approved (0 Critical/Important), 1250 Vitest, 189 pgTAP, build OK, su copia; deviazioni 1–2 accettate (non disabilitare le righe: la pagina resta usabile con poco segnale)
+Task 11: minor (carry to T13/finale): `Riprendi` alto 52 px invece di 56; riga dei dati in `text-label` invece di `text-dato`; progresso perso se una rilettura in background fallisce (come la home)
+Task 11: complete (commits 882ef80..aa1950a, review clean)
