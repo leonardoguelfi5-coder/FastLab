@@ -235,3 +235,6 @@ Ruling: rimandati dopo la prova sul telefono: doppia ✓ nel toast (testo "salva
 Question for user: i valori "ricorda tra piante" valgono anche il giorno dopo (la prima pianta di oggi parte con la Temp aria di ieri, come nella v2) — tenerli solo per la stessa data di rilievo?
 Final review: minor (deferred, Piano 2 o dopo locale): limite 1000 righe di PostgREST su misureDelGiorno/export; pagina bianca se mancano VITE_* nel deploy; errori GoTrue 429/"Signups not allowed" in inglese; utente con esperimenti non eliminabile dal Dashboard (FK senza cascade); indici FK; lacune pgTAP su cascate e FK incrociate; data router per useBlocker (indietro di sistema); codice duplicato (confronta, intestazione pianta, beforeunload); vite-plugin-pwa e xlsx
 Final fix round: dispatched implementer (opus)
+Final fix round: implemented 8313b6e (campo), 0292a60 (db), 3395c67 (config) — 838 tests; verification review (opus) → Approved
+Final review: minor (deferred): test di NuovoEsperimento con il vecchio testo "non trovato"; retry inutile su ESPERIMENTO_NON_TROVATO (query.ts:25); finestra dopoSalvataggio attiva anche dopo Correggi/Nuova misura (innocua, commento da precisare); test del link "I miei esperimenti" solo via Campo
+Piano 1: COMPLETE nel cloud (commits 2fd1c23..3395c67 + docs). Restano solo le verifiche in locale elencate in 2026-10-29-piano-1-stato.md
