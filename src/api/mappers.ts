@@ -1,6 +1,6 @@
 import type {
-  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Parametro, Strumento, StrumentoParametro, Pianta,
-  SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura,
+  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
+  Pianta, SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura, VoceCatalogo,
 } from '@/domain/tipi'
 
 // Righe come le restituisce PostgREST (select('*')). Le colonne esperimento_id, creato_da,
@@ -22,10 +22,11 @@ export interface RigaPianta {
 export interface RigaParametro {
   id: string; esperimento_id: string; nome: string; unita: string | null; tipo: TipoParametro; ordine: number
   archiviato: boolean; progressivo: boolean; n_letture: number
-  valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[]
+  valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[]; catalogo_chiave: string | null
 }
 export interface RigaStrumento {
   id: string; esperimento_id: string; nome: string; icona: string | null; ordine: number; tipo: TipoStrumento; archiviato: boolean
+  catalogo_id: string | null
 }
 export interface RigaStrumentoParametro {
   esperimento_id: string; strumento_id: string; parametro_id: string; obbligatorio: boolean; ordine: number
@@ -112,6 +113,8 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     valore_min: p.valore_min,
     valore_max: p.valore_max,
     sotto_campi: p.sotto_campi.map(s => ({ chiave: s.chiave, nome: s.nome, unita: s.unita })),
+    // `?? null`: una riga letta da un database senza la colonna non lascia undefined nel dominio.
+    catalogo_chiave: p.catalogo_chiave ?? null,
   }))
 
   const parametriPerStrumento = raggruppa([...r.strumento_parametri].sort(perOrdine), pp => pp.strumento_id)
@@ -122,6 +125,7 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     ordine: p.ordine,
     tipo: p.tipo,
     archiviato: p.archiviato,
+    catalogo_id: p.catalogo_id ?? null,
     parametri: (parametriPerStrumento.get(p.id) ?? []).map((pp): StrumentoParametro => ({
       parametro_id: pp.parametro_id,
       obbligatorio: pp.obbligatorio,
@@ -171,6 +175,7 @@ export function aRigaParametro(espId: string, p: Parametro): RigaParametro {
     valore_min: p.valore_min,
     valore_max: p.valore_max,
     sotto_campi: p.sotto_campi,
+    catalogo_chiave: p.catalogo_chiave,
   }
 }
 
@@ -187,7 +192,10 @@ export function aRigaPianta(espId: string, p: Pianta): RigaPianta {
 
 /** Solo la riga dello strumento: i suoi parametri vanno in strumento_parametri (aRigaStrumentoParametro). */
 export function aRigaStrumento(espId: string, p: Strumento): RigaStrumento {
-  return { id: p.id, esperimento_id: espId, nome: p.nome, icona: p.icona, ordine: p.ordine, tipo: p.tipo, archiviato: p.archiviato }
+  return {
+    id: p.id, esperimento_id: espId, nome: p.nome, icona: p.icona, ordine: p.ordine, tipo: p.tipo, archiviato: p.archiviato,
+    catalogo_id: p.catalogo_id,
+  }
 }
 
 export function aRigaStrumentoParametro(espId: string, strumentoId: string, pp: StrumentoParametro): RigaStrumentoParametro {
@@ -197,5 +205,57 @@ export function aRigaStrumentoParametro(espId: string, strumentoId: string, pp: 
     parametro_id: pp.parametro_id,
     obbligatorio: pp.obbligatorio,
     ordine: pp.ordine,
+  }
+}
+
+/** Una voce del catalogo come la restituisce PostgREST: `parametri` è JSON libero, letto con tolleranza. */
+export interface RigaCatalogo {
+  id: string; nome: string; icona: string | null; descrizione: string | null; parametri: unknown; archiviato: boolean
+  creato_da?: string | null; creato_il?: string; aggiornato_il?: string
+}
+
+const numeroONull = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null)
+
+/**
+ * Un valore della voce dal JSON del database. Il JSON non ha schema nel database (solo "è un array"): un campo
+ * mancante o di tipo sbagliato prende il default (unità e limiti null, una lettura) invece di rompere la pagina.
+ * Le letture valide sono quelle che accetta `parametri.n_letture` (da 1 a 20).
+ */
+function daJsonParametroCatalogo(x: unknown): ParametroCatalogo {
+  const o = (typeof x === 'object' && x !== null ? x : {}) as Record<string, unknown>
+  const n = o.n_letture
+  return {
+    chiave: typeof o.chiave === 'string' ? o.chiave : '',
+    nome: typeof o.nome === 'string' ? o.nome : '',
+    unita: typeof o.unita === 'string' ? o.unita : null,
+    n_letture: typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 20 ? n : 1,
+    valore_min: numeroONull(o.valore_min),
+    valore_max: numeroONull(o.valore_max),
+  }
+}
+
+/** Da riga del database a voce del catalogo: le colonne solo-database (creato_da, date) cadono. */
+export function daRigaCatalogo(r: RigaCatalogo): VoceCatalogo {
+  return {
+    id: r.id,
+    nome: r.nome,
+    icona: r.icona ?? null,
+    descrizione: r.descrizione ?? '',
+    parametri: Array.isArray(r.parametri) ? r.parametri.map(daJsonParametroCatalogo) : [],
+    archiviato: r.archiviato,
+  }
+}
+
+/** Riga da scrivere per una voce del catalogo: solo colonne scrivibili, mai creato_da, creato_il o aggiornato_il. */
+export function aRigaCatalogo(v: VoceCatalogo) {
+  return {
+    id: v.id,
+    nome: v.nome,
+    icona: v.icona,
+    descrizione: v.descrizione,
+    parametri: v.parametri.map(p => ({
+      chiave: p.chiave, nome: p.nome, unita: p.unita, n_letture: p.n_letture, valore_min: p.valore_min, valore_max: p.valore_max,
+    })),
+    archiviato: v.archiviato,
   }
 }

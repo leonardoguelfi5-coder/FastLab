@@ -54,7 +54,10 @@ describe('bozza', () => {
     b.strumenti[0].parametri.push(
       { parametro_id: palchi.id, obbligatorio: false, ordine: 1 },
       { parametro_id: diametro.id, obbligatorio: false, ordine: 2 })
-    b.strumenti.push({ id: crypto.randomUUID(), nome: 'SPAD', icona: null, ordine: 1, tipo: 'strumento', archiviato: false, parametri: [] })
+    b.strumenti.push({
+      id: crypto.randomUUID(), nome: 'SPAD', icona: null, ordine: 1, tipo: 'strumento', archiviato: false, catalogo_id: null,
+      parametri: [],
+    })
     expect(validaBozza(b)).toEqual([
       'Il parametro "Palchi" deve avere almeno un sotto-campo.',
       'Il parametro "Diametro" ha il minimo maggiore del massimo.',
@@ -144,13 +147,14 @@ describe('bozza', () => {
     const p = nuovoParametro(3)
     expect(p).toEqual({
       id: expect.any(String), nome: '', unita: null, tipo: 'numero', ordine: 3, archiviato: false, progressivo: false,
-      n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+      n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [], catalogo_chiave: null,
     })
     expect(nuovoParametro(0).id).not.toBe(p.id)
   })
   it('nuovoStrumento: senza nome, icona e parametri, di tipo strumento se non si dice altro', () => {
     expect(nuovoStrumento(1)).toEqual({
-      id: expect.any(String), nome: '', icona: null, ordine: 1, tipo: 'strumento', archiviato: false, parametri: [],
+      id: expect.any(String), nome: '', icona: null, ordine: 1, tipo: 'strumento', archiviato: false, catalogo_id: null,
+      parametri: [],
     })
     expect(nuovoStrumento(0, 'fenologico')).toMatchObject({ ordine: 0, tipo: 'fenologico', archiviato: false })
   })
@@ -179,6 +183,14 @@ describe('bozza', () => {
     expect(b.strumenti.map(p => p.nome)).toEqual(c.strumenti.map(p => p.nome))
     // il riferimento al parametro archiviato sparisce dallo strumento
     expect(b.strumenti[0].parametri).toHaveLength(1)
+  })
+  it('clonaConfig conserva i collegamenti al catalogo: la copia resta aggiornabile dal catalogo', () => {
+    const c = configDiEsempio()
+    c.strumenti[0].catalogo_id = 'cat-metro'
+    c.parametri[0].catalogo_chiave = 'altezza'
+    const b = clonaConfig(c)
+    expect(b.strumenti.map(s => s.catalogo_id)).toEqual(['cat-metro', null])
+    expect(b.parametri.map(p => p.catalogo_chiave)).toEqual(['altezza', null, null])
   })
   it('clonaConfig non copia gli strumenti archiviati, come i parametri archiviati', () => {
     const c = configDiEsempio()

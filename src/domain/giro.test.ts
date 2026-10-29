@@ -17,7 +17,7 @@ const tutti: Parametro[] = [A, gs, E, Ci, vecchio, note, palchi, stadio]
 
 function strumento(nome: string, ps: [Parametro, boolean][], extra: Partial<Strumento> = {}): Strumento {
   return {
-    id: `S-${nome}`, nome, icona: null, ordine: 0, tipo: 'strumento', archiviato: false,
+    id: `S-${nome}`, nome, icona: null, ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
     parametri: ps.map(([p, obbligatorio], ordine) => ({ parametro_id: p.id, obbligatorio, ordine })),
     ...extra,
   }

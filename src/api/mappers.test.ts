@@ -45,17 +45,17 @@ function righe(): RigheConfig {
       {
         id: 'par2', ...DB, nome: 'Palchi', unita: null, tipo: 'lista', ordine: 1, archiviato: false,
         progressivo: true, n_letture: 1, valore_min: null, valore_max: null,
-        sotto_campi: [{ chiave: 'n_foglie', nome: 'N foglie', unita: null }],
+        sotto_campi: [{ chiave: 'n_foglie', nome: 'N foglie', unita: null }], catalogo_chiave: null,
       },
       {
         id: 'par1', ...DB, nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false,
         progressivo: false, n_letture: 3, valore_min: 0, valore_max: 300,
-        sotto_campi: [],
+        sotto_campi: [], catalogo_chiave: 'altezza',
       },
     ],
     strumenti: [
-      { id: 'pa2', ...DB, nome: 'Fenologici', icona: null, ordine: 1, tipo: 'fenologico', archiviato: true },
-      { id: 'pa1', ...DB, nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false },
+      { id: 'pa2', ...DB, nome: 'Fenologici', icona: null, ordine: 1, tipo: 'fenologico', archiviato: true, catalogo_id: null },
+      { id: 'pa1', ...DB, nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: 'cat-metro' },
     ],
     strumento_parametri: [
       { ...DB, strumento_id: 'pa1', parametro_id: 'par2', obbligatorio: false, ordine: 1 },
@@ -93,6 +93,23 @@ describe('daRigheConfig', () => {
       { parametro_id: 'par2', obbligatorio: false, ordine: 1 },
     ])
     expect(c.strumenti[1].parametri).toEqual([{ parametro_id: 'par2', obbligatorio: false, ordine: 0 }])
+  })
+
+  it('porta i collegamenti al catalogo (null per ciò che non viene dal catalogo)', () => {
+    const c = daRigheConfig(righe())
+    expect(c.strumenti.map(s => s.catalogo_id)).toEqual(['cat-metro', null])
+    expect(c.parametri.map(p => p.catalogo_chiave)).toEqual(['altezza', null])
+  })
+
+  it('una riga senza le colonne del catalogo (database non ancora migrato) le legge come null', () => {
+    const r = righe()
+    const senza = daRigheConfig({
+      ...r,
+      parametri: r.parametri.map(p => { const q: Partial<typeof p> = { ...p }; delete q.catalogo_chiave; return q as typeof p }),
+      strumenti: r.strumenti.map(s => { const q: Partial<typeof s> = { ...s }; delete q.catalogo_id; return q as typeof s }),
+    })
+    expect(senza.strumenti.map(s => s.catalogo_id)).toEqual([null, null])
+    expect(senza.parametri.map(p => p.catalogo_chiave)).toEqual([null, null])
   })
 
   it('toglie esperimento_id e le altre colonne solo del database da ogni oggetto', () => {
@@ -178,11 +195,11 @@ describe('aRigaMisura', () => {
 describe('mapper di scrittura della configurazione', () => {
   const parametro: Parametro = {
     id: 'par1', nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false, progressivo: false,
-    n_letture: 3, valore_min: 0, valore_max: 300, sotto_campi: [],
+    n_letture: 3, valore_min: 0, valore_max: 300, sotto_campi: [], catalogo_chiave: 'altezza',
   }
   const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
   const strumento: Strumento = {
-    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: 'cat-metro',
     parametri: [{ parametro_id: 'par1', obbligatorio: true, ordine: 0 }],
   }
 
@@ -198,6 +215,7 @@ describe('mapper di scrittura della configurazione', () => {
   it('aRigaStrumento porta solo le colonne dello strumento, senza i parametri annidati', () => {
     expect(aRigaStrumento('E', strumento)).toEqual({
       id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+      catalogo_id: 'cat-metro',
     })
     expect(aRigaStrumento('E', { ...strumento, tipo: 'fenologico', archiviato: true })).toMatchObject({
       tipo: 'fenologico', archiviato: true,

@@ -451,7 +451,7 @@ describe('parametriDiUnaMisura', () => {
   const vuoto = parametro('Mai misurato')
   const config = { parametri: [altezza, tempAria, vecchio, staccato, vuoto, note] } as ConfigEsperimento
   const strumento: Strumento = {
-    id: 'PA', nome: 'Termometro', icona: null, ordine: 0, tipo: 'strumento', archiviato: false,
+    id: 'PA', nome: 'Termometro', icona: null, ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
     parametri: [
       { parametro_id: tempAria.id, obbligatorio: true, ordine: 1 },
       { parametro_id: vecchio.id, obbligatorio: false, ordine: 0 },

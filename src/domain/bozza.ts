@@ -27,12 +27,13 @@ export function nuovoParametro(ordine: number): Parametro {
     valore_min: null,
     valore_max: null,
     sotto_campi: [],
+    catalogo_chiave: null,
   }
 }
 
-/** Strumento nuovo, senza nome, icona né parametri; di tipo 'strumento' se non si dice altro. */
+/** Strumento nuovo, senza nome, icona né parametri, non preso dal catalogo; di tipo 'strumento' se non si dice altro. */
 export function nuovoStrumento(ordine: number, tipo: TipoStrumento = 'strumento'): Strumento {
-  return { id: nuovoId(), nome: '', icona: null, ordine, tipo, archiviato: false, parametri: [] }
+  return { id: nuovoId(), nome: '', icona: null, ordine, tipo, archiviato: false, catalogo_id: null, parametri: [] }
 }
 
 type Rimappa = Map<string, string>
@@ -51,6 +52,7 @@ function rimappa(mappa: Rimappa, id: string): string {
  * Copia la configurazione di un esperimento (non i dati) in una nuova bozza: tutti gli id
  * sono nuovi e i riferimenti rimappati. I parametri e gli strumenti archiviati non si
  * copiano; i parametri archiviati spariscono anche dagli strumenti. La copia riparte "in corso", senza data di inizio; le note restano.
+ * I collegamenti al catalogo (`catalogo_id`, `catalogo_chiave`) restano: la copia si aggiorna dal catalogo come l'originale.
  */
 export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
   const livelli = nuoviId(c.fattori.flatMap(f => f.livelli))

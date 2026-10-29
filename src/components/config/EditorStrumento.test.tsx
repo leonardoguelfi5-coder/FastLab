@@ -12,7 +12,10 @@ const vecchio = parametro('Vecchio', { ordine: 2, archiviato: true })
 const PARAMETRI = [altezza, spad, vecchio]
 
 function strumento(parametri: Strumento['parametri']): Strumento {
-  return { id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 0, tipo: 'strumento', archiviato: false, parametri }
+  return {
+    id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
+    parametri,
+  }
 }
 
 function rendi(iniziale: Strumento, parametri: Parametro[] = PARAMETRI) {

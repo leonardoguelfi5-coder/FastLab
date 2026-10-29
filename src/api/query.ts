@@ -1,4 +1,5 @@
 import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
+import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
@@ -17,6 +18,8 @@ export const chiavi = {
   misureGiorno: (espId: string, data: string) => ['misure', 'giorno', espId, data] as const,
   misurePianta: (piantaId: string) => ['misure', 'pianta', piantaId] as const,
   inviti: ['inviti'] as const,
+  /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
+  catalogo: ['catalogo'] as const,
   sonoAdmin: ['sonoAdmin'] as const,
 }
 
@@ -93,6 +96,11 @@ export function useMisura(id: string | undefined) {
 
 export function useInviti() {
   return useQuery({ queryKey: chiavi.inviti, queryFn: listaInviti })
+}
+
+/** Le voci del catalogo strumenti, senza le archiviate. */
+export function useCatalogo() {
+  return useQuery({ queryKey: chiavi.catalogo, queryFn: listaCatalogo })
 }
 
 export function useSonoAdmin() {

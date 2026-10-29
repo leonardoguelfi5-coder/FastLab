@@ -35,6 +35,7 @@ export function parametro(nome: string, extra: Partial<Parametro> = {}): Paramet
     valore_min: null,
     valore_max: null,
     sotto_campi: [],
+    catalogo_chiave: null,
     ...extra,
   }
 }
@@ -49,7 +50,7 @@ export function conPiante(etichette: string[]): BozzaEsperimento {
   b.piante = piante(etichette, trattamentoId)
   b.parametri = [par]
   b.strumenti = [{
-    id: crypto.randomUUID(), nome: 'Altezza', icona: null, ordine: 0, tipo: 'strumento', archiviato: false,
+    id: crypto.randomUUID(), nome: 'Altezza', icona: null, ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
     parametri: [{ parametro_id: par.id, obbligatorio: false, ordine: 0 }],
   }]
   return b
@@ -86,14 +87,14 @@ export function configDiEsempio(): ConfigEsperimento {
     parametri: [altezza, palchi, note, vecchio],
     strumenti: [
       {
-        id: crypto.randomUUID(), nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+        id: crypto.randomUUID(), nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
         parametri: [
           { parametro_id: altezza.id, obbligatorio: true, ordine: 0 },
           { parametro_id: vecchio.id, obbligatorio: false, ordine: 1 },
         ],
       },
       {
-        id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 1, tipo: 'strumento', archiviato: false,
+        id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 1, tipo: 'strumento', archiviato: false, catalogo_id: null,
         parametri: [
           { parametro_id: palchi.id, obbligatorio: false, ordine: 0 },
           { parametro_id: note.id, obbligatorio: false, ordine: 1 },

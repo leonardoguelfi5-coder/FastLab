@@ -26,6 +26,7 @@ function parametro(nome: string, ordine: number, extra: Partial<Parametro> = {})
     valore_min: null,
     valore_max: null,
     sotto_campi: [],
+    catalogo_chiave: null,
     ...extra,
   }
 }
@@ -39,6 +40,7 @@ function strumento(nome: string, icona: string, ordine: number, parametri: Param
     ordine,
     tipo: 'strumento',
     archiviato: false,
+    catalogo_id: null,
     parametri: parametri.map((p, i) => ({ parametro_id: p.id, obbligatorio: false, ordine: i })),
   }
 }

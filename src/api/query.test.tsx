@@ -7,13 +7,15 @@ vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn() }))
+vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 
+import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 import {
-  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
+  chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
   useParametriConDati, usePianteConDati, useSonoAdmin,
 } from './query'
 
@@ -46,6 +48,11 @@ describe('chiavi', () => {
     expect(chiavi.parametriConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.pianteConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.parametriConDati('E')).not.toEqual(chiavi.pianteConDati('E'))
+  })
+
+  it('il catalogo è condiviso tra esperimenti: la sua chiave sta fuori dal prefisso della configurazione', () => {
+    expect(chiavi.catalogo).toEqual(['catalogo'])
+    expect(chiavi.catalogo[0]).not.toBe(chiavi.config('E')[0])
   })
 })
 
@@ -123,6 +130,14 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useInviti(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toBe(inviti)
+  })
+
+  it('useCatalogo legge le voci del catalogo', async () => {
+    const voci = [{ id: 'c1', nome: 'SPAD', icona: '💚', descrizione: '', archiviato: false, parametri: [] }]
+    vi.mocked(listaCatalogo).mockResolvedValue(voci)
+    const { result } = renderHook(() => useCatalogo(), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toBe(voci)
   })
 
   it('useSonoAdmin legge il ruolo', async () => {

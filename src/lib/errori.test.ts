@@ -99,6 +99,17 @@ describe('messaggioErrore', () => {
     )
   })
 
+  it('nome doppio nel catalogo (indice catalogo_strumenti_nome_unico)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"',
+    })).toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
+  it('il nome dell\'indice del catalogo senza 23505 non basta', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'catalogo_strumenti_nome_unico' }))
+      .not.toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
   it('dati collegati (23503)', () => {
     expect(messaggioErrore({ code: '23503', message: 'violates foreign key constraint' })).toBe(
       'Questo elemento ha dati collegati e non può essere eliminato.',

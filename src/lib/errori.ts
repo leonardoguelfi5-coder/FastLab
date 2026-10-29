@@ -15,6 +15,9 @@ export const INVITO_GIA_USATO = 'Questo invito è già stato usato o non c\'è p
 /** `creaInvito` con un'email che ha già un invito (indice unico `inviti_email_unica`). */
 export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\'invito nell\'elenco.'
 
+/** Un nome già usato da un'altra voce non archiviata del catalogo (indice unico `catalogo_strumenti_nome_unico`). */
+const MSG_NOME_NEL_CATALOGO = 'Nel catalogo c\'è già uno strumento con questo nome.'
+
 /** `caricaConfig` non trova l'esperimento: id non valido, eliminato o non accessibile. */
 export const ESPERIMENTO_NON_TROVATO = 'Esperimento non trovato: forse è stato eliminato, o il link non è giusto.'
 
@@ -60,6 +63,7 @@ export function messaggioErrore(e: unknown): string {
   }
   // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
   if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO].includes(messaggio)) return messaggio
+  if (code === '23505' && messaggio.includes('catalogo_strumenti_nome_unico')) return MSG_NOME_NEL_CATALOGO
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
 

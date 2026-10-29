@@ -15,7 +15,7 @@ const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' 
 
 const parametro: Parametro = {
   id: 'par1', nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false, progressivo: false,
-  n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+  n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [], catalogo_chiave: null,
 }
 const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
 /** La risposta di un update o di una delete con `.select('id')`: le righe toccate. */
@@ -137,11 +137,12 @@ describe('archiviaParametro', () => {
 
 const RIGA_STRUMENTO = {
   id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+  catalogo_id: null,
 }
 
 describe('salvaStrumento', () => {
   const strumento: Strumento = {
-    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false, catalogo_id: null,
     parametri: [
       { parametro_id: 'par1', obbligatorio: true, ordine: 0 },
       { parametro_id: 'par2', obbligatorio: false, ordine: 1 },
