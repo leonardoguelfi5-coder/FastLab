@@ -3,7 +3,7 @@ import type { BozzaEsperimento, Passata } from '@/domain/tipi'
 import { nuovaPassata } from '@/domain/bozza'
 import { EditorPassata } from '@/components/config/EditorPassata'
 import { Button } from '@/components/ui/button'
-import { Espandibile } from './Espandibile'
+import { Espandibile } from '@/components/Espandibile'
 
 interface PassoPassateProps {
   bozza: BozzaEsperimento

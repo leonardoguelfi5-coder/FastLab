@@ -23,6 +23,9 @@ vi.mock('@/pages/SchedaPianta', () => ({
 vi.mock('@/pages/ModificaMisura', () => ({
   ModificaMisura: () => <h1>Modifica della misura (prova)</h1>,
 }))
+vi.mock('@/pages/Impostazioni', () => ({
+  Impostazioni: () => <h1>Impostazioni dell'esperimento (prova)</h1>,
+}))
 vi.mock('@/pages/NuovoEsperimento', () => ({
   NuovoEsperimento: () => <h1>Procedura nuovo esperimento (prova)</h1>,
 }))
@@ -33,11 +36,10 @@ import { AppRoutes } from './App'
 
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
-/** Percorsi privati ancora segnaposto. */
-const PERCORSI_SEGNAPOSTO = [
-  '/esperimenti/x/impostazioni',
+const PERCORSI_PRIVATI = [
+  '/', '/esperimenti/x', '/esperimenti/x/piante/p', '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni',
+  '/esperimenti/nuovo', '/admin/inviti',
 ]
-const PERCORSI_PRIVATI = ['/', '/esperimenti/x', '/esperimenti/x/piante/p', '/esperimenti/x/misure/m', ...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
 
 function vaiA(percorso: string) {
   render(
@@ -57,7 +59,6 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: null, caricamento: false })
     vaiA(percorso)
     expect(screen.getByRole('button', { name: 'Accedi' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('/accedi e /registrati sono pubbliche', () => {
@@ -66,53 +67,46 @@ describe('AppRoutes', () => {
     expect(screen.getByLabelText('Codice invito')).toBeInTheDocument()
   })
 
-  it.each(PERCORSI_SEGNAPOSTO)('con la sessione %s mostra la pagina (segnaposto) nel guscio', (percorso) => {
+  it('con la sessione /esperimenti/:espId/impostazioni mostra le impostazioni', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
-    vaiA(percorso)
-    expect(screen.getByText('In costruzione')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument()
+    vaiA('/esperimenti/x/impostazioni')
+    expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni dell\'esperimento (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione / mostra l\'elenco degli esperimenti', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/')
     expect(screen.getByRole('heading', { level: 1, name: 'Elenco esperimenti (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId mostra la schermata in campo', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x')
     expect(screen.getByRole('heading', { level: 1, name: 'Schermata in campo (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/piante/:piantaId mostra la scheda della pianta', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/piante/p')
     expect(screen.getByRole('heading', { level: 1, name: 'Scheda della pianta (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/misure/:misuraId mostra la modifica della misura', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/misure/m')
     expect(screen.getByRole('heading', { level: 1, name: 'Modifica della misura (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('con la sessione /admin/inviti mostra la pagina degli inviti', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/admin/inviti')
     expect(screen.getByRole('heading', { level: 1, name: 'Pagina inviti (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/nuovo mostra la procedura guidata', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/nuovo')
     expect(screen.getByRole('heading', { level: 1, name: 'Procedura nuovo esperimento (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
   })
 
   it('un percorso sconosciuto con la sessione torna a /', () => {

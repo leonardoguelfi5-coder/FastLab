@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { bozzaVuota, clonaConfig, nuovaPassata, nuovoParametro, validaBozza } from './bozza'
+import {
+  bozzaVuota, clonaConfig, nuovaPassata, nuovoParametro, problemiParametro, problemiPassata, validaBozza,
+} from './bozza'
 import { conPiante, configDiEsempio, fattore, parametro } from './test-helpers'
 
 describe('bozza', () => {
@@ -151,5 +153,58 @@ describe('bozza', () => {
     const c = configDiEsempio(); const copia = structuredClone(c)
     clonaConfig(c)
     expect(c).toEqual(copia)
+  })
+})
+
+describe('problemiParametro', () => {
+  it('un parametro valido non ha problemi', () => expect(problemiParametro(parametro('Altezza'), [])).toEqual([]))
+
+  it('gli stessi controlli di validaBozza, per un parametro solo', () => {
+    expect(problemiParametro(parametro('  '), [])).toEqual(['Un parametro non ha nome.'])
+    expect(problemiParametro(parametro('Altezza', { n_letture: 0 }), []))
+      .toEqual(['Il parametro "Altezza" deve avere almeno una lettura.'])
+    expect(problemiParametro(parametro('Palchi', { tipo: 'lista' }), []))
+      .toEqual(['Il parametro "Palchi" deve avere almeno un sotto-campo.'])
+    expect(problemiParametro(parametro('T', { valore_min: 5, valore_max: 1 }), []))
+      .toEqual(['Il parametro "T" ha il minimo maggiore del massimo.'])
+  })
+
+  it('il nome è unico tra gli altri parametri, senza badare a spazi e maiuscole', () => {
+    const altezza = parametro('Altezza')
+    expect(problemiParametro(parametro(' ALTEZZA '), [altezza]))
+      .toEqual(['C\'è già un parametro che si chiama "Altezza".'])
+  })
+
+  it('un parametro archiviato con lo stesso nome si può ripristinare', () => {
+    const vecchio = parametro('SPAD', { archiviato: true })
+    expect(problemiParametro(parametro('spad'), [vecchio]))
+      .toEqual(['C\'è già un parametro archiviato che si chiama "SPAD": ripristinalo invece di crearne uno nuovo.'])
+  })
+
+  it('il parametro stesso (stesso id) tra gli altri non conta', () => {
+    const altezza = parametro('Altezza')
+    expect(problemiParametro({ ...altezza, unita: 'cm' }, [altezza])).toEqual([])
+  })
+})
+
+describe('problemiPassata', () => {
+  const passata = (nome: string, parametri = 1) => ({
+    ...nuovaPassata(0), nome,
+    parametri: Array.from({ length: parametri }, (_, i) => ({ parametro_id: `p${i}`, obbligatorio: false, ordine: i })),
+  })
+
+  it('una passata valida non ha problemi', () => expect(problemiPassata(passata('SPAD'), [])).toEqual([]))
+  it('senza nome o senza parametri', () => {
+    expect(problemiPassata(passata(' '), [])).toEqual(['Una passata non ha nome.'])
+    expect(problemiPassata(passata('SPAD', 0), [])).toEqual(['La passata "SPAD" non ha parametri.'])
+  })
+  it('il nome è unico tra le altre passate', () => {
+    const altra = passata('Termometro')
+    expect(problemiPassata(passata('termometro '), [altra])).toEqual(['C\'è già una passata che si chiama "Termometro".'])
+    expect(problemiPassata({ ...altra, icona: '🌡' }, [altra])).toEqual([])
+  })
+  it('con l\'elenco dei parametri attivi contano solo quelli', () => {
+    expect(problemiPassata(passata('SPAD', 1), [], new Set())).toEqual(['La passata "SPAD" non ha parametri.'])
+    expect(problemiPassata(passata('SPAD', 1), [], new Set(['p0']))).toEqual([])
   })
 })

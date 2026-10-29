@@ -14,7 +14,7 @@ import { contaPerPianta } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Passata } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
-import { percorsoPianta } from '@/lib/percorsi'
+import { percorsoImpostazioni, percorsoPianta } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -256,7 +256,7 @@ export function Campo() {
       indietro="/"
       azioni={
         <Link
-          to={`/esperimenti/${encodeURIComponent(espId)}/impostazioni`}
+          to={percorsoImpostazioni(espId)}
           aria-label="Impostazioni"
           className={buttonVariants({ variant: 'quiet', size: 'icon' })}
         >

@@ -1,9 +1,10 @@
 import { useId } from 'react'
-import { ChevronDown, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import type { Parametro, SottoCampo, TipoParametro } from '@/domain/tipi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Scelta } from '@/components/Scelta'
 import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero, parseNumero } from '@/lib/numeri'
 import { CampoNumero } from './CampoNumero'
@@ -14,6 +15,8 @@ interface EditorParametroProps {
   onChange: (p: Parametro) => void
   /** Il parametro ha già dati: il tipo non si può più cambiare. */
   tipoBloccato?: boolean
+  /** Perché il tipo è bloccato, se non è perché ci sono dati (es. mentre lo si sta controllando). */
+  motivoBlocco?: string
 }
 
 const TIPI: { valore: TipoParametro; nome: string; aiuto: string }[] = [
@@ -106,7 +109,9 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
 }
 
 /** Modifica di un parametro: nome, tipo e le opzioni che valgono per quel tipo. */
-export function EditorParametro({ valore: p, onChange, tipoBloccato }: EditorParametroProps) {
+export function EditorParametro({
+  valore: p, onChange, tipoBloccato, motivoBlocco = 'Il tipo non si può cambiare: ci sono già dati.',
+}: EditorParametroProps) {
   const id = useId()
   const tipo = TIPI.find(t => t.valore === p.tipo) ?? TIPI[0]
   const cambia = (modifica: Partial<Parametro>) => onChange({ ...p, ...modifica })
@@ -125,23 +130,18 @@ export function EditorParametro({ valore: p, onChange, tipoBloccato }: EditorPar
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-tipo`}>Tipo</Label>
-        {/* Scelta nativa (sul telefono apre il selettore di sistema) vestita come gli altri campi. */}
-        <div className="relative">
-          <select
-            id={`${id}-tipo`}
-            value={p.tipo}
-            disabled={tipoBloccato}
-            aria-describedby={`${id}-tipo-aiuto${tipoBloccato ? ` ${id}-tipo-bloccato` : ''}`}
-            onChange={(e) => onChange(conTipo(p, e.target.value as TipoParametro))}
-            className="h-13 w-full cursor-pointer appearance-none rounded-md border border-riga-controllo bg-foglio pr-11 pl-3.5 text-base text-grafite transition-colors outline-none hover:border-grafite-tenue focus:border-inchiostro focus:ring-3 focus:ring-inchiostro-velato disabled:cursor-not-allowed disabled:border-riga disabled:bg-carta-ombra disabled:text-grafite-tenue"
-          >
-            {TIPI.map(t => <option key={t.valore} value={t.valore}>{t.nome}</option>)}
-          </select>
-          <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3.5 size-5 -translate-y-1/2 text-grafite-tenue" />
-        </div>
+        <Scelta
+          id={`${id}-tipo`}
+          value={p.tipo}
+          disabled={tipoBloccato}
+          aria-describedby={`${id}-tipo-aiuto${tipoBloccato ? ` ${id}-tipo-bloccato` : ''}`}
+          onChange={(e) => onChange(conTipo(p, e.target.value as TipoParametro))}
+        >
+          {TIPI.map(t => <option key={t.valore} value={t.valore}>{t.nome}</option>)}
+        </Scelta>
         <p id={`${id}-tipo-aiuto`} className="text-sm text-grafite-tenue">{tipo.aiuto}</p>
         {tipoBloccato && (
-          <p id={`${id}-tipo-bloccato`} className="text-sm text-grafite-tenue">Il tipo non si può cambiare: ci sono già dati.</p>
+          <p id={`${id}-tipo-bloccato`} className="text-sm text-grafite-tenue">{motivoBlocco}</p>
         )}
       </div>
 

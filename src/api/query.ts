@@ -1,4 +1,5 @@
 import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
+import { parametriConDati, pianteConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
@@ -7,6 +8,9 @@ import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 export const chiavi = {
   esperimenti: ['esperimenti'] as const,
   config: (espId: string) => ['config', espId] as const,
+  /** Sotto il prefisso della configurazione: invalidando `config(espId)` si rileggono anche questi. */
+  parametriConDati: (espId: string) => ['config', espId, 'parametriConDati'] as const,
+  pianteConDati: (espId: string) => ['config', espId, 'pianteConDati'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
   misura: (id: string) => ['misure', 'una', id] as const,
@@ -30,6 +34,29 @@ export function useConfig(espId: string | undefined) {
     queryKey: chiavi.config(espId ?? ''),
     queryFn: () => caricaConfig(espId as string),
     enabled: !!espId,
+  })
+}
+
+/**
+ * Gli id dei parametri con dati. Si rileggono a ogni apertura della pagina (`staleTime: 0`): da questo dipende se
+ * offrire "Elimina" o "Archivia", e una risposta vecchia non deve decidere.
+ */
+export function useParametriConDati(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.parametriConDati(espId ?? ''),
+    queryFn: () => parametriConDati(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
+  })
+}
+
+/** Gli id delle piante con almeno una misura: freschi a ogni apertura, come `useParametriConDati`. */
+export function usePianteConDati(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.pianteConDati(espId ?? ''),
+    queryFn: () => pianteConDati(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
   })
 }
 

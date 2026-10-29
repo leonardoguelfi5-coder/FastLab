@@ -124,6 +124,7 @@ describe('salvaPassata', () => {
       ], { onConflict: 'passata_id,parametro_id' }],
       ['passata_parametri', 'delete'],
       ['passata_parametri', 'eq', 'passata_id', 'pa1'],
+      ['passata_parametri', 'eq', 'esperimento_id', 'E'],
       ['passata_parametri', 'not', 'parametro_id', 'in', '(par1,par2)'],
     ])
   })
@@ -135,6 +136,7 @@ describe('salvaPassata', () => {
       ['passate', 'upsert', { id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0 }, { onConflict: 'id' }],
       ['passata_parametri', 'delete'],
       ['passata_parametri', 'eq', 'passata_id', 'pa1'],
+      ['passata_parametri', 'eq', 'esperimento_id', 'E'],
     ])
   })
 
@@ -151,15 +153,17 @@ describe('salvaPassata', () => {
 })
 
 describe('eliminaPassata', () => {
-  it('elimina per id', async () => {
-    await eliminaPassata('pa1')
-    expect(mock.di('passate').map(c => [c.metodo, ...c.args])).toEqual([['delete'], ['eq', 'id', 'pa1']])
+  it('elimina per id e esperimento', async () => {
+    await eliminaPassata('E', 'pa1')
+    expect(mock.di('passate').map(c => [c.metodo, ...c.args])).toEqual([
+      ['delete'], ['eq', 'id', 'pa1'], ['eq', 'esperimento_id', 'E'],
+    ])
   })
 
   it('lancia l\'errore (misure collegate: 23503)', async () => {
     const e = { code: '23503', message: 'violates foreign key constraint' }
     mock.risponde('passate', { error: e })
-    await expect(eliminaPassata('pa1')).rejects.toBe(e)
+    await expect(eliminaPassata('E', 'pa1')).rejects.toBe(e)
   })
 })
 
@@ -198,28 +202,30 @@ describe('piante', () => {
     await expect(aggiornaPianta('E', pianta)).rejects.toBe(errore)
   })
 
-  it('eliminaPianta elimina per id', async () => {
-    await eliminaPianta('p1')
-    expect(mock.di('piante').map(c => [c.metodo, ...c.args])).toEqual([['delete'], ['eq', 'id', 'p1']])
+  it('eliminaPianta elimina per id e esperimento', async () => {
+    await eliminaPianta('E', 'p1')
+    expect(mock.di('piante').map(c => [c.metodo, ...c.args])).toEqual([
+      ['delete'], ['eq', 'id', 'p1'], ['eq', 'esperimento_id', 'E'],
+    ])
   })
 
   it('eliminaPianta lancia l\'errore (misure collegate: 23503)', async () => {
     const e = { code: '23503', message: 'violates foreign key constraint' }
     mock.risponde('piante', { error: e })
-    await expect(eliminaPianta('p1')).rejects.toBe(e)
+    await expect(eliminaPianta('E', 'p1')).rejects.toBe(e)
   })
 })
 
 describe('aggiornaTrattamento', () => {
-  it('aggiorna l\'etichetta per id', async () => {
-    await aggiornaTrattamento('t1', 'Nuova')
+  it('aggiorna l\'etichetta per id e esperimento', async () => {
+    await aggiornaTrattamento('E', 't1', 'Nuova')
     expect(mock.di('trattamenti').map(c => [c.metodo, ...c.args])).toEqual([
-      ['update', { etichetta: 'Nuova' }], ['eq', 'id', 't1'],
+      ['update', { etichetta: 'Nuova' }], ['eq', 'id', 't1'], ['eq', 'esperimento_id', 'E'],
     ])
   })
 
   it('lancia l\'errore di Supabase', async () => {
     mock.risponde('trattamenti', { error: errore })
-    await expect(aggiornaTrattamento('t1', 'x')).rejects.toBe(errore)
+    await expect(aggiornaTrattamento('E', 't1', 'x')).rejects.toBe(errore)
   })
 })

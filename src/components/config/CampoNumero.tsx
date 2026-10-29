@@ -16,6 +16,11 @@ interface CampoNumeroProps {
   errore: string
   /** Solo interi senza segno: tastiera numerica. Altrimenti tastiera normale, che ha anche il segno meno. */
   intero?: boolean
+  /**
+   * Se il testo scritto è valido, a ogni cambiamento: mentre non lo è, `valore` resta l'ultimo valido, e chi usa
+   * il campo per un'azione (es. "Aggiungi 30 piante") non deve proporla con un numero diverso da quello che si vede.
+   */
+  onValidita?: (valido: boolean) => void
 }
 
 /**
@@ -23,7 +28,7 @@ interface CampoNumeroProps {
  * compare sotto il campo; uscendo dal campo con un testo non valido torna l'ultimo valore valido,
  * così quel che si vede è sempre quel che è salvato.
  */
-export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore, intero }: CampoNumeroProps) {
+export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore, intero, onValidita }: CampoNumeroProps) {
   const id = useId()
   const [testo, setTesto] = useState(() => formattaNumero(valore))
   const [ultimo, setUltimo] = useState(valore)
@@ -55,11 +60,16 @@ export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore,
           const nuovo = e.target.value
           setTesto(nuovo)
           const letto = leggi(nuovo)
+          onValidita?.(!Number.isNaN(letto))
           if (Number.isNaN(letto)) return
           setUltimo(letto)
           onChange(letto)
         }}
-        onBlur={() => { if (sbagliato) setTesto(formattaNumero(valore)) }}
+        onBlur={() => {
+          if (!sbagliato) return
+          setTesto(formattaNumero(valore))
+          onValidita?.(true)
+        }}
       />
       {aiuto && <p id={`${id}-aiuto`} className="text-sm text-grafite-tenue">{aiuto}</p>}
       {sbagliato && <TestoErrore id={`${id}-errore`}>{errore}</TestoErrore>}

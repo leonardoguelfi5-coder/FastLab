@@ -2,25 +2,13 @@ import { useState } from 'react'
 import type { BozzaEsperimento, Parametro } from '@/domain/tipi'
 import { nuovoParametro } from '@/domain/bozza'
 import { EditorParametro } from '@/components/config/EditorParametro'
+import { riassuntoParametro } from '@/components/config/riassunti'
 import { Button } from '@/components/ui/button'
-import { Espandibile } from './Espandibile'
+import { Espandibile } from '@/components/Espandibile'
 
 interface PassoParametriProps {
   bozza: BozzaEsperimento
   onChange: (b: BozzaEsperimento) => void
-}
-
-const TIPO: Record<Parametro['tipo'], string> = { numero: 'Numero', testo: 'Testo', sino: 'Sì/No', lista: 'Lista ripetuta' }
-
-/** Riassunto di una riga, es. "Numero · °C · ricorda tra piante". */
-function riassunto(p: Parametro): string {
-  const parti: string[] = [TIPO[p.tipo]]
-  if (p.unita) parti.push(p.unita)
-  if (p.tipo === 'numero' && p.n_letture > 1) parti.push(`${p.n_letture} letture`)
-  if (p.tipo === 'lista') parti.push(p.sotto_campi.length === 1 ? '1 sotto-campo' : `${p.sotto_campi.length} sotto-campi`)
-  if (p.progressivo) parti.push('progressivo')
-  if (p.ricorda_tra_piante) parti.push('ricorda tra piante')
-  return parti.join(' · ')
 }
 
 /** Passo 3: i parametri che si misurano su ogni pianta. Si modifica un parametro alla volta. */
@@ -58,7 +46,7 @@ export function PassoParametri({ bozza, onChange }: PassoParametriProps) {
           <Espandibile
             key={p.id}
             titolo={p.nome.trim() || 'Senza nome'}
-            riassunto={riassunto(p)}
+            riassunto={riassuntoParametro(p)}
             aperto={aperto === p.id}
             onCambia={() => setAperto(aperto === p.id ? null : p.id)}
           >

@@ -55,7 +55,7 @@ export async function salvaPassata(espId: string, p: Passata): Promise<void> {
   }
 
   // Gli id sono uuid (solo cifre esadecimali e trattini): sicuri nella lista del filtro `in`.
-  let elimina = supabase.from('passata_parametri').delete().eq('passata_id', p.id)
+  let elimina = supabase.from('passata_parametri').delete().eq('passata_id', p.id).eq('esperimento_id', espId)
   if (p.parametri.length > 0) {
     elimina = elimina.not('parametro_id', 'in', `(${p.parametri.map(pp => pp.parametro_id).join(',')})`)
   }
@@ -63,9 +63,9 @@ export async function salvaPassata(espId: string, p: Passata): Promise<void> {
   if (error) throw error
 }
 
-/** Elimina una passata (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
-export async function eliminaPassata(id: string): Promise<void> {
-  const { error } = await supabase.from('passate').delete().eq('id', id)
+/** Elimina una passata dell'esperimento (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
+export async function eliminaPassata(espId: string, id: string): Promise<void> {
+  const { error } = await supabase.from('passate').delete().eq('id', id).eq('esperimento_id', espId)
   if (error) throw error
 }
 
@@ -81,13 +81,14 @@ export async function aggiornaPianta(espId: string, p: Pianta): Promise<void> {
   if (error) throw error
 }
 
-/** Elimina una pianta. Fallisce con 23503 se ha già misure. */
-export async function eliminaPianta(id: string): Promise<void> {
-  const { error } = await supabase.from('piante').delete().eq('id', id)
+/** Elimina una pianta dell'esperimento. Fallisce con 23503 se ha già misure. */
+export async function eliminaPianta(espId: string, id: string): Promise<void> {
+  const { error } = await supabase.from('piante').delete().eq('id', id).eq('esperimento_id', espId)
   if (error) throw error
 }
 
-export async function aggiornaTrattamento(id: string, etichetta: string): Promise<void> {
-  const { error } = await supabase.from('trattamenti').update({ etichetta }).eq('id', id)
+/** Rinomina un trattamento dell'esperimento. Fallisce con 23505 se l'etichetta c'è già. */
+export async function aggiornaTrattamento(espId: string, id: string, etichetta: string): Promise<void> {
+  const { error } = await supabase.from('trattamenti').update({ etichetta }).eq('id', id).eq('esperimento_id', espId)
   if (error) throw error
 }

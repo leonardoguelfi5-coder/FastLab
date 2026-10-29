@@ -6,6 +6,9 @@ export const percorsoCampo = (espId: string) => `/esperimenti/${parte(espId)}`
 /** Scheda di una pianta. */
 export const percorsoPianta = (espId: string, piantaId: string) => `${percorsoCampo(espId)}/piante/${parte(piantaId)}`
 
+/** Impostazioni di un esperimento (configurazione a esperimento avviato). */
+export const percorsoImpostazioni = (espId: string) => `${percorsoCampo(espId)}/impostazioni`
+
 /** Modifica di una misura già registrata. */
 export const percorsoMisura = (espId: string, misuraId: string) => `${percorsoCampo(espId)}/misure/${parte(misuraId)}`
 

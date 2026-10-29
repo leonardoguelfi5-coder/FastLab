@@ -6,12 +6,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
+vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn() }))
 
+import { parametriConDati, pianteConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 import {
-  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta, useSonoAdmin,
+  chiavi, creaQueryClient, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
+  useParametriConDati, usePianteConDati, useSonoAdmin,
 } from './query'
 
 function wrapper() {
@@ -37,6 +40,12 @@ describe('chiavi', () => {
     expect(chiavi.misura('m1')[0]).toBe('misure')
     expect(chiavi.misura('m1')).not.toEqual(chiavi.misura('m2'))
     expect(chiavi.misure).toEqual(['misure'])
+  })
+
+  it('i parametri e le piante con dati stanno sotto la configurazione: si invalidano con lei', () => {
+    expect(chiavi.parametriConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
+    expect(chiavi.pianteConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
+    expect(chiavi.parametriConDati('E')).not.toEqual(chiavi.pianteConDati('E'))
   })
 })
 
@@ -121,6 +130,39 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useSonoAdmin(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toBe(true)
+  })
+})
+
+describe('parametri e piante con dati', () => {
+  it('useParametriConDati e usePianteConDati leggono gli id con dati', async () => {
+    vi.mocked(parametriConDati).mockResolvedValue(new Set(['par1']))
+    vi.mocked(pianteConDati).mockResolvedValue(new Set(['p1']))
+    const avvolgi = wrapper()
+    const parametri = renderHook(() => useParametriConDati('E'), { wrapper: avvolgi })
+    const piante = renderHook(() => usePianteConDati('E'), { wrapper: avvolgi })
+    await waitFor(() => expect(parametri.result.current.data).toEqual(new Set(['par1'])))
+    await waitFor(() => expect(piante.result.current.data).toEqual(new Set(['p1'])))
+    expect(parametriConDati).toHaveBeenCalledWith('E')
+    expect(pianteConDati).toHaveBeenCalledWith('E')
+  })
+
+  it('si rileggono a ogni apertura: mai offrire "Elimina" su dati vecchi', async () => {
+    vi.mocked(parametriConDati).mockResolvedValue(new Set())
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
+    const conClient = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const prima = renderHook(() => useParametriConDati('E'), { wrapper: conClient })
+    await waitFor(() => expect(prima.result.current.isSuccess).toBe(true))
+    prima.unmount()
+    const dopo = renderHook(() => useParametriConDati('E'), { wrapper: conClient })
+    await waitFor(() => expect(parametriConDati).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(dopo.result.current.isFetching).toBe(false))
+  })
+
+  it('senza esperimento non interrogano il database', () => {
+    renderHook(() => useParametriConDati(undefined), { wrapper: wrapper() })
+    renderHook(() => usePianteConDati(undefined), { wrapper: wrapper() })
+    expect(parametriConDati).not.toHaveBeenCalled()
+    expect(pianteConDati).not.toHaveBeenCalled()
   })
 })
 
