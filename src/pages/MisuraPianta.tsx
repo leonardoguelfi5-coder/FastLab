@@ -18,22 +18,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { prossimaDaMisurare, statiPiante } from '@/domain/giro'
+import { misureStrumentoNelGiorno } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
-import { percorsoFineGiro, percorsoMisura, percorsoNuovaMisura } from '@/lib/percorsi'
+import { percorsoFineGiro, percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
 import { useCampoStore } from '@/store/campo'
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
-const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
-
 /**
  * "Vai alla pianta": si salta a qualsiasi pianta scrivendone l'etichetta, restando nel giro dello strumento. Prende il
  * posto della pianta attuale come "Salva e vai" (il gesto indietro esce dal giro), e con valori non salvati chiede
- * prima se scartarli. Non è un testo grande: in questa schermata il grande è il numero della pianta.
+ * prima se scartarli. La pianta attuale non è un salto: il campo si svuota e i valori scritti restano (scartarli
+ * cancellerebbe la bozza lasciandoli a schermo). Non è un testo grande: in questa schermata il grande è il numero
+ * della pianta.
  */
-function VaiAllaPianta({ espId, config, strumentoId, conferma }: {
-  espId: string; config: ConfigEsperimento; strumentoId: string; conferma: (azione: () => void) => void
+function VaiAllaPianta({ espId, config, strumentoId, piantaId, conferma }: {
+  espId: string; config: ConfigEsperimento; strumentoId: string; piantaId: string; conferma: (azione: () => void) => void
 }) {
   const navigate = useNavigate()
   const idCampo = useId()
@@ -48,8 +49,12 @@ function VaiAllaPianta({ espId, config, strumentoId, conferma }: {
     const cercata = testo.trim()
     if (cercata === '') return
     const pianta = trovaPianta(config.piante, cercata)
+    if (pianta?.id === piantaId) {
+      setTesto('')
+      return
+    }
     if (pianta) {
-      conferma(() => navigate(percorsoMisura(espId, strumentoId, pianta.id), { replace: true }))
+      conferma(() => navigate(percorsoMisuraPianta(espId, strumentoId, pianta.id), { replace: true }))
       return
     }
     setErrore(`Nessuna pianta con etichetta «${cercata}» in questo esperimento.`)
@@ -109,12 +114,7 @@ interface ArrivoPiantaProps {
 function ArrivoPianta({
   espId, config, pianta, strumento, misure, misureGiorno, dataRilievo, oggi, conferma, onModifiche,
 }: ArrivoPiantaProps) {
-  const misureOggi = useMemo(
-    () => misure
-      .filter(m => m.strumento_id === strumento.id && m.data_rilievo === dataRilievo)
-      .sort((a, b) => confronta(a.ora, b.ora)),
-    [misure, strumento.id, dataRilievo],
-  )
+  const misureOggi = useMemo(() => misureStrumentoNelGiorno(misure, strumento.id, dataRilievo), [misure, strumento.id, dataRilievo])
   // Si decide una volta, all'arrivo: un salvataggio fatto qui ("Salva", che resta) non fa ricomparire la domanda.
   const [scelta, setScelta] = useState<ModuloIniziale | 'chiedi' | null>(() => {
     const base = { espId, piantaId: pianta.id, strumentoId: strumento.id, dataRilievo }
@@ -129,7 +129,7 @@ function ArrivoPianta({
   )
   const avanti = useMemo<Avanti>(
     () => (successiva
-      ? { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoMisura(espId, strumento.id, successiva.id) }
+      ? { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoMisuraPianta(espId, strumento.id, successiva.id) }
       : { testo: 'e termina', percorso: percorsoFineGiro(espId, strumento.id) }),
     [espId, strumento.id, successiva],
   )
@@ -181,7 +181,10 @@ function MisuraCaricata({
   espId, config, strumento, piantaId, dataRilievo, oggi, misure, misureGiorno, conferma, onModifiche,
 }: MisuraCaricataProps) {
   const pianta = config.piante.find(p => p.id === piantaId)
-  if (!pianta) return <AvvisoGiro espId={espId} testo="Questa pianta non esiste in questo esperimento." />
+  if (!pianta) {
+    // Lo strumento c'è: si torna a scegliere da dove ripartire, non "un altro" strumento.
+    return <AvvisoGiro espId={espId} testo="Questa pianta non esiste in questo esperimento." azione="Torna alla scelta dello strumento" />
+  }
 
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
   // Il modulo aspetta le misure della pianta (i progressivi, la domanda all'arrivo) e quelle del giorno (la pianta dopo).
@@ -203,7 +206,7 @@ function MisuraCaricata({
             </p>
           )}
         </div>
-        <VaiAllaPianta espId={espId} config={config} strumentoId={strumento.id} conferma={conferma} />
+        <VaiAllaPianta espId={espId} config={config} strumentoId={strumento.id} piantaId={pianta.id} conferma={conferma} />
         <BannerData espId={espId} conferma={conferma} />
       </div>
 

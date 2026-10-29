@@ -15,7 +15,7 @@ export const percorsoHome = (espId: string) => `/esperimenti/${parte(espId)}`
 export const percorsoNuovaMisura = (espId: string) => `${percorsoHome(espId)}/misura`
 
 /** La misura di una pianta con uno strumento, nel giro sequenziale. */
-export const percorsoMisura = (espId: string, strumentoId: string, piantaId: string) =>
+export const percorsoMisuraPianta = (espId: string, strumentoId: string, piantaId: string) =>
   `${percorsoNuovaMisura(espId)}/${parte(strumentoId)}/${parte(piantaId)}`
 
 /** La fine del giro di uno strumento: riepilogo e piante che mancano. */

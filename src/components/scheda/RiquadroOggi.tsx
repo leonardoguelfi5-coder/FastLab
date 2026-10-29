@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
+import { misureStrumentoNelGiorno } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { percorsoPianta } from '@/lib/percorsi'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
@@ -11,8 +12,6 @@ import { titoloRiquadro } from './titolo'
 
 /** Il modulo con cui si apre il riquadro, deciso da chi lo mostra: una misura nuova o la correzione di una del giorno. */
 export type ModuloIniziale = { tipo: 'nuova' } | { tipo: 'correggi'; misuraId: string }
-
-const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /** I parametri da compilare con uno strumento: nel suo ordine, senza gli archiviati. */
 function parametriDelloStrumento(config: ConfigEsperimento, strumento: Strumento): Parametro[] {
@@ -65,12 +64,7 @@ export function RiquadroOggi({
   const chiaveNuova = chiaveBozza({ ...base, misuraId: null })
   const aperto = chiaveAperto(base)
 
-  const misureOggi = useMemo(
-    () => misure
-      .filter(m => m.strumento_id === strumento.id && m.data_rilievo === dataRilievo)
-      .sort((a, b) => confronta(a.ora, b.ora)),
-    [misure, strumento.id, dataRilievo],
-  )
+  const misureOggi = useMemo(() => misureStrumentoNelGiorno(misure, strumento.id, dataRilievo), [misure, strumento.id, dataRilievo])
 
   // L'id di una misura nuova cambia solo dopo un salvataggio riuscito: un nuovo tentativo dopo un errore, "Scarta" sulla
   // bozza ripresa o un giro in una correzione lo riusano, e l'upsert per id non crea doppioni anche se un tentativo

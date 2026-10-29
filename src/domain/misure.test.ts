@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, misureStrumentoNelGiorno, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Strumento, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
@@ -65,6 +65,18 @@ describe('eVuoto', () => {
     expect(eVuoto(palchi, undefined)).toBe(true)
     expect(eVuoto(palchi, [])).toBe(true)
     expect(eVuoto(palchi, [{ n: 1, valori: { f: 5 } }])).toBe(false)
+  })
+})
+
+describe('misureStrumentoNelGiorno', () => {
+  it('le misure dello strumento in quella data, per ora; a parità di ora nell\'ordine ricevuto', () => {
+    const tardi = mis(D, '15:40', {})
+    const prima = mis(D, '09:12', {})
+    const seconda = mis(D, '09:12', {})
+    const altroStrumento = mis(D, '08:00', {}, { strumento_id: 'PA2' })
+    const ieri = mis('2026-10-27', '08:00', {})
+
+    expect(misureStrumentoNelGiorno([tardi, prima, altroStrumento, seconda, ieri], 'PA1', D)).toEqual([prima, seconda, tardi])
   })
 })
 

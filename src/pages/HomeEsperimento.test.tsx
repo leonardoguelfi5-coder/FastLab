@@ -89,6 +89,7 @@ function vaiAllaPagina() {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return client
 }
 
 const striscia = () => screen.getByRole('link', { name: /^Nuova misura/ })
@@ -217,6 +218,31 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     expect(await within(await aspettaLaHome()).findByText(/SPAD in corso · 34\/56/)).toBeInTheDocument()
     expect(striscia()).toHaveTextContent(`${strumento('SPAD').icona} SPAD in corso · 34/56`)
     expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
+  })
+
+  it('l\'icona dello strumento non entra nel nome accessibile della striscia', async () => {
+    useCampoStore.getState().setStrumento('E', strumento('SPAD').id)
+    vi.mocked(misureDelGiorno).mockResolvedValue(misureSpad(34))
+    vaiAllaPagina()
+    await within(await aspettaLaHome()).findByText(/SPAD in corso · 34\/56/)
+    expect(within(striscia()).getByText(strumento('SPAD').icona!)).toHaveAttribute('aria-hidden', 'true')
+    expect(striscia()).toHaveAccessibleName(/^Nuova misura ?SPAD in corso · 34\/56$/)
+  })
+
+  it('dopo una prima lettura riuscita, una rilettura che fallisce lascia il progresso', async () => {
+    useCampoStore.getState().setStrumento('E', strumento('SPAD').id)
+    vi.mocked(misureDelGiorno).mockResolvedValueOnce(misureSpad(34)).mockRejectedValue(new TypeError('Failed to fetch'))
+    const client = vaiAllaPagina()
+    expect(await within(await aspettaLaHome()).findByText(/SPAD in corso · 34\/56/)).toBeInTheDocument()
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['misure'] })
+      // React Query avvisa i componenti a un giro di timer: si aspetta che la pagina abbia visto l'errore.
+      await new Promise(r => setTimeout(r, 20))
+    })
+
+    expect(misureDelGiorno).toHaveBeenCalledTimes(2)
+    expect(striscia()).toHaveTextContent('SPAD in corso · 34/56')
   })
 
   it('senza uno strumento nello store non legge nemmeno le misure del giorno', async () => {

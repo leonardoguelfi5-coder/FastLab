@@ -46,6 +46,16 @@ function adattaLetture(p: Parametro, v: ValoreParametro): ValoreParametro {
 const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
+ * Le misure di uno strumento in una data, in ordine di ora (a parità di ora, nell'ordine ricevuto): quelle del riquadro
+ * "Oggi" e della domanda all'arrivo su una pianta.
+ */
+export function misureStrumentoNelGiorno(misure: Misura[], strumentoId: string, dataRilievo: string): Misura[] {
+  return misure
+    .filter(m => m.strumento_id === strumentoId && m.data_rilievo === dataRilievo)
+    .sort((a, b) => confronta(a.ora, b.ora))
+}
+
+/**
  * Il valore non vuoto più recente (per data e ora del rilievo) tra le misure fino a `finoA` compreso.
  * `escludiId` salta una misura, per esempio quella che si sta modificando.
  * Restituisce una copia profonda, o `undefined` se non c'è nessun valore.

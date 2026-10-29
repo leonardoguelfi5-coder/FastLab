@@ -8,10 +8,11 @@ import { BarraAzioni } from '@/components/BarraAzioni'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { AvvisoGiro } from '@/components/scheda/AvvisoGiro'
 import type { ArrivoScheda } from '@/components/scheda/ModuloOggi'
+import { useAttesaArrivo } from '@/components/scheda/useAttesaArrivo'
 import { Button } from '@/components/ui/button'
 import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import type { ConfigEsperimento, Misura, Strumento } from '@/domain/tipi'
-import { percorsoMisura, percorsoNuovaMisura } from '@/lib/percorsi'
+import { percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
 
@@ -26,12 +27,18 @@ function Riepilogo({ espId, config, strumento, misure }: { espId: string; config
     [config, strumento, misure],
   )
   const incompleta = new Set(incomplete.map(p => p.id))
-  const scegliAltro = () => navigate(percorsoNuovaMisura(espId))
+  // Si arriva qui con "Salva e termina", e i pulsanti in basso sono dove c'era lui: il secondo tocco di un doppio
+  // tocco non è una scelta (porterebbe via dal riepilogo prima di leggerlo).
+  const toccoValido = useAttesaArrivo()
+  const scegliAltro = () => {
+    if (toccoValido()) navigate(percorsoNuovaMisura(espId))
+  }
   // Come dopo "Salva e vai": si continua a misurare (il cursore nel primo campo), e i pulsanti della pianta compaiono
   // dove c'era questo, quindi un doppio tocco non salva niente al posto di chi rileva.
   const vaiAlleMancanti = () => {
+    if (!toccoValido()) return
     const arrivo: ArrivoScheda = { primoCampo: true }
-    navigate(percorsoMisura(espId, strumento.id, mancanti[0].id), { state: arrivo })
+    navigate(percorsoMisuraPianta(espId, strumento.id, mancanti[0].id), { state: arrivo })
   }
 
   return (
@@ -43,7 +50,7 @@ function Riepilogo({ espId, config, strumento, misure }: { espId: string; config
           <span className="font-mono tabular-nums">{`${fatte}/${totale}`}</span>
         </h2>
         {mancanti.length > 0 ? (
-          <p className="text-grafite">{`Mancano ${mancanti.map(p => p.etichetta).join(', ')}`}</p>
+          <p className="text-grafite">{`${mancanti.length === 1 ? 'Manca' : 'Mancano'} ${mancanti.map(p => p.etichetta).join(', ')}`}</p>
         ) : (
           <p className="text-grafite">Giro completo: tutte le piante sono misurate.</p>
         )}
@@ -54,7 +61,7 @@ function Riepilogo({ espId, config, strumento, misure }: { espId: string; config
           {mancanti.map(p => (
             <li key={p.id} className="border-b border-riga first:border-t">
               <Link
-                to={percorsoMisura(espId, strumento.id, p.id)}
+                to={percorsoMisuraPianta(espId, strumento.id, p.id)}
                 className="flex min-h-11 items-center gap-3 px-4 py-2.5 transition-colors -outline-offset-2 hover:bg-carta-ombra/70 active:bg-carta-ombra"
               >
                 <span className="flex-1">

@@ -22,15 +22,16 @@ function riepilogo({ esperimento, piante, trattamenti }: ConfigEsperimento): str
  * Il giro in corso dello strumento scelto l'ultima volta, alla data di rilievo: "🌡 SPAD in corso · 34/56". Compare
  * solo con uno strumento non archiviato dell'esperimento, almeno una pianta già toccata e il giro non finito; per
  * il resto (nessuna scelta, giro non cominciato o finito) la striscia ha solo il titolo. Gli stati si calcolano solo
- * a misure arrivate: senza, non si può dire quali piante sono fatte. Un errore di lettura qui non si mostra: non
- * serve per aprire la misura, e la home non deve allarmare per un dettaglio.
+ * a misure arrivate (dopo un primo successo; una rilettura fallita lascia quelle già lette): senza, non si può dire
+ * quali piante sono fatte. Un errore di lettura qui non si mostra: non serve per aprire la misura, e la home non deve
+ * allarmare per un dettaglio. L'icona è a parte, per tenerla fuori dal nome che leggono i lettori di schermo.
  */
-function useGiroInCorso(espId: string, config: ConfigEsperimento): string | null {
+function useGiroInCorso(espId: string, config: ConfigEsperimento): { icona: string | null; testo: string } | null {
   const oggi = useOggi()
   const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
   // Senza uno strumento scelto non c'è giro da mostrare: non si legge nulla (la home non paga una query per niente).
   const misure = useMisureGiorno(strumentoId ? espId : undefined, dataRilievo)
-  const dati = misure.isSuccess ? misure.data : undefined
+  const dati = misure.data
 
   return useMemo(() => {
     if (!dati) return null
@@ -40,7 +41,7 @@ function useGiroInCorso(espId: string, config: ConfigEsperimento): string | null
     const { fatte, totale } = riepilogoGiro(config.piante, stati)
     const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
     if (!cominciato || fatte >= totale) return null
-    return `${strumento.icona ? `${strumento.icona} ` : ''}${strumento.nome} in corso · ${fatte}/${totale}`
+    return { icona: strumento.icona, testo: `${strumento.nome} in corso · ${fatte}/${totale}` }
   }, [dati, config, strumentoId])
 }
 
@@ -58,7 +59,12 @@ function StrisciaNuovaMisura({ espId, config }: { espId: string; config: ConfigE
     >
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-title"><span aria-hidden>➕ </span>Nuova misura</span>
-        {giro && <span className="font-mono text-label tabular-nums text-foglio/85">{giro}</span>}
+        {giro && (
+          <span className="font-mono text-label tabular-nums text-foglio/85">
+            {giro.icona && <span aria-hidden>{`${giro.icona} `}</span>}
+            {giro.testo}
+          </span>
+        )}
       </span>
       <ChevronRight aria-hidden className="size-6 shrink-0" />
     </Link>

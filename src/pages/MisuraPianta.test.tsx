@@ -266,6 +266,26 @@ describe('MisuraPianta: il giro', () => {
     expect(salvate()).toHaveLength(1)
   })
 
+  it('un doppio tocco su "Salva e termina" non tocca "Vai alle mancanti": si resta sulla fine del giro', async () => {
+    archivio = config.piante.filter(p => !['12', '33', '56'].includes(p.etichetta)).map(p => misura(p.etichetta))
+    const utente = userEvent.setup()
+    apri('56')
+    await pronta()
+    await utente.type(campo('SPAD'), '40')
+    await utente.click(pulsante('Salva e termina'))
+    const fine = `/esperimenti/E/misura/${idStrumento('SPAD')}/fine`
+    await waitFor(() => expect(posizione()).toBe(fine))
+
+    // Il secondo tocco, subito: nello stesso punto ora c'è "Vai alle mancanti".
+    await utente.click(await screen.findByRole('button', { name: 'Vai alle mancanti' }))
+    await utente.click(pulsante('Scegli un altro strumento'))
+    expect(posizione()).toBe(fine)
+
+    piuTardi()
+    await utente.click(pulsante('Vai alle mancanti'))
+    await pianta('12')
+  })
+
   it('la fine del giro conta subito la pianta appena salvata, senza aspettare che le misure del giorno si rileggano', async () => {
     archivio = config.piante.filter(p => p.etichetta !== '56').map(p => misura(p.etichetta))
     const prima = archivio
@@ -411,6 +431,21 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     expect(campo('SPAD')).toHaveValue('41')
   })
 
+  it('due misure alla stessa ora si distinguono: "09:12 (1)" e "09:12 (2)" nella domanda, nell\'elenco e nei pulsanti', async () => {
+    const prima = misura('2')
+    const seconda = misura('2', { valori: { [par('SPAD').id]: [41] } })
+    archivio = [prima, seconda]
+    const utente = userEvent.setup()
+    apri('2')
+
+    expect(await screen.findByText('Correggere una di quelle delle 09:12 (1) e 09:12 (2) o aggiungerne una nuova?')).toBeInTheDocument()
+    const elenco = screen.getByRole('list', { name: 'Misure già registrate' })
+    expect(within(elenco).getAllByRole('listitem').map(li => li.textContent?.split(' · ')[0])).toEqual(['09:12 (1)', '09:12 (2)'])
+    expect(screen.getAllByRole('button', { name: /^Correggi/ }).map(b => b.textContent)).toEqual(['Correggi 09:12 (1)', 'Correggi 09:12 (2)'])
+    await scegli(utente, 'Correggi 09:12 (2)')
+    expect(campo('SPAD')).toHaveValue('41')
+  })
+
   it('una pianta fatta aperta apposta (da un collegamento) chiede anche lei', async () => {
     archivio = [misura('7')]
     apri('7')
@@ -476,6 +511,7 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     const utente = userEvent.setup()
     apri('', 'Ciras', `/esperimenti/E/misura/${idStrumento('Ciras')}/fine`)
     expect(await screen.findByRole('heading', { level: 2, name: 'Ciras: 55/56' })).toBeInTheDocument()
+    piuTardi()
     await utente.click(pulsante('Vai alle mancanti'))
 
     await pianta('33')
@@ -490,7 +526,9 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     ]
     const utente = userEvent.setup()
     apri('', 'Termometro', `/esperimenti/E/misura/${idStrumento('Termometro')}/fine`)
-    await utente.click(await screen.findByRole('button', { name: 'Vai alle mancanti' }))
+    const vai = await screen.findByRole('button', { name: 'Vai alle mancanti' })
+    piuTardi()
+    await utente.click(vai)
     await pianta('2')
 
     // Il secondo tocco cade su "Nuova misura", che è al posto di "Vai alle mancanti": la domanda resta.
@@ -527,7 +565,9 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     }))
     const utente = userEvent.setup()
     apri('', 'Termometro', `/esperimenti/E/misura/${idStrumento('Termometro')}/fine`)
-    await utente.click(await screen.findByRole('button', { name: 'Vai alle mancanti' }))
+    const vai = await screen.findByRole('button', { name: 'Vai alle mancanti' })
+    piuTardi()
+    await utente.click(vai)
     await pianta('5')
     await pronta()
     expect(campo('Temp aria')).toHaveValue('26')
@@ -612,6 +652,19 @@ describe('MisuraPianta: valori non salvati e bozze', () => {
 })
 
 describe('MisuraPianta: vai alla pianta', () => {
+  it('"Vai alla pianta" sulla pianta attuale non chiede e non tocca i valori scritti: svuota solo il campo', async () => {
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '41')
+    await utente.type(campo('Vai alla pianta'), '01{Enter}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(campo('Vai alla pianta')).toHaveValue('')
+    expect(campo('SPAD')).toHaveValue('41')
+    expect(posizione()).toBe(percorso('SPAD', '1'))
+  })
+
   it('" 01 " apre la pianta 1', async () => {
     const utente = userEvent.setup()
     apri('5')
@@ -765,6 +818,7 @@ describe('MisuraPianta: casi limite', () => {
     apri('inesistente')
     expect(await screen.findByText('Questa pianta non esiste in questo esperimento.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Torna alla scelta dello strumento' })).toHaveAttribute('href', '/esperimenti/E/misura')
   })
 
   it('se la configurazione non si carica spiega cosa è successo, con "Riprova"', async () => {

@@ -90,6 +90,7 @@ function vaiAllaPagina() {
       </MemoryRouter>
     </QueryClientProvider>,
   )
+  return client
 }
 
 /** La riga di uno strumento nell'elenco (il pulsante che lo sceglie), e il suo testo secondario. */
@@ -287,6 +288,23 @@ describe('SceltaStrumento: lo strumento in corso', () => {
     expect(riprendi).toBeInTheDocument()
     // Alto 56 px come le righe dell'elenco.
     expect(riprendi).toHaveClass('h-14')
+  })
+
+  it('dopo una prima lettura riuscita, una rilettura che fallisce lascia il progresso e "Riprendi"', async () => {
+    useCampoStore.getState().setStrumento('E', strumento('SPAD').id)
+    vi.mocked(misureDelGiorno).mockResolvedValueOnce(misureDi('SPAD', 34)).mockRejectedValue(new TypeError('Failed to fetch'))
+    const client = vaiAllaPagina()
+    expect(await screen.findByRole('button', { name: 'Riprendi dalla pianta 35' })).toBeInTheDocument()
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ['misure'] })
+      // React Query avvisa i componenti a un giro di timer: si aspetta che la pagina abbia visto l'errore.
+      await new Promise(r => setTimeout(r, 20))
+    })
+
+    expect(misureDelGiorno).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('button', { name: 'Riprendi dalla pianta 35' })).toBeInTheDocument()
+    expect(within(riga('SPAD')).getByText('34/56 oggi')).toBeInTheDocument()
   })
 
   it('"Riprendi" porta alla prima pianta non fatta, saltando le fatte e riprendendo le incomplete', async () => {

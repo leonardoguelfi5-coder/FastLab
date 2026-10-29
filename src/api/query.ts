@@ -84,8 +84,9 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
 }
 
 /**
- * La data dell'ultima misura di ogni strumento. Sotto il prefisso `misure`: dopo ogni salvataggio si rilegge insieme
- * alle altre, e "ultima volta" non resta indietro.
+ * La data dell'ultima misura di ogni strumento. Sotto il prefisso `misure`: la modifica e l'eliminazione di una misura
+ * invalidano tutto il prefisso, e il salvataggio dal modulo della pianta la invalida a parte; così "ultima volta" non
+ * resta indietro.
  */
 export function useUltimeMisure(espId: string | undefined) {
   return useQuery({

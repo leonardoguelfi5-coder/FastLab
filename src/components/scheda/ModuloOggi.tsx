@@ -303,6 +303,8 @@ export function ModuloOggi({
     queryClient.setQueryData<Misura[]>(chiavi.misureGiorno(espId, m.data_rilievo), prima => prima && [m, ...prima.filter(x => x.id !== m.id)])
     void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
     void queryClient.invalidateQueries({ queryKey: chiavi.misureGiorno(espId, m.data_rilievo) })
+    // "ultima volta" nella scelta dello strumento: questa può essere la misura più recente del suo strumento.
+    void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisure(espId) })
     void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
     // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
     if (!montato.current) return

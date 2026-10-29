@@ -76,6 +76,8 @@ function vaiAllaPagina(strumentoId = idStrumento('SPAD')) {
 
 const posizione = () => screen.getByTestId('posizione').textContent
 const titolo = (nome: string) => screen.findByRole('heading', { level: 2, name: nome })
+/** Più tardi di un doppio tocco: i pulsanti ignorano i tocchi appena comparsi. */
+const piuTardi = () => vi.setSystemTime(new Date(Date.now() + 1000))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -132,6 +134,7 @@ describe('FineGiro', () => {
     expect(within(elenco).getByRole('link', { name: '33 incompleta' })).toBeInTheDocument()
     expect(within(elenco).getByRole('link', { name: '40' })).toBeInTheDocument()
 
+    piuTardi()
     await utente.click(screen.getByRole('button', { name: 'Vai alle mancanti' }))
     expect(posizione()).toBe(`/esperimenti/E/misura/${idStrumento('Ciras')}/${idPianta('33')}`)
   })
@@ -142,8 +145,27 @@ describe('FineGiro', () => {
     vaiAllaPagina()
     await titolo('SPAD: 54/56')
     expect(screen.getByRole('button', { name: 'Scegli un altro strumento' })).toBeInTheDocument()
+    piuTardi()
     await utente.click(screen.getByRole('button', { name: 'Vai alle mancanti' }))
     expect(posizione()).toBe(`/esperimenti/E/misura/${idStrumento('SPAD')}/${idPianta('12')}`)
+  })
+
+  it('con una sola pianta mancante dice "Manca"', async () => {
+    vi.mocked(misureDelGiorno).mockImplementation(async () => spadTranne('12'))
+    vaiAllaPagina()
+    await titolo('SPAD: 55/56')
+    expect(screen.getByText('Manca 12')).toBeInTheDocument()
+  })
+
+  it('un tocco appena comparsa la pagina non vale (il secondo di un doppio tocco su "Salva e termina")', async () => {
+    vi.mocked(misureDelGiorno).mockImplementation(async () => spadTranne('12', '33'))
+    const utente = userEvent.setup()
+    vaiAllaPagina()
+    await titolo('SPAD: 54/56')
+    await utente.click(screen.getByRole('button', { name: 'Vai alle mancanti' }))
+    await utente.click(screen.getByRole('button', { name: 'Scegli un altro strumento' }))
+    expect(screen.getByRole('heading', { level: 2, name: 'SPAD: 54/56' })).toBeInTheDocument()
+    expect(screen.queryByTestId('posizione')).not.toBeInTheDocument()
   })
 
   it('con il giro completo lo dice, senza "Vai alle mancanti"', async () => {
@@ -154,6 +176,7 @@ describe('FineGiro', () => {
     expect(screen.getByText('Giro completo: tutte le piante sono misurate.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Vai alle mancanti' })).not.toBeInTheDocument()
     expect(screen.queryByText(/^Mancano/)).not.toBeInTheDocument()
+    piuTardi()
     await utente.click(screen.getByRole('button', { name: 'Scegli un altro strumento' }))
     expect(posizione()).toBe('/esperimenti/E/misura')
   })

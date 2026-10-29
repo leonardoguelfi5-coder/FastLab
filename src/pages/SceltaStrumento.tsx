@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { prossimaDaMisurare, riepilogoGiro, statiPiante, type StatoPianta } from '@/domain/giro'
 import type { ConfigEsperimento, Pianta, Strumento } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
-import { percorsoFineGiro, percorsoHome, percorsoImpostazioni, percorsoMisura } from '@/lib/percorsi'
+import { percorsoFineGiro, percorsoHome, percorsoImpostazioni, percorsoMisuraPianta } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
 
@@ -54,8 +54,8 @@ function righeStrumenti(config: ConfigEsperimento, misure: Parameters<typeof sta
 const inCorso = (g: Giro | null): g is Giro => g !== null && g.cominciato && g.fatte < g.totale
 
 /**
- * La riga in Geist Mono sotto il nome. Mai un dato falso: finché le letture non arrivano "…", e se falliscono niente
- * (la pagina si usa lo stesso).
+ * La riga in Geist Mono sotto il nome. Mai un dato falso: finché le letture non arrivano "…", e se la prima fallisce
+ * niente (la pagina si usa lo stesso); se fallisce una rilettura restano i dati già letti.
  *  - giro finito: "fatto ✓";
  *  - giro iniziato: "34/56 oggi", o "34/56 il 27/10" se la data di rilievo non è oggi;
  *  - altrimenti la data dell'ultima misura ("ultima volta 21/10"), o "mai misurato".
@@ -75,7 +75,8 @@ function testoSecondario(
   if (giro.totale > 0 && giro.fatte === giro.totale) return 'fatto ✓'
   if (giro.cominciato) return `${giro.fatte}/${giro.totale} ${dataRilievo === oggi ? 'oggi' : `il ${formattaGiornoMese(dataRilievo)}`}`
   if (ultime.isPending) return '…'
-  if (!ultime.isSuccess) return ''
+  // Come per le misure del giorno: una rilettura fallita lascia le date già lette.
+  if (ultime.data === undefined) return ''
   const ultima = ultime.data.get(strumentoId)
   return ultima ? `ultima volta ${formattaGiornoMese(ultima)}` : 'mai misurato'
 }
@@ -131,7 +132,9 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
   const setStrumento = useCampoStore(s => s.setStrumento)
   const misure = useMisureGiorno(espId, dataRilievo)
   const ultime = useUltimeMisure(espId)
-  const dati = misure.isSuccess ? misure.data : undefined
+  // I dati restano anche se una rilettura in background fallisce: il progresso e "Riprendi" non spariscono per questo.
+  // Prima del primo successo non ci sono, e non si calcola nulla.
+  const dati = misure.data
 
   const righe = useMemo(() => righeStrumenti(config, dati), [config, dati])
   // Lo strumento dello store sta in cima solo se il suo giro è cominciato e non finito alla data di rilievo.
@@ -140,7 +143,7 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
 
   function scegli({ strumento, prossima }: RigaStrumento) {
     setStrumento(espId, strumento.id)
-    navigate(prossima ? percorsoMisura(espId, strumento.id, prossima.id) : percorsoFineGiro(espId, strumento.id))
+    navigate(prossima ? percorsoMisuraPianta(espId, strumento.id, prossima.id) : percorsoFineGiro(espId, strumento.id))
   }
 
   if (righe.length === 0) {
