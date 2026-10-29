@@ -210,3 +210,6 @@ Task 14: minor (deferred): layout data/ora verificato solo come classi (controll
 Task 14: fix round 1/5 (8 addressed, 0 open; commits 8bcb1e0..2e1731f)
 Task 14: complete (commits 8bcb1e0..2e1731f, review clean)
 Task 15: dispatched implementer (opus)
+Task 15: implementer DONE_WITH_CONCERNS d5b97cc (796 tests) — sezioni in src/components/impostazioni/, useAzione/useBozze, problemiParametro/problemiPassata estratti da validaBozza, API filtrano esperimento_id, Espandibile spostato in components; extra: ricontrollo pianteConDati al cambio trattamento, retry aggiunta piante con stessi id (23505 → ok se già presenti), sotto-campi di liste con dati non rimovibili
+Ruling (T15, to apply in fix round with review): (a) guardia nel DB sul cambio di trattamento di una pianta con misure — migration 20261029000006 con trigger + test pgTAP, da verificare in locale (Docker assente nel cloud); (b) gli update di configurazione/esperimento verificano le righe toccate (`.select('id')`, errore chiaro se 0) — un "salvato" che non ha salvato nulla viola "mai silenzio sugli esiti" — cost if wrong: one migration + small API change
+Task 15: dispatched reviewer (opus) on 8ef5624..d5b97cc
