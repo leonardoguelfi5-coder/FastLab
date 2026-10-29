@@ -5,6 +5,7 @@ import { messaggioErrore } from '@/lib/errori'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TestoErrore } from '@/components/TestoErrore'
 
 export function Accedi() {
   const navigate = useNavigate()
@@ -28,12 +29,12 @@ export function Accedi() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-6 p-4">
-      <h1 className="text-2xl font-bold">FastLab</h1>
+    <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-8 px-4 py-10">
+      <h1 className="border-b border-riga pb-4 text-headline text-grafite">FastLab</h1>
 
-      <form onSubmit={invia} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="accedi-email" className="text-sm font-medium">Email</Label>
+      <form onSubmit={invia} className="flex flex-col gap-5">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="accedi-email">Email</Label>
           <Input
             id="accedi-email"
             type="email"
@@ -41,11 +42,10 @@ export function Accedi() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-12 text-lg"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="accedi-password" className="text-sm font-medium">Password</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="accedi-password">Password</Label>
           <Input
             id="accedi-password"
             type="password"
@@ -53,27 +53,30 @@ export function Accedi() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="h-12 text-lg"
           />
         </div>
-        <Button type="submit" disabled={invio} className="h-12 text-lg">
+        <Button type="submit" size="lg" disabled={invio} className="mt-1">
           {invio ? 'Accesso…' : 'Accedi'}
         </Button>
-        {errore && <p role="alert" className="text-sm text-destructive">{errore}</p>}
+        {errore && <TestoErrore role="alert">{errore}</TestoErrore>}
       </form>
 
-      <div className="flex flex-col items-start gap-1">
+      <div className="flex flex-col items-start gap-1 text-sm">
         <Button
           type="button"
           variant="link"
+          size="sm"
           aria-expanded={passwordDimenticata}
           onClick={() => setPasswordDimenticata(v => !v)}
-          className="h-11 px-0"
+          className="px-0 text-sm"
         >
           Password dimenticata?
         </Button>
-        {passwordDimenticata && <p className="text-sm">Chiedi all'amministratore di reimpostarla.</p>}
-        <Link to="/registrati" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4">
+        {passwordDimenticata && <p className="pb-2 text-grafite">Chiedi all'amministratore di reimpostarla.</p>}
+        <Link
+          to="/registrati"
+          className="inline-flex min-h-11 items-center rounded-sm font-medium text-inchiostro underline decoration-1 underline-offset-4 hover:decoration-2"
+        >
           Non hai un account? Registrati (serve un invito)
         </Link>
       </div>

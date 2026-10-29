@@ -52,61 +52,61 @@ export function EditorPassata({ valore, parametri, onChange }: EditorPassataProp
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="grid grid-cols-[1fr_6rem] gap-3">
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`${id}-nome`} className="text-sm font-medium">Nome della passata</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-nome`}>Nome della passata</Label>
           <Input
             id={`${id}-nome`}
             value={valore.nome}
             placeholder="es. Termometro"
             onChange={(e) => onChange({ ...valore, nome: e.target.value })}
-            className="h-12 text-lg"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor={`${id}-icona`} className="text-sm font-medium">Icona</Label>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-icona`}>Icona</Label>
           <Input
             id={`${id}-icona`}
             value={valore.icona ?? ''}
             placeholder="🌱"
             aria-describedby={`${id}-icona-aiuto`}
             onChange={(e) => onChange({ ...valore, icona: e.target.value.trim() === '' ? null : e.target.value })}
-            className="h-12 text-center text-lg"
+            className="text-center text-campo"
           />
         </div>
       </div>
-      <p id={`${id}-icona-aiuto`} className="-mt-2 text-sm text-muted-foreground">L'icona è facoltativa: un'emoji, es. 🌡 o 🌱.</p>
+      <p id={`${id}-icona-aiuto`} className="-mt-3 text-sm text-grafite-tenue">L'icona è facoltativa: un'emoji, es. 🌡 o 🌱.</p>
 
       <div className="flex flex-col gap-2">
-        <p className="text-base font-medium">Parametri</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base font-semibold text-grafite">Parametri</p>
+        <p className="text-sm text-grafite-tenue">
           Accendi "Incluso" per i parametri da misurare in questa passata: compaiono nel modulo in quest'ordine, che cambi con le frecce.
         </p>
         {righe.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Non ci sono ancora parametri da includere.</p>
+          <p className="text-sm text-grafite-tenue">Non ci sono ancora parametri da includere.</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          // Una riga per parametro, separate da linee: chi è incluso sta in cima, nell'ordine del modulo.
+          <ul className="mt-1 flex flex-col border-t border-riga">
             {righe.map(p => {
               const pp = voce.get(p.id)
               const i = pp ? inclusi.indexOf(pp) : -1
               const idNome = `${id}-${p.id}`
               return (
-                <li key={p.id} className="flex flex-col gap-3 rounded-lg border p-3">
+                <li key={p.id} className="flex flex-col gap-3 border-b border-riga py-3">
                   <div className="flex items-center gap-2">
                     <p id={idNome} className="min-w-0 flex-1">
-                      <span data-testid="nome-parametro" className="font-medium">{p.nome || 'Senza nome'}</span>
-                      <span className="text-sm text-muted-foreground">{` · ${descrivi(p)}`}</span>
+                      <span data-testid="nome-parametro" className="font-semibold text-grafite">{p.nome || 'Senza nome'}</span>
+                      <span className="text-sm text-grafite-tenue">{` · ${descrivi(p)}`}</span>
                     </p>
                     {pp && (
                       <>
                         <Button variant="outline" size="icon" aria-label={`Sposta «${p.nome}» su`} disabled={i === 0}
-                          onClick={() => sposta(i, -1)} className="size-11">
-                          <ArrowUp className="size-5" />
+                          onClick={() => sposta(i, -1)}>
+                          <ArrowUp />
                         </Button>
                         <Button variant="outline" size="icon" aria-label={`Sposta «${p.nome}» giù`} disabled={i === inclusi.length - 1}
-                          onClick={() => sposta(i, 1)} className="size-11">
-                          <ArrowDown className="size-5" />
+                          onClick={() => sposta(i, 1)}>
+                          <ArrowDown />
                         </Button>
                       </>
                     )}

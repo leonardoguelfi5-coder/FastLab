@@ -7,6 +7,8 @@ import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { useSessione } from '@/api/auth'
 import { useConfig } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { BarraAzioni } from '@/components/BarraAzioni'
+import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { messaggioErrore } from '@/lib/errori'
 import { cn } from '@/lib/utils'
@@ -125,11 +127,11 @@ function Procedura({ chiave, crea }: ProceduraProps) {
   return (
     <AppShell titolo={TITOLO} indietro="/" onIndietro={chiediPrimaDiUscire}>
       {ripristinato && (
-        <div role="status" className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3">
-          <p className="flex-1 text-sm">Bozza ripristinata.</p>
-          <Button variant="outline" onClick={() => setConferma('ricomincia')} className="h-11">Ricomincia</Button>
-          <Button variant="ghost" size="icon" aria-label="Chiudi l'avviso" onClick={() => setRipristinato(false)} className="size-11">
-            <X className="size-5" />
+        <div role="status" className="flex items-center gap-1 rounded-lg bg-carta-ombra py-1 pr-1 pl-4">
+          <p className="flex-1 text-base text-grafite">Bozza ripristinata.</p>
+          <Button variant="ghost" size="sm" onClick={() => setConferma('ricomincia')}>Ricomincia</Button>
+          <Button variant="quiet" size="icon" aria-label="Chiudi l'avviso" onClick={() => setRipristinato(false)}>
+            <X />
           </Button>
         </div>
       )}
@@ -138,14 +140,17 @@ function Procedura({ chiave, crea }: ProceduraProps) {
         <SceltaIniziale onModello={() => parti(bozzaHydrochar())} onDaZero={() => parti(bozzaVuota())} />
       ) : (
         <>
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">{`Passo ${passo + 1} di ${PASSI.length}`}</p>
-            <div aria-hidden className="flex gap-1">
-              {PASSI.map((nome, i) => (
-                <span key={nome} className={cn('h-1.5 flex-1 rounded-full', i <= passo ? 'bg-primary' : 'bg-muted')} />
-              ))}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <p className="text-label text-grafite-tenue tabular-nums">{`Passo ${passo + 1} di ${PASSI.length}`}</p>
+              {/* Avanzamento a tratti di matita: grafite i passi fatti e quello attuale, riga quelli da fare. */}
+              <div aria-hidden className="flex gap-1">
+                {PASSI.map((nome, i) => (
+                  <span key={nome} className={cn('h-1 flex-1 rounded-full', i <= passo ? 'bg-grafite' : 'bg-riga')} />
+                ))}
+              </div>
             </div>
-            <h2 ref={titolo} tabIndex={-1} className="text-2xl font-bold outline-none">{PASSI[passo]}</h2>
+            <h2 ref={titolo} tabIndex={-1} className="text-headline text-grafite outline-none">{PASSI[passo]}</h2>
           </div>
 
           {passo === 0 && <PassoGenerale bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
@@ -157,6 +162,7 @@ function Procedura({ chiave, crea }: ProceduraProps) {
           {passo === ULTIMO && (
             <PassoRiepilogo
               bozza={lavoro.bozza}
+              onPassoPrecedente={() => vaiAlPasso(passo - 1)}
               // Con "avanti" del browser si può saltare il blocco del passo 2: qui si ricontrolla.
               altriErrori={blocco ? [blocco] : []}
               giaTentato={lavoro.tentato}
@@ -165,26 +171,28 @@ function Procedura({ chiave, crea }: ProceduraProps) {
             />
           )}
 
-          <div className="sticky bottom-0 z-10 -mx-4 mt-2 flex flex-col gap-2 border-t bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {passo === 1 && blocco && <p id="motivo-blocco" className="text-sm text-destructive">{blocco}</p>}
-            <div className="flex gap-2">
-              {passo > 0 && (
-                <Button variant="outline" onClick={() => vaiAlPasso(passo - 1)} className="h-12 flex-1 text-base">
-                  Passo precedente
-                </Button>
-              )}
-              {passo < ULTIMO && (
+          {/* Nel riepilogo la barra la disegna PassoRiepilogo, perché l'azione principale è "Crea esperimento". */}
+          {passo < ULTIMO && (
+            <BarraAzioni>
+              {passo === 1 && blocco && <TestoErrore id="motivo-blocco">{blocco}</TestoErrore>}
+              <div className="flex gap-2">
+                {passo > 0 && (
+                  <Button variant="outline" size="lg" onClick={() => vaiAlPasso(passo - 1)} className="px-3 text-sm">
+                    Passo precedente
+                  </Button>
+                )}
                 <Button
+                  size="lg"
                   disabled={passo === 1 && blocco !== null}
                   aria-describedby={passo === 1 && blocco ? 'motivo-blocco' : undefined}
                   onClick={() => vaiAlPasso(passo + 1)}
-                  className="h-12 flex-1 text-base"
+                  className="min-w-0 flex-1"
                 >
                   Avanti
                 </Button>
-              )}
-            </div>
-          </div>
+              </div>
+            </BarraAzioni>
+          )}
         </>
       )}
 
@@ -212,9 +220,9 @@ function Procedura({ chiave, crea }: ProceduraProps) {
 
 function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-sm text-destructive">{messaggioErrore(errore)}</p>
-      <Button variant="outline" onClick={onRiprova} className="h-11">Riprova</Button>
+    <div role="alert" className="flex flex-col items-start gap-1">
+      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
+      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
     </div>
   )
 }
@@ -239,7 +247,7 @@ function Duplica({ espId, chiave }: { espId: string; chiave: string }) {
     <AppShell titolo={TITOLO} indietro="/">
       {copia?.errore || config.isError
         ? <ErroreConRiprova errore={copia?.errore ?? config.error} onRiprova={() => void config.refetch()} />
-        : <p role="status" className="text-muted-foreground">Caricamento…</p>}
+        : <p role="status" className="text-grafite-tenue">Caricamento…</p>}
     </AppShell>
   )
 }

@@ -1,9 +1,99 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+/*
+ * FastLab, "Il quaderno di campo" (vedi DESIGN.md). I caratteri Geist e Geist Mono si importano in main.tsx:
+ * importati da qui, dentro Tailwind, i percorsi relativi dei file .woff2 non si risolverebbero.
+ * Solo tema chiaro: nessun elemento ha la classe .dark, quindi le varianti dark: dei componenti
+ * non si attivano mai, nemmeno con il sistema operativo in modalità scura.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Token ─────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: light;
+
+  /* Carta e linee */
+  --carta: oklch(98.4% 0.006 85);
+  --foglio: oklch(99.6% 0.003 85);
+  --carta-ombra: oklch(95.6% 0.009 85);
+  --riga: oklch(88.5% 0.011 80);
+  --riga-forte: oklch(78% 0.014 75);
+  /*
+   * Bordo a riposo di campi, caselle e interruttori: l'unico tono di linea che arriva a 3:1 sulla carta
+   * (3.8:1 su carta, 3.5:1 su carta ombra), come chiede WCAG per i controlli. Riga e riga forte restano
+   * per separatori e passaggio del puntatore.
+   */
+  --riga-controllo: oklch(60% 0.012 75);
+
+  /* Testo */
+  --grafite: oklch(23% 0.014 262);
+  --grafite-tenue: oklch(44% 0.016 262);
+
+  /* L'unico inchiostro: ciò che si tocca o che è scelto */
+  --inchiostro: oklch(37% 0.105 262);
+  --inchiostro-scuro: oklch(30% 0.095 262);
+  --inchiostro-velato: oklch(94.5% 0.028 262);
+
+  /* Stati */
+  --registrato: oklch(45% 0.1 152);
+  --registrato-velato: oklch(95% 0.03 152);
+  --attenzione: oklch(50% 0.11 68);
+  --attenzione-velato: oklch(95.5% 0.04 80);
+  --errore: oklch(49% 0.16 28);
+  --errore-scuro: oklch(42% 0.145 28);
+  --errore-velato: oklch(95.5% 0.025 28);
+
+  /* Solo per ciò che galleggia */
+  --ombra-galleggiante: 0 1px 2px oklch(23% 0.014 262 / 0.06), 0 8px 24px oklch(23% 0.014 262 / 0.1);
+  --ombra-dialogo: 0 2px 6px oklch(23% 0.014 262 / 0.08), 0 20px 48px oklch(23% 0.014 262 / 0.16);
+  --velo: oklch(23% 0.014 262 / 0.35);
+
+  /* Variabili di shadcn/ui, sulla stessa palette: i componenti che le usano restano coerenti. */
+  --background: var(--carta);
+  --foreground: var(--grafite);
+  --card: var(--carta-ombra);
+  --card-foreground: var(--grafite);
+  --popover: var(--foglio);
+  --popover-foreground: var(--grafite);
+  --primary: var(--inchiostro);
+  --primary-foreground: var(--foglio);
+  --secondary: var(--carta-ombra);
+  --secondary-foreground: var(--grafite);
+  --muted: var(--carta-ombra);
+  --muted-foreground: var(--grafite-tenue);
+  --accent: var(--carta-ombra);
+  --accent-foreground: var(--grafite);
+  --destructive: var(--errore);
+  --border: var(--riga);
+  --input: var(--riga-controllo);
+  --ring: var(--inchiostro);
+  --radius: 10px;
+}
 
 @theme inline {
+  --color-carta: var(--carta);
+  --color-foglio: var(--foglio);
+  --color-carta-ombra: var(--carta-ombra);
+  --color-riga: var(--riga);
+  --color-riga-forte: var(--riga-forte);
+  --color-riga-controllo: var(--riga-controllo);
+  --color-grafite: var(--grafite);
+  --color-grafite-tenue: var(--grafite-tenue);
+  --color-inchiostro: var(--inchiostro);
+  --color-inchiostro-scuro: var(--inchiostro-scuro);
+  --color-inchiostro-velato: var(--inchiostro-velato);
+  --color-registrato: var(--registrato);
+  --color-registrato-velato: var(--registrato-velato);
+  --color-attenzione: var(--attenzione);
+  --color-attenzione-velato: var(--attenzione-velato);
+  --color-errore: var(--errore);
+  --color-errore-scuro: var(--errore-scuro);
+  --color-errore-velato: var(--errore-velato);
+  --color-velo: var(--velo);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -22,203 +112,178 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-galleggiante: var(--ombra-galleggiante);
+  --shadow-dialogo: var(--ombra-dialogo);
 }
 
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@theme {
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, Consolas, monospace;
+  --font-heading: var(--font-sans);
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Scala tipografica di DESIGN.md (text-base resta il Body: 1rem / 1.5). */
+  --text-numero: 2.25rem;
+  --text-numero--line-height: 1.1;
+  --text-numero--letter-spacing: -0.02em;
+  --text-numero--font-weight: 600;
+  --text-headline: 1.5rem;
+  --text-headline--line-height: 1.2;
+  --text-headline--letter-spacing: -0.015em;
+  --text-headline--font-weight: 650;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.3;
+  --text-title--font-weight: 600;
+  --text-campo: 1.25rem;
+  --text-campo--line-height: 1.3;
+  --text-campo--font-weight: 500;
+  --text-dato: 0.9375rem;
+  --text-dato--line-height: 1.4;
+  --text-dato--font-weight: 450;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: 0.04em;
+  --text-label--font-weight: 550;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 14px;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+  /* Movimento: solo per segnalare uno stato, mai coreografico. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+/* ── Base ──────────────────────────────────────────────────────────────── */
 
 @layer base {
-  .theme {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+  *,
+  ::before,
+  ::after {
+    border-color: var(--riga);
   }
-  :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-  }
-  .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-  }
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    font-family: var(--font-sans);
+    background-color: var(--carta);
+    color: var(--grafite);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--carta);
+    color: var(--grafite);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Focus visibile ovunque: anello di 2px d'inchiostro a 2px di distanza. */
+  :focus-visible {
+    outline: 2px solid var(--inchiostro);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--inchiostro-velato);
+    color: var(--grafite);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p,
+  li,
+  dd {
+    text-wrap: pretty;
+  }
+
+  /* Il segnaposto non scende sotto la grafite tenue: in serra un grigio più chiaro non si legge. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--grafite-tenue);
+    opacity: 1;
+  }
+
+  code,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Toast (sonner) ────────────────────────────────────────────────────── */
+/* Fondo grafite, testo foglio, angoli 10px, ombra galleggiante; in basso, sopra la barra d'azione. */
+
+[data-sonner-toaster] {
+  font-family: var(--font-sans);
+}
+
+/* Entra ed esce dissolvendosi sul posto (senza scivolare sopra la barra d'azione), in 200 ms. */
+[data-sonner-toaster] [data-sonner-toast] {
+  --y: translateY(0);
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"][data-front="true"][data-swipe-out="false"] {
+  --y: translateY(0);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  box-shadow: var(--ombra-galleggiante);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-title] {
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-description] {
+  color: var(--carta-ombra);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-icon] {
+  width: 20px;
+  height: 20px;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+  color: var(--registrato-velato);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--attenzione-velato);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--errore-velato);
 }

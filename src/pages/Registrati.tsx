@@ -5,6 +5,7 @@ import { messaggioErrore } from '@/lib/errori'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TestoErrore } from '@/components/TestoErrore'
 
 const LUNGHEZZA_MINIMA = 8
 
@@ -45,15 +46,15 @@ export function Registrati() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-6 p-4">
-      <h1 className="text-2xl font-bold">FastLab</h1>
+    <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-8 px-4 py-10">
+      <h1 className="border-b border-riga pb-4 text-headline text-grafite">FastLab</h1>
 
       {daConfermare ? (
-        <p role="status">Controlla la tua email per confermare l'account, poi accedi.</p>
+        <p role="status" className="max-w-[65ch] text-base text-grafite">Controlla la tua email per confermare l'account, poi accedi.</p>
       ) : (
-        <form onSubmit={invia} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="registrati-email" className="text-sm font-medium">Email</Label>
+        <form onSubmit={invia} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="registrati-email">Email</Label>
             <Input
               id="registrati-email"
               type="email"
@@ -61,11 +62,10 @@ export function Registrati() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-12 text-lg"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="registrati-password" className="text-sm font-medium">Password</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="registrati-password">Password</Label>
             <Input
               id="registrati-password"
               type="password"
@@ -74,12 +74,11 @@ export function Registrati() {
               aria-describedby="registrati-password-aiuto"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="h-12 text-lg"
             />
-            <p id="registrati-password-aiuto" className="text-sm text-muted-foreground">Almeno 8 caratteri.</p>
+            <p id="registrati-password-aiuto" className="text-sm text-grafite-tenue">Almeno 8 caratteri.</p>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="registrati-conferma" className="text-sm font-medium">Conferma password</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="registrati-conferma">Conferma password</Label>
             <Input
               id="registrati-conferma"
               type="password"
@@ -87,31 +86,33 @@ export function Registrati() {
               required
               value={conferma}
               onChange={(e) => setConferma(e.target.value)}
-              className="h-12 text-lg"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="registrati-codice" className="text-sm font-medium">Codice invito</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="registrati-codice">Codice invito</Label>
             <Input
               id="registrati-codice"
+              variant="campo"
               type="text"
               autoCapitalize="characters"
               autoComplete="off"
               aria-describedby="registrati-codice-aiuto"
               value={codice}
               onChange={(e) => setCodice(e.target.value)}
-              className="h-12 text-lg"
             />
-            <p id="registrati-codice-aiuto" className="text-sm text-muted-foreground">Lo trovi nel messaggio di invito.</p>
+            <p id="registrati-codice-aiuto" className="text-sm text-grafite-tenue">Lo trovi nel messaggio di invito.</p>
           </div>
-          <Button type="submit" disabled={invio} className="h-12 text-lg">
+          <Button type="submit" size="lg" disabled={invio} className="mt-1">
             {invio ? 'Registrazione…' : 'Registrati'}
           </Button>
-          {errore && <p role="alert" className="text-sm text-destructive">{errore}</p>}
+          {errore && <TestoErrore role="alert">{errore}</TestoErrore>}
         </form>
       )}
 
-      <Link to="/accedi" className="inline-flex min-h-11 items-center self-start text-sm underline underline-offset-4">
+      <Link
+        to="/accedi"
+        className="inline-flex min-h-11 items-center self-start rounded-sm text-sm font-medium text-inchiostro underline decoration-1 underline-offset-4 hover:decoration-2"
+      >
         {daConfermare ? 'Accedi' : 'Hai già un account? Accedi'}
       </Link>
     </div>

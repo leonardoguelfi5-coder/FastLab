@@ -1,9 +1,10 @@
 import { useId } from 'react'
-import { X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import type { Parametro, SottoCampo, TipoParametro } from '@/domain/tipi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero, parseNumero } from '@/lib/numeri'
 import { CampoNumero } from './CampoNumero'
 import { Interruttore } from './Interruttore'
@@ -52,10 +53,10 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
   const cambia = (i: number, modifica: Partial<SottoCampo>) => onChange(valore.map((s, j) => (j === i ? { ...s, ...modifica } : s)))
 
   return (
-    <fieldset className="flex flex-col gap-2 rounded-lg border p-3">
-      <legend className="px-1 text-base font-medium">Sotto-campi</legend>
-      <p className="text-sm text-muted-foreground">I valori numerici da registrare per ogni elemento della lista, es. "N foglie".</p>
-      {valore.length === 0 && <p className="text-sm text-destructive">Aggiungi almeno un sotto-campo.</p>}
+    <fieldset className="flex flex-col gap-3 border-t border-riga pt-4">
+      <legend className="float-left mb-1 w-full text-base font-semibold text-grafite">Sotto-campi</legend>
+      <p className="text-sm text-grafite-tenue">I valori numerici da registrare per ogni elemento della lista, es. "N foglie".</p>
+      {valore.length === 0 && <TestoErrore>Aggiungi almeno un sotto-campo.</TestoErrore>}
       <ul className="flex flex-col gap-3">
         {valore.map((s, i) => {
           const problema = problemaSottoCampo(valore, i)
@@ -69,26 +70,26 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
                   aria-invalid={problema !== null || undefined}
                   aria-describedby={problema ? `${id}-${i}-problema` : undefined}
                   onChange={(e) => cambia(i, { nome: e.target.value })}
-                  className="h-12 flex-1 text-lg"
+                  className="flex-1"
                 />
                 <Input
                   aria-label={`Unità del sotto-campo ${i + 1}`}
                   placeholder="Unità"
                   value={s.unita ?? ''}
                   onChange={(e) => cambia(i, { unita: testoONull(e.target.value) })}
-                  className="h-12 w-24 text-lg"
+                  className="w-24"
                 />
                 <Button
-                  variant="ghost"
+                  variant="quiet"
                   size="icon"
                   aria-label={`Togli il sotto-campo ${i + 1}`}
                   onClick={() => onChange(valore.filter((_, j) => j !== i))}
-                  className="size-11"
+                  className="text-grafite-tenue"
                 >
                   <X className="size-5" />
                 </Button>
               </div>
-              {problema && <p id={`${id}-${i}-problema`} className="text-sm text-destructive">{problema}</p>}
+              {problema && <TestoErrore id={`${id}-${i}-problema`}>{problema}</TestoErrore>}
             </li>
           )
         })}
@@ -96,7 +97,7 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
       <Button
         variant="outline"
         onClick={() => onChange([...valore, { chiave: crypto.randomUUID(), nome: '', unita: null }])}
-        className="h-11 self-start"
+        className="self-start"
       >
         + Sotto-campo
       </Button>
@@ -111,46 +112,48 @@ export function EditorParametro({ valore: p, onChange, tipoBloccato }: EditorPar
   const cambia = (modifica: Partial<Parametro>) => onChange({ ...p, ...modifica })
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={`${id}-nome`} className="text-sm font-medium">Nome</Label>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-nome`}>Nome</Label>
         <Input
           id={`${id}-nome`}
           value={p.nome}
           placeholder="es. Altezza"
           onChange={(e) => cambia({ nome: e.target.value })}
-          className="h-12 text-lg"
         />
       </div>
 
-      <div className="flex flex-col gap-1">
-        <Label htmlFor={`${id}-tipo`} className="text-sm font-medium">Tipo</Label>
-        <select
-          id={`${id}-tipo`}
-          value={p.tipo}
-          disabled={tipoBloccato}
-          aria-describedby={`${id}-tipo-aiuto${tipoBloccato ? ` ${id}-tipo-bloccato` : ''}`}
-          onChange={(e) => onChange(conTipo(p, e.target.value as TipoParametro))}
-          className="h-12 w-full rounded-lg border border-input bg-background px-3 text-lg disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {TIPI.map(t => <option key={t.valore} value={t.valore}>{t.nome}</option>)}
-        </select>
-        <p id={`${id}-tipo-aiuto`} className="text-sm text-muted-foreground">{tipo.aiuto}</p>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={`${id}-tipo`}>Tipo</Label>
+        {/* Scelta nativa (sul telefono apre il selettore di sistema) vestita come gli altri campi. */}
+        <div className="relative">
+          <select
+            id={`${id}-tipo`}
+            value={p.tipo}
+            disabled={tipoBloccato}
+            aria-describedby={`${id}-tipo-aiuto${tipoBloccato ? ` ${id}-tipo-bloccato` : ''}`}
+            onChange={(e) => onChange(conTipo(p, e.target.value as TipoParametro))}
+            className="h-13 w-full cursor-pointer appearance-none rounded-md border border-riga-controllo bg-foglio pr-11 pl-3.5 text-base text-grafite transition-colors outline-none hover:border-grafite-tenue focus:border-inchiostro focus:ring-3 focus:ring-inchiostro-velato disabled:cursor-not-allowed disabled:border-riga disabled:bg-carta-ombra disabled:text-grafite-tenue"
+          >
+            {TIPI.map(t => <option key={t.valore} value={t.valore}>{t.nome}</option>)}
+          </select>
+          <ChevronDown aria-hidden className="pointer-events-none absolute top-1/2 right-3.5 size-5 -translate-y-1/2 text-grafite-tenue" />
+        </div>
+        <p id={`${id}-tipo-aiuto`} className="text-sm text-grafite-tenue">{tipo.aiuto}</p>
         {tipoBloccato && (
-          <p id={`${id}-tipo-bloccato`} className="text-sm text-muted-foreground">Il tipo non si può cambiare: ci sono già dati.</p>
+          <p id={`${id}-tipo-bloccato`} className="text-sm text-grafite-tenue">Il tipo non si può cambiare: ci sono già dati.</p>
         )}
       </div>
 
       {p.tipo === 'numero' && (
         <>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor={`${id}-unita`} className="text-sm font-medium">Unità</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={`${id}-unita`}>Unità</Label>
             <Input
               id={`${id}-unita`}
               value={p.unita ?? ''}
               placeholder="es. cm (facoltativa)"
               onChange={(e) => cambia({ unita: testoONull(e.target.value) })}
-              className="h-12 text-lg"
             />
           </div>
           <CampoNumero
@@ -168,7 +171,7 @@ export function EditorParametro({ valore: p, onChange, tipoBloccato }: EditorPar
             <CampoNumero etichetta="Massimo" valore={p.valore_max} onChange={(v) => cambia({ valore_max: v })}
               leggi={parseNumero} errore={ERRORE_DECIMALE} />
           </div>
-          <p className="-mt-2 text-sm text-muted-foreground">
+          <p className="-mt-3 text-sm text-grafite-tenue">
             Facoltativi: un valore fuori dall'intervallo viene segnalato come sospetto, ma si può salvare.
           </p>
         </>

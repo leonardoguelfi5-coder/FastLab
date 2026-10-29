@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TestoErrore } from '@/components/TestoErrore'
 import { formattaNumero } from '@/lib/numeri'
 
 interface CampoNumeroProps {
@@ -37,10 +38,11 @@ export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore,
   const descrizione = [aiuto && `${id}-aiuto`, sbagliato && `${id}-errore`].filter(Boolean).join(' ')
 
   return (
-    <div className="flex flex-col gap-1">
-      <Label htmlFor={id} className="text-sm font-medium">{etichetta}</Label>
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>{etichetta}</Label>
       <Input
         id={id}
+        variant="campo"
         type="text"
         // I decimali possono essere negativi (es. un minimo di temperatura): la tastiera "decimal"
         // di iOS non ha il segno meno, quindi tastiera normale.
@@ -58,10 +60,9 @@ export function CampoNumero({ etichetta, aiuto, valore, onChange, leggi, errore,
           onChange(letto)
         }}
         onBlur={() => { if (sbagliato) setTesto(formattaNumero(valore)) }}
-        className="h-12 text-lg"
       />
-      {aiuto && <p id={`${id}-aiuto`} className="text-sm text-muted-foreground">{aiuto}</p>}
-      {sbagliato && <p id={`${id}-errore`} className="text-sm text-destructive">{errore}</p>}
+      {aiuto && <p id={`${id}-aiuto`} className="text-sm text-grafite-tenue">{aiuto}</p>}
+      {sbagliato && <TestoErrore id={`${id}-errore`}>{errore}</TestoErrore>}
     </div>
   )
 }

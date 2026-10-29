@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { CircleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { validaBozza } from '@/domain/bozza'
 import { caricaConfig, creaEsperimento } from '@/api/esperimenti'
 import { chiavi } from '@/api/query'
+import { BarraAzioni } from '@/components/BarraAzioni'
 import { Button } from '@/components/ui/button'
 import { messaggioErrore } from '@/lib/errori'
 
@@ -18,6 +20,8 @@ interface PassoRiepilogoProps {
   onTentativo: () => void
   /** Chiamato quando l'esperimento esiste, prima di aprirlo. */
   onCreato: () => void
+  /** Torna al passo prima (il pulsante sta nella barra in basso, accanto a "Crea esperimento"). */
+  onPassoPrecedente: () => void
 }
 
 const codice = (e: unknown) => (typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined)
@@ -40,7 +44,7 @@ async function crea({ bozza, ripresa }: { bozza: BozzaEsperimento; ripresa: bool
 }
 
 /** Passo 5: conteggi, problemi da sistemare e creazione dell'esperimento. */
-export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativo, onCreato }: PassoRiepilogoProps) {
+export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativo, onCreato, onPassoPrecedente }: PassoRiepilogoProps) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const errori = [...altriErrori, ...validaBozza(bozza)]
@@ -72,41 +76,57 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
   ] as const
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-lg font-semibold break-words">{bozza.esperimento.nome.trim() || 'Senza nome'}</p>
-      <dl className="grid grid-cols-2 gap-3">
-        {conteggi.map(([voce, n]) => (
-          <div key={voce} className="rounded-lg border p-3">
-            <dt className="text-sm text-muted-foreground">{voce}</dt>
-            <dd className="text-2xl font-semibold tabular-nums">{n}</dd>
-          </div>
-        ))}
-      </dl>
+    <div className="flex flex-col gap-6">
+      {/* Il riepilogo è un registro: voce a sinistra, conteggio a destra in cifre tabellari. */}
+      <div className="flex flex-col gap-2">
+        <p className="text-title break-words text-grafite">{bozza.esperimento.nome.trim() || 'Senza nome'}</p>
+        <dl className="-mx-4 border-t border-riga">
+          {conteggi.map(([voce, n]) => (
+            <div key={voce} className="flex items-baseline justify-between gap-4 border-b border-riga px-4 py-3">
+              <dt className="text-base text-grafite-tenue">{voce}</dt>
+              <dd className="font-mono text-campo text-grafite tabular-nums">{n}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
 
       {errori.length > 0 ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
-          <p id="riepilogo-errori" className="font-medium">Da sistemare prima di creare l'esperimento:</p>
-          <ul aria-label="Da sistemare" className="list-disc pl-5 text-sm">
+        <div className="flex flex-col gap-2 rounded-lg bg-errore-velato p-4">
+          <p id="riepilogo-errori" className="flex items-start gap-2 font-semibold text-errore">
+            <CircleAlert aria-hidden className="mt-0.5 size-5 shrink-0" />
+            Da sistemare prima di creare l'esperimento:
+          </p>
+          <ul aria-label="Da sistemare" className="flex list-disc flex-col gap-1 pl-7 text-base text-grafite marker:text-errore">
             {/* Lo stesso messaggio può ripetersi (es. due parametri senza nome): la chiave include la posizione. */}
             {errori.map((e, i) => <li key={`${i}-${e}`}>{e}</li>)}
           </ul>
-          <p className="text-sm text-muted-foreground">Torna ai passi con «Passo precedente» per correggere.</p>
+          <p className="pl-7 text-sm text-grafite-tenue">Torna ai passi con «Passo precedente» per correggere.</p>
         </div>
       ) : (
-        <p className="text-muted-foreground">Tutto pronto: puoi creare l'esperimento.</p>
+        <p className="text-grafite">Tutto pronto: puoi creare l'esperimento.</p>
       )}
 
-      <p className="text-sm text-muted-foreground">
+      <p className="max-w-[65ch] text-sm text-grafite-tenue">
         Dopo la creazione potrai ancora aggiungere piante, parametri e passate dalle impostazioni dell'esperimento.
       </p>
-      <Button
-        disabled={errori.length > 0 || creazione.isPending}
-        aria-describedby={errori.length > 0 ? 'riepilogo-errori' : undefined}
-        onClick={creaEsperimentoOra}
-        className="h-12 text-base"
-      >
-        {creazione.isPending ? 'Creazione…' : 'Crea esperimento'}
-      </Button>
+
+      <BarraAzioni>
+        <div className="flex gap-2">
+          <Button variant="outline" size="lg" onClick={onPassoPrecedente} className="px-3 text-sm">
+            Passo precedente
+          </Button>
+          <Button
+            size="lg"
+            disabled={errori.length > 0 || creazione.isPending}
+            aria-describedby={errori.length > 0 ? 'riepilogo-errori' : undefined}
+            onClick={creaEsperimentoOra}
+            // Su un telefono stretto il testo va a capo dentro il pulsante invece di uscirne.
+            className="min-w-0 flex-1 px-3 leading-tight whitespace-normal"
+          >
+            {creazione.isPending ? 'Creazione…' : 'Crea esperimento'}
+          </Button>
+        </div>
+      </BarraAzioni>
     </div>
   )
 }

@@ -48,12 +48,12 @@ export function PassoParametri({ bozza, onChange }: PassoParametriProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground">
+      <p className="max-w-[65ch] text-grafite-tenue">
         I parametri sono le cose che misuri su ogni pianta, es. altezza, temperatura, note. Per ognuno scegli il tipo; nel
         passo successivo li raggruppi nelle passate. Tocca un parametro per modificarlo.
       </p>
-      {bozza.parametri.length === 0 && <p className="text-sm text-muted-foreground">Nessun parametro ancora.</p>}
-      <ul aria-label="Parametri" className="flex flex-col gap-2">
+      {bozza.parametri.length === 0 && <p className="text-sm text-grafite-tenue">Nessun parametro ancora.</p>}
+      <ul aria-label="Parametri" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
         {bozza.parametri.map(p => (
           <Espandibile
             key={p.id}
@@ -63,13 +63,13 @@ export function PassoParametri({ bozza, onChange }: PassoParametriProps) {
             onCambia={() => setAperto(aperto === p.id ? null : p.id)}
           >
             <EditorParametro valore={p} onChange={cambia} />
-            <Button variant="ghost" onClick={() => elimina(p.id)} className="h-11 self-start text-destructive">
+            <Button variant="destructive" size="sm" onClick={() => elimina(p.id)} className="self-start">
               Elimina parametro
             </Button>
           </Espandibile>
         ))}
       </ul>
-      <Button variant="outline" onClick={aggiungi} className="h-12 text-base">+ Parametro</Button>
+      <Button variant="outline" onClick={aggiungi}>+ Parametro</Button>
     </div>
   )
 }

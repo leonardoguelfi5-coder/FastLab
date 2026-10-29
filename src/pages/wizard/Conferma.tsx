@@ -25,8 +25,8 @@ export function Conferma({ aperta, titolo, testo, annulla, conferma, onAnnulla, 
           <DialogDescription>{testo}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onAnnulla} className="h-11">{annulla}</Button>
-          <Button variant="destructive" onClick={onConferma} className="h-11">{conferma}</Button>
+          <Button variant="outline" onClick={onAnnulla}>{annulla}</Button>
+          <Button variant="destructive-solid" onClick={onConferma}>{conferma}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

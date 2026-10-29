@@ -4,12 +4,13 @@ import { Copy, Ellipsis } from 'lucide-react'
 import type { RiepilogoEsperimento } from '@/api/esperimenti'
 import { useEsperimenti } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { formattaData, oggiLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { cn } from '@/lib/utils'
 
-const VOCE_MENU = 'flex h-11 w-full items-center gap-2 rounded-md px-3 text-left text-base hover:bg-muted'
+const VOCE_MENU = 'flex h-11 w-full items-center gap-2.5 rounded-sm px-3 text-left text-base text-grafite transition-colors hover:bg-carta-ombra active:bg-carta-ombra [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-grafite-tenue'
 
 /** "oggi", "ieri" o la data GG/MM/AAAA. Si confronta la data locale (mai UTC): a mezzanotte il giorno cambia per chi è in laboratorio. */
 function quando(ultimaData: string, adesso: Date = new Date()): string {
@@ -27,9 +28,9 @@ function riepilogo(e: RiepilogoEsperimento): string {
 
 function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-sm text-destructive">{messaggioErrore(errore)}</p>
-      <Button variant="outline" onClick={onRiprova} className="h-11">Riprova</Button>
+    <div role="alert" className="flex flex-col items-start gap-1">
+      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
+      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
     </div>
   )
 }
@@ -62,7 +63,7 @@ function MenuScheda({ esperimento }: { esperimento: RiepilogoEsperimento }) {
   }, [aperto])
 
   return (
-    <div ref={radice} className="relative shrink-0 p-0.5">
+    <div ref={radice} className="relative flex shrink-0 items-start pt-2 pr-1">
       <button
         ref={pulsante}
         type="button"
@@ -70,21 +71,21 @@ function MenuScheda({ esperimento }: { esperimento: RiepilogoEsperimento }) {
         aria-expanded={aperto}
         aria-controls={aperto ? idMenu : undefined}
         onClick={() => setAperto(v => !v)}
-        className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'size-11')}
+        className={buttonVariants({ variant: 'quiet', size: 'icon' })}
       >
-        <Ellipsis aria-hidden className="size-6" />
+        <Ellipsis aria-hidden className="size-6 text-grafite-tenue" />
       </button>
       {aperto && (
         <div
           id={idMenu}
-          className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border bg-popover p-1 text-popover-foreground shadow-md"
+          className="absolute top-full right-1 z-20 mt-1 w-48 rounded-md border border-riga bg-foglio p-1 text-grafite shadow-galleggiante"
         >
           <Link
             to={`/esperimenti/nuovo?da=${encodeURIComponent(esperimento.id)}`}
             onClick={() => setAperto(false)}
             className={VOCE_MENU}
           >
-            <Copy aria-hidden className="size-4" />
+            <Copy aria-hidden />
             Duplica
           </Link>
         </div>
@@ -93,18 +94,21 @@ function MenuScheda({ esperimento }: { esperimento: RiepilogoEsperimento }) {
   )
 }
 
-/** Una scheda: il tocco sul corpo apre l'esperimento, il menu ⋯ è un controllo a parte (mai uno dentro l'altro). */
+/**
+ * Una riga di quaderno: il tocco sul corpo apre l'esperimento, il menu ⋯ è un controllo a parte (mai uno dentro
+ * l'altro). Le righe arrivano ai bordi della colonna, separate da linee di 1px.
+ */
 function SchedaEsperimento({ esperimento }: { esperimento: RiepilogoEsperimento }) {
   return (
-    <li className="flex items-start rounded-lg border bg-card text-card-foreground">
+    <li className="flex items-stretch border-b border-riga">
       <Link
         to={`/esperimenti/${encodeURIComponent(esperimento.id)}`}
-        className="flex min-h-11 min-w-0 flex-1 flex-col gap-1 rounded-lg p-3 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50"
+        className="flex min-h-11 min-w-0 flex-1 flex-col gap-1 py-4 pr-2 pl-4 transition-colors -outline-offset-2 hover:bg-carta-ombra/70 active:bg-carta-ombra"
       >
-        <h2 className="break-words text-lg font-semibold leading-snug">{esperimento.nome}</h2>
-        <p className="text-sm text-muted-foreground">{riepilogo(esperimento)}</p>
+        <h2 className="text-title break-words text-grafite">{esperimento.nome}</h2>
+        <p className="text-dato font-sans text-grafite-tenue tabular-nums">{riepilogo(esperimento)}</p>
         {esperimento.ultima_data !== null && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-dato font-sans text-grafite-tenue tabular-nums">
             {`Ultimo rilievo: ${quando(esperimento.ultima_data)}, ${esperimento.piante_ultima_data}/${esperimento.n_piante} piante`}
           </p>
         )}
@@ -116,13 +120,13 @@ function SchedaEsperimento({ esperimento }: { esperimento: RiepilogoEsperimento 
 
 function NessunEsperimento() {
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-lg font-medium">Non hai ancora esperimenti.</p>
-      <p className="text-muted-foreground">Crea il primo da zero oppure parti dal modello Hydrochar.</p>
-      <Link to="/esperimenti/nuovo" className={cn(buttonVariants(), 'h-12 text-base')}>Crea esperimento</Link>
+    <div className="flex flex-col gap-3 pt-6">
+      <p className="text-title text-grafite">Non hai ancora esperimenti.</p>
+      <p className="max-w-[65ch] text-grafite-tenue">Crea il primo da zero oppure parti dal modello Hydrochar.</p>
+      <Link to="/esperimenti/nuovo" className={cn(buttonVariants({ size: 'lg' }), 'mt-3')}>Crea esperimento</Link>
       <Link
         to="/esperimenti/nuovo?modello=hydrochar"
-        className={cn(buttonVariants({ variant: 'outline' }), 'h-12 text-base')}
+        className={buttonVariants({ variant: 'outline' })}
       >
         Usa il modello Hydrochar
       </Link>
@@ -140,13 +144,13 @@ export function Esperimenti() {
       {elenco === undefined ? (
         esperimenti.isError
           ? <ErroreConRiprova errore={esperimenti.error} onRiprova={() => void esperimenti.refetch()} />
-          : <p role="status" className="text-muted-foreground">Caricamento…</p>
+          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
       ) : elenco.length === 0 ? (
         <NessunEsperimento />
       ) : (
         <>
-          <Link to="/esperimenti/nuovo" className={cn(buttonVariants(), 'h-12 text-base')}>+ Nuovo esperimento</Link>
-          <ul aria-label="Esperimenti" className="flex flex-col gap-3">
+          <Link to="/esperimenti/nuovo" className={buttonVariants({ variant: 'outline' })}>+ Nuovo esperimento</Link>
+          <ul aria-label="Esperimenti" className="-mx-4 -mt-2 flex flex-col border-t border-riga">
             {elenco.map(e => <SchedaEsperimento key={e.id} esperimento={e} />)}
           </ul>
         </>

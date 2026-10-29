@@ -21,7 +21,7 @@ export function Interruttore({ etichetta, aiuto, checked, onCheckedChange, disab
   const idAiuto = `${id}-aiuto`
 
   return (
-    <div className={cn('flex items-start gap-3', className)}>
+    <div className={cn('flex items-start gap-3.5', className)}>
       <Switch
         id={id}
         checked={checked}
@@ -29,11 +29,17 @@ export function Interruttore({ etichetta, aiuto, checked, onCheckedChange, disab
         disabled={disabled}
         aria-labelledby={contesto ? `${contesto} ${idEtichetta}` : idEtichetta}
         aria-describedby={aiuto ? idAiuto : undefined}
-        className="mt-0.5"
       />
-      <div className={cn('flex min-w-0 flex-col gap-0.5', disabled && 'opacity-50')}>
-        <label id={idEtichetta} htmlFor={id} className="text-base leading-tight font-medium">{etichetta}</label>
-        {aiuto && <p id={idAiuto} className="text-sm text-muted-foreground">{aiuto}</p>}
+      {/* Spento non vuol dire illeggibile: niente opacità, il testo passa a grafite tenue (oltre 7:1). */}
+      <div className="flex min-w-0 flex-col gap-0.5 pt-[3px]">
+        <label
+          id={idEtichetta}
+          htmlFor={id}
+          className={cn('text-base leading-snug font-medium text-grafite', disabled ? 'text-grafite-tenue' : 'cursor-pointer')}
+        >
+          {etichetta}
+        </label>
+        {aiuto && <p id={idAiuto} className="text-sm text-grafite-tenue">{aiuto}</p>}
       </div>
     </div>
   )

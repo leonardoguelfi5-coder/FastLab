@@ -1,34 +1,43 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { CheckIcon, InfoIcon, TriangleAlertIcon, CircleAlertIcon, Loader2Icon } from "lucide-react"
+
+/**
+ * Toast di DESIGN.md: fondo grafite, testo foglio, angoli 10px, ombra galleggiante (index.css).
+ * Stanno in basso, sopra la barra d'azione se la pagina ne ha una (`--altezza-barra-azioni`, vedi BarraAzioni).
+ */
+const SOPRA_LA_BARRA = "calc(var(--altezza-barra-azioni, 0px) + 16px)"
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="system"
+      theme="light"
+      position="bottom-center"
+      offset={{ bottom: SOPRA_LA_BARRA }}
+      mobileOffset={{ bottom: SOPRA_LA_BARRA }}
       className="toaster group"
       icons={{
         success: (
-          <CircleCheckIcon className="size-4" />
+          <CheckIcon className="size-5" strokeWidth={2.5} />
         ),
         info: (
-          <InfoIcon className="size-4" />
+          <InfoIcon className="size-5" />
         ),
         warning: (
-          <TriangleAlertIcon className="size-4" />
+          <TriangleAlertIcon className="size-5" />
         ),
         error: (
-          <OctagonXIcon className="size-4" />
+          <CircleAlertIcon className="size-5" />
         ),
         loading: (
-          <Loader2Icon className="size-4 animate-spin" />
+          <Loader2Icon className="size-5 animate-spin" />
         ),
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
+          "--normal-bg": "var(--grafite)",
+          "--normal-text": "var(--foglio)",
+          "--normal-border": "var(--grafite)",
+          "--border-radius": "10px",
         } as React.CSSProperties
       }
       toastOptions={{

@@ -30,12 +30,12 @@ export function PassoPassate({ bozza, onChange }: PassoPassateProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-muted-foreground">
+      <p className="max-w-[65ch] text-grafite-tenue">
         Una passata è un giro di misure in campo: raggruppa i parametri che rilevi insieme, es. 🌡 Termometro con
         temperatura dell'aria e della pianta. Un parametro può stare in più passate. Tocca una passata per modificarla.
       </p>
-      {bozza.passate.length === 0 && <p className="text-sm text-muted-foreground">Nessuna passata ancora.</p>}
-      <ul aria-label="Passate" className="flex flex-col gap-2">
+      {bozza.passate.length === 0 && <p className="text-sm text-grafite-tenue">Nessuna passata ancora.</p>}
+      <ul aria-label="Passate" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
         {bozza.passate.map(p => (
           <Espandibile
             key={p.id}
@@ -45,13 +45,13 @@ export function PassoPassate({ bozza, onChange }: PassoPassateProps) {
             onCambia={() => setAperta(aperta === p.id ? null : p.id)}
           >
             <EditorPassata valore={p} parametri={bozza.parametri} onChange={cambia} />
-            <Button variant="ghost" onClick={() => elimina(p.id)} className="h-11 self-start text-destructive">
+            <Button variant="destructive" size="sm" onClick={() => elimina(p.id)} className="self-start">
               Elimina passata
             </Button>
           </Espandibile>
         ))}
       </ul>
-      <Button variant="outline" onClick={aggiungi} className="h-12 text-base">+ Passata</Button>
+      <Button variant="outline" onClick={aggiungi}>+ Passata</Button>
     </div>
   )
 }

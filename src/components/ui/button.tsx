@@ -3,34 +3,50 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Pulsanti di DESIGN.md §5: grandi per il pollice, piatti (nessuna ombra), premuto più scuro,
+ * focus con l'anello d'inchiostro globale (index.css). Il disabilitato non usa opacità: carta ombra
+ * con testo grafite tenue, che resta sopra 4.5:1.
+ */
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent whitespace-nowrap select-none transition-colors disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        outline:
-          "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
-        ghost:
-          "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
-        destructive:
-          "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
+        /** Principale, inchiostro pieno: uno solo per schermata. */
         default:
-          "h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        icon: "size-8",
-        "icon-xs":
-          "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm":
-          "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
-        "icon-lg": "size-9",
+          "bg-inchiostro text-title font-semibold text-foglio hover:bg-inchiostro-scuro active:bg-inchiostro-scuro disabled:bg-carta-ombra disabled:text-grafite-tenue",
+        /** Secondario: foglio con bordo riga. */
+        outline:
+          "border-riga bg-foglio text-base font-medium text-grafite hover:border-riga-forte active:bg-carta-ombra aria-expanded:bg-carta-ombra disabled:border-transparent disabled:bg-carta-ombra disabled:text-grafite-tenue",
+        /** Tonale, su carta ombra. */
+        secondary:
+          "bg-carta-ombra text-base font-medium text-grafite hover:bg-riga/60 active:bg-riga aria-expanded:bg-riga/60 disabled:text-grafite-tenue",
+        /** Solo testo d'inchiostro, per azioni minori ("Riprova", "Modifica"). */
+        ghost:
+          "rounded-sm bg-transparent text-base font-medium text-inchiostro hover:bg-inchiostro-velato/70 active:bg-inchiostro-velato aria-expanded:bg-inchiostro-velato disabled:text-grafite-tenue",
+        /** Solo icona o testo grafite: frecce, menu, chiusure. Non porta inchiostro sulla pagina. */
+        quiet:
+          "bg-transparent text-base font-medium text-grafite hover:bg-carta-ombra active:bg-riga/70 aria-expanded:bg-carta-ombra disabled:text-grafite-tenue",
+        /** Distruttivo: testo errore su foglio con bordo errore. */
+        destructive:
+          "border-errore bg-foglio text-base font-medium text-errore hover:bg-errore-velato active:bg-errore-velato disabled:border-riga disabled:bg-carta-ombra disabled:text-grafite-tenue",
+        /** Distruttivo pieno: solo per il pulsante di conferma dentro un dialogo. */
+        "destructive-solid":
+          "bg-errore text-base font-semibold text-foglio hover:bg-errore-scuro active:bg-errore-scuro disabled:bg-carta-ombra disabled:text-grafite-tenue",
+        link:
+          "rounded-sm border-0 bg-transparent text-base font-medium text-inchiostro underline decoration-1 underline-offset-4 hover:decoration-2",
+      },
+      // Nessuna taglia scende sotto i 44px: i nomi restano quelli di shadcn per compatibilità.
+      size: {
+        default: "h-12 px-4",
+        xs: "h-11 px-3 text-sm",
+        sm: "h-11 px-3",
+        lg: "h-13 px-5",
+        icon: "size-11",
+        "icon-xs": "size-11",
+        "icon-sm": "size-11",
+        "icon-lg": "size-12",
       },
     },
     defaultVariants: {
@@ -55,4 +71,6 @@ function Button({
   )
 }
 
+// buttonVariants serve anche ai link con l'aspetto di pulsante (convenzione di shadcn/ui).
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants }

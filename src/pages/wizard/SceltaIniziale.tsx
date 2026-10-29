@@ -1,23 +1,33 @@
+import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-const SCELTA = 'h-auto w-full flex-col items-start gap-1 whitespace-normal p-4 text-left'
+// Ogni scelta è una riga di quaderno larga quanto la colonna: titolo, spiegazione e freccia.
+const SCELTA = 'h-auto w-full justify-between gap-3 rounded-none border-0 border-b border-riga bg-transparent px-4 py-4 text-left whitespace-normal hover:bg-carta-ombra/70 active:bg-carta-ombra -outline-offset-2'
 
 /** Prima schermata con la bozza vuota: partire dal modello Hydrochar o da zero. */
 export function SceltaIniziale({ onModello, onDaZero }: { onModello: () => void; onDaZero: () => void }) {
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="text-2xl font-bold">Come vuoi iniziare?</h2>
-      <Button variant="outline" onClick={onModello} className={SCELTA}>
-        <span className="text-lg font-semibold">Parti dal modello Hydrochar</span>
-        <span className="text-sm font-normal text-muted-foreground">
-          Fattori Stress × Hydrochar, 8 trattamenti, 56 piante, parametri e passate già pronti: li modifichi come vuoi.
-        </span>
-      </Button>
-      <Button variant="outline" onClick={onDaZero} className={SCELTA}>
-        <span className="text-lg font-semibold">Parti da zero</span>
-        <span className="text-sm font-normal text-muted-foreground">Definisci tu fattori, piante, parametri e passate.</span>
-      </Button>
-      <p className="text-sm text-muted-foreground">Per ripartire da un tuo esperimento usa «Duplica» nell'elenco degli esperimenti.</p>
+    <div className="flex flex-col gap-4">
+      <h2 className="text-headline text-grafite">Come vuoi iniziare?</h2>
+      <div className="-mx-4 flex flex-col border-t border-riga">
+        <Button variant="quiet" onClick={onModello} className={SCELTA}>
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="text-title text-grafite">Parti dal modello Hydrochar</span>
+            <span className="text-dato font-sans text-grafite-tenue">
+              Fattori Stress × Hydrochar, 8 trattamenti, 56 piante, parametri e passate già pronti: li modifichi come vuoi.
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="text-grafite-tenue" />
+        </Button>
+        <Button variant="quiet" onClick={onDaZero} className={SCELTA}>
+          <span className="flex min-w-0 flex-col gap-1">
+            <span className="text-title text-grafite">Parti da zero</span>
+            <span className="text-dato font-sans text-grafite-tenue">Definisci tu fattori, piante, parametri e passate.</span>
+          </span>
+          <ChevronRight aria-hidden className="text-grafite-tenue" />
+        </Button>
+      </div>
+      <p className="text-sm text-grafite-tenue">Per ripartire da un tuo esperimento usa «Duplica» nell'elenco degli esperimenti.</p>
     </div>
   )
 }

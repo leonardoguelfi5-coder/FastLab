@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { creaInvito, revocaInvito, type Invito } from '@/api/inviti'
 import { chiavi, useInviti, useSonoAdmin } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { TestoErrore } from '@/components/TestoErrore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -28,9 +29,9 @@ function dataUso(usatoIl: string): string {
 
 function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
   return (
-    <div role="alert" className="flex flex-col items-start gap-2">
-      <p className="text-sm text-destructive">{messaggioErrore(errore)}</p>
-      <Button variant="outline" onClick={onRiprova} className="h-11">Riprova</Button>
+    <div role="alert" className="flex flex-col items-start gap-1">
+      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
+      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
     </div>
   )
 }
@@ -46,8 +47,8 @@ function MessaggioDaCopiare({ messaggio, onFatto }: { messaggio: string; onFatto
   }, [])
 
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id} className="text-sm font-medium">Messaggio da copiare</Label>
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>Messaggio da copiare</Label>
       <Textarea
         ref={casella}
         id={id}
@@ -56,12 +57,11 @@ function MessaggioDaCopiare({ messaggio, onFatto }: { messaggio: string; onFatto
         value={messaggio}
         aria-describedby={`${id}-aiuto`}
         onFocus={(e) => e.currentTarget.select()}
-        className="text-sm"
       />
-      <p id={`${id}-aiuto`} className="text-sm text-muted-foreground">
+      <p id={`${id}-aiuto`} className="text-sm text-grafite-tenue">
         Non è stato possibile copiarlo in automatico: tieni premuto sul testo, selezionalo e copialo.
       </p>
-      <Button variant="outline" onClick={onFatto} className="h-11 self-start">Fatto</Button>
+      <Button variant="outline" onClick={onFatto} className="mt-1 self-start">Fatto</Button>
     </div>
   )
 }
@@ -89,26 +89,27 @@ function RigaInvito({ invito, evidenziato, onRevoca }: RigaInvitoProps) {
   }
 
   return (
-    <li className={cn('flex flex-col gap-3 rounded-lg border p-3', evidenziato && 'border-primary bg-primary/5 ring-2 ring-primary/30')}>
-      <div className="flex items-start justify-between gap-2">
-        <p id={idEmail} className="min-w-0 break-all text-base font-medium">{invito.email}</p>
-        {evidenziato && <Badge>Nuovo</Badge>}
+    // Riga di quaderno; l'invito appena creato ha il fondo inchiostro velato e l'etichetta "Nuovo" (non solo colore).
+    <li className={cn('flex flex-col gap-3 border-b border-riga px-4 py-4', evidenziato && 'bg-inchiostro-velato')}>
+      <div className="flex items-start justify-between gap-3">
+        <p id={idEmail} className="min-w-0 text-title break-all text-grafite">{invito.email}</p>
+        {evidenziato && <Badge className="mt-0.5">Nuovo</Badge>}
       </div>
 
       {invito.usato_il !== null ? (
-        <p className="text-sm text-muted-foreground">{`Registrato il ${dataUso(invito.usato_il)}`}</p>
+        <p className="-mt-2 text-dato font-sans text-grafite-tenue tabular-nums">{`Registrato il ${dataUso(invito.usato_il)}`}</p>
       ) : (
         <>
-          <p className="text-sm text-muted-foreground">In attesa</p>
-          <p className="flex items-baseline gap-2">
-            <span className="text-sm text-muted-foreground">Codice</span>
-            <code className="font-mono text-xl font-semibold tracking-widest select-all">{invito.codice}</code>
+          <p className="-mt-2 text-dato font-sans text-grafite-tenue">In attesa</p>
+          <p className="flex items-baseline gap-3">
+            <span className="text-label text-grafite-tenue">Codice</span>
+            <code className="text-campo font-semibold tracking-[0.08em] text-grafite select-all">{invito.codice}</code>
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" aria-describedby={idEmail} onClick={copia} className="h-11 flex-1">
+            <Button variant="outline" aria-describedby={idEmail} onClick={copia} className="flex-1">
               Copia messaggio
             </Button>
-            <Button variant="destructive" aria-describedby={idEmail} onClick={() => onRevoca(invito)} className="h-11">
+            <Button variant="destructive" aria-describedby={idEmail} onClick={() => onRevoca(invito)}>
               Revoca
             </Button>
           </div>
@@ -170,8 +171,8 @@ function GestioneInviti() {
 
   return (
     <>
-      <form onSubmit={invia} className="flex flex-col gap-1">
-        <Label htmlFor="invito-email" className="text-sm font-medium">Email</Label>
+      <form onSubmit={invia} className="flex flex-col gap-1.5">
+        <Label htmlFor="invito-email">Email</Label>
         <div className="flex gap-2">
           <Input
             id="invito-email"
@@ -184,24 +185,24 @@ function GestioneInviti() {
               setEmail(e.target.value)
               if (crea.isError) crea.reset()
             }}
-            className="h-12 flex-1 text-lg"
+            className="flex-1"
           />
-          <Button type="submit" disabled={crea.isPending} className="h-12 text-lg">
+          <Button type="submit" size="lg" disabled={crea.isPending}>
             {crea.isPending ? 'Invio…' : 'Invita'}
           </Button>
         </div>
-        <p id="invito-email-aiuto" className="text-sm text-muted-foreground">L'email con cui il collega si registrerà.</p>
-        {crea.isError && <p role="alert" className="text-sm text-destructive">{messaggioErrore(crea.error)}</p>}
+        <p id="invito-email-aiuto" className="text-sm text-grafite-tenue">L'email con cui il collega si registrerà.</p>
+        {crea.isError && <TestoErrore role="alert">{messaggioErrore(crea.error)}</TestoErrore>}
       </form>
 
       {inviti.data === undefined ? (
         inviti.isError
           ? <ErroreConRiprova errore={inviti.error} onRiprova={() => void inviti.refetch()} />
-          : <p role="status" className="text-muted-foreground">Caricamento…</p>
+          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
       ) : inviti.data.length === 0 ? (
-        <p className="text-muted-foreground">Nessun invito ancora.</p>
+        <p className="text-grafite-tenue">Nessun invito ancora.</p>
       ) : (
-        <ul aria-label="Inviti" className="flex flex-col gap-3">
+        <ul aria-label="Inviti" className="-mx-4 -mt-2 flex flex-col border-t border-riga">
           {inviti.data.map(invito => (
             <RigaInvito key={invito.id} invito={invito} evidenziato={invito.id === nuovoId} onRevoca={chiediRevoca} />
           ))}
@@ -217,16 +218,15 @@ function GestioneInviti() {
               {`L'invito per ${daRevocare?.email ?? ''} non sarà più valido: per registrarsi servirà un nuovo invito.`}
             </DialogDescription>
           </DialogHeader>
-          {revoca.isError && <p role="alert" className="text-sm text-destructive">{messaggioErrore(revoca.error)}</p>}
+          {revoca.isError && <TestoErrore role="alert">{messaggioErrore(revoca.error)}</TestoErrore>}
           <DialogFooter>
-            <Button variant="outline" onClick={chiudiConferma} disabled={revoca.isPending} className="h-11">
+            <Button variant="outline" onClick={chiudiConferma} disabled={revoca.isPending}>
               Annulla
             </Button>
             <Button
-              variant="destructive"
+              variant="destructive-solid"
               disabled={revoca.isPending}
               onClick={() => { if (daRevocare) revoca.mutate(daRevocare.id) }}
-              className="h-11"
             >
               {revoca.isPending ? 'Revoca in corso…' : 'Revoca invito'}
             </Button>
@@ -242,7 +242,7 @@ function Corpo() {
   const admin = useSonoAdmin()
 
   if (admin.data === true) return <GestioneInviti />
-  if (admin.isPending) return <p role="status" className="text-muted-foreground">Caricamento…</p>
+  if (admin.isPending) return <p role="status" className="text-grafite-tenue">Caricamento…</p>
   // Se il ruolo non si è potuto leggere non si può dire "riservata": è un errore, non un divieto.
   if (admin.isError) return <ErroreConRiprova errore={admin.error} onRiprova={() => void admin.refetch()} />
   return <p>Questa pagina è riservata all'amministratore.</p>

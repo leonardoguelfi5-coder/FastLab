@@ -6,6 +6,7 @@ import { conLivelliInSospeso, livelloAggiungibile } from '@/components/config/li
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero } from '@/lib/numeri'
 import { Conferma } from './Conferma'
 import { MAX_PIANTE, nPiante, rigeneraRighe, trattamentiInclusi, type RigaTrattamento } from './righeTrattamenti'
@@ -20,7 +21,7 @@ const MAX_NUMERAZIONE = 999_999
 const normalizza = (s: string) => s.trim().toLowerCase()
 
 function Avviso({ id, children }: { id: string; children: string }) {
-  return <p id={id} className="text-sm text-muted-foreground">{children}</p>
+  return <p id={id} className="text-sm text-grafite-tenue">{children}</p>
 }
 
 interface TabellaProps {
@@ -33,12 +34,13 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
   const cambia = (i: number, riga: RigaTrattamento) => onChange(righe.map((r, j) => (j === i ? riga : r)))
 
   return (
-    <table className="w-full border-separate border-spacing-y-1">
-      <thead className="text-left text-sm text-muted-foreground">
-        <tr>
-          <th scope="col" className="w-12 font-normal">Incluso</th>
-          <th scope="col" className="font-normal">Etichetta</th>
-          <th scope="col" className="w-24 font-normal">N piante</th>
+    // Righe di quaderno, non una griglia da foglio di calcolo: solo linee orizzontali tra un trattamento e l'altro.
+    <table className="w-full border-collapse">
+      <thead className="text-left text-grafite-tenue">
+        <tr className="border-b border-riga">
+          <th scope="col" className="w-14 pb-2 text-label">Incluso</th>
+          <th scope="col" className="pb-2 text-label">Etichetta</th>
+          <th scope="col" className="w-24 pb-2 text-label">N piante</th>
         </tr>
       </thead>
       <tbody>
@@ -47,27 +49,30 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
           const idErrore = `${id}-${i}-errore`
           return (
             <Fragment key={r.trattamento.id}>
-              <tr>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Includi il trattamento ${i + 1}`}
-                    checked={r.incluso}
-                    onChange={(e) => cambia(i, { ...r, incluso: e.target.checked })}
-                    className="size-6 accent-primary"
-                  />
+              <tr className={sbagliato ? undefined : 'border-b border-riga'}>
+                <td className="py-2">
+                  {/* L'etichetta senza testo allarga a 44px l'area che si può toccare intorno alla casella. */}
+                  <label className="-ml-2.5 flex size-11 cursor-pointer items-center justify-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Includi il trattamento ${i + 1}`}
+                      checked={r.incluso}
+                      onChange={(e) => cambia(i, { ...r, incluso: e.target.checked })}
+                      className="size-6 cursor-pointer accent-inchiostro"
+                    />
+                  </label>
                 </td>
-                <td className="pr-2">
+                <td className="py-2 pr-2">
                   <Input
                     aria-label={`Etichetta del trattamento ${i + 1}`}
                     value={r.trattamento.etichetta}
                     disabled={!r.incluso}
                     onChange={(e) => cambia(i, { ...r, trattamento: { ...r.trattamento, etichetta: e.target.value } })}
-                    className="h-12 text-lg"
                   />
                 </td>
-                <td>
+                <td className="py-2">
                   <Input
+                    variant="campo"
                     aria-label={`N piante del trattamento ${i + 1}`}
                     inputMode="numeric"
                     autoComplete="off"
@@ -76,14 +81,14 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
                     aria-invalid={sbagliato || undefined}
                     aria-describedby={sbagliato ? idErrore : undefined}
                     onChange={(e) => cambia(i, { ...r, n: e.target.value })}
-                    className="h-12 text-center text-lg"
+                    className="text-center"
                   />
                 </td>
               </tr>
               {sbagliato && (
-                <tr>
-                  <td colSpan={3}>
-                    <p id={idErrore} className="text-right text-sm text-destructive">{`Scrivi un numero intero da 1 a ${MAX_PIANTE}.`}</p>
+                <tr className="border-b border-riga">
+                  <td colSpan={3} className="pb-2">
+                    <TestoErrore id={idErrore} className="justify-end">{`Scrivi un numero intero da 1 a ${MAX_PIANTE}.`}</TestoErrore>
                   </td>
                 </tr>
               )}
@@ -102,17 +107,17 @@ function ElencoPiante({ bozza, onChange }: { bozza: BozzaEsperimento; onChange: 
   const cambia = (i: number, modifica: Partial<Pianta>) => onChange(bozza.piante.map((p, j) => (j === i ? { ...p, ...modifica } : p)))
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6 empty:hidden">
       {bozza.trattamenti.map(t => {
         const indici = bozza.piante.flatMap((p, i) => (p.trattamento_id === t.id ? [i] : []))
         if (indici.length === 0) return null
         return (
           <section key={t.id} aria-labelledby={`${id}-${t.id}`} className="flex flex-col gap-2">
-            <h4 id={`${id}-${t.id}`} className="font-medium">
+            <h4 id={`${id}-${t.id}`} className="border-b border-riga pb-2 text-base font-semibold text-grafite">
               {t.etichetta}
-              <span className="font-normal text-muted-foreground">{` · ${indici.length} piante`}</span>
+              <span className="font-normal text-grafite-tenue tabular-nums">{` · ${indici.length} piante`}</span>
             </h4>
-            <div className="grid grid-cols-[1fr_7rem] gap-2 text-sm text-muted-foreground" aria-hidden>
+            <div className="grid grid-cols-[1fr_7rem] gap-2 text-label text-grafite-tenue" aria-hidden>
               <span>Etichetta</span>
               <span>Blocco</span>
             </div>
@@ -126,21 +131,21 @@ function ElencoPiante({ bozza, onChange }: { bozza: BozzaEsperimento; onChange: 
                   <li key={p.id} className="grid grid-cols-[1fr_7rem] items-start gap-2">
                     <div className="flex flex-col gap-1">
                       <Input
+                        variant="campo"
                         aria-label={`Etichetta della pianta ${i + 1}`}
                         value={p.etichetta}
                         aria-invalid={problema !== null || undefined}
                         aria-describedby={problema ? `${id}-p${i}` : undefined}
                         onChange={(e) => cambia(i, { etichetta: e.target.value })}
-                        className="h-12 text-lg"
                       />
-                      {problema && <p id={`${id}-p${i}`} className="text-sm text-destructive">{problema}</p>}
+                      {problema && <TestoErrore id={`${id}-p${i}`}>{problema}</TestoErrore>}
                     </div>
                     <Input
+                      variant="campo"
                       aria-label={`Blocco della pianta ${i + 1}`}
                       value={p.blocco ?? ''}
                       placeholder="—"
                       onChange={(e) => cambia(i, { blocco: e.target.value.trim() === '' ? null : e.target.value })}
-                      className="h-12 text-lg"
                     />
                   </li>
                 )
@@ -189,14 +194,14 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <p className="text-muted-foreground">
+    <div className="flex flex-col gap-10">
+      <p className="max-w-[65ch] text-grafite-tenue">
         Un fattore è ciò che fai variare (es. Stress: Controllo, S1, W1). I trattamenti sono le combinazioni dei livelli
         dei fattori; per ognuno scegli quante piante ha.
       </p>
 
       <section aria-labelledby={`${id}-fattori`} className="flex flex-col gap-3">
-        <h3 id={`${id}-fattori`} className="text-lg font-semibold">Fattori</h3>
+        <h3 id={`${id}-fattori`} className="text-title text-grafite">Fattori</h3>
         <EditorFattori
           valore={bozza.fattori}
           onChange={(fattori) => onChange({ ...bozza, fattori }, righe)}
@@ -206,8 +211,8 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
       </section>
 
       <section aria-labelledby={`${id}-trattamenti`} className="flex flex-col gap-3">
-        <h3 id={`${id}-trattamenti`} className="text-lg font-semibold">Trattamenti</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 id={`${id}-trattamenti`} className="text-title text-grafite">Trattamenti</h3>
+        <p className="max-w-[65ch] text-sm text-grafite-tenue">
           Togli la spunta alle combinazioni che non usi; puoi cambiare le etichette. Se modifichi i fattori, genera di nuovo:
           le righe già presenti restano come le hai lasciate.
         </p>
@@ -216,7 +221,7 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
           disabled={motivoTrattamenti !== null}
           aria-describedby={motivoTrattamenti ? `${id}-motivo-trattamenti` : undefined}
           onClick={generaTrattamenti}
-          className="h-12 self-start text-base"
+          className="self-start"
         >
           Genera trattamenti
         </Button>
@@ -225,35 +230,38 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
       </section>
 
       <section aria-labelledby={`${id}-piante`} className="flex flex-col gap-3">
-        <h3 id={`${id}-piante`} className="text-lg font-semibold">Piante</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 id={`${id}-piante`} className="text-title text-grafite">Piante</h3>
+        <p className="max-w-[65ch] text-sm text-grafite-tenue">
           L'etichetta è quella che digiterai in campo: puoi cambiarla (es. 101 o B3-12). Il blocco è facoltativo.
         </p>
-        <div className="flex items-start gap-2">
-          <div className="flex w-36 flex-col gap-1">
-            <Label htmlFor={`${id}-inizio`} className="text-sm font-medium">Numerazione da</Label>
+        <div className="flex items-end gap-2">
+          <div className="flex w-36 flex-col gap-1.5">
+            <Label htmlFor={`${id}-inizio`}>Numerazione da</Label>
             <Input
               id={`${id}-inizio`}
+              variant="campo"
               inputMode="numeric"
               autoComplete="off"
               value={inizio}
               aria-invalid={primo === null || undefined}
               aria-describedby={primo === null ? `${id}-inizio-errore` : undefined}
               onChange={(e) => setInizio(e.target.value)}
-              className="h-12 text-lg"
             />
           </div>
+          {/* Secondario: l'unico pulsante pieno della schermata resta "Avanti" nella barra in basso. */}
           <Button
+            variant="outline"
+            size="lg"
             disabled={motivoPiante !== null}
             aria-describedby={motivoPiante ? `${id}-motivo-piante` : undefined}
             onClick={() => (bozza.piante.length > 0 ? setConferma(true) : generaOra())}
-            className="mt-6 h-12 flex-1 text-base"
+            className="flex-1"
           >
             Genera piante
           </Button>
         </div>
         {primo === null && (
-          <p id={`${id}-inizio-errore`} className="text-sm text-destructive">Scrivi un numero intero, es. 1 o 101.</p>
+          <TestoErrore id={`${id}-inizio-errore`}>Scrivi un numero intero, es. 1 o 101.</TestoErrore>
         )}
         {motivoPiante && <Avviso id={`${id}-motivo-piante`}>{motivoPiante}</Avviso>}
         <ElencoPiante bozza={bozza} onChange={(piante) => onChange({ ...bozza, piante }, righe)} />
