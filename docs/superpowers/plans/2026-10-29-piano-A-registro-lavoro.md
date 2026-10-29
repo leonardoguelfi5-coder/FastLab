@@ -66,3 +66,6 @@ Task 10: minor (deferred): statiPiante O(piante × misure); id duplicati teorici
 Task 10: complete (commits 4f24688..45cc256, review clean)
 Task 2: fix round 1 implemented cdaf525 (916 Vitest); re-review (sonnet) dispatched
 Task 3: dispatched implementer (opus) in parallelo alla ri-revisione del T2 (add espliciti), BASE cdaf525
+Task 2: re-review fix round 1 → Approved (916 Vitest)
+Task 2: fix round 1/5 (5 addressed, 0 open; commits 20a5d09..cdaf525)
+Task 2: complete (commits 20a5d09..cdaf525, review clean)
