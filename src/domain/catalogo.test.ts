@@ -7,7 +7,7 @@ vi.mock('@/lib/id', async importOriginal => {
 })
 
 import { nuovoId } from '@/lib/id'
-import { pianoAggiornamento, strumentoDaCatalogo, type CopiaStrumento } from './catalogo'
+import { pianoAggiornamento, strumentoDaCatalogo, VOCI_DIVERSE, type CopiaStrumento } from './catalogo'
 import type { Parametro, VoceCatalogo } from './tipi'
 
 const ciras: VoceCatalogo = {
@@ -121,6 +121,8 @@ describe('pianoAggiornamento', () => {
     ...c, parametri: c.parametri.map(p => (p.catalogo_chiave === chiave ? { ...p, ...campi } : p)),
   })
   const parametroDi = (c: CopiaStrumento, chiave: string) => c.parametri.find(p => p.catalogo_chiave === chiave) as Parametro
+  /** La modifica attesa nell'esperimento E1: il parametro aggiornato e i soli campi da scrivere. */
+  const modifica = (p: Parametro, campi: Partial<Parametro>) => ({ espId: 'E1', parametro: { ...p, ...campi }, campi })
 
   it('unità cambiata nel catalogo e copia intatta: è una modifica', () => {
     const c = copia()
@@ -128,7 +130,7 @@ describe('pianoAggiornamento', () => {
 
     expect(piano).toEqual({
       aggiunte: [],
-      modifiche: [{ espId: 'E1', parametro: { ...parametroDi(c, 'gs'), unita: 'mmol m⁻² s⁻¹' } }],
+      modifiche: [modifica(parametroDi(c, 'gs'), { unita: 'mmol m⁻² s⁻¹' })],
       saltati: [],
     })
   })
@@ -153,7 +155,7 @@ describe('pianoAggiornamento', () => {
 
     expect(piano.saltati).toEqual([])
     expect(piano.modifiche).toEqual([
-      { espId: 'E1', parametro: { ...parametroDi(c, 'a'), nome: 'Assimilazione', unita: 'µmol m⁻² s⁻¹' } },
+      modifica(parametroDi(c, 'a'), { nome: 'Assimilazione', unita: 'µmol m⁻² s⁻¹' }),
     ])
   })
 
@@ -163,7 +165,7 @@ describe('pianoAggiornamento', () => {
 
     expect(pianoAggiornamento(vecchia, nuova, [c])).toEqual({
       aggiunte: [],
-      modifiche: [{ espId: 'E1', parametro: { ...parametroDi(c, 'gs'), valore_max: 3 } }],
+      modifiche: [modifica(parametroDi(c, 'gs'), { valore_max: 3 })],
       saltati: ['Pomodoro 2026 · Ciras · gs: minimo modificato a mano'],
     })
   })
@@ -174,7 +176,7 @@ describe('pianoAggiornamento', () => {
 
     expect(pianoAggiornamento(vecchia, nuova, [c])).toEqual({
       aggiunte: [],
-      modifiche: [{ espId: 'E1', parametro: { ...parametroDi(c, 'gs'), nome: 'gs (conduttanza)' } }],
+      modifiche: [modifica(parametroDi(c, 'gs'), { nome: 'gs (conduttanza)' })],
       saltati: ['Pomodoro 2026 · Ciras · gs: unità modificato a mano'],
     })
   })
@@ -276,7 +278,7 @@ describe('pianoAggiornamento', () => {
       saltati: ['Pomodoro 2026 · Ciras · A: letture non aggiornato, ci sono già misure'],
     })
     expect(pianoAggiornamento(vecchia, nuova, [copia()]).modifiche).toEqual([
-      { espId: 'E1', parametro: { ...parametroDi(copia(), 'a'), n_letture: 3 } },
+      modifica(parametroDi(copia(), 'a'), { n_letture: 3 }),
     ])
   })
 
@@ -286,7 +288,7 @@ describe('pianoAggiornamento', () => {
 
     expect(pianoAggiornamento(vecchia, nuova, [c])).toEqual({
       aggiunte: [],
-      modifiche: [{ espId: 'E1', parametro: { ...parametroDi(c, 'gs'), nome: 'Gs', valore_min: -1, valore_max: 5 } }],
+      modifiche: [modifica(parametroDi(c, 'gs'), { nome: 'Gs', valore_min: -1, valore_max: 5 })],
       saltati: ['Pomodoro 2026 · Ciras · gs: unità non aggiornato, ci sono già misure'],
     })
   })
@@ -347,6 +349,37 @@ describe('pianoAggiornamento', () => {
 
     expect(piano.saltati).toEqual(['Due · Ciras · gs: unità modificato a mano', 'Due · Ciras · A: unità modificato a mano'])
     expect(piano.modifiche.map(m => [m.espId, m.parametro.catalogo_chiave])).toEqual([['E1', 'a'], ['E1', 'gs']])
+  })
+
+  it('la modifica porta solo i campi cambiati dal piano, non quelli saltati o rimasti uguali', () => {
+    const c = ritoccata(copia({ conDati: new Set(['par-gs']) }), 'gs', { valore_min: 0.5 })
+    const nuova = conValore(vecchia, 'gs', { nome: 'Gs', unita: 'mmol m⁻² s⁻¹', valore_min: -1, valore_max: 5 })
+
+    const [m] = pianoAggiornamento(vecchia, nuova, [c]).modifiche
+
+    expect(m.campi).toEqual({ nome: 'Gs', valore_max: 5 })
+  })
+
+  it('in uno strumento archiviato nessuna aggiunta, le modifiche restano', () => {
+    const c = copia()
+    const archiviato: CopiaStrumento = { ...c, strumento: { ...c.strumento, archiviato: true } }
+    const nuova: VoceCatalogo = {
+      ...conValore(vecchia, 'a', { nome: 'Assimilazione' }),
+      parametri: [
+        ...conValore(vecchia, 'a', { nome: 'Assimilazione' }).parametri,
+        { chiave: 'e', nome: 'E', unita: null, n_letture: 1, valore_min: null, valore_max: null },
+      ],
+    }
+
+    const piano = pianoAggiornamento(vecchia, nuova, [archiviato])
+
+    expect(piano.aggiunte).toEqual([])
+    expect(piano.modifiche).toEqual([modifica(parametroDi(c, 'a'), { nome: 'Assimilazione' })])
+  })
+
+  it('due voci diverse non si confrontano: è un errore, nessun piano', () => {
+    const altra: VoceCatalogo = { ...conValore(vecchia, 'a', { nome: 'Assimilazione' }), id: 'cat-altro' }
+    expect(() => pianoAggiornamento(vecchia, altra, [copia()])).toThrow(VOCI_DIVERSE)
   })
 
   it('non modifica la voce né le copie ricevute', () => {

@@ -2,7 +2,9 @@ import { supabase } from '@/lib/supabase'
 import { SENZA_SESSIONE } from '@/lib/errori'
 import type { CopiaStrumento, PianoAggiornamento } from '@/domain/catalogo'
 import type { VoceCatalogo } from '@/domain/tipi'
-import { aggiornaParametroDaCatalogo, collegaParametri, parametriConDati, salvaParametro } from './configurazione'
+import {
+  aggiornaParametroDaCatalogo, collegaParametri, eliminaOArchiviaParametro, parametriConDati, salvaParametro,
+} from './configurazione'
 import { controllaRighe } from './righe'
 import {
   aRigaCatalogo, daRigaCatalogo, daRigaParametro, daRigheStrumenti,
@@ -93,15 +95,23 @@ export async function copieDiProprieta(catalogoId: string): Promise<CopiaStrumen
 }
 
 /**
- * Applica un piano di aggiornamento dal catalogo (`pianoAggiornamento`): prima le modifiche, che toccano solo i campi
- * del catalogo di parametri che devono esistere ancora, poi i parametri nuovi, ciascuno creato e collegato in coda al
- * suo strumento (senza riscrivere lo strumento né togliere collegamenti). Si ferma al primo errore e lo lancia: le
- * operazioni già fatte restano, e rileggendo le copie il piano successivo le trova già applicate.
+ * Applica un piano di aggiornamento dal catalogo (`pianoAggiornamento`): prima le modifiche, che scrivono solo i campi
+ * cambiati di parametri che devono esistere ancora, poi i parametri nuovi, ciascuno creato e collegato in coda al suo
+ * strumento (senza riscrivere lo strumento né togliere collegamenti). Si ferma al primo errore e lo lancia: le
+ * operazioni già fatte restano, e rileggendo le copie il piano successivo le trova già applicate. Un parametro creato
+ * ma non collegato si elimina subito: un orfano non comparirebbe nella copia e il piano successivo lo duplicherebbe.
  */
 export async function applicaAggiornamento(piano: PianoAggiornamento): Promise<void> {
-  for (const m of piano.modifiche) await aggiornaParametroDaCatalogo(m.espId, m.parametro)
+  for (const m of piano.modifiche) await aggiornaParametroDaCatalogo(m.espId, m.parametro.id, m.campi)
   for (const a of piano.aggiunte) {
     await salvaParametro(a.espId, a.parametro)
-    await collegaParametri(a.espId, a.strumentoId, [a.collegamento])
+    try {
+      await collegaParametri(a.espId, a.strumentoId, [a.collegamento])
+    } catch (e) {
+      // Appena creato e mai collegato: non ha misure, si elimina. Se anche questo fallisce conta l'errore del
+      // collegamento, che è quello da mostrare.
+      try { await eliminaOArchiviaParametro(a.espId, a.parametro) } catch { /* resta l'errore originale */ }
+      throw e
+    }
   }
 }

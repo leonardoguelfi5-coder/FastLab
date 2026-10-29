@@ -46,27 +46,37 @@ describe('salvaParametro', () => {
 })
 
 describe('aggiornaParametroDaCatalogo', () => {
-  const daCatalogo: Parametro = { ...parametro, tipo: 'testo', archiviato: true, progressivo: true, unita: 'mm', n_letture: 2, valore_min: 1, valore_max: 9 }
-
-  it('aggiorna solo nome, unità, minimo, massimo e letture (mai tipo, archiviato o progressivo) e controlla la riga', async () => {
+  it('scrive solo i campi indicati (mai gli altri) e controlla la riga', async () => {
     mock.risponde('parametri', toccata('par1'))
 
-    await aggiornaParametroDaCatalogo('E', daCatalogo)
+    await aggiornaParametroDaCatalogo('E', 'par1', { unita: 'mm', valore_max: 9 })
 
     expect(mock.di('parametri').map(c => [c.metodo, ...c.args])).toEqual([
-      ['update', { nome: 'Altezza', unita: 'mm', valore_min: 1, valore_max: 9, n_letture: 2 }],
-      ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+      ['update', { unita: 'mm', valore_max: 9 }], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
+  })
+
+  it('tiene solo i campi del catalogo, anche se l\'oggetto ne porta altri', async () => {
+    mock.risponde('parametri', toccata('par1'))
+
+    await aggiornaParametroDaCatalogo('E', 'par1', { nome: 'H', tipo: 'testo', archiviato: true } as never)
+
+    expect(mock.di('parametri')[0].args).toEqual([{ nome: 'H' }])
+  })
+
+  it('senza campi non scrive nulla', async () => {
+    await aggiornaParametroDaCatalogo('E', 'par1', {})
+    expect(mock.chiamate).toEqual([])
   })
 
   it('se il parametro non c\'è più lo dice, invece di ricrearlo', async () => {
     mock.risponde('parametri', { data: [] })
-    await expect(aggiornaParametroDaCatalogo('E', daCatalogo)).rejects.toThrow(ELEMENTO_NON_TROVATO)
+    await expect(aggiornaParametroDaCatalogo('E', 'par1', { nome: 'H' })).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('lancia l\'errore di Supabase', async () => {
     mock.risponde('parametri', { error: errore })
-    await expect(aggiornaParametroDaCatalogo('E', daCatalogo)).rejects.toBe(errore)
+    await expect(aggiornaParametroDaCatalogo('E', 'par1', { nome: 'H' })).rejects.toBe(errore)
   })
 })
 

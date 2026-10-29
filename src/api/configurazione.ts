@@ -1,7 +1,10 @@
 import { supabase } from '@/lib/supabase'
+import type { CampiCatalogo } from '@/domain/catalogo'
 import type { Parametro, Strumento, StrumentoParametro, Pianta } from '@/domain/tipi'
 import { controllaRighe } from './righe'
 import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } from './mappers'
+
+const CAMPI_CATALOGO = ['nome', 'unita', 'valore_min', 'valore_max', 'n_letture'] as const
 
 /** Crea o aggiorna un parametro (upsert per id). Cambiare il tipo di un parametro con dati fallisce con PARAMETRO_CON_DATI. */
 export async function salvaParametro(espId: string, p: Parametro): Promise<void> {
@@ -10,13 +13,18 @@ export async function salvaParametro(espId: string, p: Parametro): Promise<void>
 }
 
 /**
- * Aggiorna di un parametro solo i campi che il catalogo può cambiare (nome, unità, minimo, massimo, letture), con un
- * update e non un upsert: tipo, archiviato e progressivo restano quelli del database anche se nel frattempo sono
- * cambiati altrove, e un parametro eliminato nel frattempo fa fallire l'operazione invece di essere ricreato.
+ * Scrive in un parametro solo i campi indicati tra quelli che il catalogo può cambiare (nome, unità, minimo, massimo,
+ * letture), con un update e non un upsert: gli altri campi restano quelli del database anche se nel frattempo sono
+ * cambiati altrove, e un parametro eliminato nel frattempo fa fallire l'operazione invece di essere ricreato. Senza
+ * campi non scrive nulla.
  */
-export async function aggiornaParametroDaCatalogo(espId: string, p: Parametro): Promise<void> {
-  const campi = { nome: p.nome, unita: p.unita, valore_min: p.valore_min, valore_max: p.valore_max, n_letture: p.n_letture }
-  controllaRighe(await supabase.from('parametri').update(campi).eq('id', p.id).eq('esperimento_id', espId).select('id'))
+export async function aggiornaParametroDaCatalogo(espId: string, id: string, campi: CampiCatalogo): Promise<void> {
+  const daScrivere: CampiCatalogo = {}
+  for (const k of CAMPI_CATALOGO) {
+    if (k in campi) Object.assign(daScrivere, { [k]: campi[k] })
+  }
+  if (Object.keys(daScrivere).length === 0) return
+  controllaRighe(await supabase.from('parametri').update(daScrivere).eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
 /** Ids dei parametri dell'esperimento che compaiono in almeno una misura: non si possono eliminare. */

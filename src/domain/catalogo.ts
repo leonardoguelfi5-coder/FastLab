@@ -65,10 +65,19 @@ export interface AggiuntaDaCatalogo {
   /** Il collegamento del parametro nuovo allo strumento, in coda e facoltativo. */
   collegamento: StrumentoParametro
 }
-export interface ModificaDaCatalogo { espId: string; parametro: Parametro }
+/** I campi di un parametro che il catalogo può aggiornare nelle copie. */
+export type CampiCatalogo = Partial<Pick<Parametro, 'nome' | 'unita' | 'valore_min' | 'valore_max' | 'n_letture'>>
+/**
+ * Una modifica a un parametro di una copia: `parametro` è come sarà dopo (per mostrarlo), `campi` i soli campi da
+ * scrivere, così un ritocco fatto altrove tra la lettura e l'applicazione non viene sovrascritto con valori vecchi.
+ */
+export interface ModificaDaCatalogo { espId: string; parametro: Parametro; campi: CampiCatalogo }
 export interface PianoAggiornamento { aggiunte: AggiuntaDaCatalogo[]; modifiche: ModificaDaCatalogo[]; saltati: string[] }
 
-type ValoriCatalogo = Pick<ParametroCatalogo, 'nome' | 'unita' | 'valore_min' | 'valore_max' | 'n_letture'>
+type ValoriCatalogo = Required<CampiCatalogo>
+
+/** Il messaggio con cui `pianoAggiornamento` rifiuta di confrontare due voci diverse del catalogo. */
+export const VOCI_DIVERSE = 'Le due versioni non sono della stessa voce del catalogo: nessun aggiornamento.'
 
 /**
  * I campi che il catalogo può aggiornare nelle copie, nell'ordine in cui si controllano. `confronto` porta un valore
@@ -100,10 +109,13 @@ function perChiave(parametri: ParametroCatalogo[]): Map<string, ParametroCatalog
  *   del catalogo: se è stato ritoccato a mano resta com'è e finisce tra i `saltati`;
  * - con misure già salvate unità e letture non si aggiornano;
  * - non si elimina nulla (una chiave tolta dal catalogo resta nella copia), il tipo non si tocca, i parametri
- *   archiviati o aggiunti a mano (senza chiave) restano come sono, nome e icona dello strumento pure.
- * Funzione pura: le copie nell'ordine ricevuto, i loro parametri per `ordine`.
+ *   archiviati o aggiunti a mano (senza chiave) restano come sono, nome e icona dello strumento pure;
+ * - uno strumento archiviato riceve le modifiche ma nessun parametro nuovo (non si misura più).
+ * Funzione pura: le copie nell'ordine ricevuto, i loro parametri per `ordine`. Se `vecchia` e `nuova` non sono la
+ * stessa voce lancia `VOCI_DIVERSE`: un errore di chi chiama, che non deve sembrare un aggiornamento riuscito a vuoto.
  */
 export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, copie: CopiaStrumento[]): PianoAggiornamento {
+  if (vecchia.id !== nuova.id) throw new Error(VOCI_DIVERSE)
   const piano: PianoAggiornamento = { aggiunte: [], modifiche: [], saltati: [] }
   const vecchi = perChiave(vecchia.parametri)
   const nuovi = perChiave(nuova.parametri)
@@ -122,6 +134,7 @@ export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, c
 
       const dove = `${copia.esperimentoNome} · ${copia.strumento.nome} · ${p.nome}`
       const aggiornato: Parametro = { ...p }
+      const campi: CampiCatalogo = {}
       for (const { campo, etichetta, confronto, bloccatoDaiDati } of CAMPI) {
         if (confronto(v) === confronto(n)) continue
         // Già come nel catalogo nuovo (l'utente l'aveva corretto da sé): niente da fare, niente da segnalare.
@@ -132,26 +145,30 @@ export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, c
           piano.saltati.push(`${dove}: ${etichetta} non aggiornato, ci sono già misure`)
         } else {
           Object.assign(aggiornato, { [campo]: n[campo] })
+          Object.assign(campi, { [campo]: n[campo] })
         }
       }
 
       // Un minimo nuovo oltre un massimo ritoccato a mano (o viceversa) darebbe un parametro che la configurazione
       // rifiuta: quel limite resta com'era.
       if (aggiornato.valore_min !== null && aggiornato.valore_max !== null && aggiornato.valore_min > aggiornato.valore_max) {
-        if (aggiornato.valore_max !== p.valore_max) {
+        if ('valore_max' in campi) {
           aggiornato.valore_max = p.valore_max
+          delete campi.valore_max
           piano.saltati.push(`${dove}: massimo non aggiornato, sarebbe sotto il minimo`)
         }
-        if (aggiornato.valore_min !== p.valore_min) {
+        if ('valore_min' in campi) {
           aggiornato.valore_min = p.valore_min
+          delete campi.valore_min
           piano.saltati.push(`${dove}: minimo non aggiornato, supererebbe il massimo`)
         }
       }
 
-      if (CAMPI.some(({ campo }) => aggiornato[campo] !== p[campo])) {
-        piano.modifiche.push({ espId: copia.espId, parametro: aggiornato })
-      }
+      if (Object.keys(campi).length > 0) piano.modifiche.push({ espId: copia.espId, parametro: aggiornato, campi })
     }
+
+    // In uno strumento archiviato non si aggiungono valori: non compare più nella misura.
+    if (copia.strumento.archiviato) continue
 
     const presenti = new Set(copia.parametri.map(p => p.catalogo_chiave))
     let ordine = Math.max(ordineMassimo.get(copia.espId) ?? -1, copia.ordineMassimo)

@@ -285,7 +285,7 @@ describe('applicaAggiornamento', () => {
     valore_min: -5, valore_max: 50, sotto_campi: [], catalogo_chiave: 'temp_aria', ...extra,
   })
   const piano: PianoAggiornamento = {
-    modifiche: [{ espId: 'E1', parametro: parametro('pA') }],
+    modifiche: [{ espId: 'E1', parametro: parametro('pA'), campi: { nome: 'Temp aria', valore_max: 50 } }],
     aggiunte: [{
       espId: 'E2', strumentoId: 'S2', parametro: parametro('pNuovo', { progressivo: false }),
       collegamento: { parametro_id: 'pNuovo', obbligatorio: false, ordine: 4 },
@@ -293,13 +293,13 @@ describe('applicaAggiornamento', () => {
     saltati: ['Vite · Termometro · Temp: unità modificato a mano'],
   }
 
-  it('aggiorna i soli campi del catalogo delle modifiche, poi crea e collega i parametri aggiunti', async () => {
+  it('aggiorna i soli campi cambiati delle modifiche, poi crea e collega i parametri aggiunti', async () => {
     mock.risponde('parametri', { data: [{ id: 'pA' }] })
 
     await applicaAggiornamento(piano)
 
     expect(mock.chiamate.map(c => [c.sorgente, c.metodo, ...c.args])).toEqual([
-      ['parametri', 'update', { nome: 'Temp aria', unita: '°C', valore_min: -5, valore_max: 50, n_letture: 2 }],
+      ['parametri', 'update', { nome: 'Temp aria', valore_max: 50 }],
       ['parametri', 'eq', 'id', 'pA'],
       ['parametri', 'eq', 'esperimento_id', 'E1'],
       ['parametri', 'select', 'id'],
@@ -331,10 +331,40 @@ describe('applicaAggiornamento', () => {
     expect(mock.di('strumento_parametri')).toEqual([])
   })
 
-  it('un errore del collegamento fa fallire l\'aggiornamento', async () => {
+  it('se il collegamento fallisce elimina il parametro appena creato (niente orfani) e lancia l\'errore del collegamento', async () => {
     const e = { code: '23503', message: 'foreign key violation' }
     mock.risponde('strumento_parametri', { error: e })
+    mock.risponde('rpc:parametri_con_dati', { data: [] })
+    mock.risponde('parametri', { data: [{ id: 'pNuovo' }] })
+
     await expect(applicaAggiornamento({ ...piano, modifiche: [] })).rejects.toBe(e)
+
+    expect(mock.chiamate.map(c => [c.sorgente, c.metodo, ...c.args]).slice(2)).toEqual([
+      ['rpc:parametri_con_dati', 'rpc', { p_esperimento: 'E2' }],
+      ['parametri', 'delete'],
+      ['parametri', 'eq', 'id', 'pNuovo'],
+      ['parametri', 'eq', 'esperimento_id', 'E2'],
+      ['parametri', 'select', 'id'],
+    ])
+  })
+
+  it('se anche l\'eliminazione fallisce lancia comunque l\'errore originale del collegamento', async () => {
+    const e = { code: '23503', message: 'foreign key violation' }
+    mock.risponde('strumento_parametri', { error: e })
+    mock.risponde('rpc:parametri_con_dati', { error: { code: '08006', message: 'connessione persa' } })
+
+    await expect(applicaAggiornamento({ ...piano, modifiche: [] })).rejects.toBe(e)
+  })
+
+  it('dopo un collegamento fallito non prosegue con le altre aggiunte', async () => {
+    const e = { code: '23503', message: 'foreign key violation' }
+    mock.risponde('strumento_parametri', { error: e })
+    mock.risponde('rpc:parametri_con_dati', { data: [] })
+    mock.risponde('parametri', { data: [{ id: 'pNuovo' }] })
+    const due = { ...piano, modifiche: [], aggiunte: [piano.aggiunte[0], { ...piano.aggiunte[0], parametro: parametro('pAltro') }] }
+
+    await expect(applicaAggiornamento(due)).rejects.toBe(e)
+    expect(mock.di('parametri').filter(c => c.metodo === 'upsert')).toHaveLength(1)
   })
 
   it('un piano vuoto (solo saltati) non scrive nulla', async () => {
