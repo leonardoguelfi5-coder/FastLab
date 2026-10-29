@@ -629,7 +629,7 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
     expect(campo('Temp aria')).toHaveValue('26')
   })
 
-  it('togliendo la spunta sulla #36 la #37 parte senza Temp aria', async () => {
+  it('togliendo la spunta sulla #36 il segno "mantenuto" sparisce subito e la #37 parte senza Temp aria', async () => {
     const utente = userEvent.setup()
     apri('35')
     await pronta()
@@ -639,13 +639,56 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
     await screen.findByRole('heading', { name: 'Pianta #36' })
     await pronta()
 
+    expect(screen.getByText('mantenuto')).toBeInTheDocument()
     await utente.click(mantieni('Temp aria'))
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
     piuTardi()
     await utente.click(pulsante('Salva e vai alla #37'))
     await screen.findByRole('heading', { name: 'Pianta #37' })
     await pronta()
     expect(campo('Temp aria')).toHaveValue('')
     expect(mantieni('Temp aria')).not.toBeChecked()
+  })
+
+  it('una bozza ripresa sulla #36 tiene il segno "mantenuto" sul valore che viene dai mantenuti', async () => {
+    const utente = userEvent.setup()
+    const primo = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    await utente.type(campo('Temp pianta'), '25')
+    primo.unmount()
+
+    // Ricaricando la pagina la bozza torna con Temp aria uguale a prima: deve ancora dire da dove viene.
+    apri('36')
+    await pronta()
+    expect(screen.getByText('Bozza ripristinata.')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(campo('Temp aria')).toHaveAccessibleDescription(expect.stringContaining('mantenuto'))
+    expect(screen.getAllByText('mantenuto')).toHaveLength(1)
+
+    // Se il valore della bozza non è più quello mantenuto, il segno non c'è.
+    await utente.clear(campo('Temp aria'))
+    await utente.type(campo('Temp aria'), '30')
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
+  })
+
+  it('con tutti i campi già compilati dai mantenuti il cursore va sul primo campo, non su una casella', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(mantieni('Temp aria'))
+    await utente.click(mantieni('Temp pianta'))
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    expect(campo('Temp pianta')).toHaveValue('25,1')
+    await waitFor(() => expect(campo('Temp aria')).toHaveFocus())
   })
 
   it('cambiando data di rilievo la spunta si azzera: la pianta non è più precompilata', async () => {

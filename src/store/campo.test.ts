@@ -163,6 +163,34 @@ describe('useCampoStore: mantieni questo parametro uguale', () => {
     expect(store().dati('E').mantenuti).toBeNull()
   })
 
+  it('cambiare strumento o data scarta i mantenuti salvati: tornando indietro non riappaiono', () => {
+    store().setStrumento('E', S)
+    store().setData('E', '2026-10-27')
+    store().setMantieni('E', S, '2026-10-27', tempAria.id, true)
+    store().setStrumento('E', 'altro')
+    expect(store().stato.E.mantenuti).toBeUndefined()
+    store().setStrumento('E', S)
+    expect(store().dati('E').mantenuti).toBeNull()
+
+    store().setMantieni('E', S, '2026-10-27', tempAria.id, true)
+    store().setData('E', '2026-10-26')
+    expect(store().stato.E.mantenuti).toBeUndefined()
+    store().setData('E', '2026-10-27')
+    expect(store().dati('E').mantenuti).toBeNull()
+  })
+
+  it('ribadire la stessa data (la scheda lo fa a mezzanotte per tenere il giorno) o lo stesso strumento tiene i mantenuti', () => {
+    store().setStrumento('E', S)
+    store().setMantieni('E', S, D, tempAria.id, true)
+    store().aggiornaMantenuti('E', { [tempAria.id]: [24.5] })
+    store().setStrumento('E', S)
+    expect(store().dati('E').mantenuti?.valori).toEqual({ [tempAria.id]: [24.5] })
+    // Passata la mezzanotte la scheda fissa il giorno di prima (setData con la data di ieri): i mantenuti restano.
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 5))
+    store().setData('E', D)
+    expect(store().dati('E')).toMatchObject({ dataRilievo: D, mantenuti: { data: D, valori: { [tempAria.id]: [24.5] } } })
+  })
+
   it('mantenutiPer dà i mantenuti validi per uno strumento e una data qualsiasi (non quelli dello store)', () => {
     store().setMantieni('E', S, D, tempAria.id, true)
     expect(store().mantenutiPer('E', S, D)?.parametri).toEqual([tempAria.id])

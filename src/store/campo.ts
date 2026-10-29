@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
-import { vuotoPerForma } from '@/domain/misure'
+import { copiaProfonda, vuotoPerForma } from '@/domain/misure'
 import type { ValoreParametro, ValoriMisura } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
 
@@ -155,10 +155,17 @@ export const useCampoStore = create<CampoStore>()(
       stato: {},
       dati: (espId, oggi = oggiLocale()) => leggi(get().stato, espId, oggi),
       setStrumento: (espId, strumentoId) =>
-        set(s => ({ stato: { ...s.stato, [espId]: { ...pulite(s.stato[espId]), strumentoId } } })),
+        set(s => {
+          const scelte = { ...pulite(s.stato[espId]), strumentoId }
+          // La spunta non passa a un altro strumento: cambiando strumento si azzera.
+          if (scelte.mantenuti && scelte.mantenuti.strumentoId !== strumentoId) delete scelte.mantenuti
+          return { stato: { ...s.stato, [espId]: scelte } }
+        }),
       setData: (espId, data) =>
         set(s => {
           const scelte = pulite(s.stato[espId])
+          // Né a un altro giorno. Ribadire la stessa data (come fa la scheda a mezzanotte per tenere il giorno) la lascia.
+          if (scelte.mantenuti && scelte.mantenuti.data !== data) delete scelte.mantenuti
           if (data === oggiLocale()) delete scelte.dataRilievo
           else scelte.dataRilievo = data
           return { stato: { ...s.stato, [espId]: scelte } }
@@ -194,7 +201,7 @@ export const useCampoStore = create<CampoStore>()(
             if (!(id in valori)) continue
             const v: ValoreParametro = valori[id]
             if (vuotoPerForma(v)) delete nuovi[id]
-            else nuovi[id] = structuredClone(v)
+            else nuovi[id] = copiaProfonda(v)
           }
           scelte.mantenuti = { ...salvati, valori: nuovi }
           return { stato: { ...s.stato, [espId]: scelte } }

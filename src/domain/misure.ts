@@ -32,7 +32,7 @@ export function vuotoPerForma(v: ValoreParametro | undefined): boolean {
   return v.length === 0 || (v as (Lettura | ElementoLista)[]).every(x => x === null)
 }
 
-function copiaProfonda(v: ValoreParametro): ValoreParametro {
+export function copiaProfonda(v: ValoreParametro): ValoreParametro {
   if (!Array.isArray(v)) return v
   return (v as (Lettura | ElementoLista)[]).map(x => (x !== null && typeof x === 'object' ? { n: x.n, valori: { ...x.valori } } : x)) as ValoreParametro
 }

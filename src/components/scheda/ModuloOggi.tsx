@@ -47,9 +47,6 @@ function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: s
   return `Pianta #${etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} ${cosaFare}`
 }
 
-/** Nessun campo parte dal valore mantenuto (misura che si corregge, bozza ripresa). */
-const nessuno: ReadonlyMap<string, ValoriMisura[string]> = new Map()
-
 interface ModuloOggiProps {
   espId: string
   config: ConfigEsperimento
@@ -106,24 +103,32 @@ export function ModuloOggi({
   // si scrive. Prima la bozza lasciata da un'uscita senza salvare, poi la misura che si corregge, poi i precompilati.
   const [iniziale] = useState(() => {
     const bozza = leggiBozza(chiave)
-    if (bozza && bozza.id === id) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true, daMantenuti: nessuno }
-    if (misura) return { valori: valoriDeiParametri(parametri, misura.valori), ora: misura.ora, ripresa: false, daMantenuti: nessuno }
+    const ripresa = bozza !== null && bozza.id === id
     // I mantenuti si leggono dallo store adesso, non dall'ultimo disegno: dopo un salvataggio sono già aggiornati.
-    const mantenuti = useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)?.valori ?? {}
-    const valori = valoriIniziali({ parametri, misurePianta, dataRilievo, mantenuti })
-    // Quali campi partono dal valore mantenuto (e non da quello progressivo o vuoto): portano il segno "mantenuto".
+    // Una correzione non li usa mai.
+    const mantenuti = misura ? {} : (useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)?.valori ?? {})
+    // Quali campi portano il segno "mantenuto": quelli con un valore mantenuto (nella forma del parametro). Per una
+    // bozza ripresa il segno resta finché il campo ha ancora quel valore (vedi sotto): non deve sembrare digitato.
+    const mantenutiAdattati = valoriIniziali({ parametri, misurePianta: [], dataRilievo, mantenuti })
     const daMantenuti = new Map(
-      parametri.filter(p => mantenibile(p) && mantenuti[p.id] !== undefined && !eVuoto(p, mantenuti[p.id])).map(p => [p.id, valori[p.id]]),
+      parametri.filter(p => mantenibile(p) && mantenuti[p.id] !== undefined && !eVuoto(p, mantenuti[p.id])).map(p => [p.id, mantenutiAdattati[p.id]]),
     )
-    return { valori, ora: null, ripresa: false, daMantenuti }
+    if (bozza && ripresa) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true, daMantenuti }
+    if (misura) return { valori: valoriDeiParametri(parametri, misura.valori), ora: misura.ora, ripresa: false, daMantenuti }
+    return { valori: valoriIniziali({ parametri, misurePianta, dataRilievo, mantenuti }), ora: null, ripresa: false, daMantenuti }
   })
   const [valori, setValori] = useState<ValoriMisura>(iniziale.valori)
-  // Il segno "mantenuto" resta finché il campo ha il valore con cui è partito: scritto un altro, è un valore di questa pianta.
-  const precompilatiDaMantenuti = useMemo(
-    () => new Set([...iniziale.daMantenuti].filter(([pid, v]) => JSON.stringify(valori[pid]) === JSON.stringify(v)).map(([pid]) => pid)),
-    [iniziale.daMantenuti, valori],
-  )
   const spuntati = useMemo(() => new Set(mantenutiOra?.parametri ?? []), [mantenutiOra])
+  // Il segno "mantenuto" resta finché il campo è spuntato e ha il valore con cui è partito: scritto un altro, o tolta
+  // la spunta, non è più il valore che si porta da una pianta all'altra.
+  const precompilatiDaMantenuti = useMemo(
+    () => new Set(
+      [...iniziale.daMantenuti]
+        .filter(([pid, v]) => spuntati.has(pid) && JSON.stringify(valori[pid]) === JSON.stringify(v))
+        .map(([pid]) => pid),
+    ),
+    [iniziale.daMantenuti, valori, spuntati],
+  )
   const [ora, setOra] = useState<string | null>(iniziale.ora)
   const [modificato, setModificato] = useState(iniziale.ripresa)
   const [controllo, setControllo] = useState<Controllo | null>(null)
@@ -189,7 +194,7 @@ export function ModuloOggi({
   // compilata, si scrive Temp pianta). Se il browser non apre la tastiera da solo, pazienza.
   useEffect(() => {
     if (!primoCampo || !campi.current) return
-    const elenco = [...campi.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]), textarea')]
+    const elenco = [...campi.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]):not([type="checkbox"]), textarea')]
     ;(elenco.find(c => c.value === '') ?? elenco[0])?.focus()
   }, [primoCampo])
 
