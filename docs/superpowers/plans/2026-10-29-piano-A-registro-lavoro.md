@@ -117,3 +117,8 @@ Task 6: complete (commits e643c1c..390e515, review clean)
 Task 9: implementatore (sonnet) DONE 8464ad6 — 1129 Vitest, build OK; `percorsoCampo` eliminato → percorsoHome/percorsoNuovaMisura/percorsoPiante/percorsoSezione; `percorsoMisura` (modifica) rinominato `percorsoModificaMisura`; Impostazioni e creazione → home; SchedaPianta → /misura; freccia di Campo → home
 Task 9: dispatched reviewer (sonnet) on 232fbcd..8464ad6
 Task 7: dispatched implementer (sonnet), BASE 8464ad6 (unico implementatore; revisore T9 su copia)
+Task 9: review (sonnet) → Approved (0 Critical/Important), 1129 Vitest, build OK, su copia del commit
+Task 9: minor (carry to T12): SchedaPianta aperta dall'elenco torna a /misura e, senza strumento scelto, rimbalza lì → con il T12 la freccia va all'elenco e lo strumento è quello dello store o il primo attivo (già nel brief)
+Task 9: minor (carry to T11): la home legge le misure del giorno anche senza strumento scelto → `useMisureGiorno(strumentoId ? espId : undefined, …)`
+Task 9: minor (carry to T13): DESIGN.md dice che le emoji sono ammesse solo come icona della passata → aggiornare (icone delle sezioni della home e degli strumenti); mockup della home ancora con Mappa e badge (riferimento storico); emoji dello strumento nello stato della striscia letta dai lettori di schermo
+Task 9: complete (commits 232fbcd..8464ad6, review clean)
