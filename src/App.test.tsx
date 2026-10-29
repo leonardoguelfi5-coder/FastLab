@@ -20,6 +20,12 @@ vi.mock('@/pages/HomeEsperimento', () => ({
 vi.mock('@/pages/SceltaStrumento', () => ({
   SceltaStrumento: () => <h1>Scelta dello strumento (prova)</h1>,
 }))
+vi.mock('@/pages/MisuraPianta', () => ({
+  MisuraPianta: () => <h1>Misura della pianta (prova)</h1>,
+}))
+vi.mock('@/pages/FineGiro', () => ({
+  FineGiro: () => <h1>Fine del giro (prova)</h1>,
+}))
 vi.mock('@/pages/ElencoPiante', () => ({
   ElencoPiante: () => <h1>Elenco delle piante (prova)</h1>,
 }))
@@ -46,7 +52,7 @@ import { AppRoutes } from './App'
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 const PERCORSI_PRIVATI = [
-  '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
+  '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/misura/s/p', '/esperimenti/x/misura/s/fine', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
   '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/dataset',
   '/esperimenti/nuovo', '/admin/inviti', '/catalogo',
 ]
@@ -105,6 +111,18 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/misura')
     expect(screen.getByRole('heading', { level: 1, name: 'Scelta dello strumento (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/misura/:strumentoId/:piantaId mostra la misura della pianta', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/misura/s/p')
+    expect(screen.getByRole('heading', { level: 1, name: 'Misura della pianta (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/misura/:strumentoId/fine mostra la fine del giro, non una pianta «fine»', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/misura/s/fine')
+    expect(screen.getByRole('heading', { level: 1, name: 'Fine del giro (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/piante mostra l\'elenco delle piante', () => {

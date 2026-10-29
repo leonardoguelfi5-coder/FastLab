@@ -1,28 +1,35 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useConfig, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
-import { Conferma } from '@/components/Conferma'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import type { StatoModulo } from '@/components/scheda/ModuloOggi'
 import { RiquadroOggi } from '@/components/scheda/RiquadroOggi'
 import { StoriaPianta } from '@/components/scheda/StoriaPianta'
+import { useModuloProtetto } from '@/components/scheda/useModuloProtetto'
 import { Badge } from '@/components/ui/badge'
 import { piantaSuccessiva } from '@/domain/piante'
-import type { ConfigEsperimento, Misura } from '@/domain/tipi'
-import { percorsoNuovaMisura } from '@/lib/percorsi'
-import { useOggi } from '@/lib/useOggi'
+import type { ConfigEsperimento, Misura, Strumento } from '@/domain/tipi'
+import { percorsoPiante } from '@/lib/percorsi'
 import { useCampoStore } from '@/store/campo'
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
+
+/**
+ * Lo strumento del riquadro di oggi: quello scelto per la misura, se è ancora attivo, altrimenti il primo attivo.
+ * Non si sceglie nulla nello store: la scheda si apre dall'elenco delle piante, non da un giro di misura.
+ */
+function strumentoDellaScheda(config: ConfigEsperimento, sceltoId: string | null): Strumento | null {
+  const attivi = config.strumenti.filter(s => !s.archiviato).sort((a, b) => a.ordine - b.ordine)
+  return attivi.find(s => s.id === sceltoId) ?? attivi[0] ?? null
+}
 
 interface SchedaCaricataProps {
   espId: string
   config: ConfigEsperimento
   piantaId: string
-  strumentoId: string
+  strumentoId: string | null
   dataRilievo: string
   oggi: string
   misure: UseQueryResult<Misura[]>
@@ -35,9 +42,7 @@ function SchedaCaricata({
   espId, config, piantaId, strumentoId, dataRilievo, oggi, misure, conferma, onModifiche,
 }: SchedaCaricataProps) {
   const pianta = config.piante.find(p => p.id === piantaId)
-  const strumento = config.strumenti.find(p => p.id === strumentoId)
-  // Uno strumento scelto e poi cancellato dalle impostazioni è come nessuna scelta: si torna a sceglierlo.
-  if (!strumento) return <Navigate to={percorsoNuovaMisura(espId)} replace />
+  const strumento = strumentoDellaScheda(config, strumentoId)
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
 
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
@@ -68,20 +73,24 @@ function SchedaCaricata({
           : <Caricamento />
       ) : (
         <>
-          {/* Una data o uno strumento diversi sono un riquadro nuovo: una misura in correzione non passa a un altro giorno. */}
-          <RiquadroOggi
-            key={`${strumento.id}:${dataRilievo}`}
-            espId={espId}
-            config={config}
-            pianta={pianta}
-            strumento={strumento}
-            misure={misure.data}
-            dataRilievo={dataRilievo}
-            oggi={oggi}
-            successiva={piantaSuccessiva(config.piante, pianta.id)}
-            conferma={conferma}
-            onModifiche={onModifiche}
-          />
+          {strumento ? (
+            // Una data o uno strumento diversi sono un riquadro nuovo: una misura in correzione non passa a un altro giorno.
+            <RiquadroOggi
+              key={`${strumento.id}:${dataRilievo}`}
+              espId={espId}
+              config={config}
+              pianta={pianta}
+              strumento={strumento}
+              misure={misure.data}
+              dataRilievo={dataRilievo}
+              oggi={oggi}
+              successiva={piantaSuccessiva(config.piante, pianta.id)}
+              conferma={conferma}
+              onModifiche={onModifiche}
+            />
+          ) : (
+            <p className="text-grafite-tenue">Questo esperimento non ha strumenti attivi: aggiungine uno dalle Impostazioni.</p>
+          )}
           <StoriaPianta espId={espId} config={config} misure={misure.data} />
         </>
       )}
@@ -90,68 +99,24 @@ function SchedaCaricata({
 }
 
 /**
- * Scheda della pianta: si inseriscono i valori di oggi per lo strumento scelto nella schermata in campo e si passa
- * alla pianta successiva; sotto, la storia. Vale anche per gli esperimenti conclusi: i dati restano modificabili.
+ * Scheda della pianta, aperta dall'elenco delle piante: si inseriscono i valori di oggi con lo strumento scelto per la
+ * misura (o il primo attivo) e si passa alla pianta successiva; sotto, la storia. Vale anche per gli esperimenti
+ * conclusi: i dati restano modificabili. Il giro di misura per strumento è un'altra pagina (`MisuraPianta`).
  */
 export function SchedaPianta() {
   const { espId = '', piantaId = '' } = useParams()
-  const navigate = useNavigate()
   const config = useConfig(espId)
   // Si carica insieme alla configurazione, non dopo.
   const misure = useMisurePianta(piantaId)
-
-  // Il modulo aperto dice se ha valori non salvati; prima di chiuderlo (indietro, un'altra misura, "Usa oggi")
-  // si chiede se scartarli. Si legge al momento del tocco: un ref basta e non fa ridisegnare la pagina a ogni tasto.
-  const modulo = useRef<StatoModulo | null>(null)
-
-  // A mezzanotte (o riaprendo il telefono il mattino dopo) "oggi" cambia. Con valori scritti e nessuna data scelta,
-  // il rilievo resta sul giorno in cui li si è scritti: la data si fissa nello stesso evento, prima di ridisegnare,
-  // così il modulo non si ricrea vuoto; compare l'avviso "non oggi" e "Usa oggi" passa dalla conferma di scarto.
-  const tieniIlGiorno = useCallback((prima: string) => {
-    if (!modulo.current?.modificato) return
-    const campo = useCampoStore.getState()
-    if (campo.dati(espId, prima).dataRilievo === prima) campo.setData(espId, prima)
-  }, [espId])
-  const oggi = useOggi(tieniIlGiorno)
+  const { oggi, conferma, onModifiche, onIndietro, dialogo } = useModuloProtetto(espId)
   const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
-  const [inAttesa, setInAttesa] = useState<{ esegui: () => void } | null>(null)
-  const onModifiche = useCallback((stato: StatoModulo | null) => { modulo.current = stato }, [])
-  const conferma = useCallback((esegui: () => void) => {
-    if (modulo.current?.modificato) setInAttesa({ esegui })
-    else esegui()
-  }, [])
-
-  // Chiudere o ricaricare la scheda del browser con valori non salvati: il browser chiede conferma.
-  useEffect(() => {
-    const avvisa = (evento: BeforeUnloadEvent) => {
-      if (!modulo.current?.modificato) return
-      evento.preventDefault()
-      evento.returnValue = ''
-    }
-    window.addEventListener('beforeunload', avvisa)
-    return () => window.removeEventListener('beforeunload', avvisa)
-  }, [])
-
-  function scarta() {
-    const azione = inAttesa
-    modulo.current?.scarta()
-    setInAttesa(null)
-    azione?.esegui()
-  }
-
-  // La scheda serve a inserire i valori di uno strumento: senza, si torna a sceglierlo.
-  if (!strumentoId) return <Navigate to={percorsoNuovaMisura(espId)} replace />
 
   const dati = config.data
   return (
     <AppShell
       titolo={dati?.esperimento.nome ?? 'Esperimento'}
-      indietro={percorsoNuovaMisura(espId)}
-      onIndietro={evento => {
-        if (!modulo.current?.modificato) return
-        evento.preventDefault()
-        setInAttesa({ esegui: () => navigate(percorsoNuovaMisura(espId)) })
-      }}
+      indietro={percorsoPiante(espId)}
+      onIndietro={onIndietro(percorsoPiante(espId))}
     >
       {dati === undefined ? (
         config.isError
@@ -172,15 +137,7 @@ export function SchedaPianta() {
           onModifiche={onModifiche}
         />
       )}
-      <Conferma
-        aperta={inAttesa !== null}
-        titolo="Scartare i valori non salvati?"
-        testo="I valori inseriti per questa misura andranno persi."
-        annulla="Continua a modificare"
-        conferma="Scarta"
-        onAnnulla={() => setInAttesa(null)}
-        onConferma={scarta}
-      />
+      {dialogo}
     </AppShell>
   )
 }

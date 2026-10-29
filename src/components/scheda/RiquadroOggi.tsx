@@ -4,9 +4,13 @@ import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
-import { formattaData } from '@/lib/date'
+import { percorsoPianta } from '@/lib/percorsi'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
-import { ModuloOggi, type ArrivoScheda, type StatoModulo } from './ModuloOggi'
+import { ModuloOggi, type ArrivoScheda, type Avanti, type StatoModulo } from './ModuloOggi'
+import { titoloRiquadro } from './titolo'
+
+/** Il modulo con cui si apre il riquadro, deciso da chi lo mostra: una misura nuova o la correzione di una del giorno. */
+export type ModuloIniziale = { tipo: 'nuova' } | { tipo: 'correggi'; misuraId: string }
 
 const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
@@ -29,8 +33,19 @@ interface RiquadroOggiProps {
   /** Fissa per tutta la vita del riquadro: la pagina lo rimonta quando cambia (vedi SchedaPianta). */
   dataRilievo: string
   oggi: string
-  /** La pianta che segue nell'ordine dell'esperimento; `null` sull'ultima. */
+  /** La pianta che segue (nell'ordine dell'esperimento, o nel giro); `null` sull'ultima. Le sue misure si leggono già. */
   successiva: Pianta | null
+  /**
+   * Il pulsante "Salva e …". Senza, "Salva e vai alla #N" verso la scheda della pianta successiva, e sull'ultima
+   * solo "Salva". La misura nel giro lo usa per restare nel giro e, alla fine, per "Salva e termina".
+   */
+  avanti?: Avanti | null
+  /**
+   * Il modulo da aprire, scelto con un tocco (vale l'attesa contro il doppio tocco). Senza, quello lasciato l'ultima
+   * volta (se ne resta la bozza), altrimenti una misura nuova. Con `nuova` l'id non è mai quello di una misura già
+   * salvata; con `correggi` di una misura che non è del giorno si apre la misura nuova.
+   */
+  iniziale?: ModuloIniziale
   /** Esegue l'azione, chiedendo prima se scartare i valori non salvati del modulo. */
   conferma: (azione: () => void) => void
   onModifiche: (stato: StatoModulo | null) => void
@@ -42,7 +57,7 @@ interface RiquadroOggiProps {
  * misura che si corregge) e si rimonta quando cambia: così un "Annulla" in sospeso non finisce nella misura sbagliata.
  */
 export function RiquadroOggi({
-  espId, config, pianta, strumento, misure, dataRilievo, oggi, successiva, conferma, onModifiche,
+  espId, config, pianta, strumento, misure, dataRilievo, oggi, successiva, avanti: avantiScelto, iniziale, conferma, onModifiche,
 }: RiquadroOggiProps) {
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -61,11 +76,18 @@ export function RiquadroOggi({
   // bozza ripresa o un giro in una correzione lo riusano, e l'upsert per id non crea doppioni anche se un tentativo
   // dato per fallito (un timeout) era arrivato al server. Una bozza ripresa porta il suo. Se invece la misura con
   // quell'id è già tra quelle della pianta (il server l'ha, e la si vede), il modulo nuovo non la riscrive: id nuovo.
-  const [formId, setFormId] = useState(() => leggiBozza(chiaveNuova)?.id ?? nuovoId())
   const idLibero = (id: string) => (misure.some(m => m.id === id) ? nuovoId() : id)
+  // "Nuova misura" scelta all'arrivo su una pianta già misurata: mai l'id di una misura che c'è già. Una bozza della
+  // misura nuova (arrivata nel frattempo da un salvataggio fallito dopo l'uscita) si riprende comunque: ha dei valori.
+  const [formId, setFormId] = useState(() => {
+    const id = leggiBozza(chiaveNuova)?.id ?? nuovoId()
+    return iniziale?.tipo === 'nuova' ? idLibero(id) : id
+  })
   // Tornando alla scheda si riapre il modulo che si era lasciato: la correzione di una misura del giorno, se ne
-  // resta la bozza; altrimenti la misura nuova.
+  // resta la bozza; altrimenti la misura nuova. Chi mostra il riquadro può scegliere lui (`iniziale`).
   const [inCorrezione, setInCorrezione] = useState<Misura | null>(() => {
+    if (iniziale?.tipo === 'correggi') return misureOggi.find(m => m.id === iniziale.misuraId) ?? null
+    if (iniziale?.tipo === 'nuova') return null
     const id = leggiAperto(aperto)
     if (id === null || leggiBozza(chiaveBozza({ ...base, misuraId: id }))?.id !== id) return null
     return misureOggi.find(m => m.id === id) ?? null
@@ -117,7 +139,11 @@ export function RiquadroOggi({
     setPrimoCampo(false)
   }
 
-  const titolo = `${dataRilievo === oggi ? 'Oggi' : formattaData(dataRilievo)} · ${strumento.icona ? `${strumento.icona} ` : ''}${strumento.nome}`
+  const avanti = avantiScelto !== undefined
+    ? avantiScelto
+    : successiva && { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoPianta(espId, successiva.id) }
+
+  const titolo = titoloRiquadro(strumento, dataRilievo, oggi)
 
   return (
     <ModuloOggi
@@ -136,9 +162,10 @@ export function RiquadroOggi({
       misureOggi={misureOggi}
       misurePianta={misurePerIniziali}
       dataRilievo={dataRilievo}
-      successiva={successiva}
+      avanti={avanti}
       primoCampo={primoCampo}
-      dopoSalvataggio={primoCampo || appenaSalvata !== null}
+      // Anche il modulo scelto con un tocco all'arrivo (`iniziale`) compare dove c'erano i pulsanti della scelta.
+      dopoSalvataggio={primoCampo || appenaSalvata !== null || iniziale !== undefined}
       onCorreggi={m => conferma(() => correggi(m))}
       onNuovaMisura={() => conferma(apriNuova)}
       onSalvata={dopoSalvataggio}

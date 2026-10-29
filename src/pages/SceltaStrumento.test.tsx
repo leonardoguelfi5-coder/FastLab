@@ -419,6 +419,42 @@ describe('SceltaStrumento: la data di rilievo', () => {
     fireEvent.change(screen.getByLabelText('Data di rilievo'), { target: { value: '' } })
     expect(screen.getByLabelText('Data di rilievo')).toHaveValue(OGGI)
   })
+
+  it('una data scelta resta anche riaprendo la pagina', async () => {
+    useCampoStore.getState().setData('E', IERI)
+    vaiAllaPagina()
+    await aspettaElenco()
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue(IERI)
+    expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
+    await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalledWith('E', IERI))
+  })
+
+  it('se la pagina resta aperta oltre la mezzanotte la data segue il nuovo giorno (finché non ne è stata scelta un\'altra)', async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59))
+    vaiAllaPagina()
+    await aspettaElenco()
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue(OGGI)
+
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 1)) // l'app riprende dallo sfondo
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue('2026-10-29')
+    await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalledWith('E', '2026-10-29'))
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+  })
+
+  it('una data scelta resta anche dopo la mezzanotte e il banner continua a segnalarla', async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59))
+    useCampoStore.getState().setData('E', IERI)
+    vaiAllaPagina()
+    await aspettaElenco()
+
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 1))
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue(IERI)
+    expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
+  })
 })
 
 describe('SceltaStrumento: caricamento ed errori', () => {

@@ -11,7 +11,6 @@ import { eVuoto, mantenibile, validaMisura, valoriDaSalvare, valoriDeiParametri,
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
-import { percorsoPianta } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
 import { cancellaBozza, leggiBozza, scriviAperto, scriviBozza } from './bozza'
@@ -26,7 +25,13 @@ export interface StatoModulo { modificato: boolean; scarta: () => void }
 /** Stato della navigazione verso una scheda: dopo "Salva e vai" il cursore va nel primo campo da compilare. */
 export interface ArrivoScheda { primoCampo?: boolean }
 
-/** "vai": salva e apre la pianta successiva; "resta": salva e ricomincia con una misura nuova della stessa pianta. */
+/**
+ * Il pulsante principale "Salva e …" del modulo: il testo che segue "Salva" ("e vai alla #36", "e termina") e la
+ * pagina che prende il posto di questa dopo un salvataggio riuscito.
+ */
+export interface Avanti { testo: string; percorso: string }
+
+/** "vai": salva e va avanti (vedi `Avanti`); "resta": salva e ricomincia con una misura nuova della stessa pianta. */
 type Azione = 'vai' | 'resta'
 
 type Stato =
@@ -66,7 +71,8 @@ interface ModuloOggiProps {
   misureOggi: Misura[]
   misurePianta: Misura[]
   dataRilievo: string
-  successiva: Pianta | null
+  /** Dove porta il pulsante principale; `null`: c'è solo "Salva", che resta sulla pianta. */
+  avanti: Avanti | null
   /** Porta il cursore nel primo campo da compilare appena il modulo compare. */
   primoCampo: boolean
   /**
@@ -88,7 +94,7 @@ interface ModuloOggiProps {
  */
 export function ModuloOggi({
   espId, config, pianta, strumento, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
-  dataRilievo, successiva, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
+  dataRilievo, avanti, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
   const navigate = useNavigate()
@@ -292,15 +298,18 @@ export function ModuloOggi({
     if (!misura && useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)) aggiornaMantenuti(espId, valori)
     // La misura entra subito nella cache: l'elenco di oggi la mostra senza aspettare il ricaricamento.
     queryClient.setQueryData<Misura[]>(chiavi.misurePianta(pianta.id), prima => [m, ...(prima ?? []).filter(x => x.id !== m.id)])
+    // Anche tra quelle del giorno, se sono già state lette: il giro (la pianta dopo, la fine del giro) non deve
+    // vedere per un attimo questa pianta come ancora da misurare. Se non sono state lette, le leggerà chi le usa.
+    queryClient.setQueryData<Misura[]>(chiavi.misureGiorno(espId, m.data_rilievo), prima => prima && [m, ...prima.filter(x => x.id !== m.id)])
     void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
     void queryClient.invalidateQueries({ queryKey: chiavi.misureGiorno(espId, m.data_rilievo) })
     void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
     // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
     if (!montato.current) return
-    if (azione === 'vai' && successiva) {
-      // Al posto della scheda appena fatta: il gesto indietro riporta alla schermata in campo, non a ogni pianta.
+    if (azione === 'vai' && avanti) {
+      // Al posto della pagina appena fatta: il gesto indietro riporta a dove si è partiti, non a ogni pianta.
       const arrivo: ArrivoScheda = { primoCampo: true }
-      navigate(percorsoPianta(espId, successiva.id), { replace: true, state: arrivo })
+      navigate(avanti.percorso, { replace: true, state: arrivo })
     } else {
       onSalvata(m)
     }
@@ -309,7 +318,7 @@ export function ModuloOggi({
   const comunque = avvisiVisti ? ' comunque' : ''
   const etichetta = (azione: Azione): string => {
     if (stato.tipo === 'salvando' && stato.azione === azione) return 'Salvataggio…'
-    return azione === 'vai' && successiva ? `Salva${comunque} e vai alla #${successiva.etichetta}` : `Salva${comunque}`
+    return azione === 'vai' && avanti ? `Salva${comunque} ${avanti.testo}` : `Salva${comunque}`
   }
 
   return (
@@ -380,7 +389,7 @@ export function ModuloOggi({
         ) : null}
         {/* Uno accanto all'altro finché ci stanno; con le etichette lunghe ("Salva comunque…") vanno a capo. */}
         <div className="flex flex-wrap gap-2">
-          {successiva && (
+          {avanti && (
             <Button variant="outline" size="lg" className="grow" disabled={salvando} onClick={() => void salva('resta')}>
               {etichetta('resta')}
             </Button>
@@ -389,9 +398,9 @@ export function ModuloOggi({
             size="lg"
             className="grow-3 basis-52"
             disabled={salvando}
-            onClick={() => void salva(successiva ? 'vai' : 'resta')}
+            onClick={() => void salva(avanti ? 'vai' : 'resta')}
           >
-            {etichetta(successiva ? 'vai' : 'resta')}
+            {etichetta(avanti ? 'vai' : 'resta')}
           </Button>
         </div>
       </BarraAzioni>

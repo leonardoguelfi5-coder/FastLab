@@ -86,6 +86,17 @@ export function cancellaBozza(chiave: string): void {
 }
 
 /**
+ * Vero se, aprendo il riquadro di questa pianta, strumento e data, si riprenderebbe da solo un modulo lasciato a metà:
+ * la correzione di una delle misure del giorno (`idMisureDelGiorno`) che era aperta con la sua bozza, o la bozza della
+ * misura nuova. Sono le stesse regole con cui `RiquadroOggi` sceglie il modulo da riaprire.
+ */
+export function bozzaDaRiprendere(c: Omit<ChiaveBozza, 'misuraId'>, idMisureDelGiorno: string[]): boolean {
+  const aperta = leggiAperto(chiaveAperto(c))
+  if (aperta !== null && idMisureDelGiorno.includes(aperta) && leggiBozza(chiaveBozza({ ...c, misuraId: aperta }))?.id === aperta) return true
+  return leggiBozza(chiaveBozza({ ...c, misuraId: null })) !== null
+}
+
+/**
  * Cancella la bozza di correzione di una misura, alla data con cui la scheda la apre (quella salvata), e il ricordo che
  * quel modulo era aperto. Da chiamare quando la misura è stata corretta o eliminata altrove (la pagina di modifica):
  * senza, la scheda riproporrebbe i valori vecchi sopra la modifica appena fatta. Le bozze di altre misure restano.

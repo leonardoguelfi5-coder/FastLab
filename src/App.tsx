@@ -5,9 +5,11 @@ import { AdminInviti } from '@/pages/AdminInviti'
 import { Catalogo } from '@/pages/Catalogo'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
+import { FineGiro } from '@/pages/FineGiro'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/Impostazioni'
 import { InArrivo } from '@/pages/InArrivo'
+import { MisuraPianta } from '@/pages/MisuraPianta'
 import { ModificaMisura } from '@/pages/ModificaMisura'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
 import { Registrati } from '@/pages/Registrati'
@@ -26,6 +28,9 @@ export function AppRoutes() {
         <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<HomeEsperimento />} />
         <Route path="/esperimenti/:espId/misura" element={<SceltaStrumento />} />
+        {/* "fine" è un segmento fisso: vince sempre su `:piantaId` (e gli id delle piante sono uuid). */}
+        <Route path="/esperimenti/:espId/misura/:strumentoId/fine" element={<FineGiro />} />
+        <Route path="/esperimenti/:espId/misura/:strumentoId/:piantaId" element={<MisuraPianta />} />
         <Route path="/esperimenti/:espId/piante" element={<ElencoPiante />} />
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<ModificaMisura />} />
