@@ -7,6 +7,7 @@ colors:
   carta-ombra: "oklch(95.6% 0.009 85)"
   riga: "oklch(88.5% 0.011 80)"
   riga-forte: "oklch(78% 0.014 75)"
+  riga-controllo: "oklch(60% 0.012 75)"
   grafite: "oklch(23% 0.014 262)"
   grafite-tenue: "oklch(44% 0.016 262)"
   inchiostro: "oklch(37% 0.105 262)"
@@ -153,7 +154,8 @@ Neutri caldi da carta e un solo inchiostro freddo: il contrasto tra carta e inch
 - **Foglio** (oklch(99.6% 0.003 85)): fondo di campi, pulsanti secondari e pannelli in rilievo sulla carta. Mai bianco puro.
 - **Carta ombra** (oklch(95.6% 0.009 85)): seconda superficie per barre, intestazioni di sezione, riquadro "Oggi" nella scheda pianta.
 - **Riga** (oklch(88.5% 0.011 80)): linee divisorie, bordi di campi e pulsanti secondari.
-- **Riga forte** (oklch(78% 0.014 75)): bordo dei campi al passaggio e dei controlli che devono restare visibili sotto il sole (contrasto componenti ≥ 3:1 con la carta).
+- **Riga forte** (oklch(78% 0.014 75)): bordo al passaggio del dito o del mouse e separatori più marcati. Non basta da sola come confine di un controllo (circa 1.9:1).
+- **Riga controllo** (oklch(60% 0.012 75)): bordo a riposo di campi, caselle, interruttori e pulsanti secondari, cioè di tutto ciò che si tocca e deve restare visibile sotto il sole (≥ 3:1 sulla carta, requisito WCAG per i componenti).
 - **Grafite** (oklch(23% 0.014 262)): tutto il testo principale e i valori. Mai nero puro.
 - **Grafite tenue** (oklch(44% 0.016 262)): testo secondario, unità di misura, aiuti sotto i campi, etichette. È il grigio più chiaro ammesso per il testo (≥ 7:1 su carta).
 
@@ -209,7 +211,7 @@ Decisi e grandi, pensati per il pollice.
 - **Primary:** inchiostro blu notte, testo foglio, Title 600, altezza 52px, larghezza piena nelle barre d'azione in basso. Uno solo per schermata.
 - **Pressed / Focus:** premuto → inchiostro scuro, transizione 150 ms; focus visibile con anello di 2px inchiostro a 2px di distanza (`outline: 2px solid inchiostro; outline-offset: 2px`).
 - **Disabled:** carta ombra con testo grafite tenue, nessuna opacità ridotta sul testo sotto 4.5:1.
-- **Secondary:** foglio con bordo riga, testo grafite, altezza 48px.
+- **Secondary:** foglio con bordo riga controllo, testo grafite, altezza 48px.
 - **Ghost:** solo testo inchiostro, altezza 44px; per azioni minori ("Riprova", "Modifica", "Usa oggi").
 - **Distruttivo:** testo errore su foglio con bordo errore; pieno errore solo nel pulsante di conferma dentro un dialogo.
 
@@ -223,7 +225,7 @@ Decisi e grandi, pensati per il pollice.
 - **Corner Style:** 14px per i pochi riquadri, 10px per campi e pulsanti, 6px per celle e badge.
 
 ### Inputs / Fields
-- **Style:** foglio, bordo riga 1px, angoli 10px, altezza 52px, testo in Campo (Geist Mono 1.25rem) per numeri ed etichette; label sopra il campo in Label, unità a destra in grafite tenue.
+- **Style:** foglio, bordo riga controllo 1px, angoli 10px, altezza 52px, testo in Campo (Geist Mono 1.25rem) per numeri ed etichette; label sopra il campo in Label, unità a destra in grafite tenue.
 - **Focus:** bordo inchiostro e anello di 3px inchiostro velato; nessun bagliore.
 - **Error:** bordo errore, messaggio sotto in errore con icona, `aria-invalid`.
 - **Warning (fuori intervallo):** bordo attenzione e messaggio in attenzione; non blocca.
