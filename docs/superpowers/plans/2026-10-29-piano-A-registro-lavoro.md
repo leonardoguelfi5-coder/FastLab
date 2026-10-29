@@ -76,3 +76,7 @@ Task 3: review (opus) → Approved (0 Critical/Important), 177 pgTAP, 942 Vitest
 Ruling: fold into T3 fix round 1 i minor che rafforzano l'unica tabella condivisa: (1) trigger che vieta di cambiare `id` di una voce (gli id fissi dei semi restano fissi); (2) messaggio dedicato per la FK `strumenti_catalogo_id_fkey`; (3) `catalogo_strumenti.creato_da … on delete set null` (una voce condivisa sopravvive al suo autore); (4) in lettura i valori senza `chiave` si scartano. Si modifica direttamente la 0009, mai applicata fuori da questa sessione (DB emulato) — cost if wrong: small
 Task 3: fix round 1 implemented 7e7bd47 (945 Vitest, 182 pgTAP); re-review (opus) dispatched
 Task 4: dispatched implementer (opus) in parallelo alla ri-revisione del T3 (add espliciti), BASE 7e7bd47
+Task 3: re-review fix round 1 → Approved (182 pgTAP, 945 Vitest, su copia esatta del commit)
+Task 3: fix round 1/5 (4 addressed, 0 open; commits 2d41382..7e7bd47)
+Task 3: minor (deferred): intestazione `aggiornato_il` fuori posto in catalogo.test.sql; chiavi doppie nella stessa voce da impedire nell'editor (T8, già nel brief)
+Task 3: complete (commits 2d41382..7e7bd47, review clean)
