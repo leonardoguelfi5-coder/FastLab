@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Ricercatori e tesisti di agronomia e fisiologia vegetale (dottorandi, colleghi di laboratorio) che seguono esperimenti in serra o in campo, per esempio Hydrochar × Cuore di Bue con 56 piante in 8 trattamenti. Usano FastLab sul **telefono**, in piedi tra le file di piante, spesso in una serra calda e umida e di fretta: una passata (temperatura, SPAD, altezza, fenologici) va fatta su decine di piante di seguito. Il lavoro vero è sulle piante; l'app deve rubare meno attenzione possibile. Ogni utente gestisce i propri esperimenti; un amministratore invita i colleghi.
+Ricercatori e tesisti di agronomia e fisiologia vegetale (dottorandi, colleghi di laboratorio) che seguono esperimenti in serra o in campo, per esempio Hydrochar × Cuore di Bue con 56 piante in 8 trattamenti. Usano FastLab sul **telefono**, in piedi tra le file di piante, spesso in una serra calda e umida e di fretta: un giro di misura con uno strumento (termometro, SPAD, metro, rilievi fenologici) va fatto su decine di piante di seguito. Il lavoro vero è sulle piante; l'app deve rubare meno attenzione possibile. Ogni utente gestisce i propri esperimenti; un amministratore invita i colleghi.
 
 ## Product Purpose
 
-Raccogliere misure di campo in modo rapido e affidabile: si sceglie l'esperimento e la passata, si digita il numero della pianta, si inseriscono i valori del giorno e si passa alla successiva. Ogni pianta ha una scheda con la sua storia nel tempo. Gli esperimenti si configurano dall'app (fattori, trattamenti, piante con numerazione libera, parametri, passate) senza toccare il codice. I dati finiscono in un database online e si esportano in Excel pronto per l'analisi. Successo: una passata su 56 piante più veloce che con la v2, zero dati persi in silenzio, colleghi che creano un esperimento da soli.
+Raccogliere misure di campo in modo rapido e affidabile: si sceglie l'esperimento e lo strumento, si parte dalla prima pianta da misurare, si inseriscono i valori del giorno e si passa alla successiva. Ogni pianta ha una scheda con la sua storia nel tempo. Gli esperimenti si configurano dall'app (fattori, trattamenti, piante con numerazione libera, strumenti dal catalogo, tabella fenologica) senza toccare il codice. I dati finiscono in un database online e si esportano in Excel pronto per l'analisi. Successo: un giro di misura su 56 piante più veloce che con la v2, zero dati persi in silenzio, colleghi che creano un esperimento da soli.
 
 ## Brand Personality
 
@@ -28,7 +28,7 @@ Raccogliere misure di campo in modo rapido e affidabile: si sceglie l'esperiment
 1. **Il pollice in serra decide.** Ogni schermata in campo si usa con una mano, di fretta, con il minimo di tocchi per pianta: bersagli grandi, tastiera numerica giusta, azione principale sempre a portata.
 2. **I dati prima di tutto.** Numeri, etichette delle piante e date sono il contenuto: tipografia chiara e cifre leggibili, decorazione zero.
 3. **Mai silenzio sugli esiti.** Ogni salvataggio dice chiaramente se è andato a buon fine; un errore lascia i dati nel modulo e spiega cosa fare.
-4. **Si spiega da sola.** Un collega che non ha mai visto l'app deve poter creare un esperimento e fare una passata senza chiedere: testi brevi e concreti, stati vuoti che insegnano.
+4. **Si spiega da sola.** Un collega che non ha mai visto l'app deve poter creare un esperimento e fare un giro di misura senza chiedere: testi brevi e concreti, stati vuoti che insegnano.
 5. **Sobrietà come fiducia.** Una sola voce visiva coerente in tutte le schermate; il colore segnala stato e azione, non abbellisce.
 
 ## Accessibility & Inclusion

@@ -102,13 +102,13 @@ components:
     rounded: "{rounded.md}"
     height: "52px"
     padding: "0 14px"
-  chip-passata:
+  chip-strumento:
     backgroundColor: "{colors.foglio}"
     textColor: "{colors.grafite}"
     rounded: "{rounded.lg}"
     height: "44px"
     padding: "0 14px"
-  chip-passata-selected:
+  chip-strumento-selected:
     backgroundColor: "{colors.inchiostro}"
     textColor: "{colors.foglio}"
   cella-pianta:
@@ -147,7 +147,7 @@ Il sistema rifiuta esplicitamente, con le parole di PRODUCT.md: l'**app "startup
 Neutri caldi da carta e un solo inchiostro freddo: il contrasto tra carta e inchiostro è l'identità; tutto il resto è stato.
 
 ### Primary
-- **Inchiostro blu notte** (oklch(37% 0.105 262)): pulsante principale, passata selezionata, focus, link, piante già misurate nella griglia. È il colore di ciò che si tocca o che è scelto. Su carta raggiunge oltre 9:1. **Inchiostro scuro** (oklch(30% 0.095 262)) per lo stato premuto; **inchiostro velato** (oklch(94.5% 0.028 262)) come fondo delle selezioni e delle celle misurate.
+- **Inchiostro blu notte** (oklch(37% 0.105 262)): pulsante principale, strumento selezionato, focus, link, piante già misurate nella griglia. È il colore di ciò che si tocca o che è scelto. Su carta raggiunge oltre 9:1. **Inchiostro scuro** (oklch(30% 0.095 262)) per lo stato premuto; **inchiostro velato** (oklch(94.5% 0.028 262)) come fondo delle selezioni e delle celle misurate.
 
 ### Neutral
 - **Carta** (oklch(98.4% 0.006 85)): fondo di tutte le pagine.
@@ -215,8 +215,8 @@ Decisi e grandi, pensati per il pollice.
 - **Ghost:** solo testo inchiostro, altezza 44px; per azioni minori ("Riprova", "Modifica", "Usa oggi").
 - **Distruttivo:** testo errore su foglio con bordo errore; pieno errore solo nel pulsante di conferma dentro un dialogo.
 
-### Chips (passate)
-- **Style:** riga orizzontale scorrevole; foglio con bordo riga, altezza 44px, angoli 14px, icona/emoji della passata più nome.
+### Chips (strumenti)
+- **Style:** riga orizzontale scorrevole; foglio con bordo riga, altezza 44px, angoli 14px, icona/emoji dello strumento più nome.
 - **State:** selezionata → inchiostro pieno con testo foglio e segno ✓; non selezionata → foglio. Una sola selezionata alla volta.
 
 ### Cards / Containers
@@ -254,7 +254,7 @@ Decisi e grandi, pensati per il pollice.
 - **Do** limitare il movimento a 150–200 ms con easing `cubic-bezier(0.22, 1, 0.36, 1)` e rispettare `prefers-reduced-motion`.
 
 ### Don't:
-- **Don't** fare un'app "startup" colorata: niente gradienti, illustrazioni, animazioni ovunque, emoji a profusione (le emoji sono ammesse solo come icona della passata scelta dall'utente).
+- **Don't** fare un'app "startup" colorata: niente gradienti, illustrazioni, animazioni ovunque, emoji a profusione (le emoji sono ammesse solo come icona di uno strumento scelta dall'utente e come icone delle sezioni nella home dell'esperimento).
 - **Don't** fare l'app "verde ecologica" cliché: niente foglioline, niente verde acceso dappertutto, niente aria da sito di giardinaggio. Il verde è solo "salvato".
 - **Don't** somigliare a un gestionale aziendale: niente tabelle grigie, menu infiniti, barre di strumenti da software anni 2000.
 - **Don't** somigliare a un foglio Excel: niente griglie fitte di celle tutte uguali, niente bersagli sotto i 44px.

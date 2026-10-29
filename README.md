@@ -1,6 +1,6 @@
 # FastLab
 
-FastLab è l'app per raccogliere le misure di un esperimento in serra o in campo, dal telefono, e rivederle pianta per pianta. Ogni esperimento si configura dall'app (fattori, trattamenti, piante, parametri, passate) e i dati stanno in un database online (Supabase), non nel telefono. La registrazione è solo su invito: un amministratore invita i colleghi.
+FastLab è l'app per raccogliere le misure di un esperimento in serra o in campo, dal telefono, e rivederle pianta per pianta. Ogni esperimento si configura dall'app (fattori, trattamenti, piante, strumenti scelti da un catalogo condiviso e, se serve, una tabella fenologica) e i dati stanno in un database online (Supabase), non nel telefono. La registrazione è solo su invito: un amministratore invita i colleghi.
 
 Questa è la versione 3. Il perché delle scelte è nella spec, il lavoro svolto nel piano (vedi "Dove sono i documenti").
 
@@ -34,14 +34,58 @@ Comandi utili:
 
 ### Test del database
 
-`npm run test:db` esegue i file in `supabase/tests` sul database locale:
+`npm run test:db` esegue i file in `supabase/tests` sul database locale (il riferimento: prima `npx supabase db reset`, che riapplica tutte le migration):
 
 - `rls.test.sql`: chi può leggere e scrivere cosa (policy di sicurezza per riga);
 - `inviti.test.sql`: registrazione solo su invito, con email e codice;
 - `rpc.test.sql`: le funzioni del database usate dall'app;
 - `guardie.test.sql`: le guardie sulle piante (una pianta con misure non cambia trattamento) e sul cambio di esperimento delle righe, aggiunte con la migration `20261029000006_guardie_piante.sql`.
 
+- `strumenti.test.sql`: gli strumenti (tipo, archiviazione, vincoli) e la funzione che crea un esperimento;
+- `catalogo.test.sql`: il catalogo condiviso, le sue policy e il collegamento delle copie.
+
 Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
+
+#### Senza Docker (ambienti cloud)
+
+Dove Docker non c'è, `scripts/db-senza-docker/test-db.sh` fa lo stesso lavoro con un PostgreSQL 16 locale: ricrea il database `fastlab_test`, applica uno strato che imita Supabase (`stub-supabase.sql`), tutte le migration in ordine e lancia tutti i pgTAP. Deve finire con `Result: PASS`.
+
+Servono i pacchetti apt `postgresql-16`, `postgresql-16-pgtap` e `libtap-parser-sourcehandler-pgtap-perl` (che porta `pg_prove`), con il cluster acceso (`pg_ctlcluster 16 main start`) e l'accesso `trust` per l'utente `postgres` sul socket locale. Lo script non sostituisce il riferimento, che resta `npx supabase db reset` seguito da `npm run test:db`: GoTrue, PostgREST e i privilegi reali di Supabase qui non ci sono.
+
+## Come si usa
+
+### La home dell'esperimento
+
+Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piante, trattamenti, in corso o concluso). Sotto c'è la striscia "Nuova misura", l'unico elemento a inchiostro pieno: se un giro è a metà, dice a che punto è (per esempio "SPAD in corso · 34/56"). Poi ci sono sette icone:
+
+- Oggi, Dataset, Esporta Excel, Diario e Foto sono "In arrivo": aprono una pagina che dice che la sezione arriva con il prossimo aggiornamento;
+- Piante apre l'elenco delle piante e, da lì, la scheda di ogni pianta con la sua storia;
+- Impostazioni è a tutta larghezza in fondo: fattori, trattamenti, piante, strumenti e tabella fenologica.
+
+### Nuova misura
+
+1. **Scegli lo strumento.** "Nuova misura" mostra gli strumenti dell'esperimento, ognuno con il progresso (per esempio "34/56 oggi", oppure "ultima volta 21/10" o "mai misurato"). La data di rilievo è oggi, ma si può cambiare. Lo strumento del giro in corso sta in cima, con il pulsante "Riprendi dalla pianta 35".
+2. **Misura una pianta dopo l'altra.** Si parte dalla prima pianta da misurare. Dopo ogni salvataggio l'app passa alla pianta successiva. Le piante già fatte con quello strumento, nella data di rilievo, si saltano da sole. Una pianta con solo una parte dei valori resta "incompleta" e non si salta.
+3. **Una pianta già misurata.** Se ci arrivi apposta (digitando il numero o con "Vai alle mancanti") su una pianta già misurata quel giorno, l'app chiede "Correggi" (apre la misura che c'è, con lo stesso id) o "Nuova misura" (ne aggiunge una in più). Nel giro automatico non chiede: salta.
+4. **Mantieni uguale.** Sotto i campi numerici, di testo e sì/no c'è "Mantieni questo parametro uguale anche nelle prossime misure". Con la spunta il valore si ripropone sulle piante seguenti, con un segno "mantenuto" ben visibile, finché non la togli o cambi strumento o data. Le liste ripetute non hanno la spunta: sono sempre della pianta.
+5. **Fine giro.** Finite le piante, l'app dice quante sono fatte e elenca quelle che mancano, comprese le incomplete. Il pulsante "Vai alle mancanti" riparte dalla prima.
+
+### Strumenti e catalogo condiviso
+
+Uno strumento (per esempio SPAD, Termometro, Ciras) raggruppa i parametri che si misurano insieme. Gli strumenti partono dal **catalogo**, condiviso tra tutti gli utenti (pagina "Gestisci il catalogo" nelle Impostazioni, sezione Strumenti). Scegliere una voce la **copia** nell'esperimento: la copia resta collegata alla voce, ma si può cambiare senza toccare il catalogo. Uno strumento creato a mano può anche entrare nel catalogo.
+
+Chiunque può modificare una voce del catalogo. La modifica vale per gli esperimenti futuri. Per gli esperimenti già avviati c'è la casella **"Aggiorna anche i miei esperimenti"**, con regole prudenti:
+
+- tocca solo gli esperimenti di cui sei proprietario;
+- aggiunge valori nuovi, rinomina, cambia unità e intervalli;
+- non elimina valori, non cambia tipi e non tocca i valori che hanno già misure;
+- se una copia era stata ritoccata a mano, quei campi restano come sono e l'app elenca cosa non è stato aggiornato.
+
+Le voci del catalogo non si cancellano: si **archiviano** ("Archivia dal catalogo"). Spariscono dalla scelta, ma restano collegate alle copie esistenti. Anche uno strumento di un esperimento, se ha già misure, si archivia invece di eliminarlo: i dati restano e, dalle Impostazioni, si può ripristinare.
+
+### Tabella fenologica
+
+È un elemento a parte, **una sola per esperimento** e **facoltativa**: ognuno costruisce la sua con le voci che gli servono (numeri, testo, sì/no, liste ripetute, anche progressive). Si crea nel passo "Tabella fenologica" della creazione guidata, che si può saltare ("Questo esperimento non ha rilievi fenologici"), o più tardi dalle Impostazioni.
 
 ## Primo amministratore
 
@@ -116,11 +160,11 @@ Per un esperimento da qualche decina di piante il database resta molto sotto il 
 
 ## Struttura del codice
 
-- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
+- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, `giro.ts` per lo stato delle piante e il giro di misura di uno strumento, `catalogo.ts` per le copie dal catalogo, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
 - `src/api`: le chiamate a Supabase e la conversione tra righe del database e tipi del dominio.
-- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, schermata in campo, scheda pianta, impostazioni, inviti).
+- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, home dell'esperimento, scelta dello strumento, misura di una pianta, fine giro, catalogo, elenco e scheda delle piante, impostazioni, inviti, sezioni "In arrivo").
 - `src/components`: i pezzi riusati dalle pagine; `ui/` contiene i componenti di base, le altre cartelle sono raggruppate per schermata.
-- `src/lib` e `src/store`: utilità (date, numeri, errori, client Supabase) e lo stato della schermata in campo.
+- `src/lib` e `src/store`: utilità (date, numeri, errori, client Supabase) e lo stato della misura in campo (strumento scelto, data di rilievo, valori mantenuti).
 - `supabase/`: `migrations/` (schema, sicurezza per riga, inviti, funzioni), `tests/` (pgTAP) e `config.toml`.
 
 Per l'aspetto dell'interfaccia vedi `PRODUCT.md` e `DESIGN.md`.
