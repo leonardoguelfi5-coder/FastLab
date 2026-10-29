@@ -72,3 +72,5 @@ Task 2: complete (commits 20a5d09..cdaf525, review clean)
 Task 3: implementatore (opus) DONE e5c5734 — 942 Vitest, 177 pgTAP (emulato); salvaVoceCatalogo senza controllaRighe (come gli altri upsert); lettura tollerante dei parametri JSON oltre il brief
 Task 3: minor (carry to T6/T8): le chiavi dei valori di una voce non sono validate nel DB (vuote o doppie possibili) → l'editor del catalogo deve garantirle uniche e non vuote prima di salvare
 Task 3: dispatched reviewer (opus) on 2d41382..e5c5734
+Task 3: review (opus) → Approved (0 Critical/Important), 177 pgTAP, 942 Vitest; prova a mano come utente B (delete/truncate negati, firma altrui rifiutata, anon niente)
+Ruling: fold into T3 fix round 1 i minor che rafforzano l'unica tabella condivisa: (1) trigger che vieta di cambiare `id` di una voce (gli id fissi dei semi restano fissi); (2) messaggio dedicato per la FK `strumenti_catalogo_id_fkey`; (3) `catalogo_strumenti.creato_da … on delete set null` (una voce condivisa sopravvive al suo autore); (4) in lettura i valori senza `chiave` si scartano. Si modifica direttamente la 0009, mai applicata fuori da questa sessione (DB emulato) — cost if wrong: small
