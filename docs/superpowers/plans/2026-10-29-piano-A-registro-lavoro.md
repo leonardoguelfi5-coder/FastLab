@@ -158,3 +158,6 @@ Task 12: dispatched implementer (opus), BASE aa1950a (unico implementatore)
 Task 11: review (sonnet) → Approved (0 Critical/Important), 1250 Vitest, 189 pgTAP, build OK, su copia; deviazioni 1–2 accettate (non disabilitare le righe: la pagina resta usabile con poco segnale)
 Task 11: minor (carry to T13/finale): `Riprendi` alto 52 px invece di 56; riga dei dati in `text-label` invece di `text-dato`; progresso perso se una rilettura in background fallisce (come la home)
 Task 11: complete (commits 882ef80..aa1950a, review clean)
+Task 12: implementatore (opus) DONE_WITH_CONCERNS f8f13c4 — 1274 Vitest, 189 pgTAP, build OK; `ModuloOggi.successiva` → `avanti: {testo, percorso} | null`; pannello `SceltaArrivo` in linea con le scelte nella BarraAzioni (tutte in contorno); testo con più misure `Correggere una di quelle delle 09:12 e 15:40 o aggiungerne una nuova?`; finestra di 500 ms anche sul pannello e su "Vai alle mancanti"; `setQueryData` sulle misure del giorno dopo un salvataggio; `useModuloProtetto` estratto (conferma, beforeunload, mezzanotte); SchedaPianta → elenco piante; Campo.tsx eliminato; test instabile di SchedaPianta corretto (attesa della pulizia con waitFor, 12/12 sotto carico)
+Task 12: dispatched reviewer (opus) su copia
+Task 13: dispatched implementer (sonnet), BASE f8f13c4
