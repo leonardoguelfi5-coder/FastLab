@@ -110,3 +110,7 @@ Task 6: minor (deferred): riga "Catalogo non raggiungibile" persa al ripristino;
 Task 6: fix round 1 implemented 390e515 (1083 Vitest, build OK); `ModificaBozza` (bozza o funzione della bozza); stesso id della voce per lo stesso modulo; sul nome doppio il modulo resta aperto; "Ricomincia" disabilitato finché il catalogo non è noto; re-review (sonnet) dispatched su copia del commit
 Note: test SchedaPianta "cambiando pianta un «Annulla» rimasto in sospeso sparisce con la lista" fallito di nuovo una volta in una corsa parziale (instabile sotto carico) → da guardare nella revisione finale
 Task 9: dispatched implementer (sonnet), BASE 390e515 (unico implementatore)
+Task 6: re-review fix round 1 → Approved (1083 Vitest, build OK, su copia del commit)
+Task 6: fix round 1/5 (6 addressed, 0 open; commits e643c1c..390e515)
+Task 6: minor (deferred): dopo un errore di rete arrivato comunque al server, un nuovo "+ Nuovo strumento" con lo stesso nome prende un id nuovo → 23505 (raro, coerente col piano); messaggio d'errore del modulo resta mentre si rinomina
+Task 6: complete (commits e643c1c..390e515, review clean)
