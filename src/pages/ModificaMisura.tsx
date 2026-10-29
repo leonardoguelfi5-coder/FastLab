@@ -13,7 +13,7 @@ import { FormMisura } from '@/components/misura/FormMisura'
 import { cancellaBozzaCorrezione } from '@/components/scheda/bozza'
 import { ErroreSalvataggio, EsitoControllo, type Controllo } from '@/components/scheda/MessaggiSalvataggio'
 import type { StatoModulo } from '@/components/scheda/ModuloOggi'
-import { ATTESA_CONFERMA_MS, istante } from '@/components/scheda/salvataggio'
+import { ATTESA_CONFERMA_MS, istante, OPZIONI_ERRORE_TARDIVO } from '@/components/scheda/salvataggio'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -173,7 +173,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
         setStato({ tipo: 'errore', azione: 'salva', errore: e })
         setFermate(n => n + 1)
       } else {
-        toast.error(nonCompletataDopoUscita(misura, 'non salvata', e))
+        toast.error(nonCompletataDopoUscita(misura, 'non salvata', e), OPZIONI_ERRORE_TARDIVO)
       }
       return
     }
@@ -200,7 +200,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
         setStato({ tipo: 'errore', azione: 'elimina', errore: e })
         setFermate(n => n + 1)
       } else {
-        toast.error(nonCompletataDopoUscita(misura, 'non eliminata', e))
+        toast.error(nonCompletataDopoUscita(misura, 'non eliminata', e), OPZIONI_ERRORE_TARDIVO)
       }
       return
     }

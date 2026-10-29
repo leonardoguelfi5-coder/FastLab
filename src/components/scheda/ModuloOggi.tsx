@@ -18,7 +18,7 @@ import { cancellaBozza, leggiBozza, scriviAperto, scriviBozza } from './bozza'
 import { CampoOra } from './CampoOra'
 import { ElencoOggi } from './ElencoOggi'
 import { ErroreSalvataggio, EsitoControllo, type Controllo } from './MessaggiSalvataggio'
-import { ATTESA_CONFERMA_MS, istante } from './salvataggio'
+import { ATTESA_CONFERMA_MS, istante, OPZIONI_ERRORE_TARDIVO } from './salvataggio'
 
 /** Quel che la pagina deve sapere del modulo aperto per non farne perdere i valori: se è cambiato e come scartarlo. */
 export interface StatoModulo { modificato: boolean; scarta: () => void }
@@ -70,6 +70,11 @@ interface ModuloOggiProps {
   successiva: Pianta | null
   /** Porta il cursore nel primo campo da compilare appena il modulo compare. */
   primoCampo: boolean
+  /**
+   * Il modulo compare subito dopo un salvataggio riuscito, con i pulsanti nello stesso punto: un tocco che arriva
+   * troppo presto è il secondo di un doppio tocco, non una misura nuova, e si ignora.
+   */
+  dopoSalvataggio: boolean
   onCorreggi: (m: Misura) => void
   onNuovaMisura: () => void
   onSalvata: (m: Misura) => void
@@ -84,7 +89,7 @@ interface ModuloOggiProps {
  */
 export function ModuloOggi({
   espId, config, pianta, passata, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
-  dataRilievo, oggi, successiva, primoCampo, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
+  dataRilievo, oggi, successiva, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
   const navigate = useNavigate()
@@ -115,6 +120,8 @@ export function ModuloOggi({
   // Il blocco contro il doppio tocco: il pulsante disabilitato arriva solo al prossimo disegno, il ref subito.
   const inCorso = useRef(false)
   const avvisoAlle = useRef(0)
+  // Quando è comparso il modulo, se compare subito dopo un salvataggio (vedi `dopoSalvataggio`).
+  const apertoAlle = useRef<number | null>(null)
   // Salvata la misura, il modulo è chiuso: nessuna bozza va più scritta (tornerebbe come "ripristinata" con lo stesso id).
   const chiuso = useRef(false)
   const montato = useRef(false)
@@ -125,6 +132,10 @@ export function ModuloOggi({
     montato.current = true
     return () => { montato.current = false }
   }, [])
+
+  useEffect(() => {
+    if (dopoSalvataggio) apertoAlle.current = istante()
+  }, [dopoSalvataggio])
 
   // La bozza e il ricordo di quale modulo era aperto vanno insieme: tornando, si riapre questo modulo con i suoi valori.
   const misuraId = misura?.id ?? null
@@ -194,6 +205,8 @@ export function ModuloOggi({
 
   async function salva(azione: Azione) {
     if (inCorso.current) return
+    // Il secondo tocco di un doppio tocco sul modulo comparso al posto di quello appena salvato: non è un salvataggio.
+    if (apertoAlle.current !== null && istante() - apertoAlle.current < ATTESA_CONFERMA_MS) return
     const { errori, avvisi } = validaMisura(parametri, obbligatori, valori)
     if (errori.length > 0) {
       ferma({ tipo: 'errori', messaggi: errori })
@@ -243,7 +256,7 @@ export function ModuloOggi({
           scriviBozza(chiave, { id, valori, ora: oraMisura })
           scriviAperto(aperto, misuraId)
         }
-        toast.error(nonSalvataDopoUscita(pianta.etichetta, e, daSalvare.data_rilievo, !presente || presente.id === id))
+        toast.error(nonSalvataDopoUscita(pianta.etichetta, e, daSalvare.data_rilievo, !presente || presente.id === id), OPZIONI_ERRORE_TARDIVO)
       }
       return
     }

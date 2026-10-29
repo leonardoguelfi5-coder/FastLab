@@ -44,4 +44,8 @@ describe('piante', () => {
     expect(prossimaEtichetta([])).toBe(1)
     expect(prossimaEtichetta(piante(['B3', 'A']))).toBe(1)
   })
+  it('gli spazi attorno a un\'etichetta non contano: " 35 " è il numero 35', () => {
+    expect(etichetteNumeriche(piante(['1', ' 35 ']))).toBe(true)
+    expect(prossimaEtichetta(piante(['1', ' 35 ']))).toBe(36)
+  })
 })

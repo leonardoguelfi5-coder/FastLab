@@ -534,6 +534,8 @@ describe('ModificaMisura: salvataggio non riuscito', () => {
     await act(async () => fallisci(new TypeError('Failed to fetch')))
     expect(toast.error).toHaveBeenCalledTimes(1)
     expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Misura del 21\/10\/2026 delle 09:12 non salvata\. Il server non risponde/)
+    // Resta finché non lo si chiude: chi è uscito dalla scheda potrebbe non guardare subito.
+    expect(vi.mocked(toast.error).mock.calls[0][1]).toEqual({ duration: Infinity, action: { label: 'Chiudi', onClick: expect.any(Function) } })
     expect(toastSalvato).not.toHaveBeenCalled()
   })
 })

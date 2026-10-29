@@ -108,6 +108,8 @@ const dialogo = () => screen.findByRole('dialog', { name: 'Scartare i valori non
 const chiudiDialogo = async () => waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 /** Più tardi di un doppio tocco: il tocco che conferma un avviso deve arrivare dopo mezzo secondo. */
 const piuTardi = (secondi = 1) => vi.setSystemTime(new Date(Date.now() + secondi * 1000))
+/** Il toast d'errore dopo l'uscita resta finché non lo si chiude. */
+const PERSISTENTE = { duration: Infinity, action: { label: 'Chiudi', onClick: expect.any(Function) } }
 const bozzeSalvate = () => Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:'))
 
 beforeEach(() => {
@@ -323,12 +325,52 @@ describe('SchedaPianta: salvataggio', () => {
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
 
     await utente.type(campo('Temp pianta'), '26')
+    piuTardi()
     await utente.click(pulsante('Salva'))
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
     const [prima, seconda] = salvate()
     expect(seconda.id).toMatch(UUID)
     expect(seconda.id).not.toBe(prima.id)
+  })
+
+  it('subito dopo "Salva" un tocco sul modulo nuovo, nello stesso punto, non salva: è il secondo di un doppio tocco', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('button', { name: '10:00 · Temp aria 24,5 °C' })
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+
+    // Il modulo nuovo ha già Temp aria (ricordata): un tocco troppo vicino salverebbe una seconda misura uguale.
+    await utente.click(pulsante('Salva'))
+    await act(async () => {})
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+
+    piuTardi()
+    await utente.click(pulsante('Salva'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+  })
+
+  it('appena arrivati sulla #36 con "Salva e vai", un tocco immediato su "Salva e vai alla #37" non salva la #36', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+
+    await utente.click(pulsante('Salva e vai alla #37'))
+    await act(async () => {})
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('36')}`)
+
+    piuTardi()
+    await utente.click(pulsante('Salva e vai alla #37'))
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('37')}`))
+    expect(salvate().map(m => m.pianta_id)).toEqual([idPianta('35'), idPianta('36')])
   })
 
   it('una misura nuova non scrive i parametri lasciati vuoti: nei valori solo quelli compilati', async () => {
@@ -401,7 +443,7 @@ describe('SchedaPianta: salvataggio', () => {
 
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(
       /^Pianta #35 non salvata\. Il server non risponde\. .*\(vedi README\)\. I valori sono rimasti: riapri la pianta per riprovare\.$/,
-    ))
+    ), PERSISTENTE)
     expect(posizione()).toBe('/esperimenti/E')
     // Durante il salvataggio l'uscita non chiede di scartare: i valori erano già partiti.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -420,6 +462,7 @@ describe('SchedaPianta: salvataggio', () => {
     await act(async () => fallisci(new Error('boom')))
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(
       'Pianta #35 non salvata. Errore imprevisto: boom. I valori sono rimasti: riapri la pianta per riprovare.',
+      PERSISTENTE,
     )
     unmount()
 
@@ -463,6 +506,7 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
 
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(
       'Pianta #35 non salvata. Errore imprevisto: boom. I valori sono rimasti: riapri la pianta con data 27/10/2026 per riprovare.',
+      PERSISTENTE,
     )
     expect(bozzaNuova(IERI)?.valori[par('Temp aria').id]).toEqual([21])
   })
@@ -488,6 +532,7 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
     expect(bozzaNuova()).toEqual(nuova)
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(
       'Pianta #35 non salvata. Errore imprevisto: boom. Controlla i valori della pianta e salvali di nuovo.',
+      PERSISTENTE,
     )
   })
 

@@ -1,4 +1,4 @@
-const MSG_OFFLINE = 'Nessuna connessione: i dati non sono stati salvati. Riprova quando torna la rete.'
+const MSG_OFFLINE = 'Nessuna connessione. Riprova quando torna la rete.'
 const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per più di una settimana il database potrebbe essere in pausa: riattivalo dal pannello Supabase (vedi README).'
 const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'

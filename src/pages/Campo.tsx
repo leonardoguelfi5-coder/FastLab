@@ -108,7 +108,7 @@ function CampoPianta({ espId, config, passata }: { espId: string; config: Config
       navigate(percorsoPianta(espId, pianta.id))
       return
     }
-    setErrore(`Nessuna pianta con etichetta "${cercata}" in questo esperimento.`)
+    setErrore(`Nessuna pianta con etichetta «${cercata}» in questo esperimento.`)
     // Il testo resta selezionato: la prossima cifra lo sostituisce.
     campo.current?.focus()
     campo.current?.select()

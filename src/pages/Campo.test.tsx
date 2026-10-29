@@ -248,9 +248,9 @@ describe('Campo: numero della pianta', () => {
     await paginaConPassata('Termometro')
     await utente.type(campoPianta(), '999{Enter}')
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Nessuna pianta con etichetta "999" in questo esperimento.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Nessuna pianta con etichetta «999» in questo esperimento.')
     expect(campoPianta()).toHaveAttribute('aria-invalid', 'true')
-    expect(campoPianta()).toHaveAccessibleDescription(/Nessuna pianta con etichetta "999"/)
+    expect(campoPianta()).toHaveAccessibleDescription(/Nessuna pianta con etichetta «999»/)
     expect(screen.queryByTestId('posizione')).not.toBeInTheDocument()
   })
 
@@ -258,7 +258,7 @@ describe('Campo: numero della pianta', () => {
     const utente = userEvent.setup()
     await paginaConPassata('Termometro')
     await utente.type(campoPianta(), '  999 {Enter}')
-    expect(screen.getByRole('alert')).toHaveTextContent('Nessuna pianta con etichetta "999" in questo esperimento.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Nessuna pianta con etichetta «999» in questo esperimento.')
   })
 
   it('l\'errore sparisce appena si ricomincia a scrivere', async () => {

@@ -138,6 +138,7 @@ export function RiquadroOggi({
       oggi={oggi}
       successiva={successiva}
       primoCampo={primoCampo}
+      dopoSalvataggio={primoCampo || appenaSalvata !== null}
       onCorreggi={m => conferma(() => correggi(m))}
       onNuovaMisura={() => conferma(apriNuova)}
       onSalvata={dopoSalvataggio}

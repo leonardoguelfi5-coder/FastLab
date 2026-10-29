@@ -44,13 +44,13 @@ export function piantaSuccessiva(piante: Pianta[], piantaId: string): Pianta | n
   return i === -1 ? null : (ordinate[i + 1] ?? null)
 }
 
-/** Vero se tutte le etichette sono numeri interi senza segno. */
+/** Vero se tutte le etichette sono numeri interi senza segno (gli spazi attorno non contano, come cercando). */
 export function etichetteNumeriche(piante: Pianta[]): boolean {
-  return piante.every(p => SOLO_CIFRE.test(p.etichetta))
+  return piante.every(p => SOLO_CIFRE.test(p.etichetta.trim()))
 }
 
 /** Il massimo tra le etichette numeriche più uno (1 se non ce ne sono). */
 export function prossimaEtichetta(piante: Pianta[]): number {
-  const numeri = piante.filter(p => SOLO_CIFRE.test(p.etichetta)).map(p => Number(p.etichetta))
+  const numeri = piante.map(p => p.etichetta.trim()).filter(e => SOLO_CIFRE.test(e)).map(Number)
   return numeri.length === 0 ? 1 : Math.max(...numeri) + 1
 }
