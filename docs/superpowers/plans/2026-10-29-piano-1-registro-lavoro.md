@@ -242,3 +242,12 @@ Piano 1: COMPLETE nel cloud (commits 2fd1c23..3395c67 + docs). Restano solo le v
 ## Verifiche locali (29/10/2026, sessione locale)
 
 - `npm ci`, `npx supabase db reset` (tutte le migration, compresa 20261029000006_guardie_piante.sql, applicate da zero), `npm run test:db`: 4 file, 104 test pgTAP, Result: PASS (guardie, inviti, rls, rpc).
+- Prova nel browser (375 px, DB locale), esito OK:
+  - registrazione: codice sbagliato → messaggio invito; codice giusto in minuscolo → accesso;
+  - primo admin via SQL del README;
+  - creazione dal modello Hydrochar (8/56/11/4);
+  - " 01 " apre la pianta 1;
+  - passata Termometro su 3 piante (Temp aria ricordata, focus sul primo campo vuoto, "25.1" mostrato "25,1"; nel DB valori giusti, nessun doppione);
+  - salvataggio con rete bloccata → "Pianta #1 non salvata." + "Riprova"; Riprova salva;
+  - griglia "Fatte 3/56", "×2" sulla pianta 1.
+- Da osservare sul telefono: alla prima pianta della sessione il primo clic su "Salva e vai" (subito dopo aver scritto nel campo) non ha avviato il salvataggio, il secondo sì; non riprodotto sulle piante 2–4.
