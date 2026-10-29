@@ -153,6 +153,15 @@ describe('voceDaStrumento', () => {
     expect(JSON.stringify({ strumento, parametri })).toBe(prima)
   })
 
+  it('con un id dato la voce lo usa (stesso id a ogni tentativo di salvataggio)', () => {
+    const { strumento, parametri } = strumentoConValori()
+    const prima = voceDaStrumento(strumento, parametri, 'voce-fissa')
+    const dopo = voceDaStrumento({ ...strumento, nome: 'Altro nome' }, parametri, 'voce-fissa')
+    expect(prima.voce.id).toBe('voce-fissa')
+    expect(prima.strumento.catalogo_id).toBe('voce-fissa')
+    expect(dopo.voce.id).toBe('voce-fissa')
+  })
+
   it('i valori con lo stesso nome ricevono chiavi diverse', () => {
     const uno = { ...nuovoParametro(0), nome: 'Temp' }
     const due = { ...nuovoParametro(1), nome: 'temp' }

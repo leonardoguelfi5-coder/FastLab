@@ -295,6 +295,19 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     expect(bozza.piante).toHaveLength(56)
     expect(bozza.trattamenti).toHaveLength(8)
     expect(bozza.strumenti).toHaveLength(4)
+    // Con il catalogo disponibile i tre strumenti sono copie collegate alle loro voci, con i valori collegati alle chiavi.
+    const voce = (nome: string) => SEMI_CATALOGO.find(v => v.nome === nome)
+    const valoriDi = (nome: string) => {
+      const s = bozza.strumenti.find(x => x.nome === nome)
+      return s?.parametri.map(pp => bozza.parametri.find(p => p.id === pp.parametro_id)?.catalogo_chiave)
+    }
+    expect(bozza.strumenti.filter(s => s.tipo === 'strumento').map(s => [s.nome, s.catalogo_id])).toEqual([
+      ['Termometro', voce('Termometro')?.id], ['SPAD', voce('SPAD')?.id], ['Metro', voce('Metro')?.id],
+    ])
+    expect(valoriDi('Termometro')).toEqual(['temp_aria', 'temp_pianta'])
+    expect(valoriDi('SPAD')).toEqual(['spad'])
+    expect(valoriDi('Metro')).toEqual(['altezza'])
+    expect(bozza.strumenti.find(s => s.tipo === 'fenologico')?.catalogo_id).toBeNull()
     expect(bozza.esperimento.nome).toBe('Hydrochar × Cuore di Bue 2')
     expect(await screen.findByText('Pagina dell\'esperimento esp-nuovo')).toBeInTheDocument()
     expect(invalida).toHaveBeenCalledWith({ queryKey: ['esperimenti'] })
@@ -573,6 +586,44 @@ describe('NuovoEsperimento: da zero', () => {
   }, LUNGO)
 })
 
+describe('NuovoEsperimento: salvataggio lento nel catalogo', () => {
+  it('se finisce dopo un cambio di passo, lo strumento arriva alla bozza di adesso senza cancellare il resto', async () => {
+    let finisci: () => void = () => {}
+    vi.mocked(salvaVoceCatalogo).mockReturnValue(new Promise<void>(ok => { finisci = ok }))
+    const utente = userEvent.setup({ delay: null })
+    const { invalida } = vaiAllaPagina('/esperimenti/nuovo')
+    await utente.click(screen.getByRole('button', { name: /Parti da zero/ }))
+    await utente.type(screen.getByLabelText('Nome'), 'Prova')
+    await avanti(utente, 2)
+    expect(titoloPasso()).toHaveTextContent('Strumenti')
+
+    await utente.click(await screen.findByRole('button', { name: '+ Nuovo strumento' }))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'Penetrometro')
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'Resistenza')
+    await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    // Rete lenta: si va avanti e si prepara la tabella fenologica mentre il salvataggio è in corso.
+    await avanti(utente)
+    expect(titoloPasso()).toHaveTextContent('Tabella fenologica')
+    await utente.click(screen.getByRole('button', { name: 'Crea la tabella fenologica' }))
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'N frutti')
+
+    finisci()
+    await vi.waitFor(() => expect(invalida).toHaveBeenCalledWith({ queryKey: ['catalogo'] }))
+
+    // La tabella c'è ancora, con la sua voce, e lo strumento nuovo si è aggiunto.
+    expect(screen.getByLabelText('Nome dello strumento')).toHaveValue('Tabella fenologica')
+    expect(screen.getByRole('button', { name: /^N frutti/ })).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Passo precedente' }))
+    expect(within(screen.getByRole('list', { name: 'Strumenti' })).getByRole('button', { name: /^Penetrometro/ })).toBeInTheDocument()
+    await avanti(utente, 2)
+    expect(conteggio('Strumenti')).toHaveTextContent('1')
+    expect(conteggio('Voci fenologiche')).toHaveTextContent('1')
+  }, LUNGO)
+})
+
 describe('NuovoEsperimento: catalogo e modello Hydrochar', () => {
   it('prima di costruire la bozza dal modello aspetta il catalogo; gli strumenti sono quelli del catalogo, collegati', async () => {
     let arriva: (voci: typeof SEMI_CATALOGO) => void = () => {}
@@ -641,6 +692,20 @@ describe('NuovoEsperimento: catalogo e modello Hydrochar', () => {
     await utente.click(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ }))
     expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
     expect(screen.getByText(/Catalogo non raggiungibile/)).toBeInTheDocument()
+  })
+
+  it('con una bozza già salvata non aspetta il catalogo', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const { unmount } = vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await utente.type(await screen.findByLabelText('Nome'), ' 2')
+    unmount()
+
+    vi.mocked(listaCatalogo).mockReturnValue(new Promise(() => {}))
+    vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue 2')
+    expect(screen.getByRole('status')).toHaveTextContent('Bozza ripristinata.')
+    // "Ricomincia" ricostruirebbe il modello: finché il catalogo non c'è non si può.
+    expect(screen.getByRole('button', { name: 'Ricomincia' })).toBeDisabled()
   })
 
   it('la bozza dal modello si costruisce una volta sola: il catalogo che si aggiorna dopo non la rifà', async () => {

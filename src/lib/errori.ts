@@ -18,6 +18,11 @@ export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\
 /** Un nome già usato da un'altra voce non archiviata del catalogo (indice unico `catalogo_strumenti_nome_unico`). */
 const MSG_NOME_NEL_CATALOGO = 'Nel catalogo c\'è già uno strumento con questo nome.'
 
+/** Il salvataggio di una voce è stato rifiutato perché il nome c'è già nel catalogo (si risolve rinominando). */
+export function eNomeGiaNelCatalogo(e: unknown): boolean {
+  return messaggioErrore(e) === MSG_NOME_NEL_CATALOGO
+}
+
 /** Una lettura che dipende da chi è l'utente (es. `copieDiProprieta`) senza una sessione attiva. */
 export const SENZA_SESSIONE = 'Sessione scaduta: accedi di nuovo.'
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { BozzaEsperimento, Parametro, Strumento } from '@/domain/tipi'
 import {
@@ -12,11 +12,14 @@ import { SceltaDalCatalogo } from '@/components/config/SceltaDalCatalogo'
 import { Button } from '@/components/ui/button'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
-import { messaggioErrore } from '@/lib/errori'
+import { eNomeGiaNelCatalogo, messaggioErrore } from '@/lib/errori'
+import { nuovoId } from '@/lib/id'
+import type { ModificaBozza } from './bozzaSalvata'
 
 interface PassoStrumentiProps {
   bozza: BozzaEsperimento
-  onChange: (b: BozzaEsperimento) => void
+  /** La bozza nuova, o una funzione della bozza di quel momento (per ciò che finisce dopo un'attesa). */
+  onChange: (modifica: ModificaBozza) => void
 }
 
 /** I nomi dei valori, nell'ordine del modulo: es. "A · gs · E · Ci". */
@@ -35,11 +38,12 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
   const [aperta, setAperta] = useState<string | null>(null)
   const [nuovo, setNuovo] = useState<StrumentoConValori | null>(null)
   const [invio, setInvio] = useState(false)
+  // Lo strumento aggiunto senza collegamento al catalogo (sotto l'elenco) e il rifiuto del nome (dentro il modulo).
   const [errore, setErrore] = useState<string | null>(null)
-  // Il salvataggio nel catalogo è asincrono: la bozza si legge com'è alla fine, non com'era al tocco (nel frattempo si
-  // può modificare un altro strumento), e il doppio tocco si ferma subito, prima che il pulsante risulti disabilitato.
-  const ultima = useRef(bozza)
-  useEffect(() => { ultima.current = bozza })
+  const [erroreModulo, setErroreModulo] = useState<string | null>(null)
+  // L'id della voce resta lo stesso a ogni tentativo dello stesso modulo: ritentare è un upsert, non un'altra voce.
+  const idVoce = useRef(nuovoId())
+  // Il doppio tocco si ferma subito, prima che il pulsante risulti disabilitato.
   const inCorso = useRef(false)
 
   const elenco = bozza.strumenti.filter(s => s.tipo === 'strumento' && !s.archiviato)
@@ -49,13 +53,17 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
 
   function aggiungiDaCatalogo(voce: Parameters<typeof strumentoDaCatalogo>[0]) {
     setErrore(null)
-    const { strumento, parametri } = strumentoDaCatalogo(voce, ordineStrumentoSuccessivo(ultima.current))
-    onChange(conStrumento(ultima.current, strumento, parametri))
+    const { strumento, parametri } = strumentoDaCatalogo(voce, ordineStrumentoSuccessivo(bozza))
+    onChange(conStrumento(bozza, strumento, parametri))
   }
 
   function apriNuovo() {
     setErrore(null)
-    setNuovo(n => n ?? { strumento: nuovoStrumento(ordineStrumentoSuccessivo(bozza)), parametri: [] })
+    if (nuovo === null) {
+      idVoce.current = nuovoId()
+      setErroreModulo(null)
+      setNuovo({ strumento: nuovoStrumento(ordineStrumentoSuccessivo(bozza)), parametri: [] })
+    }
   }
 
   // I problemi di uno strumento nuovo: i suoi (nome doppio compreso) e quelli dei suoi valori.
@@ -69,23 +77,31 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
     inCorso.current = true
     setInvio(true)
     setErrore(null)
-    const { voce, strumento, parametri } = voceDaStrumento(nuovo.strumento, nuovo.parametri)
-    const fine = (s: Strumento, p: Parametro[]) => {
-      const b = ultima.current
-      onChange(conStrumento(b, { ...s, ordine: ordineStrumentoSuccessivo(b) }, p))
-    }
+    setErroreModulo(null)
+    const { voce, strumento, parametri } = voceDaStrumento(nuovo.strumento, nuovo.parametri, idVoce.current)
+    // Il salvataggio può finire dopo un cambio di passo (o a passo smontato): lo strumento si aggiunge alla bozza di quel
+    // momento, non a quella che c'era al tocco, che riporterebbe indietro tutto il resto.
+    const aggiungi = (s: Strumento, p: Parametro[]) =>
+      onChange(b => conStrumento(b, { ...s, ordine: ordineStrumentoSuccessivo(b) }, p))
+    let chiudi = true
     try {
       await salvaVoceCatalogo(voce)
-      fine(strumento, parametri)
+      aggiungi(strumento, parametri)
       void queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
     } catch (e) {
-      // Lo strumento resta nella bozza, non collegato: si può usare lo stesso e il catalogo si sistema dopo.
-      fine(nuovo.strumento, nuovo.parametri)
-      setErrore(messaggioErrore(e))
+      if (eNomeGiaNelCatalogo(e)) {
+        // Un altro strumento ha già questo nome: il modulo resta aperto, per rinominarlo o per usare quello che c'è.
+        setErroreModulo(messaggioErrore(e))
+        chiudi = false
+      } else {
+        // Rete o altro: lo strumento resta nella bozza, non collegato; si può usare lo stesso e il catalogo si sistema dopo.
+        aggiungi(nuovo.strumento, nuovo.parametri)
+        setErrore(messaggioErrore(e))
+      }
     } finally {
       inCorso.current = false
       setInvio(false)
-      setNuovo(null)
+      if (chiudi) setNuovo(null)
     }
   }
 
@@ -161,11 +177,17 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
           {problemiNuovo.length > 0 && (
             <div className="flex flex-col gap-1">{[...new Set(problemiNuovo)].map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
           )}
+          {erroreModulo && (
+            <div role="alert" className="flex flex-col gap-1">
+              <TestoErrore className="text-base">{erroreModulo}</TestoErrore>
+              <p className="text-sm text-grafite-tenue">Cambia il nome, oppure aggiungi dal catalogo lo strumento che c'è già.</p>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
-            <Button disabled={invio || problemiNuovo.length > 0} onClick={() => void confermaNuovo()}>
+            <Button variant="outline" disabled={invio || problemiNuovo.length > 0} onClick={() => void confermaNuovo()}>
               {invio ? 'Salvataggio…' : 'Salva nel catalogo e aggiungi'}
             </Button>
-            <Button variant="outline" disabled={invio} onClick={() => setNuovo(null)}>Annulla</Button>
+            <Button variant="outline" disabled={invio} onClick={() => { setNuovo(null); setErroreModulo(null) }}>Annulla</Button>
           </div>
         </section>
       )}

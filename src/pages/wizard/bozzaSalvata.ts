@@ -1,6 +1,12 @@
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { righeDaBozza, type RigaTrattamento } from './righeTrattamenti'
 
+/**
+ * Una modifica alla bozza: la bozza nuova, oppure una funzione della bozza di quel momento. La seconda serve a chi
+ * finisce dopo un'attesa (es. il salvataggio nel catalogo): la bozza che aveva in mano può essere cambiata nel frattempo.
+ */
+export type ModificaBozza = BozzaEsperimento | ((prima: BozzaEsperimento) => BozzaEsperimento)
+
 /** Lo stato di lavoro della procedura guidata. */
 export interface Lavoro {
   bozza: BozzaEsperimento

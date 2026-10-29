@@ -13,7 +13,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
-  chiaveBozza, leggiBozza, modificato, nuovoLavoro, rimuoviBozza, salvaBozza, type Lavoro,
+  chiaveBozza, leggiBozza, modificato, nuovoLavoro, rimuoviBozza, salvaBozza, type Lavoro, type ModificaBozza,
 } from './wizard/bozzaSalvata'
 import { Conferma } from '@/components/Conferma'
 import { PassoGenerale } from './wizard/PassoGenerale'
@@ -141,6 +141,9 @@ function Procedura({ chiave, crea, catalogo, dalModello = false }: ProceduraProp
   }
 
   const aggiorna = (modifica: Partial<Lavoro>) => setLavoro(l => (l ? { ...l, ...modifica } : l))
+  // Per chi finisce dopo un'attesa: parte dalla bozza viva, anche se il passo che l'ha chiesto non c'è più.
+  const aggiornaBozza = (modifica: ModificaBozza) =>
+    setLavoro(l => (l ? { ...l, bozza: typeof modifica === 'function' ? modifica(l.bozza) : modifica } : l))
   const blocco = lavoro ? motivoBlocco(lavoro.bozza, lavoro.righe) : null
 
   return (
@@ -148,7 +151,10 @@ function Procedura({ chiave, crea, catalogo, dalModello = false }: ProceduraProp
       {ripristinato && (
         <div role="status" className="flex items-center gap-1 rounded-lg bg-carta-ombra py-1 pr-1 pl-4">
           <p className="flex-1 text-base text-grafite">Bozza ripristinata.</p>
-          <Button variant="ghost" size="sm" onClick={() => setConferma('ricomincia')}>Ricomincia</Button>
+          {/* Ricominciare dal modello lo ricostruisce: finché non si sa com'è il catalogo non si può. */}
+          <Button variant="ghost" size="sm" disabled={dalModello && !catalogo.pronto} onClick={() => setConferma('ricomincia')}>
+            Ricomincia
+          </Button>
           <Button variant="quiet" size="icon" aria-label="Chiudi l'avviso" onClick={() => setRipristinato(false)}>
             <X />
           </Button>
@@ -182,7 +188,7 @@ function Procedura({ chiave, crea, catalogo, dalModello = false }: ProceduraProp
           {passo === 1 && (
             <PassoPiante bozza={lavoro.bozza} righe={lavoro.righe} onChange={(bozza, righe) => aggiorna({ bozza, righe })} />
           )}
-          {passo === 2 && <PassoStrumenti bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
+          {passo === 2 && <PassoStrumenti bozza={lavoro.bozza} onChange={aggiornaBozza} />}
           {passo === 3 && (
             <PassoFenologica
               bozza={lavoro.bozza}
@@ -287,6 +293,8 @@ export function NuovoEsperimento() {
   const hydrochar = ricerca.get('modello') === 'hydrochar'
   const modo = da ? `da:${da}` : hydrochar ? 'hydrochar' : 'nuovo'
   const chiave = chiaveBozza(sessione?.user.id ?? '', modo)
+  // Con una bozza già salvata la procedura riparte da quella: il catalogo non serve per mostrarla.
+  const bozzaSalvataPresente = useMemo(() => hydrochar && leggiBozza(chiave) !== null, [hydrochar, chiave])
   // Il modello Hydrochar prende i suoi strumenti dal catalogo: la bozza si costruisce solo quando si sa com'è andata.
   const voci = useCatalogo()
   // Una volta saputo com'è andata non si torna indietro: un catalogo in errore torna "in caricamento" quando un passo lo
@@ -305,7 +313,7 @@ export function NuovoEsperimento() {
     )
   }
   if (da) return <Duplica key={chiave} espId={da} chiave={chiave} />
-  if (hydrochar && !catalogo.pronto) {
+  if (hydrochar && !catalogo.pronto && !bozzaSalvataPresente) {
     return (
       <AppShell titolo={TITOLO} indietro="/">
         <p role="status" className="text-grafite-tenue">Caricamento…</p>

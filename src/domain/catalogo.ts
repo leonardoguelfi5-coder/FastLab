@@ -70,15 +70,17 @@ export function chiaviDaNomi(nomi: string[]): string[] {
  * porta il `catalogo_id` della voce nuova e ogni parametro la sua `catalogo_chiave`. Gli id dello strumento e dei
  * parametri restano quelli di prima (la copia è lo stesso strumento, non una nuova). Nome, unità e icona si puliscono
  * come nel catalogo; i valori seguono l'ordine dello strumento. Non modifica gli argomenti: se il salvataggio della
- * voce fallisce, lo strumento originale resta com'era, non collegato.
+ * voce fallisce, lo strumento originale resta com'era, non collegato. Con `id` la voce prende quell'id: chi ritenta
+ * un salvataggio (risposta persa, nome da cambiare) passa lo stesso, così il secondo tentativo è un upsert della
+ * stessa voce e non ne crea un'altra.
  */
-export function voceDaStrumento(strumento: Strumento, parametri: Parametro[]): {
+export function voceDaStrumento(strumento: Strumento, parametri: Parametro[], id: string = nuovoId()): {
   voce: VoceCatalogo; strumento: Strumento; parametri: Parametro[]
 } {
   const valori = parametriDello(strumento, parametri)
   const chiavi = chiaviDaNomi(valori.map(p => p.nome))
   const voce: VoceCatalogo = {
-    id: nuovoId(),
+    id,
     nome: strumento.nome.trim(),
     icona: strumento.icona?.trim() || null,
     descrizione: '',

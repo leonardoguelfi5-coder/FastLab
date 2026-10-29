@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -23,7 +23,15 @@ function rendi(iniziale: BozzaEsperimento = bozzaVuota()) {
   const invalida = vi.spyOn(client, 'invalidateQueries')
   function Banco() {
     const [b, setB] = useState(iniziale)
-    return <PassoStrumenti bozza={b} onChange={(nuova) => { onChange(nuova); setB(nuova) }} />
+    // Come la procedura: la modifica può essere la bozza nuova o una funzione della bozza di quel momento.
+    const corrente = useRef(iniziale)
+    const applica = (modifica: BozzaEsperimento | ((prima: BozzaEsperimento) => BozzaEsperimento)) => {
+      const nuova = typeof modifica === 'function' ? modifica(corrente.current) : modifica
+      corrente.current = nuova
+      onChange(nuova)
+      setB(nuova)
+    }
+    return <PassoStrumenti bozza={b} onChange={applica} />
   }
   render(
     <QueryClientProvider client={client}>
@@ -196,6 +204,8 @@ describe('PassoStrumenti: + Nuovo strumento', () => {
     await creaPenetrometro(utente)
 
     const salva = screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' })
+    // L'inchiostro pieno è solo di "Avanti" nella barra in basso.
+    expect(salva).not.toHaveClass('bg-inchiostro')
     await utente.click(salva)
     expect(screen.getByRole('button', { name: 'Salvataggio…' })).toBeDisabled()
     await utente.click(screen.getByRole('button', { name: 'Salvataggio…' }))
@@ -222,6 +232,32 @@ describe('PassoStrumenti: + Nuovo strumento', () => {
     expect(b.parametri.map(p => [p.nome, p.catalogo_chiave])).toEqual([['Resistenza', null]])
     expect(invalida).not.toHaveBeenCalledWith({ queryKey: ['catalogo'] })
     expect(strumenti().getByRole('button', { name: /^Penetrometro/ })).toBeInTheDocument()
+  })
+
+  it('se il nome è già nel catalogo (23505) il modulo resta aperto col messaggio e non aggiunge nulla; rinominando si riprova con la stessa voce', async () => {
+    vi.mocked(salvaVoceCatalogo)
+      .mockRejectedValueOnce({ code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"' })
+      .mockResolvedValue(undefined)
+    const utente = userEvent.setup({ delay: null })
+    const { onChange } = rendi()
+    await creaPenetrometro(utente)
+
+    await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    expect(await screen.findByText('Nel catalogo c\'è già uno strumento con questo nome.')).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Nome dello strumento')).toHaveValue('Penetrometro')
+    expect(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' })).toBeEnabled()
+
+    await utente.type(screen.getByLabelText('Nome dello strumento'), ' digitale')
+    await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalledOnce())
+    const [primo, secondo] = vi.mocked(salvaVoceCatalogo).mock.calls.map(c => c[0])
+    expect(secondo.id).toBe(primo.id)
+    expect(secondo.nome).toBe('Penetrometro digitale')
+    expect(ultima(onChange).strumenti[0]).toMatchObject({ nome: 'Penetrometro digitale', catalogo_id: primo.id })
+    expect(screen.queryByText('Nel catalogo c\'è già uno strumento con questo nome.')).not.toBeInTheDocument()
   })
 
   it('"Annulla" chiude l\'editor senza aggiungere nulla', async () => {
