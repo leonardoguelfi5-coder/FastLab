@@ -64,3 +64,5 @@ Task 10: review (sonnet) → Approved (0 Critical/Important), 914 Vitest
 Task 10: minor (carry to T9/T11/T12): non calcolare gli stati prima che la configurazione sia caricata (con `parametri` vuoto uno strumento risulterebbe senza parametri attivi → piante "fatte")
 Task 10: minor (deferred): statiPiante O(piante × misure); id duplicati teorici; test di non mutazione solo per prossimaDaMisurare
 Task 10: complete (commits 4f24688..45cc256, review clean)
+Task 2: fix round 1 implemented cdaf525 (916 Vitest); re-review (sonnet) dispatched
+Task 3: dispatched implementer (opus) in parallelo alla ri-revisione del T2 (add espliciti), BASE cdaf525
