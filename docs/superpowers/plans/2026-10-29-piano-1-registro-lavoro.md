@@ -198,3 +198,6 @@ Task 13: minor (deferred): commento di soloDelModulo fuori posto (ModuloOggi ~45
 Task 13: fix round 3/5 (giri 1–3: 7 + 5 + 3 addressed, 0 open; commits c54ce8b..8f358ff)
 Task 13: complete (commits c54ce8b..8f358ff, review clean)
 Task 14: dispatched implementer (sonnet), BASE (commit di questo registro)
+Task 14: implementer DONE_WITH_CONCERNS 6d974e8 (739 tests) — ATTESA_CONFERMA_MS in scheda/salvataggio.ts; StoriaPianta passa state daScheda (ritorno navigate(-1) o replace); useMisura gcTime 0; MISURA_NON_TROVATA; date future ammesse come in Campo; extra params shown only if non-empty
+Ruling (T14, to apply in fix round with review): in ModificaMisura un parametro obbligatorio della passata è obbligatorio solo se la misura ne ha già un valore (non si può svuotare), così una misura vecchia resta sempre modificabile anche se l'obbligo è arrivato dopo (spec §5.6) — cost if wrong: si può salvare una misura vecchia senza un valore diventato obbligatorio dopo
+Task 14: dispatched reviewer (sonnet) on 8bcb1e0..6d974e8
