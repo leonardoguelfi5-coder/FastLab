@@ -18,12 +18,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { parametriDiUnaMisura, validaMisura, valoriDeiParametri } from '@/domain/misure'
+import { parametriDiUnaMisura, validaMisura, valoriDaSalvare, valoriDeiParametri } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Passata, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { percorsoCampo, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
+
+/** Gli id delle misure sono uuid: con altro nel percorso il database darebbe un errore di formato, non "non trovata". */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
@@ -156,8 +159,8 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
     }
 
     // Lo stesso id: l'upsert aggiorna la riga. Le chiavi che il modulo non mostra (altre passate, parametri che non
-    // esistono più) restano com'erano.
-    const daSalvare: Misura = { ...misura, data_rilievo: data, ora, valori: { ...misura.valori, ...valori } }
+    // esistono più) restano com'erano, e un parametro che la misura non aveva e resta vuoto non si scrive.
+    const daSalvare: Misura = { ...misura, data_rilievo: data, ora, valori: valoriDaSalvare(misura.valori, valori) }
 
     inCorso.current = true
     setControllo(null)
@@ -239,7 +242,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
         <div inert={occupato} className="flex flex-col gap-6">
           {/* Affiancati se ci stanno; su un telefono stretto l'ora va sotto la data. */}
           <div className="flex flex-wrap gap-3">
-            <div className="flex min-w-44 flex-1 flex-col gap-1.5">
+            <div className="flex min-w-0 grow basis-44 flex-col gap-1.5">
               <Label htmlFor={idData}>Data di rilievo</Label>
               <Input
                 id={idData}
@@ -250,7 +253,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
                 onChange={e => modifica(setData)(e.target.value)}
               />
             </div>
-            <div className="flex w-32 shrink-0 flex-col gap-1.5">
+            <div className="flex basis-32 flex-col gap-1.5">
               <Label htmlFor={idOra}>Ora</Label>
               <Input
                 id={idOra}
@@ -283,7 +286,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
           <ErroreSalvataggio
             ref={messaggio}
             etichetta={pianta.etichetta}
-            titolo={stato.azione === 'elimina' ? 'Misura non eliminata.' : undefined}
+            titolo={stato.azione === 'elimina' ? 'Misura non eliminata.' : 'Misura non salvata.'}
             errore={stato.errore}
             onRiprova={() => void (stato.azione === 'elimina' ? elimina() : salva())}
           />
@@ -316,9 +319,12 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
 export function ModificaMisura() {
   const { espId = '', misuraId = '' } = useParams()
   const navigate = useNavigate()
-  const arrivo = useLocation().state as ArrivoMisura | null
+  const { state, key } = useLocation()
+  const arrivo = state as ArrivoMisura | null
   const config = useConfig(espId)
-  const misura = useMisura(misuraId)
+  // Un id che non è un uuid non può essere di nessuna misura: non si chiede al server.
+  const idValido = UUID.test(misuraId)
+  const misura = useMisura(idValido ? misuraId : undefined)
 
   // Il modulo aperto dice se ha modifiche non salvate; si legge al momento del tocco (come in SchedaPianta).
   const modulo = useRef<StatoModulo | null>(null)
@@ -345,11 +351,13 @@ export function ModificaMisura() {
   const alla = pianta ? percorsoPianta(espId, pianta.id) : null
 
   // Tornati alla scheda la modifica non deve restare nella cronologia: dalla storia della pianta si torna indietro di
-  // una voce; arrivati da un link diretto non c'è una voce della scheda a cui tornare, si sostituisce questa.
+  // una voce; arrivati da un link diretto non c'è una voce della scheda a cui tornare, si sostituisce questa. Anche con
+  // lo stato della storia, se questa è la prima voce della cronologia (`key` "default", es. dopo aver riaperto la
+  // pagina) indietro non lascerebbe la modifica: resterebbe aperta su una misura salvata o eliminata.
   const esci = useCallback(() => {
-    if (arrivo?.daScheda) navigate(-1)
+    if (arrivo?.daScheda && key !== 'default') navigate(-1)
     else if (alla) navigate(alla, { replace: true })
-  }, [arrivo, navigate, alla])
+  }, [arrivo, key, navigate, alla])
 
   function scarta() {
     const azione = inAttesa
@@ -358,6 +366,7 @@ export function ModificaMisura() {
   }
 
   function contenuto() {
+    if (!idValido) return <NonTrovata espId={espId} />
     // Gli errori di una lettura in background non tolgono i dati già arrivati: si mostrano solo senza dati.
     if (trovata === undefined && misura.isError) {
       return eMisuraNonTrovata(misura.error)

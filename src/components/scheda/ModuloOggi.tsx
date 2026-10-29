@@ -7,7 +7,7 @@ import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
-import { validaMisura, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
+import { validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta, ValoriMisura } from '@/domain/tipi'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
@@ -217,8 +217,9 @@ export function ModuloOggi({
       passata_id: misura?.passata_id ?? passata.id,
       data_rilievo: misura?.data_rilievo ?? dataRilievo,
       ora: oraMisura,
-      // Correggendo si tengono le chiavi che il modulo non mostra (altre passate, parametri archiviati).
-      valori: misura ? { ...misura.valori, ...valori } : valori,
+      // Correggendo si tengono le chiavi che il modulo non mostra (altre passate, parametri archiviati); un parametro
+      // lasciato vuoto che la misura non aveva non si scrive (la chiave direbbe "ha dati").
+      valori: valoriDaSalvare(misura?.valori ?? null, valori),
     }
 
     inCorso.current = true

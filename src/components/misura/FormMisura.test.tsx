@@ -48,6 +48,21 @@ describe('FormMisura', () => {
     expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
   })
 
+  it('se n_letture è stato ridotto dopo la misura, le letture in più restano visibili, modificabili e non spariscono', async () => {
+    const ridotto = parametro('Clorofilla', { n_letture: 1 })
+    const onChange = rendi([], { [ridotto.id]: [30, 31.5, 29] }, [ridotto])
+    for (const n of [1, 2, 3]) expect(screen.getByLabelText(`Clorofilla · lettura ${n}`)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Clorofilla · lettura 4')).not.toBeInTheDocument()
+
+    // Correggere la prima non tocca le altre.
+    await userEvent.type(screen.getByLabelText('Clorofilla · lettura 1'), '32')
+    expect(ultimo(onChange)[ridotto.id]).toEqual([32, 31.5, 29])
+    // Una in più si può svuotare, e il suo campo resta lì.
+    await userEvent.clear(screen.getByLabelText('Clorofilla · lettura 3'))
+    expect(ultimo(onChange)[ridotto.id]).toEqual([32, 31.5, null])
+    expect(screen.getByLabelText('Clorofilla · lettura 3')).toBeInTheDocument()
+  })
+
   it('con una sola lettura il campo porta solo il nome, con l\'unità', () => {
     rendi()
     expect(screen.queryByLabelText('Altezza · lettura 1')).not.toBeInTheDocument()

@@ -331,6 +331,33 @@ describe('SchedaPianta: salvataggio', () => {
     expect(seconda.id).not.toBe(prima.id)
   })
 
+  it('una misura nuova non scrive i parametri lasciati vuoti: nei valori solo quelli compilati', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(Object.keys(salvate()[0].valori)).toEqual([par('Temp aria').id])
+  })
+
+  it('correggere una misura che non aveva un parametro non crea la sua chiave vuota; uno svuotato resta', async () => {
+    const ta = par('Temp aria').id
+    const tp = par('Temp pianta').id
+    const vecchia = misura({ ora: '09:12', valori: { [ta]: [24.5] } })
+    archivio = [vecchia]
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: '09:12 · Temp aria 24,5 °C' }))
+    await utente.type(campo('Temp aria'), '25')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori).toEqual({ [ta]: [25] })
+    expect(salvate()[0].valori).not.toHaveProperty(tp)
+  })
+
   it('un esperimento concluso resta modificabile', async () => {
     config.esperimento.stato = 'concluso'
     const utente = userEvent.setup()

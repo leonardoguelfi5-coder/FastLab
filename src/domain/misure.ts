@@ -84,6 +84,21 @@ export function valoriDeiParametri(parametri: Parametro[], valori: ValoriMisura)
 }
 
 /**
+ * I valori da scrivere nel database per una misura: quelli del modulo fusi sopra quelli già salvati (`prima`, o `null`
+ * per una misura nuova). Un valore vuoto per un parametro che la misura non aveva non si scrive: la presenza della
+ * chiave dice "questo parametro ha dei dati" (la guardia del database e `parametri_con_dati` la contano), e un campo
+ * mai compilato non deve renderlo tale. Le chiavi già presenti restano, anche svuotate: svuotare è una correzione.
+ * Le chiavi che il modulo non mostra restano com'erano.
+ */
+export function valoriDaSalvare(prima: ValoriMisura | null, modulo: ValoriMisura): ValoriMisura {
+  const risultato: ValoriMisura = { ...prima }
+  for (const [chiave, v] of Object.entries(modulo)) {
+    if (chiave in risultato || !vuotoPerForma(v)) risultato[chiave] = v
+  }
+  return risultato
+}
+
+/**
  * I parametri del modulo per correggere una misura già salvata: tutti quelli della sua passata (nel suo ordine, anche
  * gli archiviati: il dato c'è, e per i campi obbligatori si vede) e, dopo, quelli che non sono nella passata ma hanno
  * un valore nella misura (tolti dalla passata o archiviati), nell'ordine della configurazione. Un parametro archiviato
@@ -101,7 +116,9 @@ export function parametriDiUnaMisura(
   const inPassata = new Set(dellaPassata.map(p => p.id))
   const inPiu = config.parametri.filter(p => !inPassata.has(p.id) && !eVuoto(p, valori[p.id]))
   const parametri = [...dellaPassata, ...inPiu].map(p => (p.archiviato ? { ...p, nome: `${p.nome} (archiviato)` } : p))
-  const obbligatori = new Set(passata.parametri.filter(pp => pp.obbligatorio).map(pp => pp.parametro_id))
+  const obbligatori = new Set(
+    dellaPassata.filter(p => passata.parametri.some(pp => pp.parametro_id === p.id && pp.obbligatorio) && !eVuoto(p, valori[p.id])).map(p => p.id),
+  )
   return { parametri, obbligatori }
 }
 
@@ -144,7 +161,7 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
     if (p.tipo !== 'numero') continue
     ;(v as Lettura[]).forEach((x, i) => {
       if (x === null) return
-      const soggetto = p.n_letture > 1 ? `«${p.nome}» lettura ${i + 1}` : `«${p.nome}»`
+      const soggetto = Math.max(p.n_letture, (v as Lettura[]).length) > 1 ? `«${p.nome}» lettura ${i + 1}` : `«${p.nome}»`
       if (!Number.isFinite(x)) {
         errori.push(`${soggetto}: numero non valido.`)
       } else if (fuoriIntervallo(p, x)) {

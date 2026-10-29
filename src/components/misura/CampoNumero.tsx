@@ -21,9 +21,19 @@ function ammetteNegativi(p: Parametro): boolean {
   return p.valore_max !== null && p.valore_max <= 0
 }
 
+/**
+ * Quanti campi mostrare: le letture del parametro, o di più se la misura ne ha di salvate oltre (`n_letture` è stato
+ * ridotto dopo). Quelle in più restano visibili e modificabili, anche svuotandole (il campo non sparisce mentre si
+ * scrive): altrimenti correggere il parametro le farebbe sparire.
+ */
+function quanteLetture(p: Parametro, valore: (number | null)[]): number {
+  return Math.max(p.n_letture, valore.length)
+}
+
 /** Un campo numerico per lettura: "SPAD · lettura 1", "SPAD · lettura 2"…, o solo il nome se la lettura è una. */
 export function CampoNumero({ parametro, valore, onChange, obbligatorio }: CampoNumeroProps) {
-  const letture = Array.from({ length: parametro.n_letture }, (_, i) => valore[i] ?? null)
+  const quante = quanteLetture(parametro, valore)
+  const letture = Array.from({ length: quante }, (_, i) => valore[i] ?? null)
   // La tastiera decimale non ha il segno meno: se il parametro ammette negativi serve quella normale.
   const negativo = ammetteNegativi(parametro)
 
@@ -32,7 +42,7 @@ export function CampoNumero({ parametro, valore, onChange, obbligatorio }: Campo
       {letture.map((x, i) => (
         <NumericField
           key={i}
-          label={parametro.n_letture > 1 ? `${parametro.nome} · lettura ${i + 1}` : parametro.nome}
+          label={quante > 1 ? `${parametro.nome} · lettura ${i + 1}` : parametro.nome}
           unita={parametro.unita}
           value={x}
           avviso={avvisoFuoriIntervallo(parametro, x)}

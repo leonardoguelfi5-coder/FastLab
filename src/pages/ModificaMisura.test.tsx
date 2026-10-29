@@ -64,14 +64,16 @@ function IndietroDiSistema() {
 interface OpzioniApri {
   /** Arrivando dalla storia della pianta (il solito) o da un link diretto, senza cronologia dell'app. */
   daScheda?: boolean
+  /** La modifica è la sola voce della cronologia (pagina riaperta): indietro non porterebbe alla scheda. */
+  soloVoce?: boolean
   id?: string
 }
 
-function apri({ daScheda = true, id = m.id }: OpzioniApri = {}) {
+function apri({ daScheda = true, soloVoce = false, id = m.id }: OpzioniApri = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalida = vi.spyOn(client, 'invalidateQueries')
   const aperta = { pathname: `/esperimenti/E/misure/${id}`, state: daScheda ? { daScheda: true } : null }
-  const voci = daScheda ? ['/esperimenti/E', `/esperimenti/E/piante/${idPianta('35')}`, aperta] : [aperta]
+  const voci = daScheda && !soloVoce ? ['/esperimenti/E', `/esperimenti/E/piante/${idPianta('35')}`, aperta] : [aperta]
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={voci} initialIndex={voci.length - 1}>
@@ -89,6 +91,7 @@ function apri({ daScheda = true, id = m.id }: OpzioniApri = {}) {
 
 const posizione = () => screen.getByTestId('posizione').textContent
 const tipoNavigazione = () => screen.getByTestId('posizione').dataset.tipo
+const SCONOSCIUTA = '7d4f0c2a-1b3e-4f6a-9c8d-0e1f2a3b4c5d'
 const SCHEDA = () => `/esperimenti/E/piante/${idPianta('35')}`
 const campo = (nome: string) => screen.getByLabelText(nome) as HTMLInputElement
 const pulsante = (nome: string | RegExp) => screen.getByRole('button', { name: nome })
@@ -184,7 +187,7 @@ describe('ModificaMisura: cosa mostra', () => {
     expect(ordine).toEqual([...ordine].sort((a, b) => a - b))
   })
 
-  it('i parametri obbligatori della passata vanno compilati', async () => {
+  it('un obbligatorio che la misura ha già non si può svuotare', async () => {
     const passata = config.passate.find(p => p.nome === 'Termometro')!
     passata.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
     const utente = userEvent.setup()
@@ -195,6 +198,37 @@ describe('ModificaMisura: cosa mostra', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('«Temp pianta» è obbligatorio.')
     expect(salvaMisura).not.toHaveBeenCalled()
+  })
+
+  it('un obbligatorio aggiunto dopo la misura (che non ne ha il valore) non la blocca: si corregge senza inventarlo', async () => {
+    const passata = config.passate.find(p => p.nome === 'Termometro')!
+    passata.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
+    delete m.valori[par('Temp pianta').id]
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    cambiaData('2026-10-20')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].data_rilievo).toBe('2026-10-20')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('se le letture salvate sono più di n_letture, le eccedenti restano visibili e si salvano', async () => {
+    m.valori[par('SPAD').id] = [38.1, 39.4]
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+
+    expect(campo('SPAD (archiviato) · lettura 1')).toHaveValue('38,1')
+    expect(campo('SPAD (archiviato) · lettura 2')).toHaveValue('39,4')
+    await utente.clear(campo('SPAD (archiviato) · lettura 1'))
+    await utente.type(campo('SPAD (archiviato) · lettura 1'), '40')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori[par('SPAD').id]).toEqual([40, 39.4])
   })
 })
 
@@ -253,6 +287,44 @@ describe('ModificaMisura: salvataggio', () => {
     expect(inCache![0].valori[par('Temp aria').id]).toEqual([1])
   })
 
+  it('non crea chiavi vuote: un parametro che la misura non aveva e resta vuoto non entra nei valori', async () => {
+    delete m.valori[par('Temp pianta').id]
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    expect(campo('Temp pianta')).toHaveValue('')
+    await utente.type(campo('Temp aria'), '26')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(Object.keys(salvate()[0].valori).sort()).toEqual([par('Temp aria').id, par('SPAD').id, 'chiave-estranea'].sort())
+  })
+
+  it('un parametro che la misura aveva e si svuota resta (vuoto) tra i valori', async () => {
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.clear(campo('Temp pianta'))
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori[par('Temp pianta').id]).toEqual([null])
+  })
+
+  it('con la data cambiata ricarica il giorno vecchio e quello nuovo', async () => {
+    const utente = userEvent.setup()
+    const { client } = apri()
+    await pronta()
+    client.setQueryData(chiavi.misureGiorno('E', DATA), [])
+    client.setQueryData(chiavi.misureGiorno('E', '2026-10-20'), [])
+    cambiaData('2026-10-20')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(client.getQueryState(chiavi.misureGiorno('E', DATA))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(chiavi.misureGiorno('E', '2026-10-20'))?.isInvalidated).toBe(true)
+  })
+
   it('torna alla scheda dalla cronologia: la pagina di modifica non resta tra le voci', async () => {
     const utente = userEvent.setup()
     apri()
@@ -265,6 +337,17 @@ describe('ModificaMisura: salvataggio', () => {
     // Indietro dalla scheda porta alla schermata in campo, non a una misura già salvata.
     await utente.click(pulsante('Indietro di sistema'))
     expect(posizione()).toBe('/esperimenti/E')
+  })
+
+  it('se la modifica è la sola voce della cronologia (anche con lo stato della storia) sostituisce la voce: la pagina non resta aperta', async () => {
+    const utente = userEvent.setup()
+    apri({ soloVoce: true })
+    await pronta()
+    await utente.type(campo('Temp aria'), '1')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(tipoNavigazione()).toBe('REPLACE')
   })
 
   it('aperta da un link diretto sostituisce la voce: indietro non riporta alla modifica', async () => {
@@ -287,8 +370,7 @@ describe('ModificaMisura: salvataggio', () => {
     await utente.click(pulsante('Salva'))
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
-    expect(salvate()[0]).toEqual({ ...m, valori: m.valori })
-    expect(salvate()[0].valori).toEqual(m.valori)
+    expect(salvate()[0]).toEqual(m)
   })
 
   it('l\'ora si cambia e si salva', async () => {
@@ -417,7 +499,7 @@ describe('ModificaMisura: salvataggio non riuscito', () => {
     await utente.click(pulsante('Salva'))
 
     const errore = await screen.findByRole('alert')
-    expect(errore).toHaveTextContent('Pianta #35 non salvata.')
+    expect(errore).toHaveTextContent('Misura non salvata.')
     expect(errore).toHaveTextContent('Il server non risponde')
     expect(errore).toHaveFocus()
     expect(campo('Temp aria')).toHaveValue('26,2')
@@ -501,6 +583,38 @@ describe('ModificaMisura: eliminazione', () => {
     expect(invalida).toHaveBeenCalledWith({ queryKey: ['misure'] })
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.esperimenti })
     expect(salvaMisura).not.toHaveBeenCalled()
+  })
+
+  it('un doppio tocco su "Elimina" nel dialogo elimina una volta sola', async () => {
+    let finisci!: () => void
+    vi.mocked(eliminaMisura).mockImplementationOnce(() => new Promise<void>(r => { finisci = r }))
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.click(pulsante('Elimina misura'))
+    const elimina = within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' })
+    act(() => {
+      fireEvent.click(elimina)
+      fireEvent.click(elimina)
+    })
+
+    expect(eliminaMisura).toHaveBeenCalledTimes(1)
+    await act(async () => finisci())
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(eliminaMisura).toHaveBeenCalledTimes(1)
+    expect(toast.success).toHaveBeenCalledTimes(1)
+  })
+
+  it('l\'eliminazione ricarica il giorno della misura', async () => {
+    const utente = userEvent.setup()
+    const { client } = apri()
+    await pronta()
+    client.setQueryData(chiavi.misureGiorno('E', DATA), [])
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(client.getQueryState(chiavi.misureGiorno('E', DATA))?.isInvalidated).toBe(true)
   })
 
   it('se l\'eliminazione fallisce lo dice, la misura e i valori restano e "Riprova" riprova', async () => {
@@ -656,7 +770,7 @@ describe('ModificaMisura: uscita con modifiche non salvate', () => {
 
 describe('ModificaMisura: casi limite', () => {
   it('una misura che non esiste lo dice, con il ritorno alla schermata in campo', async () => {
-    apri({ id: 'non-esiste' })
+    apri({ id: SCONOSCIUTA })
 
     expect(await screen.findByText('Misura non trovata.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Modifica misura' })).toBeInTheDocument()
@@ -665,10 +779,28 @@ describe('ModificaMisura: casi limite', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('un id che non è un uuid è "non trovata" senza chiedere nulla al server', async () => {
+    apri({ id: 'abc' })
+
+    expect(await screen.findByText('Misura non trovata.')).toBeInTheDocument()
+    expect(caricaMisura).not.toHaveBeenCalled()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('data e ora vanno a capo insieme se non ci stanno: nessuna larghezza fissa sulla data', async () => {
+    apri()
+    await pronta()
+    const riga = campo('Data di rilievo').closest('div')!.parentElement!
+    expect(riga).toHaveClass('flex-wrap')
+    for (const nome of ['Data di rilievo', 'Ora']) {
+      expect(campo(nome).closest('div')!.className).not.toMatch(/(^|\s)(w-\d+|shrink-0)(\s|$)/)
+    }
+  })
+
   it('una misura di un altro esperimento (la sua pianta non è in questo) è come non trovata', async () => {
-    const estranea: Misura = { ...m, id: 'estranea', pianta_id: 'pianta-di-un-altro-esperimento' }
+    const estranea: Misura = { ...m, id: SCONOSCIUTA, pianta_id: 'pianta-di-un-altro-esperimento' }
     archivio.push(estranea)
-    apri({ id: 'estranea' })
+    apri({ id: SCONOSCIUTA })
 
     expect(await screen.findByText('Misura non trovata.')).toBeInTheDocument()
     expect(screen.queryByLabelText('Data di rilievo')).not.toBeInTheDocument()

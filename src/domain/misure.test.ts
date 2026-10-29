@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Passata, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
@@ -451,8 +451,54 @@ describe('parametriDiUnaMisura', () => {
     expect(parametri[0]).toMatchObject({ id: vecchio.id, archiviato: true })
   })
 
-  it('gli obbligatori sono quelli segnati nella passata', () => {
-    const { obbligatori } = parametriDiUnaMisura(config, passata, { [altezza.id]: [3] })
+  it('gli obbligatori sono quelli segnati nella passata per cui la misura ha già un valore', () => {
+    const { obbligatori } = parametriDiUnaMisura(config, passata, { [tempAria.id]: [21], [altezza.id]: [3] })
     expect([...obbligatori]).toEqual([tempAria.id])
+  })
+
+  it('un obbligatorio senza valore nella misura (aggiunto dopo) o con il valore vuoto non lo è: la misura vecchia si corregge', () => {
+    expect([...parametriDiUnaMisura(config, passata, { [altezza.id]: [3] }).obbligatori]).toEqual([])
+    expect([...parametriDiUnaMisura(config, passata, { [tempAria.id]: [null] }).obbligatori]).toEqual([])
+  })
+})
+
+describe('valoriDaSalvare', () => {
+  const vuoti: ValoriMisura = {
+    n: [null], t: '', s: null, l: [], tb: '   ',
+  }
+
+  it('una misura nuova (prima = null) non scrive i parametri lasciati vuoti, di nessun tipo', () => {
+    expect(valoriDaSalvare(null, { ...vuoti, [altezza.id]: [12], [note.id]: 'ok' })).toEqual({ [altezza.id]: [12], [note.id]: 'ok' })
+  })
+
+  it('tiene i valori compilati, anche un "No" e uno zero', () => {
+    const modulo: ValoriMisura = { a: [0], b: false, c: [{ n: 1, valori: { f: null } }] }
+    expect(valoriDaSalvare(null, modulo)).toEqual(modulo)
+  })
+
+  it('una correzione non crea chiavi vuote nuove, ma tiene quelle già presenti anche svuotate', () => {
+    const prima: ValoriMisura = { a: [1], b: 'x', altra: 'da tenere' }
+    expect(valoriDaSalvare(prima, { a: [null], b: '', nuovo: [null], nuovoTesto: '' })).toEqual({
+      a: [null], b: '', altra: 'da tenere',
+    })
+  })
+
+  it('un valore nuovo compilato per una chiave assente si scrive; le chiavi non mostrate restano com\'erano', () => {
+    expect(valoriDaSalvare({ altra: 1 as never }, { nuovo: [5] })).toEqual({ altra: 1, nuovo: [5] })
+  })
+
+  it('non modifica gli oggetti ricevuti', () => {
+    const prima: ValoriMisura = { a: [1] }
+    const modulo: ValoriMisura = { a: [2], b: [3] }
+    valoriDaSalvare(prima, modulo)
+    expect(prima).toEqual({ a: [1] })
+    expect(modulo).toEqual({ a: [2], b: [3] })
+  })
+
+  it('la validazione non dipende dalla presenza delle chiavi vuote', () => {
+    const mancante = validaMisura([altezza, note], new Set(), { [altezza.id]: [3] })
+    const presente = validaMisura([altezza, note], new Set(), { [altezza.id]: [3], [note.id]: '' })
+    expect(mancante).toEqual(presente)
+    expect(validaMisura([altezza], new Set(), {}).errori).toEqual(['Nessun valore inserito.'])
   })
 })
