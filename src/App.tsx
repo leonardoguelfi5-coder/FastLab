@@ -3,6 +3,7 @@ import { AppShell } from '@/components/AppShell'
 import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
 import { AdminInviti } from '@/pages/AdminInviti'
+import { Esperimenti } from '@/pages/Esperimenti'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
 import { Registrati } from '@/pages/Registrati'
 
@@ -22,7 +23,7 @@ export function AppRoutes() {
       <Route path="/registrati" element={<Registrati />} />
 
       <Route element={<RequireAuth><Outlet /></RequireAuth>}>
-        <Route path="/" element={<InCostruzione titolo="Esperimenti" />} />
+        <Route path="/" element={<Esperimenti />} />
         <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<InCostruzione titolo="Campo" indietro="/" />} />
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<InCostruzione titolo="Scheda pianta" indietro="/" />} />

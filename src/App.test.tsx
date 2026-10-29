@@ -11,6 +11,9 @@ vi.mock('@/api/query', () => ({ useSonoAdmin: vi.fn() }))
 vi.mock('@/pages/AdminInviti', () => ({
   AdminInviti: () => <h1>Pagina inviti (prova)</h1>,
 }))
+vi.mock('@/pages/Esperimenti', () => ({
+  Esperimenti: () => <h1>Elenco esperimenti (prova)</h1>,
+}))
 vi.mock('@/pages/NuovoEsperimento', () => ({
   NuovoEsperimento: () => <h1>Procedura nuovo esperimento (prova)</h1>,
 }))
@@ -23,13 +26,12 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 /** Percorsi privati ancora segnaposto. */
 const PERCORSI_SEGNAPOSTO = [
-  '/',
   '/esperimenti/x',
   '/esperimenti/x/piante/p',
   '/esperimenti/x/misure/m',
   '/esperimenti/x/impostazioni',
 ]
-const PERCORSI_PRIVATI = [...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
+const PERCORSI_PRIVATI = ['/', ...PERCORSI_SEGNAPOSTO, '/esperimenti/nuovo', '/admin/inviti']
 
 function vaiA(percorso: string) {
   render(
@@ -65,6 +67,13 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('button', { name: 'Menu' })).toBeInTheDocument()
   })
 
+  it('con la sessione / mostra l\'elenco degli esperimenti', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/')
+    expect(screen.getByRole('heading', { level: 1, name: 'Elenco esperimenti (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('In costruzione')).not.toBeInTheDocument()
+  })
+
   it('con la sessione /admin/inviti mostra la pagina degli inviti', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/admin/inviti')
@@ -82,6 +91,6 @@ describe('AppRoutes', () => {
   it('un percorso sconosciuto con la sessione torna a /', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/boh')
-    expect(screen.getByRole('heading', { level: 1, name: 'Esperimenti' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Elenco esperimenti (prova)' })).toBeInTheDocument()
   })
 })
