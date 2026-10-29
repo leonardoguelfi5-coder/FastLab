@@ -97,3 +97,7 @@ Task 4: minor (deferred, piano successivo): nessuna guardia SQL su unità/lettur
 Task 4: minor (carry to T8): se `applicaAggiornamento` si ferma a metà, la pagina lo dice e "Riprova" usa la stessa voce vecchia (già nel brief del T8)
 Task 4: fix round 1 implemented 7ecc502 (1018 Vitest); `VOCI_DIVERSE` se vecchia e nuova hanno id diversi (errore, non piano vuoto); re-review (opus) dispatched su copia del commit
 Task 6: dispatched implementer (sonnet), BASE 7ecc502 (unico implementatore nel checkout)
+Task 4: re-review fix round 1 → Approved (1018 Vitest su copia del commit)
+Task 4: fix round 1/5 (4 addressed, 0 open; commits eb9b336 (parte T4)..7ecc502)
+Task 4: minor (deferred): rete che cade tra salvataggio del parametro aggiunto e pulizia → orfano (serve una transazione nel DB); `VOCI_DIVERSE` mostrato come errore generico (errore di programmazione)
+Task 4: complete (review clean)
