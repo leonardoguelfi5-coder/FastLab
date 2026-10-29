@@ -78,7 +78,8 @@ export function valoriIniziali(a: {
   return valori
 }
 
-function descriviIntervallo(p: Parametro): string {
+/** L'intervallo atteso di un parametro a parole brevi, es. "0–100", "≥ 5" o "≤ 30". */
+export function descriviIntervallo(p: Parametro): string {
   const { valore_min: min, valore_max: max } = p
   if (min !== null && max !== null) return `${formattaNumero(min)}–${formattaNumero(max)}`
   if (min !== null) return `≥ ${formattaNumero(min)}`

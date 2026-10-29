@@ -1,7 +1,8 @@
-const NUMERO = /^-?\d+([.,]\d*)?$/
+// Cifre con separatore decimale finale ("24,") o iniziale (",5").
+const NUMERO = /^-?(\d+([.,]\d*)?|[.,]\d+)$/
 
 /**
- * Legge un numero digitato dall'utente (virgola o punto decimale).
+ * Legge un numero digitato dall'utente (virgola o punto decimale, anche senza lo zero davanti: ",5").
  * Restituisce `null` se il testo è vuoto, `NaN` se non è un numero valido.
  */
 export function parseNumero(raw: string): number | null {

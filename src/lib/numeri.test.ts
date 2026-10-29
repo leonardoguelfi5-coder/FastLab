@@ -9,12 +9,16 @@ describe('numeri', () => {
     ['-3,5', -3.5],
     ['24,', 24],
     ['0', 0],
+    [',5', 0.5],
+    ['.5', 0.5],
+    ['-,5', -0.5],
+    ['-.5', -0.5],
   ])('parseNumero(%s) = %s', (raw, n) => expect(parseNumero(raw)).toBe(n))
   it('vuoto → null', () => {
     expect(parseNumero('')).toBeNull()
     expect(parseNumero('  ')).toBeNull()
   })
-  it.each(['abc', '1,2,3', '12a', ','])('non valido %s → NaN', (raw) =>
+  it.each(['abc', '1,2,3', '12a', ',', '.', '-', '-,', ',,5'])('non valido %s → NaN', (raw) =>
     expect(parseNumero(raw)).toBeNaN(),
   )
   it('formattaNumero', () => {
