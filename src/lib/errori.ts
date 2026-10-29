@@ -9,6 +9,19 @@ export const MISURA_NON_TROVATA = 'Misura non trovata.'
 /** Un aggiornamento o un'eliminazione che non ha toccato nessuna riga: l'elemento non c'è più (o non è accessibile). */
 export const ELEMENTO_NON_TROVATO = 'Elemento non trovato: forse è stato rimosso. Ricarica la pagina.'
 
+/** `revocaInvito` non ha eliminato nulla: l'invito è stato usato (non si revoca più) o è già stato revocato. */
+export const INVITO_GIA_USATO = 'Questo invito è già stato usato o non c\'è più: ricarica la pagina.'
+
+/** `creaInvito` con un'email che ha già un invito (indice unico `inviti_email_unica`). */
+export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\'invito nell\'elenco.'
+
+/** `caricaConfig` non trova l'esperimento: id non valido, eliminato o non accessibile. */
+export const ESPERIMENTO_NON_TROVATO = 'Esperimento non trovato: forse è stato eliminato, o il link non è giusto.'
+
+export function eEsperimentoNonTrovato(e: unknown): boolean {
+  return e instanceof Error && e.message === ESPERIMENTO_NON_TROVATO
+}
+
 export function eMisuraNonTrovata(e: unknown): boolean {
   return e instanceof Error && e.message === MISURA_NON_TROVATA
 }
@@ -45,7 +58,8 @@ export function messaggioErrore(e: unknown): string {
   if (messaggio.includes('ESPERIMENTO_NON_MODIFICABILE')) {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
-  if (messaggio === ELEMENTO_NON_TROVATO) return ELEMENTO_NON_TROVATO
+  // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
+  if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO].includes(messaggio)) return messaggio
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
 

@@ -27,6 +27,7 @@ import { misureDelGiorno } from '@/api/misure'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { piante as creaPiante } from '@/domain/test-helpers'
 import type { ConfigEsperimento, Misura, Pianta } from '@/domain/tipi'
+import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import { useCampoStore } from '@/store/campo'
 import { Campo } from './Campo'
 
@@ -139,6 +140,16 @@ describe('Campo: caricamento ed errori', () => {
     expect(await screen.findByLabelText('N° pianta')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(caricaConfig).toHaveBeenCalledTimes(2)
+  })
+
+  it('un esperimento che non c\'è lo dice e porta all\'elenco invece di "Riprova"', async () => {
+    vi.mocked(caricaConfig).mockRejectedValue(new Error(ESPERIMENTO_NON_TROVATO))
+    vaiAllaPagina()
+
+    const errore = await screen.findByRole('alert')
+    expect(errore).toHaveTextContent('Esperimento non trovato: forse è stato eliminato, o il link non è giusto.')
+    expect(within(errore).getByRole('link', { name: 'I miei esperimenti' })).toHaveAttribute('href', '/')
+    expect(within(errore).queryByRole('button', { name: 'Riprova' })).not.toBeInTheDocument()
   })
 })
 

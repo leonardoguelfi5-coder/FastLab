@@ -1,5 +1,13 @@
 const parte = encodeURIComponent
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Vero se l'id preso da un percorso è un uuid (gli id di esperimenti e misure lo sono): con altro il database darebbe
+ * un errore di formato, non "non trovato".
+ */
+export const eUuid = (id: string): boolean => UUID.test(id)
+
 /** Schermata in campo di un esperimento. */
 export const percorsoCampo = (espId: string) => `/esperimenti/${parte(espId)}`
 

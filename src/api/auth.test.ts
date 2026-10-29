@@ -73,10 +73,10 @@ describe('registrati', () => {
 })
 
 describe('esci', () => {
-  it('chiama signOut', async () => {
+  it('chiama signOut solo per questo dispositivo', async () => {
     auth.signOut.mockResolvedValue({ error: null } as never)
     await esci()
-    expect(auth.signOut).toHaveBeenCalledOnce()
+    expect(auth.signOut).toHaveBeenCalledExactlyOnceWith({ scope: 'local' })
   })
 
   it('lancia l\'errore di Supabase', async () => {

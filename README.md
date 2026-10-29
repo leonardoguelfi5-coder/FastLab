@@ -75,7 +75,7 @@ update auth.users
  where email = 'nome@esempio.it';
 ```
 
-Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le funzioni hanno il prefisso. Scegli una password di almeno 6 caratteri, comunicala al collega e digli di annotarla: l'app non ha ancora una pagina per cambiarla.
+Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le funzioni hanno il prefisso. Scegli una password di almeno 8 caratteri (come chiede la registrazione), comunicala al collega e digli di annotarla: l'app non ha ancora una pagina per cambiarla.
 
 ## Messa online su un nuovo progetto Supabase
 

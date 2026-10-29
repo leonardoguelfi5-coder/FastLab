@@ -4,7 +4,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
-import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
+import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import { configDiEsempio } from '@/domain/test-helpers'
 import { clonaConfig } from '@/domain/bozza'
 import type { RigheConfig } from './mappers'
@@ -97,7 +97,7 @@ describe('aggiornaEsperimento', () => {
 })
 
 describe('caricaConfig', () => {
-  const E = 'e1'
+  const E = '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b'
   const righe: RigheConfig = {
     esperimento: {
       id: E, nome: 'Prova', data_inizio: null, note: '', stato: 'in_corso', creato_da: 'u1', creato_il: 'x',
@@ -156,9 +156,14 @@ describe('caricaConfig', () => {
     await expect(caricaConfig(E)).rejects.toBe(errore)
   })
 
-  it('lancia un errore se l\'esperimento non esiste o non è accessibile', async () => {
+  it('se l\'esperimento non esiste o non è accessibile lo dice con un messaggio suo', async () => {
     rispondeConRighe()
     mock.risponde('esperimenti', { data: null })
-    await expect(caricaConfig(E)).rejects.toThrow('Esperimento non trovato')
+    await expect(caricaConfig(E)).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+  })
+
+  it('con un id che non è un uuid (un link sbagliato) non interroga il database: esperimento non trovato', async () => {
+    await expect(caricaConfig('non-un-id')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 })

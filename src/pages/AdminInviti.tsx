@@ -143,6 +143,8 @@ function GestioneInviti() {
       setConfermaAperta(false)
       toast.success('Invito revocato.')
     },
+    // L'invito potrebbe essere stato usato o revocato nel frattempo: l'elenco si rilegge e mostra com'è adesso.
+    onError: () => { void queryClient.invalidateQueries({ queryKey: chiavi.inviti }) },
   })
 
   function invia(evento: FormEvent<HTMLFormElement>) {

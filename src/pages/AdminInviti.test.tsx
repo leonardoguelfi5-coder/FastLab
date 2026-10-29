@@ -18,6 +18,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 import { toast } from 'sonner'
 import { useSessione } from '@/api/auth'
 import { creaInvito, listaInviti, revocaInvito, sonoAdmin, type Invito } from '@/api/inviti'
+import { EMAIL_GIA_INVITATA, INVITO_GIA_USATO } from '@/lib/errori'
 import { AdminInviti } from './AdminInviti'
 
 type Utente = ReturnType<typeof userEvent.setup>
@@ -175,12 +176,12 @@ describe('AdminInviti: nuovo invito', () => {
   })
 
   it('se l\'invito esiste già mostra l\'errore sotto il modulo e lascia l\'email scritta', async () => {
-    vi.mocked(creaInvito).mockRejectedValue({ code: '23505', message: 'duplicate key' })
+    vi.mocked(creaInvito).mockRejectedValue(new Error(EMAIL_GIA_INVITATA))
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina()
     await invita(utente, 'marco@example.it')
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Esiste già un elemento')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Questa email è già stata invitata: trovi l\'invito nell\'elenco.')
     expect(screen.getByLabelText('Email')).toHaveValue('marco@example.it')
     expect(toast.success).not.toHaveBeenCalled()
   })
@@ -287,6 +288,23 @@ describe('AdminInviti: revoca', () => {
 
     expect(await within(dialogo).findByRole('alert')).toHaveTextContent('Il server non risponde')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(toast.success).not.toHaveBeenCalled()
+  })
+
+  it('se l\'invito è stato usato nel frattempo lo dice e rilegge l\'elenco', async () => {
+    vi.mocked(revocaInvito).mockRejectedValue(new Error(INVITO_GIA_USATO))
+    vi.mocked(listaInviti)
+      .mockResolvedValueOnce([IN_ATTESA, USATO])
+      .mockResolvedValue([{ ...IN_ATTESA, usato_il: '2026-10-28T13:00:00Z' }, USATO])
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina()
+    const dialogo = await apriConferma(utente)
+
+    await utente.click(within(dialogo).getByRole('button', { name: 'Revoca invito' }))
+
+    expect(await within(dialogo).findByRole('alert'))
+      .toHaveTextContent('Questo invito è già stato usato o non c\'è più: ricarica la pagina.')
+    await vi.waitFor(() => expect(listaInviti).toHaveBeenCalledTimes(2))
     expect(toast.success).not.toHaveBeenCalled()
   })
 })

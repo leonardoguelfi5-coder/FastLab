@@ -22,11 +22,8 @@ import { parametriDiUnaMisura, validaMisura, valoriDaSalvare, valoriDeiParametri
 import type { ConfigEsperimento, Misura, Passata, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
-import { percorsoCampo, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
+import { eUuid, percorsoCampo, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
-
-/** Gli id delle misure sono uuid: con altro nel percorso il database darebbe un errore di formato, non "non trovata". */
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
@@ -323,7 +320,7 @@ export function ModificaMisura() {
   const arrivo = state as ArrivoMisura | null
   const config = useConfig(espId)
   // Un id che non è un uuid non può essere di nessuna misura: non si chiede al server.
-  const idValido = UUID.test(misuraId)
+  const idValido = eUuid(misuraId)
   const misura = useMisura(idValido ? misuraId : undefined)
 
   // Il modulo aperto dice se ha modifiche non salvate; si legge al momento del tocco (come in SchedaPianta).

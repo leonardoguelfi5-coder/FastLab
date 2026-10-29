@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ELEMENTO_NON_TROVATO, eMisuraNonTrovata, MISURA_NON_TROVATA, messaggioErrore } from './errori'
+import {
+  EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
+  INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore,
+} from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -22,6 +25,19 @@ describe('messaggioErrore', () => {
   it('elemento non trovato (nessuna riga aggiornata o eliminata): il messaggio è già per l\'utente', () => {
     expect(messaggioErrore(new Error(ELEMENTO_NON_TROVATO))).toBe(ELEMENTO_NON_TROVATO)
     expect(ELEMENTO_NON_TROVATO).toBe('Elemento non trovato: forse è stato rimosso. Ricarica la pagina.')
+  })
+
+  it('invito già usato o revocato, email già invitata, esperimento non trovato: i messaggi passano come sono', () => {
+    expect(messaggioErrore(new Error(INVITO_GIA_USATO))).toBe('Questo invito è già stato usato o non c\'è più: ricarica la pagina.')
+    expect(messaggioErrore(new Error(EMAIL_GIA_INVITATA))).toBe('Questa email è già stata invitata: trovi l\'invito nell\'elenco.')
+    expect(messaggioErrore(new Error(ESPERIMENTO_NON_TROVATO)))
+      .toBe('Esperimento non trovato: forse è stato eliminato, o il link non è giusto.')
+  })
+
+  it('eEsperimentoNonTrovato riconosce solo l\'errore di caricaConfig', () => {
+    expect(eEsperimentoNonTrovato(new Error(ESPERIMENTO_NON_TROVATO))).toBe(true)
+    expect(eEsperimentoNonTrovato(new Error(ELEMENTO_NON_TROVATO))).toBe(false)
+    expect(eEsperimentoNonTrovato(ESPERIMENTO_NON_TROVATO)).toBe(false)
   })
 
   it('senza rete (navigator.onLine === false)', () => {

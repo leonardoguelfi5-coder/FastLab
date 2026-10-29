@@ -25,8 +25,12 @@ export async function registrati(email: string, password: string, codiceInvito: 
   return data?.session ?? null
 }
 
+/**
+ * Esce solo da questo dispositivo: con `scope: 'global'` (il predefinito) uscirebbe anche il telefono in campo, che
+ * perderebbe la sessione con le modifiche aperte.
+ */
 export async function esci(): Promise<void> {
-  const { error } = await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut({ scope: 'local' })
   if (error) throw error
 }
 

@@ -1,3 +1,5 @@
+import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
+import { eUuid } from '@/lib/percorsi'
 import { supabase } from '@/lib/supabase'
 import type { BozzaEsperimento, ConfigEsperimento, Esperimento } from '@/domain/tipi'
 import { controllaRighe } from './righe'
@@ -25,6 +27,8 @@ export async function listaEsperimenti(): Promise<RiepilogoEsperimento[]> {
 
 /** Legge tutta la configurazione di un esperimento (esperimento, fattori, trattamenti, piante, parametri, passate). */
 export async function caricaConfig(espId: string): Promise<ConfigEsperimento> {
+  // Un id che non è un uuid (un link sbagliato) non si chiede nemmeno: il database darebbe un errore di formato.
+  if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
   const figlie = (tabella: string) => supabase.from(tabella).select('*').eq('esperimento_id', espId)
   const [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, passate, passataParametri] =
     await Promise.all([
@@ -42,7 +46,7 @@ export async function caricaConfig(espId: string): Promise<ConfigEsperimento> {
   for (const r of [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, passate, passataParametri]) {
     if (r.error) throw r.error
   }
-  if (!esperimento.data) throw new Error('Esperimento non trovato o non accessibile.')
+  if (!esperimento.data) throw new Error(ESPERIMENTO_NON_TROVATO)
 
   const righe: RigheConfig = {
     esperimento: esperimento.data,

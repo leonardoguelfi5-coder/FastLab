@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
+import { EMAIL_GIA_INVITATA, INVITO_GIA_USATO } from '@/lib/errori'
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
 import { creaInvito, listaInviti, revocaInvito, sonoAdmin, type Invito } from './inviti'
@@ -70,17 +71,32 @@ describe('creaInvito', () => {
     expect(chiamate.find(c => c.metodo === 'select')?.args).toEqual(['id, email, codice, creato_il, usato_il'])
   })
 
-  it('lancia l\'errore di Supabase (invito già esistente: 23505)', async () => {
-    const e = { code: '23505', message: 'duplicate key' }
+  it('con un\'email già invitata (indice inviti_email_unica) lo dice con un messaggio suo', async () => {
+    mock.risponde('inviti', {
+      error: { code: '23505', message: 'duplicate key value violates unique constraint "inviti_email_unica"' },
+    })
+    await expect(creaInvito('a@b.it')).rejects.toThrow(EMAIL_GIA_INVITATA)
+  })
+
+  it('lancia l\'errore di Supabase (anche un 23505 di un altro indice)', async () => {
+    const e = { code: '23505', message: 'duplicate key value violates unique constraint "inviti_codice_unico"' }
     mock.risponde('inviti', { error: e })
     await expect(creaInvito('a@b.it')).rejects.toBe(e)
   })
 })
 
 describe('revocaInvito', () => {
-  it('elimina per id', async () => {
+  it('elimina per id, solo se non è stato usato', async () => {
+    mock.risponde('inviti', { data: [{ id: 'i1' }] })
     await revocaInvito('i1')
-    expect(mock.di('inviti').map(c => [c.metodo, ...c.args])).toEqual([['delete'], ['eq', 'id', 'i1']])
+    expect(mock.di('inviti').map(c => [c.metodo, ...c.args])).toEqual([
+      ['delete'], ['eq', 'id', 'i1'], ['is', 'usato_il', null], ['select', 'id'],
+    ])
+  })
+
+  it('se non elimina nulla (usato nel frattempo o già revocato) non sembra riuscita', async () => {
+    mock.risponde('inviti', { data: [] })
+    await expect(revocaInvito('i1')).rejects.toThrow(INVITO_GIA_USATO)
   })
 
   it('lancia l\'errore di Supabase', async () => {
