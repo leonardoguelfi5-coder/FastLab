@@ -31,6 +31,7 @@ function mostra(shell: ReactElement) {
         <Route path="/campo" element={shell} />
         <Route path="/" element={<p>Elenco esperimenti</p>} />
         <Route path="/admin/inviti" element={<p>Pagina inviti</p>} />
+        <Route path="/catalogo" element={<p>Pagina catalogo</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -87,6 +88,15 @@ describe('AppShell', () => {
     await apriMenu(utente)
     await utente.click(screen.getByText('Corpo'))
     expect(screen.queryByRole('button', { name: 'Esci' })).not.toBeInTheDocument()
+  })
+
+  it('"Catalogo strumenti" è nel menu di tutti e porta a /catalogo', async () => {
+    const utente = userEvent.setup({ delay: null })
+    mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+    expect(screen.queryByRole('link', { name: 'Catalogo strumenti' })).not.toBeInTheDocument()
+    await apriMenu(utente)
+    await utente.click(screen.getByRole('link', { name: 'Catalogo strumenti' }))
+    expect(await screen.findByText('Pagina catalogo')).toBeInTheDocument()
   })
 
   it('la voce "Inviti" non compare se non si è amministratori', async () => {

@@ -1,4 +1,4 @@
-import type { Parametro } from '@/domain/tipi'
+import type { Parametro, ParametroCatalogo } from '@/domain/tipi'
 
 const TIPO: Record<Parametro['tipo'], string> = { numero: 'Numero', testo: 'Testo', sino: 'Sì/No', lista: 'Lista ripetuta' }
 
@@ -10,4 +10,9 @@ export function riassuntoParametro(p: Parametro): string {
   if (p.tipo === 'lista') parti.push(p.sotto_campi.length === 1 ? '1 sotto-campo' : `${p.sotto_campi.length} sotto-campi`)
   if (p.progressivo) parti.push('progressivo')
   return parti.join(' · ')
+}
+
+/** Un valore di una voce del catalogo come si legge in campo: il nome e, se c'è, l'unità (es. "Temp aria °C"). */
+export function valoreCatalogo(p: ParametroCatalogo): string {
+  return p.unita ? `${p.nome} ${p.unita}` : p.nome
 }

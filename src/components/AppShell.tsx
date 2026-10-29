@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, CircleUser, LogOut, UserPlus } from 'lucide-react'
+import { ArrowLeft, BookOpen, CircleUser, LogOut, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
 import { messaggioErrore } from '@/lib/errori'
+import { percorsoCatalogo } from '@/lib/percorsi'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -100,6 +101,10 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
                 className="absolute top-full right-0 z-30 mt-1.5 w-64 rounded-md border border-riga bg-foglio p-1 text-grafite shadow-galleggiante"
               >
                 <p className="mb-1 truncate border-b border-riga px-3 pt-2 pb-2.5 text-sm text-grafite-tenue">{sessione?.user.email}</p>
+                <Link to={percorsoCatalogo} onClick={() => setAperto(false)} className={VOCE_MENU}>
+                  <BookOpen aria-hidden />
+                  Catalogo strumenti
+                </Link>
                 {amministratore === true && (
                   <Link to="/admin/inviti" onClick={() => setAperto(false)} className={VOCE_MENU}>
                     <UserPlus aria-hidden />

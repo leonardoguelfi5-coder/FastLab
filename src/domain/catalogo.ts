@@ -97,6 +97,90 @@ export function voceDaStrumento(strumento: Strumento, parametri: Parametro[], id
   }
 }
 
+/**
+ * La voce del catalogo come si modifica nell'editor: uno strumento semplice con un valore numerico per ogni valore della
+ * voce, nello stesso ordine. Ogni parametro porta la `chiave` del suo valore in `catalogo_chiave`: rinominare un valore
+ * nell'editor non la cambia, e `voceDaModifica` la ritrova. Gli id sono nuovi (servono solo all'editor).
+ */
+export function bozzaDaVoce(v: VoceCatalogo): { strumento: Strumento; parametri: Parametro[] } {
+  const parametri = v.parametri.map((pc, i) => parametroDaCatalogo(pc, i))
+  const strumento: Strumento = {
+    id: nuovoId(),
+    nome: v.nome,
+    icona: v.icona,
+    ordine: 0,
+    tipo: 'strumento',
+    archiviato: false,
+    catalogo_id: v.id,
+    parametri: parametri.map((p, i) => ({ parametro_id: p.id, obbligatorio: false, ordine: i })),
+  }
+  return { strumento, parametri }
+}
+
+/**
+ * La voce di catalogo che esce dall'editor (`bozzaDaVoce` più le modifiche). Un valore già presente conserva la sua
+ * chiave anche se lo si rinomina: l'aggiornamento degli esperimenti confronta i valori per chiave e un nome cambiato
+ * non deve sembrare un valore tolto più uno aggiunto. Un valore nuovo (senza chiave) riceve una chiave dal suo nome,
+ * libera rispetto a tutte le altre della voce; una chiave doppia (il database non lo vieta) tiene la prima e dà
+ * una chiave nuova alle altre. `base` porta l'id della voce (per una voce nuova, un id scelto da chi chiama, uguale a
+ * ogni tentativo) e la descrizione. Non modifica gli argomenti.
+ */
+export function voceDaModifica(
+  strumento: Strumento, parametri: Parametro[], base: Pick<VoceCatalogo, 'id' | 'descrizione'>,
+): VoceCatalogo {
+  const valori = parametriDello(strumento, parametri)
+  // Prima si fissano le chiavi che restano (la prima occorrenza di ognuna), poi si danno quelle nuove: una chiave
+  // nuova non deve prendere il posto di una che un valore più avanti conserva.
+  const usate = new Set<string>()
+  const tenute = valori.map(p => {
+    const chiave = p.catalogo_chiave?.trim() ?? ''
+    if (chiave === '' || usate.has(chiave)) return null
+    usate.add(chiave)
+    return chiave
+  })
+  const chiavi = valori.map((p, i) => {
+    if (tenute[i] !== null) return tenute[i]
+    const radice = chiaveDaNome(p.nome) || 'valore'
+    let chiave = radice
+    for (let n = 2; usate.has(chiave); n++) chiave = `${radice}_${n}`
+    usate.add(chiave)
+    return chiave
+  })
+  return {
+    id: base.id,
+    nome: strumento.nome.trim(),
+    icona: strumento.icona?.trim() || null,
+    descrizione: base.descrizione.trim(),
+    archiviato: false,
+    parametri: valori.map((p, i) => ({
+      chiave: chiavi[i] as string, nome: p.nome.trim(), unita: p.unita?.trim() || null, n_letture: p.n_letture,
+      valore_min: p.valore_min, valore_max: p.valore_max,
+    })),
+  }
+}
+
+/**
+ * I problemi di una voce prima di salvarla: il database non controlla che le chiavi dei valori siano non vuote né
+ * uniche, ma l'aggiornamento degli esperimenti confronta i valori per chiave (due chiavi uguali si scambierebbero).
+ * `voceDaModifica` le produce già giuste: questo è il controllo prima di scrivere nel catalogo condiviso.
+ */
+export function problemiVoce(v: VoceCatalogo): string[] {
+  const errori: string[] = []
+  const viste = new Set<string>()
+  const doppie = new Set<string>()
+  for (const p of v.parametri) {
+    const chiave = p.chiave.trim()
+    if (chiave === '') {
+      if (!errori.includes('Un valore non ha la chiave.')) errori.push('Un valore non ha la chiave.')
+    } else if (viste.has(chiave) && !doppie.has(chiave)) {
+      doppie.add(chiave)
+      errori.push(`Due valori hanno la stessa chiave: "${chiave}".`)
+    }
+    viste.add(chiave)
+  }
+  return errori
+}
+
 /** Uno strumento copiato da una voce del catalogo in un esperimento di cui l'utente è proprietario. */
 export interface CopiaStrumento {
   espId: string

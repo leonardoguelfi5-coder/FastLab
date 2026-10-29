@@ -4,6 +4,7 @@ import { nuovoParametro, parametriDello, problemiParametro } from '@/domain/bozz
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
 import { EditorParametro } from './EditorParametro'
@@ -39,6 +40,12 @@ interface EditorStrumentoProps {
   azioniValore?: (p: Parametro) => ReactNode
   /** Problemi in più di un valore, oltre a quelli del parametro (es. un sotto-campo con dati che si è tolto). */
   problemiExtra?: (p: Parametro) => string[]
+  /**
+   * Il catalogo condiviso descrive ogni strumento con una riga di testo (facoltativa); uno strumento dell'esperimento no.
+   * Il campo compare solo se la pagina lo gestisce, passando insieme `descrizione` e `onDescrizione`.
+   */
+  descrizione?: string
+  onDescrizione?: (d: string) => void
 }
 
 const MOTIVO_NUMERO = 'Uno strumento misura numeri. Per testo, sì/no o liste usa la tabella fenologica.'
@@ -50,7 +57,7 @@ const MOTIVO_NUMERO = 'Uno strumento misura numeri. Per testo, sì/no o liste us
  * la tabella fenologica) e "Obbligatorio" nemmeno: la misura conta tutti i valori dello strumento.
  */
 export function EditorStrumento({
-  valore, onChange, tipoFenologico, altriParametri = [], bloccoTipo, azioniValore, problemiExtra,
+  valore, onChange, tipoFenologico, altriParametri = [], bloccoTipo, azioniValore, problemiExtra, descrizione, onDescrizione,
 }: EditorStrumentoProps) {
   const id = useId()
   const [aperto, setAperto] = useState<string | null>(null)
@@ -112,6 +119,20 @@ export function EditorStrumento({
         </div>
       </div>
       <p id={`${id}-icona-aiuto`} className="-mt-3 text-sm text-grafite-tenue">L'icona è facoltativa: un'emoji, es. 🌡 o 🌱.</p>
+
+      {onDescrizione && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${id}-descrizione`}>Descrizione (facoltativa)</Label>
+          <Textarea
+            id={`${id}-descrizione`}
+            value={descrizione ?? ''}
+            rows={2}
+            placeholder="es. Temperatura dell'aria e della pianta."
+            onChange={(e) => onDescrizione(e.target.value)}
+            className="min-h-16"
+          />
+        </div>
+      )}
 
       <div className="flex flex-col gap-2">
         <p className="text-base font-semibold text-grafite">Valori</p>

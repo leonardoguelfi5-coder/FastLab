@@ -3,6 +3,7 @@ import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
 import { AdminInviti } from '@/pages/AdminInviti'
 import { Campo } from '@/pages/Campo'
+import { Catalogo } from '@/pages/Catalogo'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
@@ -21,6 +22,7 @@ export function AppRoutes() {
 
       <Route element={<RequireAuth><Outlet /></RequireAuth>}>
         <Route path="/" element={<Esperimenti />} />
+        <Route path="/catalogo" element={<Catalogo />} />
         <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<HomeEsperimento />} />
         {/* Per ora la vecchia schermata di campo: il Task 11 la sostituisce con la scelta dello strumento. */}

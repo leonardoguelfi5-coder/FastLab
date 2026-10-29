@@ -8,7 +8,8 @@ vi.mock('@/lib/id', async importOriginal => {
 
 import { nuovoId } from '@/lib/id'
 import {
-  chiaviDaNomi, pianoAggiornamento, strumentoDaCatalogo, voceDaStrumento, VOCI_DIVERSE, type CopiaStrumento,
+  bozzaDaVoce, chiaviDaNomi, pianoAggiornamento, problemiVoce, strumentoDaCatalogo, voceDaModifica, voceDaStrumento, VOCI_DIVERSE,
+  type CopiaStrumento,
 } from './catalogo'
 import { nuovoParametro, nuovoStrumento } from './bozza'
 import type { Parametro, Strumento, VoceCatalogo } from './tipi'
@@ -477,5 +478,111 @@ describe('pianoAggiornamento', () => {
     const prima = JSON.stringify(c.parametri)
     pianoAggiornamento(vecchia, conValore(vecchia, 'a', { nome: 'Assimilazione' }), [c])
     expect(JSON.stringify(c.parametri)).toBe(prima)
+  })
+})
+
+describe('bozzaDaVoce e voceDaModifica (modifica di una voce dal catalogo)', () => {
+  it('la voce diventa uno strumento semplice con un valore numerico per chiave, collegato alla voce', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+
+    expect(strumento).toMatchObject({ nome: 'Ciras', icona: '🍃', tipo: 'strumento', catalogo_id: ciras.id, archiviato: false })
+    expect(parametri.map(p => [p.nome, p.catalogo_chiave, p.tipo, p.unita, p.n_letture, p.valore_min, p.valore_max])).toEqual([
+      ['A', 'a', 'numero', 'µmol m⁻² s⁻¹', 1, null, null],
+      ['gs', 'gs', 'numero', 'mol m⁻² s⁻¹', 3, 0, 2],
+      ['SPAD', 'spad', 'numero', null, 1, null, null],
+    ])
+    expect(strumento.parametri).toEqual(parametri.map((p, ordine) => ({ parametro_id: p.id, obbligatorio: false, ordine })))
+  })
+
+  it('senza modifiche si torna alla voce di partenza, con le stesse chiavi', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    expect(voceDaModifica(strumento, parametri, ciras)).toEqual(ciras)
+  })
+
+  it('rinominare un valore NON ne cambia la chiave (l\'aggiornamento degli esperimenti lo vedrebbe come tolto + aggiunto)', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const rinominati = parametri.map(p => (p.catalogo_chiave === 'a' ? { ...p, nome: 'Assimilazione' } : p))
+
+    const voce = voceDaModifica(strumento, rinominati, ciras)
+
+    expect(voce.parametri.map(p => [p.chiave, p.nome])).toEqual([['a', 'Assimilazione'], ['gs', 'gs'], ['spad', 'SPAD']])
+    // Per il piano è una sola modifica di nome, non un'aggiunta.
+    const piano = pianoAggiornamento(ciras, voce, [])
+    expect(piano.aggiunte).toEqual([])
+  })
+
+  it('un valore aggiunto prende una chiave nuova dal nome, libera anche rispetto a quelle già della voce', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const nuovo = { ...nuovoParametro(3), nome: 'Gs', unita: ' mol ' }
+    const voce = voceDaModifica(
+      { ...strumento, parametri: [...strumento.parametri, { parametro_id: nuovo.id, obbligatorio: false, ordine: 3 }] },
+      [...parametri, nuovo],
+      ciras,
+    )
+
+    expect(voce.parametri.map(p => p.chiave)).toEqual(['a', 'gs', 'spad', 'gs_2'])
+    expect(voce.parametri[3]).toMatchObject({ nome: 'Gs', unita: 'mol' })
+  })
+
+  it('un valore tolto non lascia buchi e le chiavi degli altri restano', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const senzaGs = parametri.filter(p => p.catalogo_chiave !== 'gs')
+    const voce = voceDaModifica({ ...strumento, parametri: strumento.parametri.filter(pp => pp.parametro_id !== parametri[1].id) }, senzaGs, ciras)
+
+    expect(voce.parametri.map(p => p.chiave)).toEqual(['a', 'spad'])
+  })
+
+  it('una chiave doppia o vuota nella bozza si sistema: tiene la prima, le altre ne ricevono una nuova', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const guaste = parametri.map((p, i) => ({ ...p, catalogo_chiave: i === 0 ? 'a' : i === 1 ? 'a' : '  ' }))
+
+    const voce = voceDaModifica(strumento, guaste, ciras)
+
+    expect(voce.parametri.map(p => p.chiave)).toEqual(['a', 'gs', 'spad'])
+    expect(problemiVoce(voce)).toEqual([])
+  })
+
+  it('nome, icona e descrizione si puliscono; id e descrizione vengono dalla voce di partenza o dal chiamante', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const voce = voceDaModifica({ ...strumento, nome: '  Ciras 2  ', icona: ' ' }, parametri, { id: ciras.id, descrizione: ' Nuova. ' })
+
+    expect(voce).toMatchObject({ id: ciras.id, nome: 'Ciras 2', icona: null, descrizione: 'Nuova.', archiviato: false })
+  })
+
+  it('una voce nuova (senza voce di partenza) ha chiavi dai nomi, uniche', () => {
+    const a = { ...nuovoParametro(0), nome: 'Temp aria' }
+    const b = { ...nuovoParametro(1), nome: 'Temp  aria' }
+    const s: Strumento = {
+      ...nuovoStrumento(0), nome: 'Termo',
+      parametri: [a, b].map((p, ordine) => ({ parametro_id: p.id, obbligatorio: false, ordine })),
+    }
+
+    const voce = voceDaModifica(s, [a, b], { id: 'nuova', descrizione: '' })
+
+    expect(voce.parametri.map(p => p.chiave)).toEqual(['temp_aria', 'temp_aria_2'])
+  })
+
+  it('non modifica gli argomenti', () => {
+    const { strumento, parametri } = bozzaDaVoce(ciras)
+    const prima = JSON.stringify([strumento, parametri, ciras])
+    voceDaModifica(strumento, parametri, ciras)
+    expect(JSON.stringify([strumento, parametri, ciras])).toBe(prima)
+  })
+})
+
+describe('problemiVoce', () => {
+  it('una voce con chiavi non vuote e uniche non ha problemi', () => {
+    expect(problemiVoce(ciras)).toEqual([])
+  })
+
+  it('una chiave vuota (anche solo spazi) è un problema', () => {
+    const voce = { ...ciras, parametri: [{ ...ciras.parametri[0], chiave: ' ' }, ciras.parametri[1]] }
+    expect(problemiVoce(voce)).toHaveLength(1)
+    expect(problemiVoce(voce)[0]).toMatch(/chiave/)
+  })
+
+  it('due valori con la stessa chiave sono un problema', () => {
+    const voce = { ...ciras, parametri: [ciras.parametri[0], { ...ciras.parametri[1], chiave: 'a' }] }
+    expect(problemiVoce(voce)).toEqual(['Due valori hanno la stessa chiave: "a".'])
   })
 })

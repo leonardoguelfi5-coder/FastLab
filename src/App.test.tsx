@@ -32,6 +32,9 @@ vi.mock('@/pages/ModificaMisura', () => ({
 vi.mock('@/pages/Impostazioni', () => ({
   Impostazioni: () => <h1>Impostazioni dell'esperimento (prova)</h1>,
 }))
+vi.mock('@/pages/Catalogo', () => ({
+  Catalogo: () => <h1>Catalogo strumenti (prova)</h1>,
+}))
 vi.mock('@/pages/NuovoEsperimento', () => ({
   NuovoEsperimento: () => <h1>Procedura nuovo esperimento (prova)</h1>,
 }))
@@ -45,7 +48,7 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 const PERCORSI_PRIVATI = [
   '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
   '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/dataset',
-  '/esperimenti/nuovo', '/admin/inviti',
+  '/esperimenti/nuovo', '/admin/inviti', '/catalogo',
 ]
 
 function vaiA(percorso: string) {
@@ -78,6 +81,12 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/impostazioni')
     expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni dell\'esperimento (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /catalogo mostra il catalogo degli strumenti', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/catalogo')
+    expect(screen.getByRole('heading', { level: 1, name: 'Catalogo strumenti (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione / mostra l\'elenco degli esperimenti', () => {

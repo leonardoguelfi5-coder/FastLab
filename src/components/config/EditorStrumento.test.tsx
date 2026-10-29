@@ -51,6 +51,19 @@ describe('EditorStrumento', () => {
     expect(ultima(onChange).strumento.nome).toBe('Metro')
   })
 
+  it('la descrizione c\'è solo se la pagina la gestisce (catalogo) ed è un testo facoltativo', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const { unmount } = render(<EditorStrumento valore={termometro()} onChange={() => {}} />)
+    expect(screen.queryByLabelText('Descrizione')).not.toBeInTheDocument()
+    unmount()
+
+    const onDescrizione = vi.fn()
+    render(<EditorStrumento valore={termometro()} onChange={() => {}} descrizione="Aria e foglia." onDescrizione={onDescrizione} />)
+    expect(screen.getByLabelText('Descrizione (facoltativa)')).toHaveValue('Aria e foglia.')
+    await utente.type(screen.getByLabelText('Descrizione (facoltativa)'), '!')
+    expect(onDescrizione).toHaveBeenLastCalledWith('Aria e foglia.!')
+  })
+
   it('elenca i valori con un riassunto; toccandone uno si apre il suo editor (uno alla volta)', async () => {
     const utente = userEvent.setup({ delay: null })
     rendi(termometro())
