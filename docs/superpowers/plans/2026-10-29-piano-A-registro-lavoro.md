@@ -95,3 +95,5 @@ Ruling: le modifiche dal catalogo passano da `aggiornaParametroDaCatalogo` (upda
 Ruling: fold into T4 fix round 1 i minor del focus n. 3: (1) se il collegamento di un parametro aggiunto fallisce, il parametro appena creato si elimina (non ha misure) e l'errore originale si rilancia; (2) `aggiornaParametroDaCatalogo` scrive solo i campi cambiati (non sovrascrive un ritocco fatto in Impostazioni tra lettura e applicazione); (3) nessuna aggiunta su uno strumento archiviato (le modifiche sì); (4) controllo difensivo `vecchia.id === nuova.id` — cost if wrong: small
 Task 4: minor (deferred, piano successivo): nessuna guardia SQL su unità/letture di un parametro con dati (la regola è solo nel client, come nelle Impostazioni)
 Task 4: minor (carry to T8): se `applicaAggiornamento` si ferma a metà, la pagina lo dice e "Riprova" usa la stessa voce vecchia (già nel brief del T8)
+Task 4: fix round 1 implemented 7ecc502 (1018 Vitest); `VOCI_DIVERSE` se vecchia e nuova hanno id diversi (errore, non piano vuoto); re-review (opus) dispatched su copia del commit
+Task 6: dispatched implementer (sonnet), BASE 7ecc502 (unico implementatore nel checkout)
