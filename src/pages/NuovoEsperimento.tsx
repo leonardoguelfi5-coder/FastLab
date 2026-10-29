@@ -246,12 +246,21 @@ function Duplica({ espId, chiave }: { espId: string; chiave: string }) {
 /** Nuovo esperimento: da zero o dal modello (`?modello=hydrochar`), oppure copia di un altro (`?da=<id>`). */
 export function NuovoEsperimento() {
   const [ricerca] = useSearchParams()
-  const { sessione } = useSessione()
+  const { sessione, caricamento } = useSessione()
   const da = ricerca.get('da')
   const hydrochar = ricerca.get('modello') === 'hydrochar'
   const modo = da ? `da:${da}` : hydrochar ? 'hydrochar' : 'nuovo'
   const chiave = chiaveBozza(sessione?.user.id ?? '', modo)
 
+  // Finché non si sa chi è l'utente la chiave della bozza non è quella vera: montare la procedura adesso vorrebbe dire
+  // rimontarla subito dopo, con una bozza nuova (dal modello: id diversi) al posto di quella appena preparata.
+  if (caricamento) {
+    return (
+      <AppShell titolo={TITOLO} indietro="/">
+        <p role="status" className="text-grafite-tenue">Caricamento…</p>
+      </AppShell>
+    )
+  }
   if (da) return <Duplica key={chiave} espId={da} chiave={chiave} />
   return <Procedura key={chiave} chiave={chiave} crea={() => (hydrochar ? bozzaHydrochar() : null)} />
 }

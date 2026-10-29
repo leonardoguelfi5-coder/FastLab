@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { BozzaEsperimento, Passata } from '@/domain/tipi'
-import { nuovaPassata } from '@/domain/bozza'
+import { nuovaPassata, problemiPassata } from '@/domain/bozza'
 import { EditorPassata } from '@/components/config/EditorPassata'
 import { Button } from '@/components/ui/button'
 import { Espandibile } from '@/components/Espandibile'
+import { TestoErrore } from '@/components/TestoErrore'
 
 interface PassoPassateProps {
   bozza: BozzaEsperimento
@@ -36,20 +37,28 @@ export function PassoPassate({ bozza, onChange }: PassoPassateProps) {
       </p>
       {bozza.passate.length === 0 && <p className="text-sm text-grafite-tenue">Nessuna passata ancora.</p>}
       <ul aria-label="Passate" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
-        {bozza.passate.map(p => (
-          <Espandibile
-            key={p.id}
-            titolo={[p.icona, p.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
-            riassunto={riassunto(p)}
-            aperto={aperta === p.id}
-            onCambia={() => setAperta(aperta === p.id ? null : p.id)}
-          >
-            <EditorPassata valore={p} parametri={bozza.parametri} onChange={cambia} />
-            <Button variant="destructive" size="sm" onClick={() => elimina(p.id)} className="self-start">
-              Elimina passata
-            </Button>
-          </Espandibile>
-        ))}
+        {bozza.passate.map(p => {
+          // Gli stessi controlli del riepilogo, qui dove si correggono (nome doppio compreso).
+          const problemi = problemiPassata(p, bozza.passate)
+          return (
+            <Espandibile
+              key={p.id}
+              titolo={[p.icona, p.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
+              riassunto={riassunto(p)}
+              nota={problemi.length > 0 ? 'Da completare' : undefined}
+              aperto={aperta === p.id}
+              onCambia={() => setAperta(aperta === p.id ? null : p.id)}
+            >
+              <EditorPassata valore={p} parametri={bozza.parametri} onChange={cambia} />
+              {problemi.length > 0 && (
+                <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
+              )}
+              <Button variant="destructive" size="sm" onClick={() => elimina(p.id)} className="self-start">
+                Elimina passata
+              </Button>
+            </Espandibile>
+          )
+        })}
       </ul>
       <Button variant="outline" onClick={aggiungi}>+ Passata</Button>
     </div>

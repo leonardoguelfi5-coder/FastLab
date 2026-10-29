@@ -1,6 +1,7 @@
 import { Fragment, useId, useState } from 'react'
 import type { BozzaEsperimento, Pianta } from '@/domain/tipi'
 import { generaPiante } from '@/domain/piante'
+import { problemaEtichettaTrattamento } from '@/domain/trattamenti'
 import { EditorFattori } from '@/components/config/EditorFattori'
 import { conLivelliInSospeso, livelloAggiungibile } from '@/components/config/livelli'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,8 @@ interface TabellaProps {
 function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
   const id = useId()
   const cambia = (i: number, riga: RigaTrattamento) => onChange(righe.map((r, j) => (j === i ? riga : r)))
+  // Le etichette si confrontano solo tra le righe incluse: sono i trattamenti che l'esperimento avrà.
+  const inclusi = righe.filter(r => r.incluso).map(r => r.trattamento)
 
   return (
     // Righe di quaderno, non una griglia da foglio di calcolo: solo linee orizzontali tra un trattamento e l'altro.
@@ -47,9 +50,11 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
         {righe.map((r, i) => {
           const sbagliato = r.incluso && nPiante(r) === null
           const idErrore = `${id}-${i}-errore`
+          const problema = r.incluso ? problemaEtichettaTrattamento(r.trattamento, r.trattamento.etichetta, inclusi) : null
+          const idProblema = `${id}-${i}-etichetta`
           return (
             <Fragment key={r.trattamento.id}>
-              <tr className={sbagliato ? undefined : 'border-b border-riga'}>
+              <tr className={sbagliato || problema ? undefined : 'border-b border-riga'}>
                 <td className="py-2">
                   {/* L'etichetta senza testo allarga a 44px l'area che si può toccare intorno alla casella. */}
                   <label className="-ml-2.5 flex size-11 cursor-pointer items-center justify-center">
@@ -67,6 +72,8 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
                     aria-label={`Etichetta del trattamento ${i + 1}`}
                     value={r.trattamento.etichetta}
                     disabled={!r.incluso}
+                    aria-invalid={problema !== null || undefined}
+                    aria-describedby={problema ? idProblema : undefined}
                     onChange={(e) => cambia(i, { ...r, trattamento: { ...r.trattamento, etichetta: e.target.value } })}
                   />
                 </td>
@@ -85,10 +92,15 @@ function TabellaTrattamenti({ righe, onChange }: TabellaProps) {
                   />
                 </td>
               </tr>
-              {sbagliato && (
+              {(sbagliato || problema) && (
                 <tr className="border-b border-riga">
                   <td colSpan={3} className="pb-2">
-                    <TestoErrore id={idErrore} className="justify-end">{`Scrivi un numero intero da 1 a ${MAX_PIANTE}.`}</TestoErrore>
+                    <div className="flex flex-col gap-1">
+                      {problema && <TestoErrore id={idProblema}>{problema}</TestoErrore>}
+                      {sbagliato && (
+                        <TestoErrore id={idErrore} className="justify-end">{`Scrivi un numero intero da 1 a ${MAX_PIANTE}.`}</TestoErrore>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )}
@@ -161,7 +173,11 @@ function ElencoPiante({ bozza, onChange }: { bozza: BozzaEsperimento; onChange: 
 /** Passo 2: fattori e livelli, tabella dei trattamenti e piante. */
 export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
   const id = useId()
-  const [inizio, setInizio] = useState('1')
+  // Rientrando nel passo con le piante già generate, la numerazione riparte da dove partiva (es. 101), non da 1.
+  const [inizio, setInizio] = useState(() => {
+    const e = bozza.piante[0]?.etichetta.trim()
+    return e && /^\d+$/.test(e) ? e : '1'
+  })
   const [conferma, setConferma] = useState(false)
   // Livelli scritti in "Nuovo livello" ma non ancora aggiunti: "Genera trattamenti" li aggiunge da sé.
   const [inSospeso, setInSospeso] = useState<Record<string, string>>({})

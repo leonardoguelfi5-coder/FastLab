@@ -103,6 +103,16 @@ describe('NuovoEsperimento: inizio', () => {
     expect(screen.queryByRole('button', { name: 'Passo precedente' })).not.toBeInTheDocument()
   })
 
+  it('finché non si sa chi è l\'utente non monta la procedura (né prepara una bozza con la chiave sbagliata)', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: null, caricamento: true })
+    vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Nuovo esperimento' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Caricamento…')
+    expect(screen.queryByLabelText('Nome')).not.toBeInTheDocument()
+    expect(Object.keys(sessionStorage)).toEqual([])
+  })
+
   it('"Parti dal modello Hydrochar" compila la bozza con il modello', async () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo')
@@ -255,6 +265,8 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     const { invalida } = vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
 
     expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
+    // Gli spazi ai bordi non arrivano nel database.
+    await utente.type(screen.getByLabelText('Nome'), ' 2  ')
     await avanti(utente, 4)
 
     expect(titoloPasso()).toHaveTextContent('Riepilogo')
@@ -271,9 +283,10 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     const bozza = vi.mocked(creaEsperimento).mock.calls[0][0] as BozzaEsperimento
     expect(bozza.piante).toHaveLength(56)
     expect(bozza.trattamenti).toHaveLength(8)
+    expect(bozza.esperimento.nome).toBe('Hydrochar × Cuore di Bue 2')
     expect(await screen.findByText('Pagina dell\'esperimento esp-nuovo')).toBeInTheDocument()
     expect(invalida).toHaveBeenCalledWith({ queryKey: ['esperimenti'] })
-    expect(toast.success).toHaveBeenCalledWith('Esperimento creato.')
+    expect(toast.success).toHaveBeenCalledWith('Esperimento creato.', expect.objectContaining({ className: 'toast-salvato' }))
     expect(sessionStorage.length).toBe(0)
 
     // L'esperimento ha preso il posto del riepilogo nella cronologia: "indietro" porta al passo 4.
@@ -322,7 +335,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     expect(await screen.findByText(`Pagina dell'esperimento ${id}`)).toBeInTheDocument()
     expect(caricaConfig).toHaveBeenCalledExactlyOnceWith(id)
     expect(toast.error).toHaveBeenCalledOnce()
-    expect(toast.success).toHaveBeenCalledWith('Esperimento creato.')
+    expect(toast.success).toHaveBeenCalledWith('Esperimento creato.', expect.objectContaining({ className: 'toast-salvato' }))
     expect(invalida).toHaveBeenCalledWith({ queryKey: ['esperimenti'] })
     expect(sessionStorage.length).toBe(0)
   }, LUNGO)

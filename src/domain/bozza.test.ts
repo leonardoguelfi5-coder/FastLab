@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bozzaVuota, clonaConfig, nuovaPassata, nuovoParametro, problemiParametro, problemiPassata, validaBozza,
+  bozzaVuota, clonaConfig, nuovaPassata, nuovoParametro, problemiParametro, problemiPassata, pulisciBozza,
+  pulisciParametro, validaBozza,
 } from './bozza'
 import { conPiante, configDiEsempio, fattore, parametro } from './test-helpers'
 
@@ -24,14 +25,16 @@ describe('bozza', () => {
     b.esperimento.nome = '   '
     expect(validaBozza(b)).toContain('Dai un nome all\'esperimento.')
   })
-  it('etichette pianta duplicate (anche con spazi o maiuscole)', () =>
-    expect(validaBozza(conPiante(['A1', ' a1']))).toContain('Etichetta pianta duplicata: "a1".'))
+  it('etichette pianta duplicate (anche con spazi o maiuscole): il messaggio riporta la prima com\'è scritta', () => {
+    expect(validaBozza(conPiante(['A1', ' a1']))).toContain('Etichetta pianta duplicata: "A1".')
+    expect(validaBozza(conPiante([' B3-12 ', 'b3-12']))).toContain('Etichetta pianta duplicata: "B3-12".')
+  })
   it('un\'etichetta duplicata più volte è segnalata una volta sola', () =>
     expect(validaBozza(conPiante(['A1', 'a1', 'A1'])).filter(e => e.startsWith('Etichetta pianta'))).toHaveLength(1))
   it('etichette trattamento duplicate', () => {
     const b = conPiante(['1'])
     b.trattamenti.push({ id: crypto.randomUUID(), etichetta: ' CONTROLLO ', ordine: 1, livello_ids: [] })
-    expect(validaBozza(b)).toContain('Etichetta trattamento duplicata: "controllo".')
+    expect(validaBozza(b)).toContain('Etichetta trattamento duplicata: "Controllo".')
   })
   it('etichetta pianta vuota', () => {
     const b = conPiante(['1', '  '])
@@ -46,15 +49,15 @@ describe('bozza', () => {
   it('lista senza sotto-campi, min > max, passata vuota', () => {
     const b = conPiante(['1'])
     const palchi = parametro('Palchi', { tipo: 'lista', sotto_campi: [] })
-    const altezza = parametro('Altezza', { valore_min: 10, valore_max: 5 })
-    b.parametri.push(palchi, altezza)
+    const diametro = parametro('Diametro', { valore_min: 10, valore_max: 5 })
+    b.parametri.push(palchi, diametro)
     b.passate[0].parametri.push(
       { parametro_id: palchi.id, obbligatorio: false, ordine: 1 },
-      { parametro_id: altezza.id, obbligatorio: false, ordine: 2 })
+      { parametro_id: diametro.id, obbligatorio: false, ordine: 2 })
     b.passate.push({ id: crypto.randomUUID(), nome: 'SPAD', icona: null, ordine: 1, parametri: [] })
     expect(validaBozza(b)).toEqual([
       'Il parametro "Palchi" deve avere almeno un sotto-campo.',
-      'Il parametro "Altezza" ha il minimo maggiore del massimo.',
+      'Il parametro "Diametro" ha il minimo maggiore del massimo.',
       'La passata "SPAD" non ha parametri.',
     ])
   })
@@ -104,13 +107,37 @@ describe('bozza', () => {
     b.passate[0].parametri.push({ parametro_id: palchi.id, obbligatorio: false, ordine: 1 })
     expect(validaBozza(b)).toEqual([
       'Il parametro "Palchi" ha un sotto-campo senza nome.',
-      'Il parametro "Palchi" ha due sotto-campi con lo stesso nome: "n foglie".',
+      'Il parametro "Palchi" ha due sotto-campi con lo stesso nome: "N foglie".',
     ])
   })
   it('fattore senza nome o senza livelli', () => {
     const b = conPiante(['1'])
     b.fattori = [fattore(' ', ['A']), fattore('Stress', [])]
     expect(validaBozza(b)).toEqual(['Un fattore non ha nome.', 'Il fattore "Stress" non ha livelli.'])
+  })
+
+  it('due fattori con lo stesso nome (anche con spazi o maiuscole)', () => {
+    const b = conPiante(['1'])
+    b.fattori = [fattore('Stress', ['A']), fattore(' STRESS ', ['B'])]
+    expect(validaBozza(b)).toEqual(['C\'è già un fattore che si chiama "Stress".'])
+  })
+  it('due parametri con lo stesso nome (anche con spazi o maiuscole)', () => {
+    const b = conPiante(['1'])
+    const doppio = parametro(' altezza ')
+    b.parametri.push(doppio)
+    b.passate[0].parametri.push({ parametro_id: doppio.id, obbligatorio: false, ordine: 1 })
+    expect(validaBozza(b)).toEqual([
+      'C\'è già un parametro che si chiama "altezza".',
+      'C\'è già un parametro che si chiama "Altezza".',
+    ])
+  })
+  it('due passate con lo stesso nome (anche con spazi o maiuscole)', () => {
+    const b = conPiante(['1'])
+    b.passate.push({ ...b.passate[0], id: crypto.randomUUID(), nome: 'ALTEZZA ', ordine: 1 })
+    expect(validaBozza(b)).toEqual([
+      'C\'è già una passata che si chiama "ALTEZZA".',
+      'C\'è già una passata che si chiama "Altezza".',
+    ])
   })
 
   it('nuovoParametro: numerico, vuoto, con id nuovo e con l\'ordine dato', () => {
@@ -149,6 +176,48 @@ describe('bozza', () => {
     // il riferimento al parametro archiviato sparisce dalla passata
     expect(b.passate[0].parametri).toHaveLength(1)
   })
+  it('pulisciParametro: nome e unità senza spazi ai bordi, unità vuota = nessuna, anche nei sotto-campi', () => {
+    const p = parametro(' Palchi ', {
+      tipo: 'lista', unita: '  ', sotto_campi: [{ chiave: 'a', nome: ' N foglie ', unita: ' cm ' }, { chiave: 'b', nome: 'X', unita: ' ' }],
+    })
+    expect(pulisciParametro(p)).toEqual({
+      ...p, nome: 'Palchi', unita: null,
+      sotto_campi: [{ chiave: 'a', nome: 'N foglie', unita: 'cm' }, { chiave: 'b', nome: 'X', unita: null }],
+    })
+  })
+  it('pulisciBozza: nomi ed etichette senza spazi ai bordi, blocco e icona vuoti = nessuno', () => {
+    const b = conPiante([' 1 ', '2'])
+    b.esperimento.nome = ' Prova '
+    b.esperimento.note = ' note '
+    b.fattori = [fattore(' Stress ', [' Controllo ', 'S1'])]
+    b.trattamenti[0].etichetta = ' Controllo '
+    b.piante[0].blocco = '  '
+    b.piante[1].blocco = ' B1 '
+    b.parametri[0].nome = ' Altezza '
+    b.parametri[0].unita = ' cm '
+    b.passate[0].nome = ' Altezza '
+    b.passate[0].icona = ' '
+    const originale = structuredClone(b)
+
+    const pulita = pulisciBozza(b)
+
+    expect(pulita.esperimento).toEqual({ ...b.esperimento, nome: 'Prova', note: ' note ' })
+    expect(pulita.fattori[0].nome).toBe('Stress')
+    expect(pulita.fattori[0].livelli.map(l => l.nome)).toEqual(['Controllo', 'S1'])
+    expect(pulita.trattamenti[0].etichetta).toBe('Controllo')
+    expect(pulita.piante.map(p => [p.etichetta, p.blocco])).toEqual([['1', null], ['2', 'B1']])
+    expect(pulita.parametri[0]).toMatchObject({ nome: 'Altezza', unita: 'cm' })
+    expect(pulita.passate[0]).toMatchObject({ nome: 'Altezza', icona: null })
+    // Gli id restano: un nuovo tentativo di creazione usa lo stesso esperimento.
+    expect(pulita.esperimento.id).toBe(b.esperimento.id)
+    expect(b).toEqual(originale)
+  })
+  it('pulisciBozza tiene un\'icona scritta', () => {
+    const b = conPiante(['1'])
+    b.passate[0].icona = ' 🌡 '
+    expect(pulisciBozza(b).passate[0].icona).toBe('🌡')
+  })
+
   it('clonaConfig non modifica l\'originale', () => {
     const c = configDiEsempio(); const copia = structuredClone(c)
     clonaConfig(c)

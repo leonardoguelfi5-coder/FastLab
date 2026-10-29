@@ -5,20 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { ConfigEsperimento, Trattamento } from '@/domain/tipi'
+import { problemaEtichettaTrattamento as problemaEtichetta } from '@/domain/trattamenti'
 import { useAzione } from './azione'
 import { useSegnalaModifiche } from './modifiche'
 import { Sezione, Spiegazione } from './Sezione'
-
-const normalizza = (s: string) => s.trim().toLowerCase()
-
-/** Il problema dell'etichetta scritta per un trattamento, o null se si può salvare. */
-function problemaEtichetta(t: Trattamento, testo: string, trattamenti: Trattamento[]): string | null {
-  if (testo.trim() === '') return 'Manca l\'etichetta.'
-  if (trattamenti.some(x => x.id !== t.id && normalizza(x.etichetta) === normalizza(testo))) {
-    return 'C\'è già un trattamento con questa etichetta.'
-  }
-  return null
-}
 
 /** I fattori in sola lettura e le etichette dei trattamenti, ognuna con il suo "Salva". */
 export function SezioneTrattamenti({ espId, config }: { espId: string; config: ConfigEsperimento }) {

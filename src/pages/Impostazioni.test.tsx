@@ -368,6 +368,16 @@ describe('Impostazioni: parametri', () => {
     expect(await parametri.findByRole('button', { name: /^Note/ })).toBeInTheDocument()
   })
 
+  it('un parametro che non sta in nessuna passata lo dice nel riassunto', async () => {
+    const spad = par('SPAD').id
+    config.passate = config.passate.map(p => ({ ...p, parametri: p.parametri.filter(pp => pp.parametro_id !== spad) }))
+    apri()
+    await pronta()
+
+    expect(rigaParametro('SPAD')).toHaveTextContent('in nessuna passata')
+    expect(rigaParametro('Temp aria')).not.toHaveTextContent('in nessuna passata')
+  })
+
   it('"+ Parametro" ne crea uno non salvato in fondo all\'ordine; si salva con il suo "Salva"', async () => {
     const { utente } = apri()
     await pronta()

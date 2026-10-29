@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { bozzaVuota } from '@/domain/bozza'
-import { fattore } from '@/domain/test-helpers'
+import { conPiante, fattore } from '@/domain/test-helpers'
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { PassoPiante } from './PassoPiante'
 import { righeDaBozza, type RigaTrattamento } from './righeTrattamenti'
@@ -122,6 +122,28 @@ describe('PassoPiante: trattamenti', () => {
     expect(screen.getByRole('button', { name: 'Genera piante' })).toBeEnabled()
   })
 
+  it('un\'etichetta vuota o già usata (anche con spazi o maiuscole) è segnalata nella riga, solo tra le incluse', async () => {
+    const utente = userEvent.setup({ delay: null })
+    rendi(conConcime())
+    await utente.click(screen.getByRole('button', { name: 'Genera trattamenti' }))
+    const etichetta = (riga: number) => screen.getByLabelText(`Etichetta del trattamento ${riga}`)
+
+    await utente.clear(etichetta(2))
+    await utente.type(etichetta(2), ' 0 ')
+    expect(etichetta(2)).toHaveAttribute('aria-invalid', 'true')
+    expect(etichetta(2)).toHaveAccessibleDescription('C\'è già un trattamento con questa etichetta.')
+    expect(etichetta(1)).toHaveAccessibleDescription('C\'è già un trattamento con questa etichetta.')
+
+    await utente.clear(etichetta(3))
+    expect(etichetta(3)).toHaveAccessibleDescription('Manca l\'etichetta.')
+
+    // Esclusi, il 1 e il 3 non contano più: il 2 resta l'unico "0".
+    await utente.click(screen.getByRole('checkbox', { name: 'Includi il trattamento 1' }))
+    await utente.click(screen.getByRole('checkbox', { name: 'Includi il trattamento 3' }))
+    for (const riga of [1, 2, 3]) expect(etichetta(riga)).not.toHaveAttribute('aria-invalid')
+    expect(screen.queryByText('Manca l\'etichetta.')).not.toBeInTheDocument()
+  })
+
   it('un N non valido in un trattamento escluso non blocca', async () => {
     const utente = userEvent.setup({ delay: null })
     rendi(conConcime())
@@ -160,6 +182,16 @@ describe('PassoPiante: piante', () => {
 
     await utente.clear(screen.getByLabelText('Blocco della pianta 1'))
     expect(ultimaBozza(onChange).piante[0].blocco).toBeNull()
+  })
+
+  it('rientrando nel passo con le piante già generate, "Numerazione da" riparte dalla prima etichetta numerica', () => {
+    rendi(conPiante([' 101 ', '102']))
+    expect(screen.getByLabelText('Numerazione da')).toHaveValue('101')
+  })
+
+  it('con la prima etichetta non numerica "Numerazione da" parte da 1', () => {
+    rendi(conPiante(['B3-12', '102']))
+    expect(screen.getByLabelText('Numerazione da')).toHaveValue('1')
   })
 
   it('"Numerazione da" non accetta valori che non sono interi', async () => {

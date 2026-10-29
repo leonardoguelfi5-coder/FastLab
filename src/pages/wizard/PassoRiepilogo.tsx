@@ -1,14 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import type { BozzaEsperimento } from '@/domain/tipi'
-import { validaBozza } from '@/domain/bozza'
+import { pulisciBozza, validaBozza } from '@/domain/bozza'
 import { caricaConfig, creaEsperimento } from '@/api/esperimenti'
 import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { Button } from '@/components/ui/button'
 import { messaggioErrore } from '@/lib/errori'
+import { toastSalvato } from '@/lib/toastSalvato'
 
 interface PassoRiepilogoProps {
   bozza: BozzaEsperimento
@@ -24,6 +25,20 @@ interface PassoRiepilogoProps {
   onPassoPrecedente: () => void
 }
 
+/**
+ * I parametri che non stanno in nessuna passata: non sono un errore (si possono aggiungere dopo), ma finché restano
+ * così non si misurano. L'avviso li nomina.
+ */
+function avvisoSenzaPassata(bozza: BozzaEsperimento): string | null {
+  const inPassata = new Set(bozza.passate.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
+  const fuori = bozza.parametri.filter(p => !p.archiviato && p.nome.trim() !== '' && !inPassata.has(p.id))
+  if (fuori.length === 0) return null
+  const nomi = fuori.map(p => `"${p.nome.trim()}"`).join(', ')
+  return fuori.length === 1
+    ? `${nomi} non è in nessuna passata: non si potrà misurare finché non lo aggiungi a una passata (anche dopo, dalle impostazioni).`
+    : `${nomi} non sono in nessuna passata: non si potranno misurare finché non li aggiungi a una passata (anche dopo, dalle impostazioni).`
+}
+
 const codice = (e: unknown) => (typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined)
 
 /**
@@ -33,7 +48,8 @@ const codice = (e: unknown) => (typeof e === 'object' && e !== null ? (e as { co
  */
 async function crea({ bozza, ripresa }: { bozza: BozzaEsperimento; ripresa: boolean }): Promise<string> {
   try {
-    return await creaEsperimento(bozza)
+    // Nomi ed etichette si salvano ripuliti, come dalle impostazioni; gli id restano quelli della bozza.
+    return await creaEsperimento(pulisciBozza(bozza))
   } catch (e) {
     if (ripresa && codice(e) === '23505') {
       const esistente = await caricaConfig(bozza.esperimento.id).catch(() => null)
@@ -48,13 +64,14 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const errori = [...altriErrori, ...validaBozza(bozza)]
+  const avviso = avvisoSenzaPassata(bozza)
 
   const creazione = useMutation({
     mutationFn: crea,
     onSuccess: (id) => {
       void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
       onCreato()
-      toast.success('Esperimento creato.')
+      toastSalvato('Esperimento creato.')
       // Al posto della procedura: "indietro" dall'esperimento non torna al riepilogo di una bozza già creata.
       navigate(`/esperimenti/${id}`, { replace: true })
     },
@@ -104,6 +121,13 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
         </div>
       ) : (
         <p className="text-grafite">Tutto pronto: puoi creare l'esperimento.</p>
+      )}
+
+      {avviso && (
+        <p className="flex max-w-[65ch] items-start gap-2 text-base font-medium text-attenzione">
+          <TriangleAlert aria-hidden className="mt-0.5 size-5 shrink-0" />
+          {avviso}
+        </p>
       )}
 
       <p className="max-w-[65ch] text-sm text-grafite-tenue">

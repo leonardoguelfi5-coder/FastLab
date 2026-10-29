@@ -69,6 +69,19 @@ describe('PassoParametri', () => {
     expect(b.parametri.map(p => [p.nome, p.ordine])).toEqual([['Palchi', 0]])
     expect(b.passate[0].parametri).toEqual([])
   })
+
+  it('un nome già usato (anche con spazi o maiuscole) è segnalato nel parametro, con "Da completare" a voce chiusa', async () => {
+    const utente = userEvent.setup({ delay: null })
+    rendi(PassoParametri, bozza())
+
+    await utente.click(screen.getByRole('button', { name: '+ Parametro' }))
+    expect(screen.getByText('Un parametro non ha nome.')).toBeInTheDocument()
+    await utente.type(screen.getByLabelText('Nome'), ' ALTEZZA')
+
+    expect(screen.getByText('C\'è già un parametro che si chiama "Altezza".')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ALTEZZA/ })).toHaveTextContent('Da completare')
+    expect(screen.getByRole('button', { name: /Palchi/ })).not.toHaveTextContent('Da completare')
+  })
 })
 
 describe('PassoPassate', () => {
@@ -96,5 +109,17 @@ describe('PassoPassate', () => {
     await utente.click(screen.getByRole('button', { name: 'Elimina passata' }))
     expect(ultima(onChange).passate).toEqual([])
     expect(screen.getByText('Nessuna passata ancora.')).toBeInTheDocument()
+  })
+
+  it('un nome già usato (anche con spazi o maiuscole) è segnalato nella passata, con "Da completare" a voce chiusa', async () => {
+    const utente = userEvent.setup({ delay: null })
+    rendi(PassoPassate, bozza())
+
+    await utente.click(screen.getByRole('button', { name: '+ Passata' }))
+    await utente.type(screen.getByLabelText('Nome della passata'), 'altezza ')
+
+    expect(screen.getByText('C\'è già una passata che si chiama "Altezza".')).toBeInTheDocument()
+    const nuova = screen.getAllByRole('button', { name: /altezza/i })[1]
+    expect(nuova).toHaveTextContent('Da completare')
   })
 })

@@ -9,23 +9,12 @@ import { Espandibile } from '@/components/Espandibile'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
-import { nuovoParametro, problemiParametro } from '@/domain/bozza'
+import { nuovoParametro, problemiParametro, pulisciParametro } from '@/domain/bozza'
 import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
 import { ErroreDaMostrare, useAzione } from './azione'
 import { useBozze, useSegnalaModifiche } from './modifiche'
 import { ParametriArchiviati } from './ParametriArchiviati'
 import { ControlloDati, Sezione, Spiegazione } from './Sezione'
-
-/** Il parametro come si salva: nome e unità senza spazi ai bordi, unità vuota = nessuna. */
-function pulito(p: Parametro): Parametro {
-  const unita = p.unita?.trim() || null
-  return {
-    ...p,
-    nome: p.nome.trim(),
-    unita,
-    sotto_campi: p.sotto_campi.map(s => ({ ...s, nome: s.nome.trim(), unita: s.unita?.trim() || null })),
-  }
-}
 
 /** I valori già registrati di una lista stanno sotto la chiave del sotto-campo: toglierlo li nasconderebbe. */
 function sottoCampiTolti(salvato: Parametro, p: Parametro): boolean {
@@ -83,7 +72,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
 
   async function salva(inviato: Parametro, salvato: Parametro | null) {
     const nuovo = salvato === null
-    const daSalvare = pulito(inviato)
+    const daSalvare = pulisciParametro(inviato)
     const riuscito = await esegui(async () => {
       // Togliere un sotto-campo è ammesso solo senza dati: una misura può essere arrivata dopo l'apertura.
       if (salvato && sottoCampiTolti(salvato, daSalvare)) {
@@ -154,6 +143,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
     })
   }
 
+  const inPassata = new Set(config.passate.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
   const voci = [
     ...salvati.map(p => ({ salvato: p as Parametro | null, valore: bozze.valore(p) })),
     ...nuovi.map(p => ({ salvato: null, valore: bozze.valore(p) })),
@@ -174,7 +164,10 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
           const haDati = salvato ? dati?.has(salvato.id) : false
           const modificato = salvato === null || bozze.modificato(salvato)
           const elenco = problemi(valore, salvato)
-          const riassunto = riassuntoParametro(valore) + (haDati ? ' · ha dati' : '')
+          // Un parametro fuori da ogni passata non si misura: lo si vede anche a voce chiusa.
+          const riassunto = [riassuntoParametro(valore), haDati && 'ha dati', !inPassata.has(valore.id) && 'in nessuna passata']
+            .filter(Boolean)
+            .join(' · ')
           return (
             <Espandibile
               key={valore.id}

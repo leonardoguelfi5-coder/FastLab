@@ -100,14 +100,18 @@ export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
 
 const normalizza = (s: string) => s.trim().toLowerCase()
 
-/** Etichette (normalizzate) che compaiono più di una volta, nell'ordine in cui si ripetono. */
+/**
+ * Etichette che compaiono più di una volta (senza badare a spazi e maiuscole), nell'ordine in cui si ripetono: per
+ * ognuna la prima com'è stata scritta, senza spazi ai bordi ("B3-12", non "b3-12").
+ */
 function duplicate(etichette: string[]): string[] {
-  const viste = new Set<string>()
+  const prime = new Map<string, string>()
   const doppie = new Set<string>()
-  for (const e of etichette.map(normalizza)) {
-    if (e === '') continue
-    if (viste.has(e)) doppie.add(e)
-    viste.add(e)
+  for (const e of etichette) {
+    const chiave = normalizza(e)
+    if (chiave === '') continue
+    if (prime.has(chiave)) doppie.add(prime.get(chiave)!)
+    else prime.set(chiave, e.trim())
   }
   return [...doppie]
 }
@@ -123,6 +127,7 @@ export function validaBozza(b: BozzaEsperimento): string[] {
     if (nome === '') errori.push('Un fattore non ha nome.')
     else if (f.livelli.length === 0) errori.push(`Il fattore "${nome}" non ha livelli.`)
   }
+  for (const nome of duplicate(b.fattori.map(f => f.nome))) errori.push(`C'è già un fattore che si chiama "${nome}".`)
 
   if (b.trattamenti.length === 0) errori.push('Crea almeno un trattamento.')
   if (b.trattamenti.some(t => t.etichetta.trim() === '')) errori.push('Un trattamento non ha etichetta.')
@@ -134,10 +139,10 @@ export function validaBozza(b: BozzaEsperimento): string[] {
 
   const parametri = b.parametri.filter(p => !p.archiviato)
   if (parametri.length === 0) errori.push('Aggiungi almeno un parametro.')
-  for (const p of parametri) errori.push(...problemiParametro(p, []))
+  for (const p of parametri) errori.push(...problemiParametro(p, parametri))
 
   if (b.passate.length === 0) errori.push('Crea almeno una passata.')
-  for (const p of b.passate) errori.push(...problemiPassata(p, []))
+  for (const p of b.passate) errori.push(...problemiPassata(p, b.passate))
 
   return errori
 }
@@ -188,4 +193,30 @@ export function problemiPassata(p: Passata, altre: Passata[], attivi?: Set<strin
   const inclusi = attivi ? p.parametri.filter(pp => attivi.has(pp.parametro_id)) : p.parametri
   if (inclusi.length === 0) errori.push(`La passata "${nome}" non ha parametri.`)
   return errori
+}
+
+/** Il parametro come si salva: nome e unità senza spazi ai bordi, unità vuota = nessuna (anche nei sotto-campi). */
+export function pulisciParametro(p: Parametro): Parametro {
+  return {
+    ...p,
+    nome: p.nome.trim(),
+    unita: p.unita?.trim() || null,
+    sotto_campi: p.sotto_campi.map(s => ({ ...s, nome: s.nome.trim(), unita: s.unita?.trim() || null })),
+  }
+}
+
+/**
+ * La bozza come si crea: nomi ed etichette senza spazi ai bordi, blocco e icona vuoti = nessuno. Sono le stesse
+ * pulizie delle impostazioni, così un esperimento nato dalla procedura è uguale a uno sistemato dopo.
+ */
+export function pulisciBozza(b: BozzaEsperimento): BozzaEsperimento {
+  return {
+    ...b,
+    esperimento: { ...b.esperimento, nome: b.esperimento.nome.trim() },
+    fattori: b.fattori.map(f => ({ ...f, nome: f.nome.trim(), livelli: f.livelli.map(l => ({ ...l, nome: l.nome.trim() })) })),
+    trattamenti: b.trattamenti.map(t => ({ ...t, etichetta: t.etichetta.trim() })),
+    piante: b.piante.map(p => ({ ...p, etichetta: p.etichetta.trim(), blocco: p.blocco?.trim() || null })),
+    parametri: b.parametri.map(pulisciParametro),
+    passate: b.passate.map(p => ({ ...p, nome: p.nome.trim(), icona: p.icona?.trim() || null })),
+  }
 }
