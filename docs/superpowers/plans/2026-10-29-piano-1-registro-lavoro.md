@@ -223,3 +223,8 @@ Task 15: minor (deferred): gesto indietro/menu senza conferma; testo etichette d
 Task 16: implementer (sonnet, worktree) DONE 006aabf → cherry-pick 4a9c70a: 13 file v2 eliminati, prop required di NumericField tolta, README italiano (porte +100, codice invito, extensions.crypt, vercel.json d'esempio)
 Ruling: controller adds `.claude` to eslint globalIgnores and vitest exclude (deferred T1 minor; agent worktrees broke lint with 302 parsing errors) — cost if wrong: none
 Verifica cloud (controller): vitest 812/812, tsc -b 0, lint 0 problemi, build OK; test:db NON eseguito (Docker assente)
+Task 16: review → Needs fixes (solo README): frase falsa sui test di domain, "i dati non si perdono" troppo assoluto, vercel.json non presente/non localizzato, chiave anon/publishable, email minuscola negli inviti, admin visibile dopo rientro, indirizzo /registrati, "si raggiunge". Fixed by controller (README) + aggiunto vercel.json con il rewrite SPA
+Ruling: vercel.json committed on the v3 branch (affects only deploys of this branch; main/v2 untouched) — cost if wrong: delete one file
+Task 16: minor (deferred): vite-plugin-pwa in devDependencies non usato (togliere nel Piano 2 con xlsx); sessioni aperte restano valide dopo reset password
+Task 16: complete (commits 8a41d83.., review clean); test:db e percorso completo nel browser DA FARE IN LOCALE
+Final review: dispatched (opus) on merge-base(main)..HEAD with all "minor (deferred)" lines of this ledger

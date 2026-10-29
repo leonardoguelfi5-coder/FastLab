@@ -14,11 +14,11 @@ Serve Node.js e Docker Desktop (Supabase gira in locale dentro Docker).
 
    ```
    VITE_SUPABASE_URL=http://127.0.0.1:54421
-   VITE_SUPABASE_ANON_KEY=<chiave anon>
+   VITE_SUPABASE_ANON_KEY=<chiave pubblica>
    ```
 
-   La chiave anon la stampa `npx supabase start` alla fine; si rilegge in qualsiasi momento con `npx supabase status`.
-4. Avvia l'app: `npm run dev`. Si apre su http://localhost:5173.
+   La chiave pubblica (chiamata `anon` o `publishable`, secondo la versione della CLI) la stampa `npx supabase start` alla fine; si rilegge in qualsiasi momento con `npx supabase status`.
+4. Avvia l'app: `npm run dev`. Si raggiunge su http://localhost:5173.
 
 Le porte di Supabase in `supabase/config.toml` sono spostate di +100 rispetto ai valori predefiniti (API 54421 invece di 54321, database 54422 invece di 54322, Studio 54423, e così via), per non scontrarsi con un altro stack Supabase già acceso sul computer. Se sul tuo computer non ce n'è un altro, puoi riportarle ai valori predefiniti nel file e cambiare di conseguenza `VITE_SUPABASE_URL`.
 
@@ -47,21 +47,21 @@ Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
 
 Un amministratore può invitare gli altri dalla pagina Inviti, ma il primo va creato a mano, perché nessuno può ancora invitarlo. Apri l'editor SQL (in locale: Studio su http://127.0.0.1:54423; online: Dashboard del progetto, SQL Editor).
 
-1. Crea l'invito. Il database genera da solo il codice invito:
+1. Crea l'invito, con l'email scritta tutta in minuscolo (il database accetta solo email minuscole e senza spazi). Il database genera da solo il codice invito:
 
    ```sql
    insert into public.inviti(email) values ('nome@esempio.it') returning codice;
    ```
 
    Copia il codice che restituisce (8 caratteri, lettere maiuscole e cifre).
-2. Nell'app, apri la pagina di registrazione e inserisci la stessa email, una password e il codice invito.
+2. Nell'app, apri la pagina di registrazione (`/registrati`, per esempio http://localhost:5173/registrati) e inserisci la stessa email, una password e il codice invito.
 3. Rendi amministratore il nuovo utente:
 
    ```sql
    update public.profili set admin = true where email = 'nome@esempio.it';
    ```
 
-   Al successivo accesso la voce Inviti compare nel menu.
+   Esci e rientra (o ricarica la pagina): la voce Inviti compare nel menu.
 
 Gli inviti successivi li crea l'amministratore dalla pagina Inviti. La pagina mostra il codice dell'invito e il pulsante "Copia messaggio", che copia un testo pronto da mandare al collega con l'indirizzo della registrazione, l'email e il codice. L'invito vale una sola volta.
 
@@ -75,7 +75,7 @@ update auth.users
  where email = 'nome@esempio.it';
 ```
 
-Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le funzioni hanno il prefisso. Comunica la nuova password al collega e digli di tenerla.
+Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le funzioni hanno il prefisso. Scegli una password di almeno 6 caratteri, comunicala al collega e digli di annotarla: l'app non ha ancora una pagina per cambiarla.
 
 ## Messa online su un nuovo progetto Supabase
 
@@ -87,9 +87,9 @@ Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le f
    npx supabase db push
    ```
 
-3. Nel Dashboard, Authentication → Providers → Email: **disattiva "Confirm email"** e lascia attiva la registrazione. Gli inviti non si impostano qui: li impone il database.
+3. Nel Dashboard, Authentication → Providers → Email (o la voce con un nome simile, per esempio "Sign In / Providers"): **disattiva "Confirm email"** e lascia attiva la registrazione. Gli inviti non si impostano qui: li impone il database.
 4. Nel Dashboard, Authentication → URL Configuration: imposta **Site URL** all'indirizzo dell'hosting.
-5. Pubblica l'app su un hosting per siti statici (per esempio Vercel). Imposta le variabili `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (le trovi in Dashboard → Project Settings → API; la chiave è la `anon`, mai la `service_role`) e il comando di build `npm run build` con cartella di uscita `dist`. L'app è una single-page application: l'hosting deve rimandare tutte le route a `index.html`. Su Vercel si fa con un `vercel.json` che contiene:
+5. Pubblica l'app su un hosting per siti statici (per esempio Vercel). Imposta le variabili `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (le trovi in Dashboard → Project Settings → API; la chiave è quella pubblica, `anon` o `publishable`, mai la `service_role` né una chiave segreta) e il comando di build `npm run build` con cartella di uscita `dist`. Ogni indirizzo dell'app (per esempio `/accedi` o `/esperimenti/…`) deve aprire comunque `index.html`: senza questa regola, ricaricando una pagina si vede un errore 404. Su Vercel la regola è nel file `vercel.json` nella cartella principale del repository (già presente su questo ramo):
 
    ```json
    { "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
@@ -104,7 +104,7 @@ La versione 2 resta in uso finché non si decide di sostituirla: i dati dell'esp
 
 ## Database in pausa
 
-Nel piano gratuito Supabase mette in pausa il progetto dopo 7 giorni senza attività. In quel caso l'app mostra "Il server non risponde…". Per riattivarlo: Dashboard → il progetto → **Restore project**. Ci vuole qualche minuto; i dati non si perdono. Per evitare la pausa basta usare l'app almeno una volta alla settimana.
+Nel piano gratuito Supabase mette in pausa il progetto dopo 7 giorni senza attività. In quel caso l'app mostra "Il server non risponde…". Per riattivarlo: Dashboard → il progetto → **Restore project**. Ci vuole qualche minuto e i dati restano. Non lasciare però il progetto in pausa per mesi: dopo un certo tempo Supabase non permette più il ripristino dal Dashboard (controlla le condizioni attuali del piano Free). Usare l'app almeno una volta alla settimana di solito evita la pausa.
 
 ## Limiti del piano gratuito
 
@@ -116,7 +116,7 @@ Per un esperimento da qualche decina di piante il database resta molto sotto il 
 
 ## Struttura del codice
 
-- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, modello Hydrochar). Ha i test più numerosi.
+- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
 - `src/api`: le chiamate a Supabase e la conversione tra righe del database e tipi del dominio.
 - `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, schermata in campo, scheda pianta, impostazioni, inviti).
 - `src/components`: i pezzi riusati dalle pagine; `ui/` contiene i componenti di base, le altre cartelle sono raggruppate per schermata.
