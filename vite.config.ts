@@ -15,5 +15,7 @@ export default defineConfig({
     globals: false,
     // Su Windows+OneDrive i worker in parallelo rallentano molto: 5 s di default non bastano per il primo test di un file.
     testTimeout: 15_000,
+    // Fuso fisso: i test sulle date locali (mezzanotte, ora legale) devono dare lo stesso esito su ogni macchina e distinguere i bug da UTC.
+    env: { TZ: 'Europe/Rome' },
   },
 })
