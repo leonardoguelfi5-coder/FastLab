@@ -4,9 +4,9 @@ import type { Parametro, Strumento, StrumentoParametro } from '@/domain/tipi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Interruttore } from './Interruttore'
+import { Interruttore } from '@/components/config/Interruttore'
 
-interface EditorStrumentoProps {
+interface EditorInclusioneStrumentoProps {
   valore: Strumento
   /** Tutti i parametri dell'esperimento: quelli archiviati non si mostrano. */
   parametri: Parametro[]
@@ -20,10 +20,11 @@ function descrivi(p: Parametro): string {
 }
 
 /**
- * Modifica di uno strumento: nome, icona e quali parametri compaiono nel modulo, in che ordine
- * e se sono obbligatori. I parametri inclusi stanno in cima, nell'ordine del modulo.
+ * Modifica di uno strumento scegliendo tra i parametri già esistenti dell'esperimento: nome, icona e quali compaiono
+ * nel modulo, in che ordine e se sono obbligatori. I parametri inclusi stanno in cima, nell'ordine del modulo.
+ * Provvisorio: serve alle impostazioni finché il Task 7 non le passa a `EditorStrumento` (valori dentro lo strumento).
  */
-export function EditorStrumento({ valore, parametri, onChange }: EditorStrumentoProps) {
+export function EditorInclusioneStrumento({ valore, parametri, onChange }: EditorInclusioneStrumentoProps) {
   const id = useId()
   const attivi = parametri.filter(p => !p.archiviato)
   const visibili = new Set(attivi.map(p => p.id))

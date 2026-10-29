@@ -36,6 +36,56 @@ export function nuovoStrumento(ordine: number, tipo: TipoStrumento = 'strumento'
   return { id: nuovoId(), nome: '', icona: null, ordine, tipo, archiviato: false, catalogo_id: null, parametri: [] }
 }
 
+/** La tabella fenologica nuova: vuota, con il nome e l'icona che ha anche nel modello Hydrochar. */
+export function nuovaTabellaFenologica(ordine: number): Strumento {
+  return { ...nuovoStrumento(ordine, 'fenologico'), nome: 'Tabella fenologica', icona: '🌱' }
+}
+
+/** I parametri di uno strumento, nell'ordine del modulo (i collegamenti a parametri che non ci sono più si saltano). */
+export function parametriDello(strumento: Strumento, parametri: Parametro[]): Parametro[] {
+  const perId = new Map(parametri.map(p => [p.id, p]))
+  return [...strumento.parametri].sort((a, b) => a.ordine - b.ordine).flatMap(pp => perId.get(pp.parametro_id) ?? [])
+}
+
+/** L'`ordine` di uno strumento aggiunto alla bozza: dopo il massimo (la tabella fenologica conta come gli altri). */
+export function ordineStrumentoSuccessivo(b: BozzaEsperimento): number {
+  return Math.max(-1, ...b.strumenti.map(s => s.ordine)) + 1
+}
+
+/**
+ * La bozza con lo strumento (nuovo o già presente) e i suoi parametri. I parametri sono quelli dello strumento: quelli
+ * che aveva prima e non ci sono più si tolgono dalla bozza (un parametro sta in un solo strumento e fuori da uno
+ * strumento non si misura), quelli nuovi si numerano dopo il massimo `ordine` della bozza e quelli già presenti
+ * conservano il loro. Gli altri strumenti non si toccano.
+ */
+export function conStrumento(b: BozzaEsperimento, strumento: Strumento, parametri: Parametro[]): BozzaEsperimento {
+  const prima = b.strumenti.find(s => s.id === strumento.id)
+  const ids = new Set(parametri.map(p => p.id))
+  const eranoSuoi = new Set(prima?.parametri.map(pp => pp.parametro_id))
+  const restanti = b.parametri.filter(p => !eranoSuoi.has(p.id) || ids.has(p.id))
+  const presenti = new Set(restanti.map(p => p.id))
+  let ordine = Math.max(-1, ...restanti.map(p => p.ordine))
+  const nuovi = new Map(parametri.map(p => [p.id, presenti.has(p.id) ? p : { ...p, ordine: ++ordine }]))
+
+  return {
+    ...b,
+    parametri: [...restanti.map(p => nuovi.get(p.id) ?? p), ...parametri.filter(p => !presenti.has(p.id)).map(p => nuovi.get(p.id) as Parametro)],
+    strumenti: prima ? b.strumenti.map(s => (s.id === strumento.id ? strumento : s)) : [...b.strumenti, strumento],
+  }
+}
+
+/** La bozza senza lo strumento e senza i suoi parametri; gli strumenti che restano si rinumerano. */
+export function senzaStrumento(b: BozzaEsperimento, id: string): BozzaEsperimento {
+  const tolto = b.strumenti.find(s => s.id === id)
+  if (!tolto) return b
+  const suoi = new Set(tolto.parametri.map(pp => pp.parametro_id))
+  return {
+    ...b,
+    parametri: b.parametri.filter(p => !suoi.has(p.id)),
+    strumenti: b.strumenti.filter(s => s.id !== id).map((s, ordine) => ({ ...s, ordine })),
+  }
+}
+
 type Rimappa = Map<string, string>
 
 function nuoviId(elementi: { id: string }[]): Rimappa {

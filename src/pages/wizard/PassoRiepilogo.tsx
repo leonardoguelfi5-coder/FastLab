@@ -85,11 +85,15 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
     creazione.mutate({ bozza, ripresa })
   }
 
+  // Gli strumenti si contano senza la tabella fenologica, che ha la sua riga con le voci (i suoi parametri attivi).
+  const vociFenologiche = new Set(
+    bozza.strumenti.filter(s => s.tipo === 'fenologico' && !s.archiviato).flatMap(s => s.parametri.map(pp => pp.parametro_id)),
+  )
   const conteggi = [
     ['Trattamenti', bozza.trattamenti.length],
     ['Piante', bozza.piante.length],
-    ['Parametri', bozza.parametri.filter(p => !p.archiviato).length],
-    ['Strumenti', bozza.strumenti.length],
+    ['Strumenti', bozza.strumenti.filter(s => s.tipo === 'strumento' && !s.archiviato).length],
+    ['Voci fenologiche', bozza.parametri.filter(p => !p.archiviato && vociFenologiche.has(p.id)).length],
   ] as const
 
   return (
@@ -131,7 +135,7 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
       )}
 
       <p className="max-w-[65ch] text-sm text-grafite-tenue">
-        Dopo la creazione potrai ancora aggiungere piante, parametri e strumenti dalle impostazioni dell'esperimento.
+        Dopo la creazione potrai ancora aggiungere piante, strumenti e voci fenologiche dalle impostazioni dell'esperimento.
       </p>
 
       <BarraAzioni>

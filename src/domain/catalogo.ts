@@ -1,4 +1,5 @@
 import { nuovoId } from '@/lib/id'
+import { parametriDello } from './bozza'
 import type { Parametro, ParametroCatalogo, Strumento, StrumentoParametro, VoceCatalogo } from './tipi'
 
 /** Un parametro numerico nuovo, copiato da un valore del catalogo e collegato a esso con `catalogo_chiave`. */
@@ -40,6 +41,58 @@ export function strumentoDaCatalogo(v: VoceCatalogo, ordine: number): { strument
   }
 
   return { strumento, parametri }
+}
+
+/** Il nome come chiave: minuscole, senza accenti, ogni gruppo di caratteri che non sono lettere o cifre diventa un "_". */
+function chiaveDaNome(nome: string): string {
+  return nome.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+}
+
+/**
+ * Le chiavi dei valori di una voce nuova, una per nome e nello stesso ordine. Il database non controlla che siano non
+ * vuote né uniche nella voce, ma l'aggiornamento dal catalogo confronta i valori per chiave: due valori con la stessa
+ * chiave (o una vuota) si scambierebbero. Un nome senza lettere né cifre dà `valore`; una chiave già presa riceve
+ * `_2`, `_3`, … finché non è libera (anche rispetto alle chiavi che nascono più avanti).
+ */
+export function chiaviDaNomi(nomi: string[]): string[] {
+  const usate = new Set<string>()
+  return nomi.map(nome => {
+    const base = chiaveDaNome(nome) || 'valore'
+    let chiave = base
+    for (let n = 2; usate.has(chiave); n++) chiave = `${base}_${n}`
+    usate.add(chiave)
+    return chiave
+  })
+}
+
+/**
+ * La voce di catalogo che nasce da uno strumento creato a mano (spec §5.10), con la copia già collegata: lo strumento
+ * porta il `catalogo_id` della voce nuova e ogni parametro la sua `catalogo_chiave`. Gli id dello strumento e dei
+ * parametri restano quelli di prima (la copia è lo stesso strumento, non una nuova). Nome, unità e icona si puliscono
+ * come nel catalogo; i valori seguono l'ordine dello strumento. Non modifica gli argomenti: se il salvataggio della
+ * voce fallisce, lo strumento originale resta com'era, non collegato.
+ */
+export function voceDaStrumento(strumento: Strumento, parametri: Parametro[]): {
+  voce: VoceCatalogo; strumento: Strumento; parametri: Parametro[]
+} {
+  const valori = parametriDello(strumento, parametri)
+  const chiavi = chiaviDaNomi(valori.map(p => p.nome))
+  const voce: VoceCatalogo = {
+    id: nuovoId(),
+    nome: strumento.nome.trim(),
+    icona: strumento.icona?.trim() || null,
+    descrizione: '',
+    archiviato: false,
+    parametri: valori.map((p, i) => ({
+      chiave: chiavi[i], nome: p.nome.trim(), unita: p.unita?.trim() || null, n_letture: p.n_letture,
+      valore_min: p.valore_min, valore_max: p.valore_max,
+    })),
+  }
+  return {
+    voce,
+    strumento: { ...strumento, catalogo_id: voce.id },
+    parametri: valori.map((p, i) => ({ ...p, catalogo_chiave: chiavi[i] })),
+  }
 }
 
 /** Uno strumento copiato da una voce del catalogo in un esperimento di cui l'utente è proprietario. */

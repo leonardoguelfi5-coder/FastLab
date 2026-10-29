@@ -33,8 +33,9 @@ export function chiaveBozza(utente: string, modo: string): string {
   return `fastlab:bozza:${utente}:${modo}`
 }
 
-// 2: la bozza porta `strumenti` (con tipo e archiviato) al posto della forma del Piano 1, che non si rilegge.
-const VERSIONE = 2
+// 3: gli strumenti portano `tipo`, `archiviato` e `catalogo_id`, i parametri `catalogo_chiave` (e non più `ricorda_tra_piante`):
+// una bozza della forma precedente non si rilegge.
+const VERSIONE = 3
 
 // Se lo storage non c'è o è pieno la procedura funziona lo stesso: la bozza resta solo in memoria.
 export function salvaBozza(chiave: string, l: Lavoro): void {

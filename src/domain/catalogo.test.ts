@@ -7,8 +7,11 @@ vi.mock('@/lib/id', async importOriginal => {
 })
 
 import { nuovoId } from '@/lib/id'
-import { pianoAggiornamento, strumentoDaCatalogo, VOCI_DIVERSE, type CopiaStrumento } from './catalogo'
-import type { Parametro, VoceCatalogo } from './tipi'
+import {
+  chiaviDaNomi, pianoAggiornamento, strumentoDaCatalogo, voceDaStrumento, VOCI_DIVERSE, type CopiaStrumento,
+} from './catalogo'
+import { nuovoParametro, nuovoStrumento } from './bozza'
+import type { Parametro, Strumento, VoceCatalogo } from './tipi'
 
 const ciras: VoceCatalogo = {
   id: 'c0000000-0000-0000-0000-000000000003',
@@ -80,6 +83,84 @@ describe('strumentoDaCatalogo', () => {
     const { parametri } = strumentoDaCatalogo(ciras, 0)
     parametri[0].nome = 'cambiato'
     expect(JSON.stringify(ciras)).toBe(prima)
+  })
+})
+
+describe('chiaviDaNomi', () => {
+  it('minuscole, senza accenti, spazi e simboli diventano un solo "_"', () => {
+    expect(chiaviDaNomi(['Temp aria', 'Conducibilità', '  N. foglie (tot)  '])).toEqual(['temp_aria', 'conducibilita', 'n_foglie_tot'])
+  })
+
+  it('i nomi che danno la stessa chiave ricevono un numero, così le chiavi sono uniche nella voce', () => {
+    expect(chiaviDaNomi(['Temp', 'temp', 'TEMP ', 'Temp 2'])).toEqual(['temp', 'temp_2', 'temp_3', 'temp_2_2'])
+  })
+
+  it('un nome senza lettere né cifre (vuoto, solo simboli) non dà una chiave vuota', () => {
+    const chiavi = chiaviDaNomi(['', '   ', '°C', 'µ'])
+    expect(chiavi.every(c => c !== '')).toBe(true)
+    expect(new Set(chiavi).size).toBe(4)
+  })
+
+  it('una chiave generata non ne ricopre un\'altra già scritta uguale', () => {
+    expect(chiaviDaNomi(['a 2', 'a', 'a'])).toEqual(['a_2', 'a', 'a_3'])
+  })
+
+  it('nessun nome, nessuna chiave', () => expect(chiaviDaNomi([])).toEqual([]))
+})
+
+describe('voceDaStrumento', () => {
+  function strumentoConValori(): { strumento: Strumento; parametri: Parametro[] } {
+    const penetrometro = { ...nuovoParametro(5), nome: ' Penetrometro ', unita: ' kg/cm² ', n_letture: 3, valore_min: 0, valore_max: 10 }
+    const umidita = { ...nuovoParametro(6), nome: 'Umidità', unita: null }
+    const strumento: Strumento = {
+      ...nuovoStrumento(2), nome: ' Penetrometro ', icona: ' ',
+      parametri: [
+        { parametro_id: umidita.id, obbligatorio: false, ordine: 1 },
+        { parametro_id: penetrometro.id, obbligatorio: false, ordine: 0 },
+      ],
+    }
+    return { strumento, parametri: [umidita, penetrometro] }
+  }
+
+  it('costruisce una voce nuova non archiviata, con nome e icona puliti e i valori nell\'ordine dello strumento', () => {
+    const { strumento, parametri } = strumentoConValori()
+    const { voce } = voceDaStrumento(strumento, parametri)
+
+    expect(voce).toEqual({
+      id: expect.any(String), nome: 'Penetrometro', icona: null, descrizione: '', archiviato: false,
+      parametri: [
+        { chiave: 'penetrometro', nome: 'Penetrometro', unita: 'kg/cm²', n_letture: 3, valore_min: 0, valore_max: 10 },
+        { chiave: 'umidita', nome: 'Umidità', unita: null, n_letture: 1, valore_min: null, valore_max: null },
+      ],
+    })
+    expect(voce.id).not.toBe(strumento.id)
+  })
+
+  it('collega la copia alla voce: catalogo_id sullo strumento e catalogo_chiave su ogni parametro, stessi id di prima', () => {
+    const { strumento, parametri } = strumentoConValori()
+    const { voce, strumento: collegato, parametri: collegati } = voceDaStrumento(strumento, parametri)
+
+    expect(collegato).toEqual({ ...strumento, catalogo_id: voce.id })
+    // Nell'ordine dello strumento (Penetrometro prima di Umidità), come i valori della voce.
+    expect(collegati.map(p => [p.id, p.catalogo_chiave])).toEqual([[parametri[1].id, 'penetrometro'], [parametri[0].id, 'umidita']])
+    expect(collegati.map(p => p.catalogo_chiave)).toEqual(voce.parametri.map(v => v.chiave))
+  })
+
+  it('non modifica lo strumento e i parametri ricevuti (restano non collegati se il salvataggio fallisce)', () => {
+    const { strumento, parametri } = strumentoConValori()
+    const prima = JSON.stringify({ strumento, parametri })
+    voceDaStrumento(strumento, parametri)
+    expect(JSON.stringify({ strumento, parametri })).toBe(prima)
+  })
+
+  it('i valori con lo stesso nome ricevono chiavi diverse', () => {
+    const uno = { ...nuovoParametro(0), nome: 'Temp' }
+    const due = { ...nuovoParametro(1), nome: 'temp' }
+    const strumento: Strumento = {
+      ...nuovoStrumento(0), nome: 'T',
+      parametri: [uno, due].map((p, ordine) => ({ parametro_id: p.id, obbligatorio: false, ordine })),
+    }
+    expect(voceDaStrumento(strumento, [uno, due]).voce.parametri.map(v => v.chiave)).toEqual(['temp', 'temp_2'])
   })
 })
 

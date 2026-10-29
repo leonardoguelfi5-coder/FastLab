@@ -16,12 +16,17 @@ vi.mock('@/api/inviti', () => ({
 vi.mock('@/api/esperimenti', () => ({
   listaEsperimenti: vi.fn(), caricaConfig: vi.fn(), creaEsperimento: vi.fn(), aggiornaEsperimento: vi.fn(),
 }))
+vi.mock('@/api/catalogo', () => ({
+  listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 import { toast } from 'sonner'
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
+import { listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
 import { caricaConfig, creaEsperimento } from '@/api/esperimenti'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import { configDiEsempio } from '@/domain/test-helpers'
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { NuovoEsperimento } from './NuovoEsperimento'
@@ -64,7 +69,7 @@ function vaiAllaPagina(indirizzo: string) {
       </MemoryRouter>
     </QueryClientProvider>,
   )
-  return { invalida, unmount }
+  return { invalida, unmount, client }
 }
 
 const titoloPasso = () => screen.getByRole('heading', { level: 2 })
@@ -86,6 +91,8 @@ beforeEach(() => {
   sessionStorage.clear()
   vi.mocked(useSessione).mockReturnValue({ sessione: { user: { email: 'a@b.it' } } as Session, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
+  vi.mocked(listaCatalogo).mockResolvedValue(SEMI_CATALOGO)
+  vi.mocked(salvaVoceCatalogo).mockResolvedValue(undefined)
 })
 
 describe('NuovoEsperimento: inizio', () => {
@@ -116,6 +123,8 @@ describe('NuovoEsperimento: inizio', () => {
   it('"Parti dal modello Hydrochar" compila la bozza con il modello', async () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo')
+    // Il modello prende gli strumenti dal catalogo: il pulsante si abilita quando il catalogo è arrivato.
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ })).toBeEnabled())
     await utente.click(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ }))
     expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
   })
@@ -130,9 +139,9 @@ describe('NuovoEsperimento: inizio', () => {
     expect(titoloPasso()).toHaveTextContent('Fattori e piante')
     expect(titoloPasso()).toHaveFocus()
     await avanti(utente)
-    expect(titoloPasso()).toHaveTextContent('Parametri')
-    await avanti(utente)
     expect(titoloPasso()).toHaveTextContent('Strumenti')
+    await avanti(utente)
+    expect(titoloPasso()).toHaveTextContent('Tabella fenologica')
     await avanti(utente)
     expect(titoloPasso()).toHaveTextContent('Riepilogo')
     expect(screen.queryByRole('button', { name: 'Avanti' })).not.toBeInTheDocument()
@@ -151,7 +160,7 @@ describe('NuovoEsperimento: la bozza non si perde', () => {
     await screen.findByLabelText('Nome')
 
     await avanti(utente, 2)
-    expect(titoloPasso()).toHaveTextContent('Parametri')
+    expect(titoloPasso()).toHaveTextContent('Strumenti')
     expect(indirizzo()).toBe('/esperimenti/nuovo?da=esp-vecchio&passo=3')
 
     await browser(utente, 'Indietro')
@@ -188,6 +197,7 @@ describe('NuovoEsperimento: la bozza non si perde', () => {
   it('senza modifiche la freccia Indietro esce subito', async () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     expect(await screen.findByText('Elenco esperimenti')).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -263,6 +273,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     vi.mocked(creaEsperimento).mockResolvedValue('esp-nuovo')
     const utente = userEvent.setup({ delay: null })
     const { invalida } = vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
 
     expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
     // Gli spazi ai bordi non arrivano nel database.
@@ -272,8 +283,8 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     expect(titoloPasso()).toHaveTextContent('Riepilogo')
     expect(conteggio('Trattamenti')).toHaveTextContent('8')
     expect(conteggio('Piante')).toHaveTextContent('56')
-    expect(conteggio('Parametri')).toHaveTextContent('11')
-    expect(conteggio('Strumenti')).toHaveTextContent('4')
+    expect(conteggio('Strumenti')).toHaveTextContent('3')
+    expect(conteggio('Voci fenologiche')).toHaveTextContent('7')
     expect(screen.queryByRole('list', { name: 'Da sistemare' })).not.toBeInTheDocument()
     expect(screen.getByText('Tutto pronto: puoi creare l\'esperimento.')).toBeInTheDocument()
 
@@ -283,6 +294,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     const bozza = vi.mocked(creaEsperimento).mock.calls[0][0] as BozzaEsperimento
     expect(bozza.piante).toHaveLength(56)
     expect(bozza.trattamenti).toHaveLength(8)
+    expect(bozza.strumenti).toHaveLength(4)
     expect(bozza.esperimento.nome).toBe('Hydrochar × Cuore di Bue 2')
     expect(await screen.findByText('Pagina dell\'esperimento esp-nuovo')).toBeInTheDocument()
     expect(invalida).toHaveBeenCalledWith({ queryKey: ['esperimenti'] })
@@ -299,6 +311,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     vi.mocked(creaEsperimento).mockRejectedValueOnce({ message: 'Failed to fetch' }).mockResolvedValue('esp-2')
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await avanti(utente, 4)
 
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
@@ -322,6 +335,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     vi.mocked(caricaConfig).mockResolvedValue(configDiEsempio())
     const utente = userEvent.setup({ delay: null })
     const { invalida } = vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await avanti(utente, 4)
 
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
@@ -344,6 +358,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     vi.mocked(creaEsperimento).mockRejectedValue({ code: '23505', message: 'duplicate key' })
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await avanti(utente, 4)
 
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
@@ -359,6 +374,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     vi.mocked(caricaConfig).mockRejectedValue(new Error('Esperimento non trovato o non accessibile.'))
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await avanti(utente, 4)
 
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
@@ -383,7 +399,7 @@ describe('NuovoEsperimento: errori della bozza', () => {
     await utente.click(screen.getByRole('button', { name: 'Togli il livello «S1»' }))
     expect(screen.getByRole('button', { name: 'Avanti' })).toBeDisabled()
     await browser(utente, 'Avanti')
-    expect(titoloPasso()).toHaveTextContent('Parametri')
+    expect(titoloPasso()).toHaveTextContent('Strumenti')
     await avanti(utente, 2)
 
     const errori = screen.getByRole('list', { name: 'Da sistemare' })
@@ -410,6 +426,7 @@ describe('NuovoEsperimento: errori della bozza', () => {
   it('cambiare i fattori dopo aver generato i trattamenti blocca Avanti e spiega cosa fare', async () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await screen.findByLabelText('Nome')
     await avanti(utente)
 
     await utente.click(screen.getByRole('button', { name: 'Togli il livello «S1W1»' }))
@@ -432,10 +449,8 @@ describe('NuovoEsperimento: errori della bozza', () => {
 })
 
 describe('NuovoEsperimento: da zero', () => {
-  it('1 fattore con 3 livelli, 2 piante per trattamento da 101, 2 parametri e 1 strumento', async () => {
-    vi.mocked(creaEsperimento).mockResolvedValue('esp-zero')
-    const utente = userEvent.setup({ delay: null })
-    vaiAllaPagina('/esperimenti/nuovo')
+  /** Dal primo passo a "Strumenti": 1 fattore con 3 livelli, 2 piante per trattamento da 101. */
+  async function finoAgliStrumenti(utente: Utente) {
     await utente.click(screen.getByRole('button', { name: /Parti da zero/ }))
     await utente.type(screen.getByLabelText('Nome'), 'Prova concime')
     await avanti(utente)
@@ -452,24 +467,40 @@ describe('NuovoEsperimento: da zero', () => {
     await utente.type(screen.getByLabelText('Numerazione da'), '101')
     await utente.click(screen.getByRole('button', { name: 'Genera piante' }))
     await avanti(utente)
+    expect(titoloPasso()).toHaveTextContent('Strumenti')
+  }
 
-    await utente.click(screen.getByRole('button', { name: '+ Parametro' }))
-    await utente.type(screen.getByLabelText('Nome'), 'Altezza')
-    await utente.type(screen.getByLabelText('Unità'), 'cm')
-    await utente.click(screen.getByRole('button', { name: '+ Parametro' }))
-    await utente.type(screen.getByLabelText('Nome'), 'Note')
-    await utente.selectOptions(screen.getByLabelText('Tipo'), 'testo')
+  it('Ciras dal catalogo, "+ Nuovo strumento" Penetrometro, senza tabella fenologica: la bozza arriva al database', async () => {
+    vi.mocked(creaEsperimento).mockResolvedValue('esp-zero')
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+    await finoAgliStrumenti(utente)
+
+    // Dal catalogo: compare con A, gs, E, Ci.
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Ciras»' }))
+    expect(within(screen.getByRole('list', { name: 'Strumenti' })).getByRole('button', { name: /^🍃 Ciras/ }))
+      .toHaveTextContent('A · gs · E · Ci')
+
+    // Uno nuovo: entra nel catalogo e nella bozza.
+    await utente.click(screen.getByRole('button', { name: '+ Nuovo strumento' }))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'Penetrometro')
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'Resistenza')
+    await utente.type(screen.getByLabelText('Unità'), 'kg/cm²')
+    await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+    expect(salvaVoceCatalogo).toHaveBeenCalledOnce()
+    expect(await screen.findByRole('button', { name: /^Penetrometro/ })).toBeInTheDocument()
+
     await avanti(utente)
+    expect(titoloPasso()).toHaveTextContent('Tabella fenologica')
+    await utente.click(screen.getByRole('button', { name: 'Questo esperimento non ha rilievi fenologici' }))
 
-    await utente.click(screen.getByRole('button', { name: '+ Strumento' }))
-    await utente.type(screen.getByLabelText('Nome dello strumento'), 'Fenologici')
-    for (const interruttore of screen.getAllByRole('switch', { name: /Incluso/ })) await utente.click(interruttore)
-    await avanti(utente)
-
+    expect(titoloPasso()).toHaveTextContent('Riepilogo')
+    expect(indirizzo()).toBe('/esperimenti/nuovo?passo=5')
     expect(conteggio('Trattamenti')).toHaveTextContent('3')
     expect(conteggio('Piante')).toHaveTextContent('6')
-    expect(conteggio('Parametri')).toHaveTextContent('2')
-    expect(conteggio('Strumenti')).toHaveTextContent('1')
+    expect(conteggio('Strumenti')).toHaveTextContent('2')
+    expect(conteggio('Voci fenologiche')).toHaveTextContent('0')
     expect(sessionStorage.length).toBe(1)
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
 
@@ -480,10 +511,152 @@ describe('NuovoEsperimento: da zero', () => {
     expect(b.fattori.map(f => [f.nome, f.livelli.map(l => l.nome)])).toEqual([['Concime', ['0', '50', '100']]])
     expect(b.trattamenti.map(t => t.etichetta)).toEqual(['0', '50', '100'])
     expect(b.piante.map(p => p.etichetta)).toEqual(['101', '102', '103', '104', '105', '106'])
-    expect(b.parametri.map(p => [p.nome, p.tipo, p.unita])).toEqual([['Altezza', 'numero', 'cm'], ['Note', 'testo', null]])
-    expect(b.strumenti.map(p => [p.nome, p.parametri.map(pp => pp.parametro_id)]))
-      .toEqual([['Fenologici', b.parametri.map(p => p.id)]])
+    const voce = vi.mocked(salvaVoceCatalogo).mock.calls[0][0]
+    expect(b.strumenti.map(s => [s.nome, s.tipo, s.catalogo_id])).toEqual([
+      ['Ciras', 'strumento', SEMI_CATALOGO.find(v => v.nome === 'Ciras')?.id], ['Penetrometro', 'strumento', voce.id],
+    ])
+    expect(b.parametri.map(p => [p.nome, p.catalogo_chiave])).toEqual(
+      [['A', 'a'], ['gs', 'gs'], ['E', 'e'], ['Ci', 'ci'], ['Resistenza', 'resistenza']])
+    for (const s of b.strumenti) expect(s.parametri.every(pp => b.parametri.some(p => p.id === pp.parametro_id))).toBe(true)
   }, LUNGO)
+
+  it('con la tabella fenologica: voci di ogni tipo, e il riepilogo le conta', async () => {
+    vi.mocked(creaEsperimento).mockResolvedValue('esp-zero')
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+    await finoAgliStrumenti(utente)
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Metro»' }))
+    await avanti(utente)
+
+    await utente.click(screen.getByRole('button', { name: 'Crea la tabella fenologica' }))
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'N frutti')
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'Note')
+    await utente.selectOptions(screen.getByLabelText('Tipo'), 'testo')
+    await avanti(utente)
+
+    expect(conteggio('Strumenti')).toHaveTextContent('1')
+    expect(conteggio('Voci fenologiche')).toHaveTextContent('2')
+    await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
+
+    await screen.findByText('Pagina dell\'esperimento esp-zero')
+    const b = vi.mocked(creaEsperimento).mock.calls[0][0] as BozzaEsperimento
+    const tabella = b.strumenti.find(s => s.tipo === 'fenologico')
+    expect(tabella?.nome).toBe('Tabella fenologica')
+    expect(tabella?.parametri.map(pp => b.parametri.find(p => p.id === pp.parametro_id)?.nome)).toEqual(['N frutti', 'Note'])
+    expect(b.parametri.find(p => p.nome === 'Note')?.tipo).toBe('testo')
+  }, LUNGO)
+
+  it('se il salvataggio nel catalogo fallisce lo strumento resta nella bozza, non collegato, e si può creare lo stesso', async () => {
+    vi.mocked(creaEsperimento).mockResolvedValue('esp-zero')
+    vi.mocked(salvaVoceCatalogo).mockRejectedValue({ message: 'Failed to fetch' })
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+    await finoAgliStrumenti(utente)
+
+    await utente.click(await screen.findByRole('button', { name: '+ Nuovo strumento' }))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'Penetrometro')
+    await utente.click(screen.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(screen.getByLabelText('Nome'), 'Resistenza')
+    await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    await avanti(utente)
+    await utente.click(screen.getByRole('button', { name: 'Questo esperimento non ha rilievi fenologici' }))
+    await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
+
+    await screen.findByText('Pagina dell\'esperimento esp-zero')
+    const b = vi.mocked(creaEsperimento).mock.calls[0][0] as BozzaEsperimento
+    expect(b.strumenti.map(s => [s.nome, s.catalogo_id])).toEqual([['Penetrometro', null]])
+    expect(b.parametri.map(p => [p.nome, p.catalogo_chiave])).toEqual([['Resistenza', null]])
+  }, LUNGO)
+})
+
+describe('NuovoEsperimento: catalogo e modello Hydrochar', () => {
+  it('prima di costruire la bozza dal modello aspetta il catalogo; gli strumenti sono quelli del catalogo, collegati', async () => {
+    let arriva: (voci: typeof SEMI_CATALOGO) => void = () => {}
+    vi.mocked(listaCatalogo).mockReturnValue(new Promise(ok => { arriva = ok }))
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+
+    expect(screen.getByRole('status')).toHaveTextContent('Caricamento…')
+    expect(screen.queryByLabelText('Nome')).not.toBeInTheDocument()
+
+    arriva(SEMI_CATALOGO)
+    expect(await screen.findByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
+    expect(screen.queryByText(/Catalogo non raggiungibile/)).not.toBeInTheDocument()
+    await avanti(utente, 2)
+    for (const nome of ['Termometro', 'SPAD', 'Metro']) {
+      expect(within(screen.getByRole('list', { name: 'Strumenti' })).getByRole('button', { name: new RegExp(nome) })).toBeInTheDocument()
+    }
+    // I tre strumenti vengono dal catalogo: non si possono aggiungere una seconda volta.
+    expect(screen.getByRole('button', { name: '«Termometro» è già nell\'esperimento' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Aggiungi «Ciras»' })).toBeEnabled()
+  })
+
+  it('se il catalogo non si carica la bozza nasce dai semi, strumenti non collegati, con la riga che lo dice', async () => {
+    vi.mocked(listaCatalogo).mockRejectedValue({ message: 'Failed to fetch' })
+    vi.mocked(creaEsperimento).mockResolvedValue('esp-nuovo')
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+
+    expect(await screen.findByText(
+      'Catalogo non raggiungibile: gli strumenti del modello non sono collegati al catalogo.',
+    )).toBeInTheDocument()
+    expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
+    await avanti(utente, 4)
+    expect(conteggio('Strumenti')).toHaveTextContent('3')
+    expect(screen.getByText('Tutto pronto: puoi creare l\'esperimento.')).toBeInTheDocument()
+
+    await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
+    await screen.findByText('Pagina dell\'esperimento esp-nuovo')
+    const bozza = vi.mocked(creaEsperimento).mock.calls[0][0] as BozzaEsperimento
+    expect(bozza.strumenti).toHaveLength(4)
+    expect(bozza.strumenti.map(s => s.catalogo_id)).toEqual([null, null, null, null])
+    expect(bozza.parametri.filter(p => p.catalogo_chiave !== null)).toHaveLength(4)
+  }, LUNGO)
+
+  it('dalla scelta iniziale il modello è disponibile solo quando il catalogo è arrivato (o ha fallito)', async () => {
+    let arriva: (voci: typeof SEMI_CATALOGO) => void = () => {}
+    vi.mocked(listaCatalogo).mockReturnValue(new Promise(ok => { arriva = ok }))
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+
+    expect(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Parti da zero/ })).toBeEnabled()
+    arriva(SEMI_CATALOGO)
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ })).toBeEnabled())
+    await utente.click(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ }))
+    expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
+    expect(screen.queryByText(/Catalogo non raggiungibile/)).not.toBeInTheDocument()
+  })
+
+  it('dalla scelta iniziale con il catalogo in errore il modello si costruisce dai semi, con la riga informativa', async () => {
+    vi.mocked(listaCatalogo).mockRejectedValue({ message: 'Failed to fetch' })
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ })).toBeEnabled())
+    await utente.click(screen.getByRole('button', { name: /Parti dal modello Hydrochar/ }))
+    expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
+    expect(screen.getByText(/Catalogo non raggiungibile/)).toBeInTheDocument()
+  })
+
+  it('la bozza dal modello si costruisce una volta sola: il catalogo che si aggiorna dopo non la rifà', async () => {
+    const utente = userEvent.setup({ delay: null })
+    const { client } = vaiAllaPagina('/esperimenti/nuovo?modello=hydrochar')
+    await utente.type(await screen.findByLabelText('Nome'), ' 2')
+    const prima = Object.values(sessionStorage)[0]
+    expect(prima).toContain('Hydrochar × Cuore di Bue 2')
+
+    vi.mocked(listaCatalogo).mockResolvedValue([])
+    await client.invalidateQueries({ queryKey: ['catalogo'] })
+    await vi.waitFor(() => expect(listaCatalogo).toHaveBeenCalledTimes(2))
+
+    expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue 2')
+    expect(Object.values(sessionStorage)[0]).toBe(prima)
+  })
 })
 
 describe('NuovoEsperimento: duplicazione', () => {
@@ -499,8 +672,8 @@ describe('NuovoEsperimento: duplicazione', () => {
     expect(screen.getByText('Copia di Esempio')).toBeInTheDocument()
     expect(conteggio('Trattamenti')).toHaveTextContent('4')
     expect(conteggio('Piante')).toHaveTextContent('4')
-    expect(conteggio('Parametri')).toHaveTextContent('3')
     expect(conteggio('Strumenti')).toHaveTextContent('2')
+    expect(conteggio('Voci fenologiche')).toHaveTextContent('0')
     expect(screen.getByRole('button', { name: 'Crea esperimento' })).toBeEnabled()
   })
 

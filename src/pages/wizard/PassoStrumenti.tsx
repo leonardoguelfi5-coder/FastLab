@@ -1,66 +1,174 @@
-import { useState } from 'react'
-import type { BozzaEsperimento, Strumento } from '@/domain/tipi'
-import { nuovoStrumento, problemiStrumento } from '@/domain/bozza'
-import { EditorStrumento } from '@/components/config/EditorStrumento'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import type { BozzaEsperimento, Parametro, Strumento } from '@/domain/tipi'
+import {
+  conStrumento, nuovoStrumento, ordineStrumentoSuccessivo, parametriDello, problemiParametro, problemiStrumento, senzaStrumento,
+} from '@/domain/bozza'
+import { strumentoDaCatalogo, voceDaStrumento } from '@/domain/catalogo'
+import { salvaVoceCatalogo } from '@/api/catalogo'
+import { chiavi, useCatalogo } from '@/api/query'
+import { EditorStrumento, type StrumentoConValori } from '@/components/config/EditorStrumento'
+import { SceltaDalCatalogo } from '@/components/config/SceltaDalCatalogo'
 import { Button } from '@/components/ui/button'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
+import { messaggioErrore } from '@/lib/errori'
 
 interface PassoStrumentiProps {
   bozza: BozzaEsperimento
   onChange: (b: BozzaEsperimento) => void
 }
 
-function riassunto(p: Strumento): string {
-  const n = p.parametri.length
-  return n === 0 ? 'Nessun parametro' : n === 1 ? '1 parametro' : `${n} parametri`
+/** I nomi dei valori, nell'ordine del modulo: es. "A · gs · E · Ci". */
+function riassunto(valori: Parametro[]): string {
+  return valori.length === 0 ? 'Nessun valore' : valori.map(p => p.nome.trim() || 'senza nome').join(' · ')
 }
 
-/** Passo 4: gli strumenti, cioè i gruppi di parametri che si rilevano insieme in campo. Si modifica uno strumento alla volta. */
+/**
+ * Passo 3: gli strumenti dell'esperimento. Si prendono dal catalogo (ne nasce una copia, che si modifica qui senza
+ * toccare il catalogo) o si crea uno strumento nuovo, che entra anche nel catalogo (spec §5.10). La tabella fenologica
+ * è il passo dopo e qui non compare.
+ */
 export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
+  const queryClient = useQueryClient()
+  const catalogo = useCatalogo()
   const [aperta, setAperta] = useState<string | null>(null)
-  const cambia = (p: Strumento) => onChange({ ...bozza, strumenti: bozza.strumenti.map(x => (x.id === p.id ? p : x)) })
-  const elimina = (id: string) =>
-    onChange({ ...bozza, strumenti: bozza.strumenti.filter(p => p.id !== id).map((p, ordine) => ({ ...p, ordine })) })
+  const [nuovo, setNuovo] = useState<StrumentoConValori | null>(null)
+  const [invio, setInvio] = useState(false)
+  const [errore, setErrore] = useState<string | null>(null)
+  // Il salvataggio nel catalogo è asincrono: la bozza si legge com'è alla fine, non com'era al tocco (nel frattempo si
+  // può modificare un altro strumento), e il doppio tocco si ferma subito, prima che il pulsante risulti disabilitato.
+  const ultima = useRef(bozza)
+  useEffect(() => { ultima.current = bozza })
+  const inCorso = useRef(false)
 
-  function aggiungi() {
-    const p = nuovoStrumento(bozza.strumenti.length)
-    onChange({ ...bozza, strumenti: [...bozza.strumenti, p] })
-    setAperta(p.id)
+  const elenco = bozza.strumenti.filter(s => s.tipo === 'strumento' && !s.archiviato)
+  const gia = new Set(elenco.flatMap(s => (s.catalogo_id ? [s.catalogo_id] : [])))
+
+  const cambia = (v: StrumentoConValori) => onChange(conStrumento(bozza, v.strumento, v.parametri))
+
+  function aggiungiDaCatalogo(voce: Parameters<typeof strumentoDaCatalogo>[0]) {
+    setErrore(null)
+    const { strumento, parametri } = strumentoDaCatalogo(voce, ordineStrumentoSuccessivo(ultima.current))
+    onChange(conStrumento(ultima.current, strumento, parametri))
+  }
+
+  function apriNuovo() {
+    setErrore(null)
+    setNuovo(n => n ?? { strumento: nuovoStrumento(ordineStrumentoSuccessivo(bozza)), parametri: [] })
+  }
+
+  // I problemi di uno strumento nuovo: i suoi (nome doppio compreso) e quelli dei suoi valori.
+  const problemiNuovo = nuovo === null ? [] : [
+    ...problemiStrumento(nuovo.strumento, bozza.strumenti),
+    ...nuovo.parametri.flatMap(p => problemiParametro(p, [...nuovo.parametri, ...bozza.parametri])),
+  ]
+
+  async function confermaNuovo() {
+    if (nuovo === null || inCorso.current || problemiNuovo.length > 0) return
+    inCorso.current = true
+    setInvio(true)
+    setErrore(null)
+    const { voce, strumento, parametri } = voceDaStrumento(nuovo.strumento, nuovo.parametri)
+    const fine = (s: Strumento, p: Parametro[]) => {
+      const b = ultima.current
+      onChange(conStrumento(b, { ...s, ordine: ordineStrumentoSuccessivo(b) }, p))
+    }
+    try {
+      await salvaVoceCatalogo(voce)
+      fine(strumento, parametri)
+      void queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
+    } catch (e) {
+      // Lo strumento resta nella bozza, non collegato: si può usare lo stesso e il catalogo si sistema dopo.
+      fine(nuovo.strumento, nuovo.parametri)
+      setErrore(messaggioErrore(e))
+    } finally {
+      inCorso.current = false
+      setInvio(false)
+      setNuovo(null)
+    }
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <p className="max-w-[65ch] text-grafite-tenue">
-        Uno strumento è un giro di misure in campo: raggruppa i parametri che rilevi insieme, es. 🌡 Termometro con
-        temperatura dell'aria e della pianta. Un parametro sta in un solo strumento. Tocca uno strumento per modificarlo.
+        Uno strumento è quello che usi in campo, es. 🌡 Termometro con la temperatura dell'aria e della pianta. Scegli dal
+        catalogo o creane uno nuovo: finisce nel catalogo, per tutti. Un valore sta in un solo strumento.
       </p>
-      {bozza.strumenti.length === 0 && <p className="text-sm text-grafite-tenue">Nessuno strumento ancora.</p>}
-      <ul aria-label="Strumenti" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
-        {bozza.strumenti.map(p => {
-          // Gli stessi controlli del riepilogo, qui dove si correggono (nome doppio compreso).
-          const problemi = problemiStrumento(p, bozza.strumenti)
-          return (
-            <Espandibile
-              key={p.id}
-              titolo={[p.icona, p.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
-              riassunto={riassunto(p)}
-              nota={problemi.length > 0 ? 'Da completare' : undefined}
-              aperto={aperta === p.id}
-              onCambia={() => setAperta(aperta === p.id ? null : p.id)}
-            >
-              <EditorStrumento valore={p} parametri={bozza.parametri} onChange={cambia} />
-              {problemi.length > 0 && (
-                <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
-              )}
-              <Button variant="destructive" size="sm" onClick={() => elimina(p.id)} className="self-start">
-                Elimina strumento
-              </Button>
-            </Espandibile>
-          )
-        })}
-      </ul>
-      <Button variant="outline" onClick={aggiungi}>+ Strumento</Button>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-title text-grafite">Strumenti dell'esperimento</h3>
+        {elenco.length === 0 && <p className="text-sm text-grafite-tenue">Nessuno strumento ancora.</p>}
+        <ul aria-label="Strumenti" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
+          {elenco.map(s => {
+            const valori = parametriDello(s, bozza.parametri)
+            const suoi = new Set(valori.map(p => p.id))
+            // Gli stessi controlli del riepilogo, qui dove si correggono (nome doppio compreso).
+            const problemi = problemiStrumento(s, bozza.strumenti)
+            return (
+              <Espandibile
+                key={s.id}
+                titolo={[s.icona, s.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
+                riassunto={riassunto(valori)}
+                nota={problemi.length > 0 ? 'Da completare' : undefined}
+                aperto={aperta === s.id}
+                onCambia={() => setAperta(aperta === s.id ? null : s.id)}
+              >
+                <EditorStrumento
+                  valore={{ strumento: s, parametri: valori }}
+                  onChange={cambia}
+                  altriParametri={bozza.parametri.filter(p => !suoi.has(p.id))}
+                />
+                {problemi.length > 0 && (
+                  <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => { onChange(senzaStrumento(bozza, s.id)); setAperta(null) }}
+                  className="self-start"
+                >
+                  Rimuovi strumento
+                </Button>
+              </Espandibile>
+            )
+          })}
+        </ul>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <h3 className="text-title text-grafite">Dal catalogo</h3>
+        <SceltaDalCatalogo
+          voci={catalogo.data}
+          errore={catalogo.isError ? catalogo.error : undefined}
+          onRiprova={() => void catalogo.refetch()}
+          gia={gia}
+          onAggiungi={aggiungiDaCatalogo}
+          onNuovo={apriNuovo}
+        />
+        {errore && (
+          <div role="alert" className="flex flex-col gap-1">
+            <TestoErrore className="text-base">{errore}</TestoErrore>
+            <p className="text-sm text-grafite-tenue">Lo strumento è comunque nella bozza, ma non è collegato al catalogo.</p>
+          </div>
+        )}
+      </div>
+
+      {nuovo && (
+        <section aria-label="Nuovo strumento" className="-mx-4 flex flex-col gap-4 bg-carta-ombra px-4 py-5">
+          <h3 className="text-title text-grafite">Nuovo strumento</h3>
+          <EditorStrumento valore={nuovo} onChange={setNuovo} altriParametri={bozza.parametri} />
+          {problemiNuovo.length > 0 && (
+            <div className="flex flex-col gap-1">{[...new Set(problemiNuovo)].map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button disabled={invio || problemiNuovo.length > 0} onClick={() => void confermaNuovo()}>
+              {invio ? 'Salvataggio…' : 'Salva nel catalogo e aggiungi'}
+            </Button>
+            <Button variant="outline" disabled={invio} onClick={() => setNuovo(null)}>Annulla</Button>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

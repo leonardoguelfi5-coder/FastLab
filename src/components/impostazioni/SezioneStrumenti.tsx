@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { eliminaStrumento, salvaStrumento } from '@/api/configurazione'
-import { EditorStrumento } from '@/components/config/EditorStrumento'
 import { Conferma } from '@/components/Conferma'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
@@ -8,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { nuovoStrumento, problemiStrumento } from '@/domain/bozza'
 import type { ConfigEsperimento, Strumento } from '@/domain/tipi'
 import { useAzione } from './azione'
+import { EditorInclusioneStrumento } from './EditorInclusioneStrumento'
 import { useBozze, useSegnalaModifiche } from './modifiche'
 import { Sezione, Spiegazione } from './Sezione'
 
@@ -102,7 +102,7 @@ export function SezioneStrumenti({ espId, config }: { espId: string; config: Con
               aperto={aperta === valore.id}
               onCambia={() => setAperta(aperta === valore.id ? null : valore.id)}
             >
-              <EditorStrumento valore={valore} parametri={config.parametri} onChange={bozze.cambia} />
+              <EditorInclusioneStrumento valore={valore} parametri={config.parametri} onChange={bozze.cambia} />
               {problemi.length > 0 && (
                 <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
               )}

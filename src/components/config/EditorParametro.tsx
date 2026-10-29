@@ -18,6 +18,8 @@ interface EditorParametroProps {
   tipoBloccato?: boolean
   /** Perché il tipo è bloccato, se non è perché ci sono dati (es. mentre lo si sta controllando). */
   motivoBlocco?: string
+  /** Nasconde "Progressivo": per i valori degli strumenti, dove non ha senso (vale solo nella tabella fenologica). */
+  senzaProgressivo?: boolean
 }
 
 const TIPI: { valore: TipoParametro; nome: string; aiuto: string }[] = [
@@ -111,7 +113,7 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
 
 /** Modifica di un parametro: nome, tipo e le opzioni che valgono per quel tipo. */
 export function EditorParametro({
-  valore: p, onChange, tipoBloccato, motivoBlocco = 'Il tipo non si può cambiare: ci sono già dati.',
+  valore: p, onChange, tipoBloccato, motivoBlocco = 'Il tipo non si può cambiare: ci sono già dati.', senzaProgressivo,
 }: EditorParametroProps) {
   const id = useId()
   const tipo = TIPI.find(t => t.valore === p.tipo) ?? TIPI[0]
@@ -180,7 +182,7 @@ export function EditorParametro({
 
       {p.tipo === 'lista' && <SottoCampi valore={p.sotto_campi} onChange={(s) => cambia({ sotto_campi: s })} />}
 
-      {(p.tipo === 'numero' || p.tipo === 'lista') && (
+      {(p.tipo === 'numero' || p.tipo === 'lista') && !senzaProgressivo && (
         <Interruttore
           etichetta="Progressivo"
           aiuto="Per le conte che crescono nel tempo: il campo parte dall'ultimo valore registrato per la stessa pianta."

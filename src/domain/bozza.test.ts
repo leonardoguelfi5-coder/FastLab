@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  bozzaVuota, clonaConfig, nuovoStrumento, nuovoParametro, problemiParametro, problemiStrumento, pulisciBozza,
-  pulisciParametro, validaBozza,
+  bozzaVuota, clonaConfig, conStrumento, nuovaTabellaFenologica, nuovoStrumento, nuovoParametro, ordineStrumentoSuccessivo,
+  parametriDello, problemiParametro, problemiStrumento, pulisciBozza, pulisciParametro, senzaStrumento, validaBozza,
 } from './bozza'
 import type { BozzaEsperimento, Parametro, Strumento } from './tipi'
 import { conPiante, configDiEsempio, fattore, parametro } from './test-helpers'
@@ -384,5 +384,88 @@ describe('problemiStrumento', () => {
   it('con l\'elenco dei parametri attivi contano solo quelli', () => {
     expect(problemiStrumento(strumento('SPAD', 1), [], new Set())).toEqual(['Lo strumento "SPAD" non ha valori.'])
     expect(problemiStrumento(strumento('SPAD', 1), [], new Set(['p0']))).toEqual([])
+  })
+})
+
+describe('strumenti nella bozza', () => {
+  /** Due strumenti: «Altezza» (Altezza, ordine 0) e «Fenologici» (Palchi 1, Note 2), come in `configDiEsempio`. */
+  const base = () => {
+    const c = configDiEsempio()
+    const b: BozzaEsperimento = { ...c, parametri: c.parametri.filter(p => !p.archiviato) }
+    b.strumenti = b.strumenti.map(s => ({ ...s, parametri: s.parametri.filter(pp => b.parametri.some(p => p.id === pp.parametro_id)) }))
+    return b
+  }
+
+  it('parametriDello dà i parametri dello strumento nell\'ordine del modulo', () => {
+    const b = base()
+    const fenologici = { ...b.strumenti[1], parametri: [...b.strumenti[1].parametri].reverse().map((pp, ordine) => ({ ...pp, ordine })) }
+    expect(parametriDello(fenologici, b.parametri).map(p => p.nome)).toEqual(['Note', 'Palchi'])
+  })
+
+  it('nuovaTabellaFenologica è vuota, di tipo fenologico, con il nome e l\'icona della tabella', () => {
+    expect(nuovaTabellaFenologica(3)).toMatchObject({
+      nome: 'Tabella fenologica', icona: '🌱', tipo: 'fenologico', ordine: 3, archiviato: false, catalogo_id: null, parametri: [],
+    })
+  })
+
+  it('ordineStrumentoSuccessivo parte dopo il massimo, 0 se non ce ne sono', () => {
+    expect(ordineStrumentoSuccessivo(bozzaVuota())).toBe(0)
+    expect(ordineStrumentoSuccessivo(base())).toBe(2)
+  })
+
+  describe('conStrumento', () => {
+    it('uno strumento nuovo si aggiunge con i suoi parametri, numerati dopo il massimo della bozza', () => {
+      const b = base()
+      const nuovo = { ...nuovoStrumento(2), nome: 'Calibro' }
+      const diametro = { ...nuovoParametro(0), nome: 'Diametro' }
+      const spessore = { ...nuovoParametro(1), nome: 'Spessore' }
+      nuovo.parametri = [diametro, spessore].map((p, ordine) => ({ parametro_id: p.id, obbligatorio: false, ordine }))
+
+      const dopo = conStrumento(b, nuovo, [diametro, spessore])
+
+      expect(dopo.strumenti.map(s => s.nome)).toEqual(['Altezza', 'Fenologici', 'Calibro'])
+      expect(dopo.parametri.map(p => [p.nome, p.ordine])).toEqual(
+        [['Altezza', 0], ['Palchi', 1], ['Note', 2], ['Diametro', 3], ['Spessore', 4]])
+      expect(b.parametri).toHaveLength(3)
+    })
+
+    it('modificare uno strumento sostituisce il suo valore e lascia stare gli altri parametri e il loro ordine', () => {
+      const b = base()
+      const [altezza] = b.parametri
+      const dopo = conStrumento(b, { ...b.strumenti[0], nome: 'Metro' }, [{ ...altezza, unita: 'm' }])
+
+      expect(dopo.strumenti.map(s => s.nome)).toEqual(['Metro', 'Fenologici'])
+      expect(dopo.parametri.map(p => [p.nome, p.unita, p.ordine])).toEqual([['Altezza', 'm', 0], ['Palchi', null, 1], ['Note', null, 2]])
+    })
+
+    it('un valore tolto dall\'editor sparisce anche dai parametri della bozza; uno aggiunto va in coda', () => {
+      const b = base()
+      const [palchi, note] = parametriDello(b.strumenti[1], b.parametri)
+      const nuovo = { ...nuovoParametro(0), nome: 'Fiori' }
+      const strumento = {
+        ...b.strumenti[1],
+        parametri: [note, nuovo].map((p, ordine) => ({ parametro_id: p.id, obbligatorio: false, ordine })),
+      }
+
+      const dopo = conStrumento(b, strumento, [note, nuovo])
+
+      expect(dopo.parametri.map(p => [p.nome, p.ordine])).toEqual([['Altezza', 0], ['Note', 2], ['Fiori', 3]])
+      expect(dopo.parametri.some(p => p.id === palchi.id)).toBe(false)
+    })
+  })
+
+  describe('senzaStrumento', () => {
+    it('toglie lo strumento e i suoi parametri, e rinumera gli strumenti', () => {
+      const b = base()
+      const dopo = senzaStrumento(b, b.strumenti[0].id)
+
+      expect(dopo.strumenti.map(s => [s.nome, s.ordine])).toEqual([['Fenologici', 0]])
+      expect(dopo.parametri.map(p => p.nome)).toEqual(['Palchi', 'Note'])
+    })
+
+    it('un id che non c\'è lascia la bozza com\'è', () => {
+      const b = base()
+      expect(senzaStrumento(b, 'non-esiste')).toEqual(b)
+    })
   })
 })

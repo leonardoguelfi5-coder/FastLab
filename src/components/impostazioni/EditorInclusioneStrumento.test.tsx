@@ -4,7 +4,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Parametro, Strumento } from '@/domain/tipi'
 import { parametro } from '@/domain/test-helpers'
-import { EditorStrumento } from './EditorStrumento'
+import { EditorInclusioneStrumento } from './EditorInclusioneStrumento'
 
 const altezza = parametro('Altezza', { unita: 'cm', ordine: 0 })
 const spad = parametro('SPAD', { ordine: 1 })
@@ -22,7 +22,7 @@ function rendi(iniziale: Strumento, parametri: Parametro[] = PARAMETRI) {
   const onChange = vi.fn<(p: Strumento) => void>()
   function Banco() {
     const [p, setP] = useState(iniziale)
-    return <EditorStrumento valore={p} parametri={parametri} onChange={(nuova) => { onChange(nuova); setP(nuova) }} />
+    return <EditorInclusioneStrumento valore={p} parametri={parametri} onChange={(nuova) => { onChange(nuova); setP(nuova) }} />
   }
   render(<Banco />)
   return onChange
@@ -31,7 +31,7 @@ function rendi(iniziale: Strumento, parametri: Parametro[] = PARAMETRI) {
 const ultima = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1)?.[0] as Strumento
 const riga = (nome: string) => within(screen.getByText(nome).closest('li') as HTMLElement)
 
-describe('EditorStrumento', () => {
+describe('EditorInclusioneStrumento', () => {
   it('ha nome e icona modificabili; l\'icona vuota diventa null', async () => {
     const utente = userEvent.setup({ delay: null })
     const onChange = rendi(strumento([]))

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { X } from 'lucide-react'
-import type { BozzaEsperimento } from '@/domain/tipi'
+import type { BozzaEsperimento, VoceCatalogo } from '@/domain/tipi'
 import { bozzaVuota, clonaConfig } from '@/domain/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { useSessione } from '@/api/auth'
-import { useConfig } from '@/api/query'
+import { useCatalogo, useConfig } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
@@ -17,14 +17,14 @@ import {
 } from './wizard/bozzaSalvata'
 import { Conferma } from '@/components/Conferma'
 import { PassoGenerale } from './wizard/PassoGenerale'
-import { PassoParametri } from './wizard/PassoParametri'
+import { PassoFenologica } from './wizard/PassoFenologica'
 import { PassoStrumenti } from './wizard/PassoStrumenti'
 import { PassoPiante } from './wizard/PassoPiante'
 import { PassoRiepilogo } from './wizard/PassoRiepilogo'
 import { motivoBlocco } from './wizard/righeTrattamenti'
 import { SceltaIniziale } from './wizard/SceltaIniziale'
 
-const PASSI = ['Generale', 'Fattori e piante', 'Parametri', 'Strumenti', 'Riepilogo'] as const
+const PASSI = ['Generale', 'Fattori e piante', 'Strumenti', 'Tabella fenologica', 'Riepilogo'] as const
 const ULTIMO = PASSI.length - 1
 const TITOLO = 'Nuovo esperimento'
 
@@ -34,30 +34,47 @@ function leggiPasso(valore: string | null): number {
   return Number.isInteger(n) && n >= 1 && n <= PASSI.length ? n - 1 : 0
 }
 
+/** Il catalogo come serve al modello Hydrochar: le voci (vuote se non ci sono) e se si sa già com'è andata. */
+interface CatalogoPerModello {
+  voci: VoceCatalogo[]
+  /** false finché la richiesta è in corso; poi vale sia se il catalogo è arrivato sia se non si è caricato. */
+  pronto: boolean
+  /** Il catalogo non si è caricato: il modello si costruisce dai semi, con strumenti non collegati. */
+  nonRaggiungibile: boolean
+}
+
+const AVVISO_CATALOGO = 'Catalogo non raggiungibile: gli strumenti del modello non sono collegati al catalogo.'
+
 interface ProceduraProps {
   /** Dove si salva la bozza in sessionStorage. */
   chiave: string
   /** La bozza di partenza, oppure null per chiedere prima da dove partire. */
   crea: () => BozzaEsperimento | null
+  /** Il catalogo per il modello Hydrochar, sia quello scelto all'inizio sia quello dell'indirizzo (`dalModello`). */
+  catalogo: CatalogoPerModello
+  /** La bozza di partenza (`crea`) è il modello Hydrochar. */
+  dalModello?: boolean
 }
 
 /**
  * La procedura guidata. Il passo sta nell'indirizzo (il "indietro" del telefono torna al passo prima)
  * e la bozza modificata in sessionStorage, così uscire dalla pagina (menu, ricarica) non la perde.
  */
-function Procedura({ chiave, crea }: ProceduraProps) {
+function Procedura({ chiave, crea, catalogo, dalModello = false }: ProceduraProps) {
   const navigate = useNavigate()
   const [ricerca, setRicerca] = useSearchParams()
   const passo = leggiPasso(ricerca.get('passo'))
 
   const [avvio] = useState(() => {
     const salvato = leggiBozza(chiave)
-    if (salvato) return { lavoro: salvato, ripristinato: true }
+    if (salvato) return { lavoro: salvato, ripristinato: true, senzaCatalogo: false }
     const b = crea()
-    return { lavoro: b ? nuovoLavoro(b) : null, ripristinato: false }
+    return { lavoro: b ? nuovoLavoro(b) : null, ripristinato: false, senzaCatalogo: b !== null && dalModello && catalogo.nonRaggiungibile }
   })
   const [lavoro, setLavoro] = useState<Lavoro | null>(avvio.lavoro)
   const [ripristinato, setRipristinato] = useState(avvio.ripristinato)
+  // La bozza dal modello è nata dai semi perché il catalogo non c'era: lo si dice finché si lavora a quella bozza.
+  const [senzaCatalogo, setSenzaCatalogo] = useState(avvio.senzaCatalogo)
   const [conferma, setConferma] = useState<'uscita' | 'ricomincia' | null>(null)
   const modificata = useMemo(() => lavoro !== null && modificato(lavoro), [lavoro])
 
@@ -97,8 +114,9 @@ function Procedura({ chiave, crea }: ProceduraProps) {
     }, { replace: sostituisci })
   }
 
-  function parti(b: BozzaEsperimento | null) {
+  function parti(b: BozzaEsperimento | null, daiSemi = false) {
     setLavoro(b ? nuovoLavoro(b) : null)
+    setSenzaCatalogo(daiSemi)
     if (passo !== 0) vaiAlPasso(0, true)
   }
 
@@ -106,7 +124,8 @@ function Procedura({ chiave, crea }: ProceduraProps) {
     rimuoviBozza(chiave)
     setConferma(null)
     setRipristinato(false)
-    parti(crea())
+    const b = crea()
+    parti(b, b !== null && dalModello && catalogo.nonRaggiungibile)
   }
 
   function esciSenzaSalvare() {
@@ -136,8 +155,14 @@ function Procedura({ chiave, crea }: ProceduraProps) {
         </div>
       )}
 
+      {senzaCatalogo && lavoro !== null && <p className="text-sm text-grafite-tenue">{AVVISO_CATALOGO}</p>}
+
       {lavoro === null ? (
-        <SceltaIniziale onModello={() => parti(bozzaHydrochar([]))} onDaZero={() => parti(bozzaVuota())} />
+        <SceltaIniziale
+          modelloInCaricamento={!catalogo.pronto}
+          onModello={() => parti(bozzaHydrochar(catalogo.voci), catalogo.nonRaggiungibile)}
+          onDaZero={() => parti(bozzaVuota())}
+        />
       ) : (
         <>
           <div className="flex flex-col gap-3">
@@ -157,8 +182,15 @@ function Procedura({ chiave, crea }: ProceduraProps) {
           {passo === 1 && (
             <PassoPiante bozza={lavoro.bozza} righe={lavoro.righe} onChange={(bozza, righe) => aggiorna({ bozza, righe })} />
           )}
-          {passo === 2 && <PassoParametri bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
-          {passo === 3 && <PassoStrumenti bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
+          {passo === 2 && <PassoStrumenti bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
+          {passo === 3 && (
+            <PassoFenologica
+              bozza={lavoro.bozza}
+              onChange={(bozza) => aggiorna({ bozza })}
+              // "Questo esperimento non ha rilievi fenologici": si va al riepilogo (la tabella vuota, se c'era, l'ha già tolta).
+              onSalta={() => vaiAlPasso(passo + 1)}
+            />
+          )}
           {passo === ULTIMO && (
             <PassoRiepilogo
               bozza={lavoro.bozza}
@@ -218,6 +250,9 @@ function Procedura({ chiave, crea }: ProceduraProps) {
   )
 }
 
+/** Per le procedure che non partono dal modello Hydrochar (copia di un esperimento). */
+const SENZA_MODELLO: CatalogoPerModello = { voci: [], pronto: true, nonRaggiungibile: false }
+
 /** Duplicazione: la procedura parte da una copia della configurazione (non dei dati) di un esperimento. */
 function Duplica({ espId, chiave }: { espId: string; chiave: string }) {
   const config = useConfig(espId)
@@ -232,7 +267,8 @@ function Duplica({ espId, chiave }: { espId: string; chiave: string }) {
 
   if (copia?.bozza) {
     const bozza = copia.bozza
-    return <Procedura chiave={chiave} crea={() => bozza} />
+    // Una copia non usa il modello: il catalogo non serve alla partenza (il passo Strumenti lo legge da sé).
+    return <Procedura chiave={chiave} crea={() => bozza} catalogo={SENZA_MODELLO} />
   }
   return (
     <AppShell titolo={TITOLO} indietro="/">
@@ -251,6 +287,13 @@ export function NuovoEsperimento() {
   const hydrochar = ricerca.get('modello') === 'hydrochar'
   const modo = da ? `da:${da}` : hydrochar ? 'hydrochar' : 'nuovo'
   const chiave = chiaveBozza(sessione?.user.id ?? '', modo)
+  // Il modello Hydrochar prende i suoi strumenti dal catalogo: la bozza si costruisce solo quando si sa com'è andata.
+  const voci = useCatalogo()
+  // Una volta saputo com'è andata non si torna indietro: un catalogo in errore torna "in caricamento" quando un passo lo
+  // rilegge (es. "Riprova"), e smontare la procedura per questo farebbe perdere il punto in cui si è arrivati.
+  const [catalogoNoto, setCatalogoNoto] = useState(false)
+  if (!voci.isPending && !catalogoNoto) setCatalogoNoto(true)
+  const catalogo: CatalogoPerModello = { voci: voci.data ?? [], pronto: catalogoNoto, nonRaggiungibile: voci.isError }
 
   // Finché non si sa chi è l'utente la chiave della bozza non è quella vera: montare la procedura adesso vorrebbe dire
   // rimontarla subito dopo, con una bozza nuova (dal modello: id diversi) al posto di quella appena preparata.
@@ -262,5 +305,20 @@ export function NuovoEsperimento() {
     )
   }
   if (da) return <Duplica key={chiave} espId={da} chiave={chiave} />
-  return <Procedura key={chiave} chiave={chiave} crea={() => (hydrochar ? bozzaHydrochar([]) : null)} />
+  if (hydrochar && !catalogo.pronto) {
+    return (
+      <AppShell titolo={TITOLO} indietro="/">
+        <p role="status" className="text-grafite-tenue">Caricamento…</p>
+      </AppShell>
+    )
+  }
+  return (
+    <Procedura
+      key={chiave}
+      chiave={chiave}
+      crea={() => (hydrochar ? bozzaHydrochar(catalogo.voci) : null)}
+      catalogo={catalogo}
+      dalModello={hydrochar}
+    />
+  )
 }
