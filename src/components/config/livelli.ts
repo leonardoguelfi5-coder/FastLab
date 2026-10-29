@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import type { Fattore } from '@/domain/tipi'
 
 const normalizza = (s: string) => s.trim().toLowerCase()
@@ -16,7 +17,7 @@ export function livelloAggiungibile(f: Fattore, testo: string): boolean {
 /** Il fattore con il livello `testo` in fondo, oppure null se il livello non si può aggiungere. */
 export function conLivello(f: Fattore, testo: string): Fattore | null {
   if (!livelloAggiungibile(f, testo)) return null
-  return { ...f, livelli: [...f.livelli, { id: crypto.randomUUID(), nome: testo.trim(), ordine: f.livelli.length }] }
+  return { ...f, livelli: [...f.livelli, { id: nuovoId(), nome: testo.trim(), ordine: f.livelli.length }] }
 }
 
 /**

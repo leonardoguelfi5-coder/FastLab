@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import type { Fattore, Trattamento } from './tipi'
 
 /**
@@ -12,7 +13,7 @@ export function generaTrattamenti(fattori: Fattore[]): Trattamento[] {
     [[]],
   )
   return combinazioni.map((livelli, ordine) => ({
-    id: crypto.randomUUID(),
+    id: nuovoId(),
     etichetta: livelli.map(l => l.nome).join(' + '),
     ordine,
     livello_ids: livelli.map(l => l.id),

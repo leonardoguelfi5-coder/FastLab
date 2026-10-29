@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import type { Pianta } from './tipi'
 
 const SOLO_CIFRE = /^\d+$/
@@ -9,7 +10,7 @@ export function generaPiante(righe: { trattamento_id: string; n: number }[], ini
     for (let k = 0; k < n; k++) {
       const i = piante.length
       piante.push({
-        id: crypto.randomUUID(),
+        id: nuovoId(),
         trattamento_id,
         etichetta: String(inizio + i),
         blocco: null,

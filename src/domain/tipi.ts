@@ -16,5 +16,5 @@ export interface PassataParametro { parametro_id: string; obbligatorio: boolean;
 export interface Passata { id: string; nome: string; icona: string | null; ordine: number; parametri: PassataParametro[] }
 export interface ConfigEsperimento { esperimento: Esperimento; fattori: Fattore[]; trattamenti: Trattamento[];
   piante: Pianta[]; parametri: Parametro[]; passate: Passata[] }
-export type BozzaEsperimento = ConfigEsperimento   // stessa forma; ids generati dal client con crypto.randomUUID()
+export type BozzaEsperimento = ConfigEsperimento   // stessa forma; ids generati dal client con nuovoId() (src/lib/id.ts)
 export interface Misura { id: string; pianta_id: string; passata_id: string; data_rilievo: string; ora: string; valori: ValoriMisura }

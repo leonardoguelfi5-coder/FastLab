@@ -251,3 +251,4 @@ Piano 1: COMPLETE nel cloud (commits 2fd1c23..3395c67 + docs). Restano solo le v
   - salvataggio con rete bloccata → "Pianta #1 non salvata." + "Riprova"; Riprova salva;
   - griglia "Fatte 3/56", "×2" sulla pianta 1.
 - Da osservare sul telefono: alla prima pianta della sessione il primo clic su "Salva e vai" (subito dopo aver scritto nel campo) non ha avviato il salvataggio, il secondo sì; non riprodotto sulle piante 2–4.
+- Prova sul telefono via http (hotspot): pagina bianca alla creazione dell esperimento, perche `crypto.randomUUID()` esiste solo in contesti sicuri (https/localhost). Corretto con `nuovoId()` in `src/lib/id.ts` (fallback su `crypto.getRandomValues`) usato in tutto il codice dell app; test in `src/lib/id.test.ts`. tsc pulito, 840 test verdi, eslint pulito.

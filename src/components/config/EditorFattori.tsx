@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import { useId, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Fattore } from '@/domain/tipi'
@@ -111,7 +112,7 @@ export function EditorFattori({ valore, onChange, inSospeso, onInSospeso }: Edit
   const cambiaTesti = onInSospeso ?? setInterni
 
   function aggiungi() {
-    onChange([...valore, { id: crypto.randomUUID(), nome: '', ordine: valore.length, livelli: [] }])
+    onChange([...valore, { id: nuovoId(), nome: '', ordine: valore.length, livelli: [] }])
   }
 
   return (

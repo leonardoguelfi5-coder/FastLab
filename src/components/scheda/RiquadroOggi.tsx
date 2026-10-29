@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
@@ -60,8 +61,8 @@ export function RiquadroOggi({
   // bozza ripresa o un giro in una correzione lo riusano, e l'upsert per id non crea doppioni anche se un tentativo
   // dato per fallito (un timeout) era arrivato al server. Una bozza ripresa porta il suo. Se invece la misura con
   // quell'id è già tra quelle della pianta (il server l'ha, e la si vede), il modulo nuovo non la riscrive: id nuovo.
-  const [formId, setFormId] = useState(() => leggiBozza(chiaveNuova)?.id ?? crypto.randomUUID())
-  const idLibero = (id: string) => (misure.some(m => m.id === id) ? crypto.randomUUID() : id)
+  const [formId, setFormId] = useState(() => leggiBozza(chiaveNuova)?.id ?? nuovoId())
+  const idLibero = (id: string) => (misure.some(m => m.id === id) ? nuovoId() : id)
   // Tornando alla scheda si riapre il modulo che si era lasciato: la correzione di una misura del giorno, se ne
   // resta la bozza; altrimenti la misura nuova.
   const [inCorrezione, setInCorrezione] = useState<Misura | null>(() => {
@@ -106,7 +107,7 @@ export function RiquadroOggi({
     setAppenaSalvata(m)
     setInCorrezione(null)
     // L'unico punto in cui una misura nuova prende un id nuovo: quella di prima è salvata.
-    setFormId(crypto.randomUUID())
+    setFormId(nuovoId())
     setPrimoCampo(false)
   }
 

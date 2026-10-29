@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import type { Parametro, SottoCampo, TipoParametro } from '@/domain/tipi'
@@ -99,7 +100,7 @@ function SottoCampi({ valore, onChange }: { valore: SottoCampo[]; onChange: (s: 
       </ul>
       <Button
         variant="outline"
-        onClick={() => onChange([...valore, { chiave: crypto.randomUUID(), nome: '', unita: null }])}
+        onClick={() => onChange([...valore, { chiave: nuovoId(), nome: '', unita: null }])}
         className="self-start"
       >
         + Sotto-campo

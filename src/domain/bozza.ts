@@ -1,9 +1,10 @@
+import { nuovoId } from '@/lib/id'
 import type { BozzaEsperimento, ConfigEsperimento, Parametro, Passata } from './tipi'
 
 /** Bozza di un nuovo esperimento: nessun fattore, trattamento, pianta, parametro o passata. */
 export function bozzaVuota(): BozzaEsperimento {
   return {
-    esperimento: { id: crypto.randomUUID(), nome: '', data_inizio: null, note: '', stato: 'in_corso' },
+    esperimento: { id: nuovoId(), nome: '', data_inizio: null, note: '', stato: 'in_corso' },
     fattori: [],
     trattamenti: [],
     piante: [],
@@ -15,7 +16,7 @@ export function bozzaVuota(): BozzaEsperimento {
 /** Parametro nuovo, numerico e senza opzioni, da completare nell'editor. */
 export function nuovoParametro(ordine: number): Parametro {
   return {
-    id: crypto.randomUUID(),
+    id: nuovoId(),
     nome: '',
     unita: null,
     tipo: 'numero',
@@ -32,13 +33,13 @@ export function nuovoParametro(ordine: number): Parametro {
 
 /** Passata nuova, senza nome, icona né parametri. */
 export function nuovaPassata(ordine: number): Passata {
-  return { id: crypto.randomUUID(), nome: '', icona: null, ordine, parametri: [] }
+  return { id: nuovoId(), nome: '', icona: null, ordine, parametri: [] }
 }
 
 type Rimappa = Map<string, string>
 
 function nuoviId(elementi: { id: string }[]): Rimappa {
-  return new Map(elementi.map(e => [e.id, crypto.randomUUID()]))
+  return new Map(elementi.map(e => [e.id, nuovoId()]))
 }
 
 function rimappa(mappa: Rimappa, id: string): string {
@@ -62,7 +63,7 @@ export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
 
   return {
     esperimento: {
-      id: crypto.randomUUID(),
+      id: nuovoId(),
       nome: `Copia di ${c.esperimento.nome}`,
       data_inizio: null,
       note: c.esperimento.note,
@@ -80,7 +81,7 @@ export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
     })),
     piante: c.piante.map(p => ({
       ...p,
-      id: crypto.randomUUID(),
+      id: nuovoId(),
       trattamento_id: rimappa(trattamenti, p.trattamento_id),
     })),
     parametri: attivi.map(p => ({

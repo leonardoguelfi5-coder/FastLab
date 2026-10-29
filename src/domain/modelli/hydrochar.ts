@@ -1,3 +1,4 @@
+import { nuovoId } from '@/lib/id'
 import type { BozzaEsperimento, Fattore, Parametro, Passata } from '../tipi'
 import { bozzaVuota } from '../bozza'
 import { generaTrattamenti } from '../trattamenti'
@@ -5,16 +6,16 @@ import { generaPiante } from '../piante'
 
 function fattore(nome: string, ordine: number, livelli: string[]): Fattore {
   return {
-    id: crypto.randomUUID(),
+    id: nuovoId(),
     nome,
     ordine,
-    livelli: livelli.map((l, i) => ({ id: crypto.randomUUID(), nome: l, ordine: i })),
+    livelli: livelli.map((l, i) => ({ id: nuovoId(), nome: l, ordine: i })),
   }
 }
 
 function parametro(nome: string, ordine: number, extra: Partial<Parametro> = {}): Parametro {
   return {
-    id: crypto.randomUUID(),
+    id: nuovoId(),
     nome,
     unita: null,
     tipo: 'numero',
@@ -33,7 +34,7 @@ function parametro(nome: string, ordine: number, extra: Partial<Parametro> = {})
 /** Passata con i parametri nell'ordine dato, tutti facoltativi. */
 function passata(nome: string, icona: string, ordine: number, parametri: Parametro[]): Passata {
   return {
-    id: crypto.randomUUID(),
+    id: nuovoId(),
     nome,
     icona,
     ordine,
