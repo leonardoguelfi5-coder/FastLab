@@ -215,8 +215,8 @@ select throws_ok(
 select throws_ok(
   $$ update piante set esperimento_id = 'ea000000-0000-0000-0000-000000000001'
       where id = 'bb000000-0000-0000-0000-000000000001' $$,
-  '42501', null,
-  'B non sposta le proprie righe nell''esperimento di A');
+  'P0001', 'ESPERIMENTO_NON_MODIFICABILE',
+  'B non sposta le proprie righe nell''esperimento di A (la guardia scatta prima del WITH CHECK)');
 
 select results_eq(
   $$ select id from riepilogo_esperimenti() $$,
