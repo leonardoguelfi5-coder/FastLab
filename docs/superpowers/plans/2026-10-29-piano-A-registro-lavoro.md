@@ -152,3 +152,6 @@ Task 8: re-review fix round 1 → Approved (1210 Vitest, build OK, su copia)
 Task 8: fix round 1/5 (4 addressed, 0 open; commits 411d79c..9534878)
 Task 8: minor (deferred): il test "catalogo già riletto" non discrimina (mock troppo veloce); l'errore della fase esperimenti non ha "Chiudi"; un nuovo esito sostituisce l'errore pendente
 Task 8: complete (commits 411d79c..9534878, review clean)
+Task 11: implementatore (sonnet) DONE aa1950a — 1250 Vitest, 189 pgTAP (emulato), build OK; `Riprendi` a inchiostro pieno nella riga dello strumento in corso; tocco su uno strumento con misure non ancora caricate → prima pianta (il T12 chiede Correggi/Nuova se ha misure); home legge le misure solo con uno strumento scelto
+Task 11: dispatched reviewer (sonnet) su copia
+Task 12: dispatched implementer (opus), BASE aa1950a (unico implementatore)
