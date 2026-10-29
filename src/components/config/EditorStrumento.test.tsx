@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { useState } from 'react'
+import { useState, type ComponentProps } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { nuovaTabellaFenologica, nuovoStrumento } from '@/domain/bozza'
@@ -24,7 +24,7 @@ const termometro = () => collega(
   [parametro('Temp aria', { unita: '°C', ordine: 0 }), parametro('Temp pianta', { unita: '°C', ordine: 1 })],
 )
 
-function rendi(iniziale: Valore, props: { tipoFenologico?: boolean; altriParametri?: Parametro[] } = {}) {
+function rendi(iniziale: Valore, props: Partial<ComponentProps<typeof EditorStrumento>> = {}) {
   const onChange = vi.fn<(v: Valore) => void>()
   function Banco() {
     const [v, setV] = useState(iniziale)
@@ -184,6 +184,48 @@ describe('EditorStrumento', () => {
       rendi(termometro(), { tipoFenologico: true })
       await utente.click(screen.getByRole('button', { name: /^Temp aria/ }))
       expect(screen.getByLabelText('Tipo')).toBeEnabled()
+    })
+  })
+
+  describe('per chi modifica uno strumento già salvato', () => {
+    const tabella = () => collega(
+      nuovaTabellaFenologica(0),
+      [parametro('N frutti', { ordine: 0 }), parametro('Note', { ordine: 1, tipo: 'testo' })],
+    )
+
+    it('`bloccoTipo` ferma il tipo di un valore con la sua ragione; gli altri restano liberi', async () => {
+      const utente = userEvent.setup({ delay: null })
+      rendi(tabella(), { bloccoTipo: p => (p.nome === 'Note' ? 'Controllo dei dati in corso.' : null) })
+
+      await utente.click(screen.getByRole('button', { name: /^Note/ }))
+      expect(screen.getByLabelText('Tipo')).toBeDisabled()
+      expect(screen.getByText('Controllo dei dati in corso.')).toBeInTheDocument()
+      await utente.click(screen.getByRole('button', { name: /^N frutti/ }))
+      expect(screen.getByLabelText('Tipo')).toBeEnabled()
+    })
+
+    it('`azioniValore` sostituisce "Togli il valore" per i valori che dice, gli altri lo tengono', async () => {
+      const utente = userEvent.setup({ delay: null })
+      const onChange = rendi(tabella(), {
+        azioniValore: p => (p.nome === 'Note' ? <button type="button">Archivia il valore «Note»</button> : undefined),
+      })
+
+      await utente.click(screen.getByRole('button', { name: /^Note/ }))
+      expect(screen.getByRole('button', { name: 'Archivia il valore «Note»' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Togli il valore «Note»' })).not.toBeInTheDocument()
+      await utente.click(screen.getByRole('button', { name: /^N frutti/ }))
+      await utente.click(screen.getByRole('button', { name: 'Togli il valore «N frutti»' }))
+      expect(ultima(onChange).parametri.map(p => p.nome)).toEqual(['Note'])
+    })
+
+    it('`problemiExtra` aggiunge dei problemi a un valore: "Da completare" e il testo', async () => {
+      const utente = userEvent.setup({ delay: null })
+      rendi(tabella(), { problemiExtra: p => (p.nome === 'Note' ? ['Questo valore ha dati.'] : []) })
+
+      expect(screen.getByRole('button', { name: /^Note/ })).toHaveTextContent('Da completare')
+      expect(screen.getByRole('button', { name: /^N frutti/ })).not.toHaveTextContent('Da completare')
+      await utente.click(screen.getByRole('button', { name: /^Note/ }))
+      expect(screen.getByText('Questo valore ha dati.')).toBeInTheDocument()
     })
   })
 })

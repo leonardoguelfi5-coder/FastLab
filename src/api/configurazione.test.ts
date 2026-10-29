@@ -9,7 +9,7 @@ import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
   aggiornaParametroDaCatalogo, aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento,
   collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, parametriConDati, salvaParametro,
-  salvaStrumento,
+  salvaStrumento, strumentiConDati,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -264,6 +264,43 @@ describe('eliminaStrumento', () => {
     const e = { code: '23503', message: 'violates foreign key constraint' }
     mock.risponde('strumenti', { error: e })
     await expect(eliminaStrumento('E', 'pa1')).rejects.toBe(e)
+  })
+})
+
+describe('strumentiConDati', () => {
+  it('legge gli strumenti delle misure dell\'esperimento, uno solo per strumento', async () => {
+    mock.risponde('misure', { data: [{ strumento_id: 'pa1' }, { strumento_id: 'pa2' }, { strumento_id: 'pa1' }] })
+
+    expect(await strumentiConDati('E')).toEqual(new Set(['pa1', 'pa2']))
+    expect(mock.di('misure').map(c => [c.metodo, ...c.args])).toEqual([
+      ['select', 'strumento_id'], ['eq', 'esperimento_id', 'E'], ['order', 'id'], ['range', 0, 999],
+    ])
+  })
+
+  it('senza misure restituisce un Set vuoto', async () => {
+    mock.risponde('misure', { data: [] })
+    expect((await strumentiConDati('E')).size).toBe(0)
+  })
+
+  it('continua pagina dopo pagina finché ce ne sono: il limite di righe di PostgREST non nasconde uno strumento', async () => {
+    const pagine = [Array.from({ length: 1000 }, () => ({ strumento_id: 'pa1' })), [{ strumento_id: 'pa2' }]]
+    const intervalli: unknown[][] = []
+    vi.mocked(supabase.from).mockImplementation((() => {
+      const query: Record<string, unknown> = {}
+      query.select = () => query
+      query.eq = () => query
+      query.order = () => query
+      query.range = (...args: unknown[]) => { intervalli.push(args); return Promise.resolve({ data: pagine[intervalli.length - 1], error: null }) }
+      return query
+    }) as never)
+
+    expect(await strumentiConDati('E')).toEqual(new Set(['pa1', 'pa2']))
+    expect(intervalli).toEqual([[0, 999], [1000, 1999]])
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('misure', { error: errore })
+    await expect(strumentiConDati('E')).rejects.toBe(errore)
   })
 })
 

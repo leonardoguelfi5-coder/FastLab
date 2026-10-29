@@ -1,6 +1,6 @@
 import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati } from './configurazione'
+import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
@@ -12,6 +12,7 @@ export const chiavi = {
   /** Sotto il prefisso della configurazione: invalidando `config(espId)` si rileggono anche questi. */
   parametriConDati: (espId: string) => ['config', espId, 'parametriConDati'] as const,
   pianteConDati: (espId: string) => ['config', espId, 'pianteConDati'] as const,
+  strumentiConDati: (espId: string) => ['config', espId, 'strumentiConDati'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
   misura: (id: string) => ['misure', 'una', id] as const,
@@ -58,6 +59,16 @@ export function usePianteConDati(espId: string | undefined) {
   return useQuery({
     queryKey: chiavi.pianteConDati(espId ?? ''),
     queryFn: () => pianteConDati(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
+  })
+}
+
+/** Gli id degli strumenti con almeno una misura: freschi a ogni apertura, da questo dipende se offrire "Elimina". */
+export function useStrumentiConDati(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.strumentiConDati(espId ?? ''),
+    queryFn: () => strumentiConDati(espId as string),
     enabled: !!espId,
     staleTime: 0,
   })

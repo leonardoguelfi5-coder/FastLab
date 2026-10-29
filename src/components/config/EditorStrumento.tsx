@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import type { Parametro, Strumento } from '@/domain/tipi'
 import { nuovoParametro, parametriDello, problemiParametro } from '@/domain/bozza'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,19 @@ interface EditorStrumentoProps {
   tipoFenologico?: boolean
   /** Gli altri parametri dell'esperimento: un valore non può avere il loro stesso nome. */
   altriParametri?: Parametro[]
+  /**
+   * Un valore già salvato può avere il tipo fermo (ha dati, o non si sa ancora): la ragione, da mostrare sotto il tipo,
+   * oppure niente se il tipo è libero. Nello strumento semplice il tipo è sempre fermo sul numero.
+   */
+  bloccoTipo?: (p: Parametro) => string | null | undefined
+  /**
+   * Cosa fare di un valore al posto di "Togli il valore", che lo toglie dalla bozza e basta. Un valore già salvato non si
+   * toglie così: ha dati da proteggere, e chi modifica uno strumento salvato offre "Archivia" o "Elimina". `undefined`
+   * lascia il pulsante di sempre.
+   */
+  azioniValore?: (p: Parametro) => ReactNode
+  /** Problemi in più di un valore, oltre a quelli del parametro (es. un sotto-campo con dati che si è tolto). */
+  problemiExtra?: (p: Parametro) => string[]
 }
 
 const MOTIVO_NUMERO = 'Uno strumento misura numeri. Per testo, sì/no o liste usa la tabella fenologica.'
@@ -36,7 +49,9 @@ const MOTIVO_NUMERO = 'Uno strumento misura numeri. Per testo, sì/no o liste us
  * si misurerebbe). Nello strumento semplice il progressivo non c'è (vale per le conte che crescono nel tempo, cioè per
  * la tabella fenologica) e "Obbligatorio" nemmeno: la misura conta tutti i valori dello strumento.
  */
-export function EditorStrumento({ valore, onChange, tipoFenologico, altriParametri = [] }: EditorStrumentoProps) {
+export function EditorStrumento({
+  valore, onChange, tipoFenologico, altriParametri = [], bloccoTipo, azioniValore, problemiExtra,
+}: EditorStrumentoProps) {
   const id = useId()
   const [aperto, setAperto] = useState<string | null>(null)
   const { strumento } = valore
@@ -109,7 +124,9 @@ export function EditorStrumento({ valore, onChange, tipoFenologico, altriParamet
         <ul aria-label="Valori" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
           {parametri.map(p => {
             // Gli stessi controlli del riepilogo, qui dove si correggono (nome doppio compreso, anche in altri strumenti).
-            const problemi = problemiParametro(p, [...parametri, ...altriParametri])
+            const problemi = [...problemiParametro(p, [...parametri, ...altriParametri]), ...(problemiExtra?.(p) ?? [])]
+            const blocco = fenologico ? bloccoTipo?.(p) : null
+            const azione = azioniValore?.(p)
             return (
               <Espandibile
                 key={p.id}
@@ -122,8 +139,8 @@ export function EditorStrumento({ valore, onChange, tipoFenologico, altriParamet
                 <EditorParametro
                   valore={p}
                   onChange={cambiaParametro}
-                  tipoBloccato={!fenologico}
-                  motivoBlocco={MOTIVO_NUMERO}
+                  tipoBloccato={!fenologico || !!blocco}
+                  motivoBlocco={fenologico ? blocco || undefined : MOTIVO_NUMERO}
                   senzaProgressivo={!fenologico}
                 />
                 {fenologico && (
@@ -137,15 +154,17 @@ export function EditorStrumento({ valore, onChange, tipoFenologico, altriParamet
                 {problemi.length > 0 && (
                   <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
                 )}
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  aria-label={`Togli il valore «${p.nome.trim() || 'senza nome'}»`}
-                  onClick={() => togli(p)}
-                  className="self-start"
-                >
-                  Togli il valore
-                </Button>
+                {azione !== undefined ? azione : (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    aria-label={`Togli il valore «${p.nome.trim() || 'senza nome'}»`}
+                    onClick={() => togli(p)}
+                    className="self-start"
+                  >
+                    Togli il valore
+                  </Button>
+                )}
               </Espandibile>
             )
           })}

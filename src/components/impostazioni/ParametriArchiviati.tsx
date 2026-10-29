@@ -1,53 +1,29 @@
-import { useId, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { riassuntoParametro } from '@/components/config/riassunti'
-import { Button } from '@/components/ui/button'
-import type { Parametro } from '@/domain/tipi'
-import { cn } from '@/lib/utils'
-import { Spiegazione } from './Sezione'
+import type { Parametro, Strumento } from '@/domain/tipi'
+import { ElencoArchiviati } from './ElencoArchiviati'
 
 interface ParametriArchiviatiProps {
   archiviati: Parametro[]
+  /** Gli strumenti dell'esperimento (archiviati compresi): di ogni valore si dice a quale appartiene. */
+  strumenti: Strumento[]
   inCorso: boolean
   onRipristina: (p: Parametro) => void
 }
 
-/** I parametri archiviati, a parte e chiusi finché non si aprono, ognuno con "Ripristina". */
-export function ParametriArchiviati({ archiviati, inCorso, onRipristina }: ParametriArchiviatiProps) {
-  const id = useId()
-  const [aperti, setAperti] = useState(false)
-  if (archiviati.length === 0) return null
-
+/** I valori archiviati (i parametri), con lo strumento a cui appartengono: da lì si capisce cosa sono. */
+export function ParametriArchiviati({ archiviati, strumenti, inCorso, onRipristina }: ParametriArchiviatiProps) {
+  const di = (p: Parametro) => strumenti.find(s => s.parametri.some(pp => pp.parametro_id === p.id))
   return (
-    <div className="flex flex-col gap-2">
-      <Button
-        variant="quiet"
-        aria-expanded={aperti}
-        aria-controls={aperti ? id : undefined}
-        onClick={() => setAperti(a => !a)}
-        className="-ml-3 self-start"
-      >
-        {`Parametri archiviati (${archiviati.length})`}
-        <ChevronDown aria-hidden className={cn('text-grafite-tenue', aperti && 'rotate-180')} />
-      </Button>
-      {aperti && (
-        <div id={id} className="flex flex-col gap-2">
-          <Spiegazione>
-            Non compaiono nei moduli degli strumenti; i loro dati restano nella storia delle piante e nell'export.
-          </Spiegazione>
-          <ul className="flex flex-col border-t border-riga">
-            {archiviati.map(p => (
-              <li key={p.id} className="flex items-center gap-3 border-b border-riga py-3">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-grafite">{p.nome}</span>
-                  <span className="block text-sm text-grafite-tenue">{riassuntoParametro(p)}</span>
-                </span>
-                <Button variant="outline" size="sm" disabled={inCorso} onClick={() => onRipristina(p)}>Ripristina</Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <ElencoArchiviati
+      titolo="Valori archiviati"
+      spiegazione="Non compaiono nei moduli degli strumenti; i loro dati restano nella storia delle piante e nell'export."
+      voci={archiviati.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        dettaglio: [riassuntoParametro(p), di(p)?.nome].filter(Boolean).join(' · '),
+      }))}
+      inCorso={inCorso}
+      onRipristina={id => { const p = archiviati.find(x => x.id === id); if (p) onRipristina(p) }}
+    />
   )
 }

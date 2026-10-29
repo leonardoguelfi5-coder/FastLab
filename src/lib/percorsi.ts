@@ -34,3 +34,6 @@ export const percorsoModificaMisura = (espId: string, misuraId: string) => `${pe
 
 /** Lo stato di navigazione con cui la storia della pianta apre una misura: la modifica sa di poter tornare indietro. */
 export interface ArrivoMisura { daScheda?: boolean }
+
+/** Il catalogo degli strumenti, condiviso tra tutti gli esperimenti. */
+export const percorsoCatalogo = '/catalogo'

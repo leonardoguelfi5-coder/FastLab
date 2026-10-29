@@ -46,8 +46,13 @@ export function useBozze<T extends { id: string }>() {
   )
   const cambia = useCallback((t: T) => setBozze(b => ({ ...b, [t.id]: t })), [])
   const scarta = useCallback((id: string) => setBozze(b => senza(b, id)), [])
+  /** Cambia la bozza di un elemento solo se c'è già: un elemento senza modifiche locali segue la configurazione. */
+  const modifica = useCallback(
+    (id: string, cambio: (b: T) => T) => setBozze(b => (Object.hasOwn(b, id) ? { ...b, [id]: cambio(b[id]) } : b)),
+    [],
+  )
   /** Dopo un salvataggio riuscito: la bozza va via solo se è ancora quella inviata (nel frattempo si può aver scritto). */
   const salvata = useCallback((inviata: T) => setBozze(b => (b[inviata.id] === inviata ? senza(b, inviata.id) : b)), [])
 
-  return { valore, modificato, cambia, scarta, salvata }
+  return { valore, modificato, cambia, modifica, scarta, salvata }
 }

@@ -1,151 +1,126 @@
 import { useState } from 'react'
-import { eliminaStrumento, salvaStrumento } from '@/api/configurazione'
-import { Conferma } from '@/components/Conferma'
+import { Link } from 'react-router-dom'
+import type { UseQueryResult } from '@tanstack/react-query'
+import { useCatalogo } from '@/api/query'
+import { SceltaDalCatalogo } from '@/components/config/SceltaDalCatalogo'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
-import { Button } from '@/components/ui/button'
-import { nuovoStrumento, problemiStrumento } from '@/domain/bozza'
-import type { ConfigEsperimento, Strumento } from '@/domain/tipi'
-import { useAzione } from './azione'
-import { EditorInclusioneStrumento } from './EditorInclusioneStrumento'
-import { useBozze, useSegnalaModifiche } from './modifiche'
-import { Sezione, Spiegazione } from './Sezione'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { strumentoDaCatalogo } from '@/domain/catalogo'
+import type { ConfigEsperimento, Parametro, Strumento, VoceCatalogo } from '@/domain/tipi'
+import { percorsoCatalogo } from '@/lib/percorsi'
+import { ModificaStrumento } from './ModificaStrumento'
+import { NuovoStrumento } from './NuovoStrumento'
+import { ParametriArchiviati } from './ParametriArchiviati'
+import { AvvisoDati, Sezione, Spiegazione } from './Sezione'
+import { StrumentiArchiviati } from './StrumentiArchiviati'
+import { ValoriSenzaStrumento } from './ValoriSenzaStrumento'
+import { useStrumenti } from './useStrumenti'
 
-const sostituisci = (elenco: Strumento[], p: Strumento) =>
-  elenco.some(x => x.id === p.id) ? elenco.map(x => (x.id === p.id ? p : x)) : [...elenco, p]
+interface SezioneStrumentiProps {
+  espId: string
+  config: ConfigEsperimento
+  datiParametri: UseQueryResult<Set<string>>
+  datiStrumenti: UseQueryResult<Set<string>>
+}
 
 /**
- * Gli strumenti, uno alla volta in un editor che si apre, con il proprio "Salva"; "+ Strumento" ne prepara uno nuovo. Uno
- * strumento con misure non si elimina: lo dice il database (23503) e il messaggio lo spiega.
+ * Gli strumenti dell'esperimento, uno alla volta in un editor che si apre con i suoi valori e il proprio "Salva". Si
+ * aggiungono dal catalogo o si creano nuovi (e allora entrano anche nel catalogo). Uno strumento con misure si archivia;
+ * senza misure si può anche eliminare, con i valori che ha. La tabella fenologica ha la sua sezione.
  */
-export function SezioneStrumenti({ espId, config }: { espId: string; config: ConfigEsperimento }) {
-  const { inCorso, esegui } = useAzione(espId)
-  const bozze = useBozze<Strumento>()
-  // Gli strumenti nuovi come sono stati creati: quel che si scrive sta nelle bozze, come per quelli salvati.
-  const [create, setCreate] = useState<Strumento[]>([])
-  const [aperta, setAperta] = useState<string | null>(null)
-  const [daEliminare, setDaEliminare] = useState<{ strumento: Strumento; aperto: boolean } | null>(null)
+export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti }: SezioneStrumentiProps) {
+  const g = useStrumenti({ espId, config, tipo: 'strumento', chiave: 'strumenti', datiParametri, datiStrumenti })
+  const catalogo = useCatalogo()
+  const [dalCatalogo, setDalCatalogo] = useState(false)
+  const [nuovo, setNuovo] = useState(false)
+  // Lo strumento aggiunto senza collegamento al catalogo.
+  const [avviso, setAvviso] = useState<string | null>(null)
 
-  // Uno nuovo già arrivato in configurazione (salvato anche se la risposta si è persa) è ormai uno strumento salvato.
-  const inConfig = new Set(config.strumenti.map(p => p.id))
-  const nuove = create.filter(p => !inConfig.has(p.id))
-  const attivi = new Set(config.parametri.filter(p => !p.archiviato).map(p => p.id))
-  useSegnalaModifiche('strumenti', nuove.length > 0 || config.strumenti.some(p => bozze.modificato(p)))
+  // Le voci già nell'esperimento non si aggiungono due volte, archiviate comprese.
+  const gia = new Set(config.strumenti.flatMap(s => (s.catalogo_id ? [s.catalogo_id] : [])))
+  const archiviati = config.parametri.filter(p => p.archiviato)
+  // Valori attivi fuori da ogni strumento (restano dalla v2, dove un parametro poteva non stare in nessuno): non si misurano.
+  // Quelli di una bozza non ancora salvata non contano: lo strumento li collega al "Salva".
+  const collegati = new Set([
+    ...config.strumenti.flatMap(s => s.parametri.map(pp => pp.parametro_id)),
+    ...g.voci.flatMap(v => v.parametri.map(p => p.id)),
+  ])
+  const senzaStrumento = config.parametri.filter(p => !p.archiviato && !collegati.has(p.id))
 
-  function aggiungi() {
-    const ordine = Math.max(-1, ...config.strumenti.map(p => p.ordine), ...nuove.map(p => p.ordine)) + 1
-    const p = nuovoStrumento(ordine)
-    setCreate(n => [...n, p])
-    setAperta(p.id)
+  function aggiungiDaCatalogo(voce: VoceCatalogo) {
+    setAvviso(null)
+    setDalCatalogo(false)
+    const { strumento, parametri } = strumentoDaCatalogo(voce, 0)
+    void g.aggiungi(strumento, parametri)
   }
 
-  function scartaNuova(id: string) {
-    setCreate(n => n.filter(x => x.id !== id))
-    bozze.scarta(id)
+  function aggiungiNuovo(strumento: Strumento, parametri: Parametro[], errore: string | null) {
+    setAvviso(errore)
+    setNuovo(false)
+    setDalCatalogo(false)
+    void g.aggiungi(strumento, parametri)
   }
-
-  async function salva(inviata: Strumento, nuova: boolean) {
-    // Un parametro eliminato nel frattempo non si manda: il collegamento fallirebbe (23503).
-    const esistenti = new Set(config.parametri.map(p => p.id))
-    const daSalvare: Strumento = {
-      ...inviata,
-      nome: inviata.nome.trim(),
-      icona: inviata.icona?.trim() || null,
-      parametri: inviata.parametri.filter(pp => esistenti.has(pp.parametro_id)),
-    }
-    const riuscito = await esegui(() => salvaStrumento(espId, daSalvare), {
-      messaggio: `Strumento «${daSalvare.nome}» salvato.`,
-      aggiorna: c => ({ ...c, strumenti: sostituisci(c.strumenti, daSalvare) }),
-    })
-    if (!riuscito) return
-    if (nuova) setCreate(n => n.filter(x => x.id !== inviata.id))
-    bozze.salvata(inviata)
-  }
-
-  async function elimina(p: Strumento) {
-    setDaEliminare({ strumento: p, aperto: false })
-    const riuscito = await esegui(() => eliminaStrumento(espId, p.id), {
-      messaggio: 'Strumento eliminato.',
-      neutro: true,
-      aggiorna: c => ({ ...c, strumenti: c.strumenti.filter(x => x.id !== p.id) }),
-    })
-    if (riuscito) {
-      setCreate(n => n.filter(x => x.id !== p.id))
-      bozze.scarta(p.id)
-      setAperta(a => (a === p.id ? null : a))
-    }
-  }
-
-  const voci = [
-    ...config.strumenti.map(p => ({ salvata: p as Strumento | null, valore: bozze.valore(p) })),
-    ...nuove.map(p => ({ salvata: null, valore: bozze.valore(p) })),
-  ]
-  // Il nome si confronta con gli strumenti salvati e con quelli nuovi (come per i parametri).
-  const altre = [...config.strumenti, ...nuove.map(bozze.valore)]
 
   return (
     <Sezione titolo="Strumenti">
       <Spiegazione>
-        Uno strumento raggruppa i parametri che rilevi insieme in campo. Si elimina solo se non ha ancora misure.
+        Uno strumento raggruppa i valori che rilevi insieme in campo, e si modifica qui con i suoi valori. Un valore con
+        dati non si elimina: si archivia, e i suoi dati restano nella storia e nell'export. Uno strumento con misure si
+        archivia; senza misure si può anche eliminare.
       </Spiegazione>
+      <AvvisoDati letture={[datiParametri, datiStrumenti]} />
+
       <ul aria-label="Strumenti dell'esperimento" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
-        {voci.map(({ salvata, valore }) => {
-          const modificata = salvata === null || bozze.modificato(salvata)
-          const problemi = problemiStrumento(valore, altre, attivi)
-          const n = valore.parametri.filter(pp => attivi.has(pp.parametro_id)).length
+        {g.voci.map(voce => {
+          const valori = voce.parametri.map(p => p.nome.trim() || 'senza nome')
           return (
             <Espandibile
-              key={valore.id}
-              titolo={[valore.icona, valore.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
-              riassunto={n === 0 ? 'Nessun parametro' : n === 1 ? '1 parametro' : `${n} parametri`}
-              nota={salvata === null ? 'Non salvato' : modificata ? 'Modifiche non salvate' : undefined}
-              aperto={aperta === valore.id}
-              onCambia={() => setAperta(aperta === valore.id ? null : valore.id)}
+              key={voce.id}
+              titolo={[voce.strumento.icona, voce.strumento.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
+              riassunto={valori.length === 0 ? 'Nessun valore' : valori.join(' · ')}
+              nota={g.salvato(voce.id) === undefined ? 'Non salvato' : g.modificato(voce) ? 'Modifiche non salvate' : undefined}
+              aperto={g.aperta === voce.id}
+              onCambia={() => g.setAperta(g.aperta === voce.id ? null : voce.id)}
             >
-              <EditorInclusioneStrumento valore={valore} parametri={config.parametri} onChange={bozze.cambia} />
-              {problemi.length > 0 && (
-                <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  disabled={!modificata || problemi.length > 0 || inCorso}
-                  onClick={() => void salva(valore, salvata === null)}
-                >
-                  {inCorso ? 'Salvataggio…' : 'Salva'}
-                </Button>
-                {salvata && modificata && (
-                  <Button variant="ghost" disabled={inCorso} onClick={() => bozze.scarta(salvata.id)}>Annulla le modifiche</Button>
-                )}
-              </div>
-              {salvata === null ? (
-                <Button variant="destructive" size="sm" className="self-start" onClick={() => scartaNuova(valore.id)}>Scarta</Button>
-              ) : (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="self-start"
-                  disabled={inCorso}
-                  onClick={() => setDaEliminare({ strumento: salvata, aperto: true })}
-                >
-                  Elimina strumento
-                </Button>
-              )}
+              <ModificaStrumento g={g} voce={voce} />
             </Espandibile>
           )
         })}
       </ul>
-      <Button variant="outline" onClick={aggiungi}>+ Strumento</Button>
+      {g.voci.length === 0 && <p className="text-sm text-grafite-tenue">Nessuno strumento ancora.</p>}
+      {avviso && (
+        <div role="alert" className="flex flex-col gap-1">
+          <TestoErrore className="text-base">{avviso}</TestoErrore>
+          <p className="text-sm text-grafite-tenue">Lo strumento è comunque nell'esperimento, ma non è collegato al catalogo.</p>
+        </div>
+      )}
 
-      <Conferma
-        aperta={daEliminare?.aperto ?? false}
-        titolo={`Eliminare lo strumento «${daEliminare?.strumento.nome ?? ''}»?`}
-        testo="Si può eliminare solo uno strumento senza misure: i parametri restano. L'operazione non si può annullare."
-        annulla="Annulla"
-        conferma="Elimina"
-        onAnnulla={() => setDaEliminare(d => d && { ...d, aperto: false })}
-        onConferma={() => { if (daEliminare) void elimina(daEliminare.strumento) }}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" aria-expanded={dalCatalogo} onClick={() => setDalCatalogo(a => !a)}>+ Aggiungi dal catalogo</Button>
+        <Link to={percorsoCatalogo} className={buttonVariants({ variant: 'ghost' })}>Gestisci il catalogo</Link>
+      </div>
+      {dalCatalogo && (
+        <SceltaDalCatalogo
+          voci={catalogo.data}
+          errore={catalogo.isError ? catalogo.error : undefined}
+          onRiprova={() => void catalogo.refetch()}
+          gia={gia}
+          onAggiungi={aggiungiDaCatalogo}
+          onNuovo={() => { setAvviso(null); setNuovo(true) }}
+        />
+      )}
+      {dalCatalogo && nuovo && <NuovoStrumento config={config} onAggiungi={aggiungiNuovo} onAnnulla={() => setNuovo(false)} />}
+
+      <ValoriSenzaStrumento
+        valori={senzaStrumento}
+        conDati={datiParametri.data}
+        inCorso={g.inCorso}
+        onArchivia={p => void g.archiviaValore(null, p)}
       />
+
+      <StrumentiArchiviati archiviati={g.archiviati} parametri={config.parametri} inCorso={g.inCorso} onRipristina={g.ripristina} />
+      <ParametriArchiviati archiviati={archiviati} strumenti={config.strumenti} inCorso={g.inCorso} onRipristina={g.ripristinaValore} />
     </Sezione>
   )
 }

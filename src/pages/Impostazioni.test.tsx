@@ -17,10 +17,13 @@ vi.mock('@/api/esperimenti', () => ({
   listaEsperimenti: vi.fn(), caricaConfig: vi.fn(), creaEsperimento: vi.fn(), aggiornaEsperimento: vi.fn(),
 }))
 vi.mock('@/api/configurazione', () => ({
-  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
-  archiviaParametro: vi.fn(),
+  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
+  archiviaParametro: vi.fn(), archiviaStrumento: vi.fn(),
   salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
   aggiornaTrattamento: vi.fn(),
+}))
+vi.mock('@/api/catalogo', () => ({
+  listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
 }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }) }))
@@ -29,14 +32,15 @@ import { toast } from 'sonner'
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
+import { listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta,
-  parametriConDati, pianteConDati, salvaParametro, salvaStrumento,
+  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro,
+  eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, salvaParametro, salvaStrumento, strumentiConDati,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
+import type { ConfigEsperimento, Parametro, Strumento } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { Impostazioni } from './Impostazioni'
 
@@ -46,6 +50,7 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 let config: ConfigEsperimento
 
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
+const strum = (nome: string): Strumento => config.strumenti.find(s => s.nome === nome)!
 const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
 const idTrattamento = (etichetta: string) => config.trattamenti.find(t => t.etichetta === etichetta)!.id
 
@@ -78,11 +83,14 @@ async function pronta() {
 /** La riga (espandibile) di una pianta, dall'etichetta. */
 const rigaPianta = (etichetta: string) =>
   sezione('Piante').getByRole('button', { name: new RegExp(`^#${etichetta}(?!\\d)`) })
-const rigaParametro = (nome: string) => sezione('Parametri').getByRole('button', { name: new RegExp(`^${nome}`) })
-// Aperta, uno strumento mostra anche i pulsanti "Sposta «…» su/giù" dei suoi parametri.
-const rigaStrumento = (nome: string) => sezione('Strumenti').getByRole('button', { name: new RegExp(`^(?!Sposta).*${nome}`) })
+/** La riga di uno strumento (con la sua icona davanti, se c'è): aperto, i suoi valori hanno righe che iniziano col loro nome. */
+const rigaStrumento = (nome: string) =>
+  sezione('Strumenti').getAllByRole('button', { name: new RegExp(`^(\\S+ )?${nome}`) })[0]
 /** Il contenuto aperto di una voce espandibile. */
 const aperta = (riga: HTMLElement) => within(riga.closest('li') as HTMLElement)
+/** La riga di un valore dentro lo strumento (o la tabella) aperto. */
+const rigaValore = (dentro: ReturnType<typeof aperta>, nome: string) => dentro.getByRole('button', { name: new RegExp(`^${nome}`) })
+const tabella = () => sezione('Tabella fenologica')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -95,6 +103,10 @@ beforeEach(() => {
   // Temp aria ha dati; la pianta 1 ha misure.
   vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Temp aria').id]))
   vi.mocked(pianteConDati).mockImplementation(async () => new Set([idPianta('1')]))
+  // Le misure della pianta 1 sono col Termometro; gli altri strumenti non ne hanno.
+  vi.mocked(strumentiConDati).mockImplementation(async () => new Set([strum('Termometro').id]))
+  vi.mocked(listaCatalogo).mockResolvedValue(SEMI_CATALOGO)
+  vi.mocked(salvaVoceCatalogo).mockResolvedValue(undefined)
 
   vi.mocked(aggiornaEsperimento).mockImplementation(async (_e, patch) => {
     config.esperimento = { ...config.esperimento, ...patch }
@@ -122,25 +134,98 @@ beforeEach(() => {
       : [...config.strumenti, p]
   })
   vi.mocked(eliminaStrumento).mockImplementation(async (_e, id) => { config.strumenti = config.strumenti.filter(p => p.id !== id) })
+  vi.mocked(archiviaStrumento).mockImplementation(async (_e, id) => {
+    config.strumenti = config.strumenti.map(x => (x.id === id ? { ...x, archiviato: true } : x))
+  })
+  vi.mocked(archiviaParametro).mockImplementation(async (_e, id) => {
+    config.parametri = config.parametri.map(x => (x.id === id ? { ...x, archiviato: true } : x))
+  })
 })
 
 describe('Impostazioni: dal piano', () => {
-  it('il parametro con dati ha il tipo bloccato e "Archivia"; quello senza dati ha "Elimina"', async () => {
+  it('un valore con dati ha il tipo bloccato e "Archivia il valore"; uno senza dati ha "Elimina il valore"', async () => {
+    vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('N frutti').id]))
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Temp aria'))
-    const tempAria = aperta(rigaParametro('Temp aria'))
-    expect(tempAria.getByLabelText('Tipo')).toBeDisabled()
-    expect(tempAria.getByText('Il tipo non si può cambiare: ci sono già dati.')).toBeInTheDocument()
-    expect(tempAria.getByRole('button', { name: 'Archivia' })).toBeEnabled()
-    expect(tempAria.queryByRole('button', { name: 'Elimina' })).not.toBeInTheDocument()
+    await utente.click(rigaValore(tabella(), 'N fruttiNumero'))
+    const nFrutti = aperta(rigaValore(tabella(), 'N fruttiNumero'))
+    expect(nFrutti.getByLabelText('Tipo')).toBeDisabled()
+    expect(nFrutti.getByText('Il tipo non si può cambiare: ci sono già dati.')).toBeInTheDocument()
+    expect(nFrutti.getByRole('button', { name: 'Archivia il valore «N frutti»' })).toBeEnabled()
+    expect(nFrutti.queryByRole('button', { name: /^Elimina il valore/ })).not.toBeInTheDocument()
 
-    await utente.click(rigaParametro('SPAD'))
-    const spad = aperta(rigaParametro('SPAD'))
-    expect(spad.getByLabelText('Tipo')).toBeEnabled()
-    expect(spad.getByRole('button', { name: 'Elimina' })).toBeEnabled()
-    expect(spad.queryByRole('button', { name: 'Archivia' })).not.toBeInTheDocument()
+    await utente.click(rigaValore(tabella(), 'Note'))
+    const note = aperta(rigaValore(tabella(), 'Note'))
+    expect(note.getByLabelText('Tipo')).toBeEnabled()
+    expect(note.getByRole('button', { name: 'Elimina il valore «Note»' })).toBeEnabled()
+    expect(note.queryByRole('button', { name: /^Archivia il valore/ })).not.toBeInTheDocument()
+  })
+
+  it('"Aggiungi dal catalogo" Ciras salva i suoi 4 valori con la chiave del catalogo e poi lo strumento', async () => {
+    const ciras = SEMI_CATALOGO.find(v => v.nome === 'Ciras')!
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Ciras»' }))
+
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
+    const [esp, strumento] = vi.mocked(salvaStrumento).mock.calls[0]
+    expect(esp).toBe('E')
+    expect(strumento).toMatchObject({ nome: 'Ciras', tipo: 'strumento', catalogo_id: ciras.id, ordine: 4, archiviato: false })
+    expect(strumento.parametri).toHaveLength(4)
+    const salvati = vi.mocked(salvaParametro).mock.calls.map(([, p]) => p)
+    expect(salvati.map(p => [p.nome, p.catalogo_chiave])).toEqual([['A', 'a'], ['gs', 'gs'], ['E', 'e'], ['Ci', 'ci']])
+    // Dopo il massimo `ordine` dei parametri dell'esperimento (10), e prima dello strumento.
+    expect(salvati.map(p => p.ordine)).toEqual([11, 12, 13, 14])
+    expect(strumento.parametri.map(pp => pp.parametro_id)).toEqual(salvati.map(p => p.id))
+    const ultimoParametro = Math.max(...vi.mocked(salvaParametro).mock.invocationCallOrder)
+    expect(ultimoParametro).toBeLessThan(vi.mocked(salvaStrumento).mock.invocationCallOrder[0])
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Strumento «Ciras» salvato.'))
+    expect(await screen.findByRole('button', { name: /^🍃 Ciras/ })).toHaveTextContent('A · gs · E · Ci')
+  })
+
+  it('"Archivia" su uno strumento con misure lo archivia (nessun delete); "Elimina" compare solo senza misure', async () => {
+    const termometro = strum('Termometro').id
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Termometro'))
+    const termometroAperto = aperta(rigaStrumento('Termometro'))
+    expect(termometroAperto.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    await utente.click(termometroAperto.getByRole('button', { name: 'Archivia strumento' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Termometro»?' })
+    expect(archiviaStrumento).not.toHaveBeenCalled()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Archivia' }))
+
+    await waitFor(() => expect(archiviaStrumento).toHaveBeenCalledWith('E', termometro))
+    expect(eliminaStrumento).not.toHaveBeenCalled()
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Strumento «Termometro» archiviato.'))
+    await waitFor(() => expect(sezione('Strumenti').queryByRole('button', { name: /^🌡 Termometro/ })).not.toBeInTheDocument())
+    expect(sezione('Strumenti').getByRole('button', { name: 'Strumenti archiviati (1)' })).toBeInTheDocument()
+
+    await utente.click(rigaStrumento('SPAD'))
+    expect(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' })).toBeEnabled()
+  })
+
+  it('la tabella fenologica ha valori di ogni tipo; in uno strumento semplice il tipo è bloccato su numero', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    expect(rigaValore(tabella(), 'Palchi')).toHaveTextContent('Lista ripetuta')
+    expect(rigaValore(tabella(), 'Note')).toHaveTextContent('Testo')
+    await utente.click(rigaValore(tabella(), 'Note'))
+    expect(aperta(rigaValore(tabella(), 'Note')).getByLabelText('Tipo')).toBeEnabled()
+
+    await utente.click(rigaStrumento('Termometro'))
+    const tempAria = rigaValore(aperta(rigaStrumento('Termometro')), 'Temp aria')
+    await utente.click(tempAria)
+    const campo = aperta(tempAria).getByLabelText('Tipo')
+    expect(campo).toBeDisabled()
+    expect(campo).toHaveValue('numero')
+    expect(aperta(tempAria).getByText(/Uno strumento misura numeri/)).toBeInTheDocument()
   })
 
   it('la pianta con dati non ha "Rimuovi" e lo dice', async () => {
@@ -321,174 +406,149 @@ describe('Impostazioni: piante', () => {
   })
 })
 
-describe('Impostazioni: parametri', () => {
-  it('"Elimina" su un parametro senza dati chiede conferma e lo elimina', async () => {
-    const { utente } = apri()
-    await pronta()
-
-    await utente.click(rigaParametro('SPAD'))
-    await utente.click(aperta(rigaParametro('SPAD')).getByRole('button', { name: 'Elimina' }))
-    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare il parametro «SPAD»?' })
-    await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
-
-    await waitFor(() => expect(eliminaOArchiviaParametro).toHaveBeenCalledWith('E', expect.objectContaining({ nome: 'SPAD' })))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro eliminato.'))
-  })
-
-  it('"Archivia" su un parametro con dati lo archivia (mai elimina) e lo dice', async () => {
-    vi.mocked(archiviaParametro).mockImplementation(async (_e, id) => {
-      config.parametri = config.parametri.map(x => (x.id === id ? { ...x, archiviato: true } : x))
-    })
+describe('Impostazioni: valori degli strumenti', () => {
+  it('togliere da uno strumento un valore con dati lo archivia (nessun delete); il collegamento resta', async () => {
     const tempAria = par('Temp aria').id
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Temp aria'))
-    await utente.click(aperta(rigaParametro('Temp aria')).getByRole('button', { name: 'Archivia' }))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro archiviato.'))
-    // Anche se nel frattempo i dati fossero spariti: "Archivia" non passa da eliminaOArchiviaParametro.
-    expect(archiviaParametro).toHaveBeenCalledWith('E', tempAria)
+    await utente.click(rigaStrumento('Termometro'))
+    const termometro = aperta(rigaStrumento('Termometro'))
+    await utente.click(rigaValore(termometro, 'Temp aria'))
+    await utente.click(termometro.getByRole('button', { name: 'Archivia il valore «Temp aria»' }))
+
+    await waitFor(() => expect(archiviaParametro).toHaveBeenCalledWith('E', tempAria))
     expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
-    await waitFor(() => expect(sezione('Parametri').queryByRole('button', { name: /^Temp aria/ })).not.toBeInTheDocument())
-    expect(sezione('Parametri').getByRole('button', { name: 'Parametri archiviati (1)' })).toBeInTheDocument()
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Valore «Temp aria» archiviato.'))
+    await waitFor(() => expect(termometro.queryByRole('button', { name: /^Temp aria/ })).not.toBeInTheDocument())
+    // Lo strumento non si salva da sé: il collegamento al valore archiviato resta com'è nel database.
+    expect(salvaStrumento).not.toHaveBeenCalled()
+    expect(strum('Termometro').parametri.some(pp => pp.parametro_id === tempAria)).toBe(true)
+    expect(termometro.getByRole('button', { name: 'Salva' })).toBeDisabled()
   })
 
-  it('un archiviato si ripristina con "Ripristina"', async () => {
-    par('Note').archiviato = true
-    const prima = { ...par('Note') }
+  it('togliere un valore senza dati lo elimina, dopo una conferma', async () => {
     const { utente } = apri()
     await pronta()
 
-    const parametri = sezione('Parametri')
-    expect(parametri.queryByRole('button', { name: /^Note/ })).not.toBeInTheDocument()
-    await utente.click(parametri.getByRole('button', { name: 'Parametri archiviati (1)' }))
-    const riga = within(parametri.getByText('Note').closest('li') as HTMLElement)
-    await utente.click(riga.getByRole('button', { name: 'Ripristina' }))
+    await utente.click(rigaStrumento('Termometro'))
+    const termometro = aperta(rigaStrumento('Termometro'))
+    await utente.click(rigaValore(termometro, 'Temp pianta'))
+    await utente.click(termometro.getByRole('button', { name: 'Elimina il valore «Temp pianta»' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare il valore «Temp pianta»?' })
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
 
-    await waitFor(() => expect(salvaParametro).toHaveBeenCalledWith('E', { ...prima, archiviato: false }))
-    expect(await parametri.findByRole('button', { name: /^Note/ })).toBeInTheDocument()
+    await waitFor(() => expect(eliminaOArchiviaParametro).toHaveBeenCalledWith('E', expect.objectContaining({ nome: 'Temp pianta' })))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Valore eliminato.'))
+    expect(archiviaParametro).not.toHaveBeenCalled()
   })
 
-  it('un parametro che non sta in nessuno strumento lo dice nel riassunto', async () => {
-    const spad = par('SPAD').id
-    config.strumenti = config.strumenti.map(p => ({ ...p, parametri: p.parametri.filter(pp => pp.parametro_id !== spad) }))
-    apri()
-    await pronta()
-
-    expect(rigaParametro('SPAD')).toHaveTextContent('in nessuno strumento')
-    expect(rigaParametro('Temp aria')).not.toHaveTextContent('in nessuno strumento')
-  })
-
-  it('"+ Parametro" ne crea uno non salvato in fondo all\'ordine; si salva con il suo "Salva"', async () => {
-    const { utente } = apri()
-    await pronta()
-
-    await utente.click(sezione('Parametri').getByRole('button', { name: '+ Parametro' }))
-    const nuovo = rigaParametro('Senza nome')
-    expect(nuovo).toHaveTextContent('Non salvato')
-    const voce = aperta(nuovo)
-    await utente.type(voce.getByLabelText('Nome'), 'altezza')
-    expect(voce.getByText('C\'è già un parametro che si chiama "Altezza".')).toBeInTheDocument()
-    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
-
-    await utente.clear(voce.getByLabelText('Nome'))
-    await utente.type(voce.getByLabelText('Nome'), ' Diametro ')
-    await utente.click(voce.getByRole('button', { name: 'Salva' }))
-    await waitFor(() => expect(salvaParametro).toHaveBeenCalledWith('E', expect.objectContaining({
-      nome: 'Diametro', ordine: 11, archiviato: false,
-    })))
-    await waitFor(() => expect(rigaParametro('Diametro')).not.toHaveTextContent('Non salvato'))
-  })
-
-  it('a un parametro lista con dati non si toglie un sotto-campo', async () => {
-    vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Palchi').id]))
-    const { utente } = apri()
-    await pronta()
-
-    await utente.click(rigaParametro('Palchi'))
-    const voce = aperta(rigaParametro('Palchi'))
-    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
-    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
-    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
-  })
-
-  it('finché non si sa se un parametro lista ha dati, i sotto-campi non si tolgono', async () => {
+  it('finché non si sa se un valore ha dati si archivia, non si elimina', async () => {
     vi.mocked(parametriConDati).mockReturnValue(new Promise(() => undefined))
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
 
-    await utente.click(rigaParametro('Palchi'))
-    const voce = aperta(rigaParametro('Palchi'))
-    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
-    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
-    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
+    await utente.click(rigaStrumento('SPAD'))
+    const spad = aperta(rigaStrumento('SPAD'))
+    await utente.click(rigaValore(spad, 'SPAD'))
+    expect(spad.getByRole('button', { name: 'Archivia il valore «SPAD»' })).toBeEnabled()
+    expect(spad.queryByRole('button', { name: /^Elimina il valore/ })).not.toBeInTheDocument()
   })
 
-  it('anche con dati in errore i sotto-campi non si tolgono', async () => {
-    vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
-    await sezione('Parametri').findByRole('alert')
-
-    await utente.click(rigaParametro('Palchi'))
-    const voce = aperta(rigaParametro('Palchi'))
-    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
-    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
-    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
-    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
-    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
-  })
-
-  it('togliendo un sotto-campo si ricontrolla sul server se nel frattempo sono arrivati dati', async () => {
+  it('un valore nuovo si salva con lo strumento: prima il valore, poi lo strumento con il collegamento', async () => {
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Palchi'))
-    const voce = aperta(rigaParametro('Palchi'))
-    // Un secondo sotto-campo, così la lista resta valida dopo aver tolto il primo.
-    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
-    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
-    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
-    vi.mocked(parametriConDati).mockResolvedValue(new Set([par('Palchi').id]))
-    await utente.click(voce.getByRole('button', { name: 'Salva' }))
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(metro.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(metro.getByLabelText('Nome'), ' Diametro ')
+    expect(rigaStrumento('Metro')).toHaveTextContent('Modifiche non salvate')
+    await utente.click(metro.getByRole('button', { name: 'Salva' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
-      'Il parametro «Palchi» ha già dei dati: i suoi sotto-campi non si possono togliere.'))
-    expect(salvaParametro).not.toHaveBeenCalled()
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Strumento «Metro» salvato.'))
+    expect(salvaParametro).toHaveBeenCalledTimes(1)
+    const nuovo = vi.mocked(salvaParametro).mock.calls[0][1]
+    // Dopo il massimo `ordine` dell'esperimento, non solo dello strumento.
+    expect(nuovo).toMatchObject({ nome: 'Diametro', ordine: 11, archiviato: false, tipo: 'numero' })
+    const [, strumento] = vi.mocked(salvaStrumento).mock.calls[0]
+    expect(strumento.parametri.map(pp => pp.parametro_id)).toEqual([par('Altezza').id, nuovo.id])
+    expect(vi.mocked(salvaParametro).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(salvaStrumento).mock.invocationCallOrder[0])
+    await waitFor(() => expect(rigaStrumento('Metro')).not.toHaveTextContent('Modifiche non salvate'))
   })
 
-  it('un parametro nuovo arrivato in configurazione nonostante un errore non compare due volte', async () => {
-    // Il salvataggio arriva al database ma la risposta no.
-    vi.mocked(salvaParametro).mockImplementationOnce(async (_e, p) => {
-      config.parametri = [...config.parametri, p]
-      throw new TypeError('Failed to fetch')
-    })
+  it('"Salva" che fallisce sul secondo passo lascia la bozza e mostra l\'errore; il nuovo "Salva" riprova', async () => {
+    vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
     await pronta()
 
-    await utente.click(sezione('Parametri').getByRole('button', { name: '+ Parametro' }))
-    await utente.type(aperta(rigaParametro('Senza nome')).getByLabelText('Nome'), 'Diametro')
-    await utente.click(aperta(rigaParametro('Diametro')).getByRole('button', { name: 'Salva' }))
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(metro.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(metro.getByLabelText('Nome'), 'Diametro')
+    await utente.click(metro.getByRole('button', { name: 'Salva' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalled())
-    await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(sezione('Parametri').getAllByRole('button', { name: /^Diametro/ })).toHaveLength(1))
-    expect(rigaParametro('Diametro')).not.toHaveTextContent('Non salvato')
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    expect(toastSalvato).not.toHaveBeenCalled()
+    // Il valore è già nel database, lo strumento no: la bozza resta com'è e si può riprovare.
+    expect(salvaParametro).toHaveBeenCalledTimes(1)
+    expect(metro.getByLabelText('Nome')).toHaveValue('Diametro')
+    expect(rigaStrumento('Metro')).toHaveTextContent('Modifiche non salvate')
+    expect(metro.getByRole('button', { name: 'Salva' })).toBeEnabled()
+
+    await utente.click(metro.getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Strumento «Metro» salvato.'))
+    expect(salvaStrumento).toHaveBeenCalledTimes(2)
+    const [primo, secondo] = vi.mocked(salvaStrumento).mock.calls.map(([, s]) => s)
+    expect(secondo).toEqual(primo)
+    // Il valore, già nel database, non si riscrive; se lo si riscrivesse sarebbe lo stesso (upsert per id).
+    const id = vi.mocked(salvaParametro).mock.calls[0][1].id
+    expect(vi.mocked(salvaParametro).mock.calls.filter(([, p]) => p.id === id).length).toBeLessThanOrEqual(2)
+    await waitFor(() => expect(config.parametri.filter(p => p.nome === 'Diametro')).toHaveLength(1))
+  })
+
+  it('"Salva" che fallisce sul primo passo non salva lo strumento', async () => {
+    vi.mocked(salvaParametro).mockRejectedValueOnce({ code: '23505', message: 'duplicate key' })
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(metro.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(metro.getByLabelText('Nome'), 'Diametro')
+    await utente.click(metro.getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Esiste già un elemento con questo nome o etichetta.'))
+    expect(salvaStrumento).not.toHaveBeenCalled()
+    expect(metro.getByLabelText('Nome')).toHaveValue('Diametro')
+  })
+
+  it('un valore con il nome di un altro valore dell\'esperimento non si salva', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(metro.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(metro.getByLabelText('Nome'), 'temp aria')
+    expect(metro.getByText('C\'è già un parametro che si chiama "Temp aria".')).toBeInTheDocument()
+    expect(metro.getByRole('button', { name: 'Salva' })).toBeDisabled()
   })
 
   it('un errore di rete lascia i valori scritti e lo dice', async () => {
-    vi.mocked(salvaParametro).mockRejectedValue(new TypeError('Failed to fetch'))
+    vi.mocked(salvaStrumento).mockRejectedValue(new TypeError('Failed to fetch'))
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Altezza'))
-    const voce = aperta(rigaParametro('Altezza'))
-    await utente.type(voce.getByLabelText('Nome'), ' pianta')
-    await utente.click(voce.getByRole('button', { name: 'Salva' }))
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.type(metro.getByLabelText('Nome dello strumento'), ' lungo')
+    await utente.click(metro.getByRole('button', { name: 'Salva' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
-    expect(voce.getByLabelText('Nome')).toHaveValue('Altezza pianta')
-    expect(voce.getByRole('button', { name: 'Salva' })).toBeEnabled()
+    expect(metro.getByLabelText('Nome dello strumento')).toHaveValue('Metro lungo')
+    expect(metro.getByRole('button', { name: 'Salva' })).toBeEnabled()
     expect(toastSalvato).not.toHaveBeenCalled()
   })
 
@@ -496,77 +556,296 @@ describe('Impostazioni: parametri', () => {
     const { client, utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Altezza'))
-    await utente.type(aperta(rigaParametro('Altezza')).getByLabelText('Nome'), ' pianta')
+    await utente.click(rigaStrumento('Metro'))
+    await utente.type(aperta(rigaStrumento('Metro')).getByLabelText('Nome dello strumento'), ' lungo')
     await act(() => client.invalidateQueries({ queryKey: chiavi.config('E') }))
     await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
-    expect(aperta(rigaParametro('Altezza')).getByLabelText('Nome')).toHaveValue('Altezza pianta')
+    expect(aperta(rigaStrumento('Metro lungo')).getByLabelText('Nome dello strumento')).toHaveValue('Metro lungo')
   })
 
-  it('le azioni distruttive aspettano di sapere quali parametri e piante hanno dati', async () => {
-    let rispondiParametri!: (s: Set<string>) => void
-    let rispondiPiante!: (s: Set<string>) => void
-    vi.mocked(parametriConDati).mockReturnValue(new Promise(r => { rispondiParametri = r }))
-    vi.mocked(pianteConDati).mockReturnValue(new Promise(r => { rispondiPiante = r }))
+  it('"Annulla le modifiche" torna ai valori salvati', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.type(metro.getByLabelText('Nome dello strumento'), ' lungo')
+    await utente.click(metro.getByRole('button', { name: 'Annulla le modifiche' }))
+    expect(metro.getByLabelText('Nome dello strumento')).toHaveValue('Metro')
+    expect(rigaStrumento('Metro')).not.toHaveTextContent('Modifiche non salvate')
+  })
+
+  it('salvando uno strumento, i valori eliminati nel frattempo non si mandano', async () => {
+    const tempAria = par('Temp aria').id
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Termometro'))
+    const termometro = aperta(rigaStrumento('Termometro'))
+    await utente.type(termometro.getByLabelText('Nome dello strumento'), ' mattino')
+    await utente.click(rigaValore(termometro, 'Temp pianta'))
+    await utente.click(termometro.getByRole('button', { name: 'Elimina il valore «Temp pianta»' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Valore eliminato.'))
+
+    await utente.click(termometro.getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
+    const [, salvato] = vi.mocked(salvaStrumento).mock.calls[0]
+    expect(salvato.nome).toBe('Termometro mattino')
+    expect(salvato.parametri.map(pp => pp.parametro_id)).toEqual([tempAria])
+  })
+
+  it('i valori archiviati si ripristinano dall\'elenco, che dice a quale strumento appartengono', async () => {
+    par('Note').archiviato = true
+    par('Temp pianta').archiviato = true
+    const prima = { ...par('Temp pianta') }
+    const { utente } = apri()
+    await pronta()
+
+    expect(rigaValore(tabella(), 'Palchi')).toBeInTheDocument()
+    expect(tabella().queryByRole('button', { name: /^Note/ })).not.toBeInTheDocument()
+    const strumenti = sezione('Strumenti')
+    await utente.click(strumenti.getByRole('button', { name: 'Valori archiviati (2)' }))
+    const riga = within(strumenti.getByText('Temp pianta', { selector: 'span' }).closest('li') as HTMLElement)
+    expect(riga.getByText(/Termometro/)).toBeInTheDocument()
+    expect(within(strumenti.getByText('Note', { selector: 'span' }).closest('li') as HTMLElement).getByText(/Tabella fenologica/)).toBeInTheDocument()
+    await utente.click(riga.getByRole('button', { name: 'Ripristina' }))
+
+    await waitFor(() => expect(salvaParametro).toHaveBeenCalledWith('E', { ...prima, archiviato: false }))
+    await utente.click(rigaStrumento('Termometro'))
+    expect(await aperta(rigaStrumento('Termometro')).findByRole('button', { name: /^Temp pianta/ })).toBeInTheDocument()
+  })
+})
+
+describe('Impostazioni: valori senza strumento', () => {
+  it('un valore che non sta in nessuno strumento (di prima della v3) si vede e si può archiviare, mai eliminare', async () => {
+    const note = par('Note').id
+    const fenologica = config.strumenti.find(s => s.tipo === 'fenologico')!
+    fenologica.parametri = fenologica.parametri.filter(pp => pp.parametro_id !== note)
+    vi.mocked(parametriConDati).mockImplementation(async () => new Set([note]))
+    const { utente } = apri()
+    await pronta()
+
+    const senza = within(sezione('Strumenti').getByRole('list', { name: 'Valori senza strumento' }))
+    expect(senza.getByText('Note')).toBeInTheDocument()
+    expect(senza.getByText(/ha dati/)).toBeInTheDocument()
+    expect(senza.queryByRole('button', { name: /^Elimina/ })).not.toBeInTheDocument()
+    await utente.click(senza.getByRole('button', { name: 'Archivia il valore «Note»' }))
+
+    await waitFor(() => expect(archiviaParametro).toHaveBeenCalledWith('E', note))
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+    await waitFor(() => expect(sezione('Strumenti').queryByRole('list', { name: 'Valori senza strumento' })).not.toBeInTheDocument())
+    expect(sezione('Strumenti').getByRole('button', { name: 'Valori archiviati (1)' })).toBeInTheDocument()
+  })
+
+  it('senza valori fuori dagli strumenti l\'elenco non c\'è', async () => {
+    apri()
+    await pronta()
+    expect(sezione('Strumenti').queryByRole('list', { name: 'Valori senza strumento' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
+  it('a un valore lista con dati non si toglie un sotto-campo', async () => {
+    vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Palchi').id]))
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaValore(tabella(), 'Palchi'))
+    const voce = aperta(rigaValore(tabella(), 'Palchi'))
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
+    expect(tabella().getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('finché non si sa se un valore lista ha dati, i sotto-campi non si tolgono', async () => {
+    vi.mocked(parametriConDati).mockReturnValue(new Promise(() => undefined))
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
 
-    await utente.click(rigaParametro('SPAD'))
-    const spad = aperta(rigaParametro('SPAD'))
-    expect(spad.getByRole('button', { name: 'Elimina' })).toBeDisabled()
-    expect(spad.getByLabelText('Tipo')).toBeDisabled()
-    await utente.click(rigaPianta('2'))
-    const due = aperta(rigaPianta('2'))
-    expect(due.getByRole('button', { name: 'Rimuovi' })).toBeDisabled()
-    expect(due.getByLabelText('Trattamento')).toBeDisabled()
+    await utente.click(rigaValore(tabella(), 'Palchi'))
+    const voce = aperta(rigaValore(tabella(), 'Palchi'))
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
+    expect(tabella().getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
 
-    await act(async () => {
-      rispondiParametri(new Set())
-      rispondiPiante(new Set())
-    })
-    await waitFor(() => expect(due.getByRole('button', { name: 'Rimuovi' })).toBeEnabled())
-    expect(due.getByLabelText('Trattamento')).toBeEnabled()
-    expect(spad.getByRole('button', { name: 'Elimina' })).toBeEnabled()
-    expect(spad.getByLabelText('Tipo')).toBeEnabled()
+  it('anche con dati in errore i sotto-campi non si tolgono', async () => {
+    vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    await tabella().findByRole('alert')
+
+    await utente.click(rigaValore(tabella(), 'Palchi'))
+    const voce = aperta(rigaValore(tabella(), 'Palchi'))
+    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
+    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
+    expect(tabella().getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('togliendo un sotto-campo si ricontrolla sul server se nel frattempo sono arrivati dati', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaValore(tabella(), 'Palchi'))
+    const voce = aperta(rigaValore(tabella(), 'Palchi'))
+    // Un secondo sotto-campo, così la lista resta valida dopo aver tolto il primo.
+    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
+    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    vi.mocked(parametriConDati).mockResolvedValue(new Set([par('Palchi').id]))
+    await utente.click(tabella().getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Il parametro «Palchi» ha già dei dati: i suoi sotto-campi non si possono togliere.'))
+    expect(salvaParametro).not.toHaveBeenCalled()
+    expect(salvaStrumento).not.toHaveBeenCalled()
   })
 })
 
 describe('Impostazioni: strumenti', () => {
-  it('"Elimina strumento" con misure fallisce con il messaggio del database', async () => {
-    vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
+  it('"Elimina strumento" elimina anche i suoi valori senza dati, dopo una conferma che lo dice', async () => {
+    const spad = strum('SPAD').id
     const { utente } = apri()
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
     await utente.click(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Eliminare lo strumento «SPAD»?' })
+    expect(within(dialogo).getByText(/Si eliminano anche i suoi valori \(SPAD\)/)).toBeInTheDocument()
+    expect(eliminaStrumento).not.toHaveBeenCalled()
     await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Questo elemento ha dati collegati e non può essere eliminato.'))
-    expect(eliminaStrumento).toHaveBeenCalledWith('E', config.strumenti[1].id)
-    expect(rigaStrumento('SPAD')).toBeInTheDocument()
+    await waitFor(() => expect(eliminaStrumento).toHaveBeenCalledWith('E', spad))
+    await waitFor(() => expect(eliminaOArchiviaParametro).toHaveBeenCalledWith('E', expect.objectContaining({ nome: 'SPAD' })))
+    // Prima lo strumento (se ha misure il database rifiuta), poi i suoi valori.
+    expect(vi.mocked(eliminaStrumento).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(eliminaOArchiviaParametro).mock.invocationCallOrder[0])
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Strumento eliminato.'))
+    await waitFor(() => expect(sezione('Strumenti').queryByRole('button', { name: /^💚 SPAD/ })).not.toBeInTheDocument())
   })
 
-  it('uno strumento si modifica e si salva; "+ Strumento" non si salva senza nome e parametri', async () => {
-    const prima = structuredClone(config.strumenti[1])
+  it('"Elimina strumento" con misure arrivate nel frattempo spiega e rimanda ad "Archivia"', async () => {
+    vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('SPAD'))
+    await utente.click(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/«SPAD» ha già delle misure.*archivi/i)))
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+    expect(rigaStrumento('SPAD')).toBeInTheDocument()
+    expect(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
+  })
+
+  it('"Elimina strumento" non c\'è finché non si sa quali strumenti hanno misure, né se la lettura fallisce', async () => {
+    let rispondi!: (s: Set<string>) => void
+    vi.mocked(strumentiConDati).mockReturnValue(new Promise(r => { rispondi = r }))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+
+    await utente.click(rigaStrumento('SPAD'))
+    const spad = aperta(rigaStrumento('SPAD'))
+    expect(spad.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(spad.getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
+
+    await act(async () => { rispondi(new Set()) })
+    expect(await spad.findByRole('button', { name: 'Elimina strumento' })).toBeEnabled()
+  })
+
+  it('con la lettura delle misure in errore non c\'è "Elimina" e c\'è "Riprova"', async () => {
+    vi.mocked(strumentiConDati).mockRejectedValue(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    await sezione('Strumenti').findByRole('alert')
+
+    await utente.click(rigaStrumento('SPAD'))
+    expect(aperta(rigaStrumento('SPAD')).queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(sezione('Strumenti').getByRole('button', { name: 'Riprova' })).toBeInTheDocument()
+  })
+
+  it('un archiviato si ripristina con "Ripristina"', async () => {
+    strum('Metro').archiviato = true
+    const prima = structuredClone(strum('Metro'))
+    const { utente } = apri()
+    await pronta()
+
+    const strumenti = sezione('Strumenti')
+    expect(strumenti.queryByRole('button', { name: /^📏 Metro/ })).not.toBeInTheDocument()
+    await utente.click(strumenti.getByRole('button', { name: 'Strumenti archiviati (1)' }))
+    await utente.click(within(strumenti.getByText('📏 Metro', { selector: 'span' }).closest('li') as HTMLElement).getByRole('button', { name: 'Ripristina' }))
+
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledWith('E', { ...prima, archiviato: false }))
+    expect(await strumenti.findByRole('button', { name: /^📏 Metro/ })).toBeInTheDocument()
+  })
+
+  it('uno strumento si modifica e si salva', async () => {
+    const prima = structuredClone(strum('SPAD'))
     const { utente } = apri()
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
     const voce = aperta(rigaStrumento('SPAD'))
+    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
     await utente.type(voce.getByLabelText('Nome dello strumento'), ' fogliare')
     await utente.click(voce.getByRole('button', { name: 'Salva' }))
     await waitFor(() => expect(salvaStrumento).toHaveBeenCalledWith('E', { ...prima, nome: 'SPAD fogliare' }))
-
-    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Strumento' }))
-    const nuova = aperta(rigaStrumento('Senza nome'))
-    expect(nuova.getByText('Uno strumento non ha nome.')).toBeInTheDocument()
-    expect(nuova.getByRole('button', { name: 'Salva' })).toBeDisabled()
+    // Nessun valore è cambiato: nessun valore si riscrive.
+    expect(salvaParametro).not.toHaveBeenCalled()
   })
-})
 
-describe('Impostazioni: strumenti, casi limite', () => {
-  it('uno strumento nuovo arrivato in configurazione nonostante un errore non compare due volte', async () => {
+  it('il nome di uno strumento non può essere uguale a quello di un altro', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    const voce = aperta(rigaStrumento('Metro'))
+    await utente.clear(voce.getByLabelText('Nome dello strumento'))
+    await utente.type(voce.getByLabelText('Nome dello strumento'), ' spad ')
+    expect(voce.getByText('C\'è già uno strumento che si chiama "SPAD".')).toBeInTheDocument()
+    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('"Gestisci il catalogo" porta al catalogo', async () => {
+    apri()
+    await pronta()
+    expect(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' })).toHaveAttribute('href', '/catalogo')
+  })
+
+  it('dal catalogo si possono aggiungere solo le voci che l\'esperimento non ha già, anche se archiviate', async () => {
+    strum('Metro').archiviato = true
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    expect(await screen.findByRole('button', { name: 'Aggiungi «Ciras»' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '«Termometro» è già nell\'esperimento' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '«Metro» è già nell\'esperimento' })).toBeDisabled()
+  })
+
+  it('un errore nel salvare dal catalogo lascia lo strumento in elenco, non salvato, e il nuovo "Salva" riprova', async () => {
+    vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Calibro»' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    const riga = await screen.findByRole('button', { name: /^📐 Calibro/ })
+    expect(riga).toHaveTextContent('Non salvato')
+
+    await utente.click(aperta(riga).getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Strumento «Calibro» salvato.'))
+    expect(vi.mocked(salvaStrumento).mock.calls[1][1]).toEqual(vi.mocked(salvaStrumento).mock.calls[0][1])
+    await waitFor(() => expect(sezione('Strumenti').getAllByRole('button', { name: /^📐 Calibro/ })).toHaveLength(1))
+    expect(sezione('Strumenti').getByRole('button', { name: /^📐 Calibro/ })).not.toHaveTextContent('Non salvato')
+  })
+
+  it('uno strumento arrivato in configurazione nonostante un errore non compare due volte', async () => {
     vi.mocked(salvaStrumento).mockImplementationOnce(async (_e, p) => {
       config.strumenti = [...config.strumenti, p]
       throw new TypeError('Failed to fetch')
@@ -574,36 +853,173 @@ describe('Impostazioni: strumenti, casi limite', () => {
     const { utente } = apri()
     await pronta()
 
-    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Strumento' }))
-    const nuova = aperta(rigaStrumento('Senza nome'))
-    await utente.type(nuova.getByLabelText('Nome dello strumento'), 'Diametro')
-    const riga = within(nuova.getByText('Altezza', { selector: '[data-testid="nome-parametro"]' }).closest('li') as HTMLElement)
-    await utente.click(riga.getByRole('switch', { name: /Incluso/ }))
-    await utente.click(nuova.getByRole('button', { name: 'Salva' }))
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Calibro»' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled())
     await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(sezione('Strumenti').getAllByRole('button', { name: /^(?!Sposta).*Diametro/ })).toHaveLength(1))
+    await waitFor(() => expect(sezione('Strumenti').getAllByRole('button', { name: /^📐 Calibro/ })).toHaveLength(1))
+    expect(sezione('Strumenti').getByRole('button', { name: /^📐 Calibro/ })).not.toHaveTextContent('Non salvato')
   })
 
-  it('salvando uno strumento, i parametri eliminati nel frattempo non si mandano', async () => {
-    const tempAria = par('Temp aria').id
+  it('"Scarta" uno strumento non salvato toglie anche i valori già scritti nel database dal tentativo andato male', async () => {
+    vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaStrumento('Termometro'))
-    await utente.type(aperta(rigaStrumento('Termometro')).getByLabelText('Nome dello strumento'), ' mattino')
-    // Intanto "Temp pianta" (senza dati) viene eliminato.
-    await utente.click(rigaParametro('Temp pianta'))
-    await utente.click(aperta(rigaParametro('Temp pianta')).getByRole('button', { name: 'Elimina' }))
-    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro eliminato.'))
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Calibro»' }))
+    const riga = await screen.findByRole('button', { name: /^📐 Calibro/ })
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
+    await utente.click(aperta(riga).getByRole('button', { name: 'Scarta' }))
 
-    await utente.click(aperta(rigaStrumento('Termometro')).getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(eliminaOArchiviaParametro).toHaveBeenCalledWith('E', expect.objectContaining({ nome: 'Diametro' })))
+    expect(sezione('Strumenti').queryByRole('button', { name: /^📐 Calibro/ })).not.toBeInTheDocument()
+  })
+})
+
+describe('Impostazioni: nuovo strumento', () => {
+  /** Apre "+ Nuovo strumento" e compila «Penetrometro» con un valore. */
+  async function compilaPenetrometro(utente: ReturnType<typeof userEvent.setup>) {
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: '+ Nuovo strumento' }))
+    const modulo = within(screen.getByRole('region', { name: 'Nuovo strumento' }))
+    await utente.type(modulo.getByLabelText('Nome dello strumento'), 'Penetrometro')
+    await utente.click(modulo.getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(modulo.getByLabelText('Nome'), 'Resistenza')
+    return modulo
+  }
+
+  it('entra nel catalogo, poi la copia si aggiunge all\'esperimento collegata alla voce', async () => {
+    const { utente } = apri()
+    await pronta()
+    const modulo = await compilaPenetrometro(utente)
+    await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
     await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
-    const [, salvata] = vi.mocked(salvaStrumento).mock.calls[0]
-    expect(salvata.nome).toBe('Termometro mattino')
-    expect(salvata.parametri.map(pp => pp.parametro_id)).toEqual([tempAria])
+    expect(salvaVoceCatalogo).toHaveBeenCalledTimes(1)
+    const voce = vi.mocked(salvaVoceCatalogo).mock.calls[0][0]
+    expect(voce).toMatchObject({ nome: 'Penetrometro', parametri: [{ chiave: 'resistenza', nome: 'Resistenza' }] })
+    const [, strumento] = vi.mocked(salvaStrumento).mock.calls[0]
+    expect(strumento).toMatchObject({ nome: 'Penetrometro', catalogo_id: voce.id })
+    expect(vi.mocked(salvaParametro).mock.calls[0][1]).toMatchObject({ nome: 'Resistenza', catalogo_chiave: 'resistenza', ordine: 11 })
+    expect(vi.mocked(salvaVoceCatalogo).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(salvaStrumento).mock.invocationCallOrder[0])
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Nuovo strumento' })).not.toBeInTheDocument())
+    expect(await sezione('Strumenti').findByRole('button', { name: /^Penetrometro/ })).toBeInTheDocument()
+  })
+
+  it('con il catalogo irraggiungibile la copia entra nell\'esperimento, non collegata, e lo dice', async () => {
+    vi.mocked(salvaVoceCatalogo).mockRejectedValue(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await pronta()
+    const modulo = await compilaPenetrometro(utente)
+    await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(salvaStrumento).mock.calls[0][1]).toMatchObject({ nome: 'Penetrometro', catalogo_id: null })
+    expect(vi.mocked(salvaParametro).mock.calls[0][1].catalogo_chiave).toBeNull()
+    expect(await sezione('Strumenti').findByText(/non è collegato al catalogo/)).toBeInTheDocument()
+  })
+
+  it('con un nome già nel catalogo il modulo resta aperto e nulla entra nell\'esperimento', async () => {
+    vi.mocked(salvaVoceCatalogo).mockRejectedValue({ code: '23505', message: 'catalogo_strumenti_nome_unico' })
+    const { utente } = apri()
+    await pronta()
+    const modulo = await compilaPenetrometro(utente)
+    await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
+
+    expect(await modulo.findByText('Nel catalogo c\'è già uno strumento con questo nome.')).toBeInTheDocument()
+    expect(modulo.getByLabelText('Nome dello strumento')).toHaveValue('Penetrometro')
+    expect(salvaStrumento).not.toHaveBeenCalled()
+    expect(salvaParametro).not.toHaveBeenCalled()
+  })
+
+  it('senza nome o con un valore senza nome non si salva', async () => {
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: '+ Nuovo strumento' }))
+    const modulo = within(screen.getByRole('region', { name: 'Nuovo strumento' }))
+    expect(modulo.getByText('Uno strumento non ha nome.')).toBeInTheDocument()
+    expect(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' })).toBeDisabled()
+  })
+})
+
+describe('Impostazioni: tabella fenologica', () => {
+  it('"Elimina la tabella fenologica" c\'è solo senza misure e toglie anche le sue voci', async () => {
+    const id = strum('Tabella fenologica').id
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare la tabella fenologica?' })
+    await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(eliminaStrumento).toHaveBeenCalledWith('E', id))
+    await waitFor(() => expect(eliminaOArchiviaParametro).toHaveBeenCalledTimes(7))
+    expect(await tabella().findByRole('button', { name: 'Crea la tabella fenologica' })).toBeInTheDocument()
+  })
+
+  it('se la tabella ha misure arrivate nel frattempo, l\'eliminazione spiega che si archiviano i valori', async () => {
+    vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/La tabella fenologica ha già delle misure.*archivia/)))
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+  })
+
+  it('con misure la tabella non si elimina: i suoi valori con dati si archiviano', async () => {
+    vi.mocked(strumentiConDati).mockResolvedValue(new Set([strum('Tabella fenologica').id]))
+    apri()
+    await pronta()
+    expect(tabella().queryByRole('button', { name: 'Elimina la tabella fenologica' })).not.toBeInTheDocument()
+    expect(tabella().queryByRole('button', { name: /^Archivia/ })).not.toBeInTheDocument()
+  })
+
+  it('se manca, "Crea la tabella fenologica" ne prepara una vuota che si salva con le sue voci', async () => {
+    config.strumenti = config.strumenti.filter(s => s.tipo !== 'fenologico')
+    config.parametri = config.parametri.filter(p => ['Temp aria', 'Temp pianta', 'SPAD', 'Altezza'].includes(p.nome))
+    const { utente } = apri()
+    await pronta()
+
+    expect(tabella().queryByLabelText('Nome dello strumento')).not.toBeInTheDocument()
+    await utente.click(tabella().getByRole('button', { name: 'Crea la tabella fenologica' }))
+    expect(tabella().getByLabelText('Nome dello strumento')).toHaveValue('Tabella fenologica')
+    expect(tabella().getByText('Lo strumento "Tabella fenologica" non ha valori.')).toBeInTheDocument()
+    expect(tabella().getByRole('button', { name: 'Salva' })).toBeDisabled()
+
+    await utente.click(tabella().getByRole('button', { name: 'Aggiungi valore' }))
+    await utente.type(tabella().getByLabelText('Nome'), 'Note')
+    await utente.selectOptions(tabella().getByLabelText('Tipo'), 'testo')
+    await utente.click(tabella().getByRole('switch', { name: /Obbligatorio/ }))
+    await utente.click(tabella().getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
+    const [, tabellaSalvata] = vi.mocked(salvaStrumento).mock.calls[0]
+    expect(tabellaSalvata).toMatchObject({ nome: 'Tabella fenologica', tipo: 'fenologico', ordine: 3 })
+    expect(tabellaSalvata.parametri).toEqual([expect.objectContaining({ obbligatorio: true, ordine: 0 })])
+    expect(vi.mocked(salvaParametro).mock.calls[0][1]).toMatchObject({ nome: 'Note', tipo: 'testo' })
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Strumento «Tabella fenologica» salvato.'))
+  })
+
+  it('le voci della tabella hanno "Obbligatorio" e "Progressivo"; quelle di uno strumento semplice no', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaValore(tabella(), 'Palchi'))
+    const palchi = aperta(rigaValore(tabella(), 'Palchi'))
+    expect(palchi.getByRole('switch', { name: /Obbligatorio/ })).toBeInTheDocument()
+    expect(palchi.getByRole('switch', { name: /Progressivo/ })).toBeInTheDocument()
+
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(rigaValore(metro, 'Altezza'))
+    expect(metro.queryByRole('switch', { name: /Obbligatorio/ })).not.toBeInTheDocument()
+    expect(metro.queryByRole('switch', { name: /Progressivo/ })).not.toBeInTheDocument()
   })
 })
 
@@ -617,15 +1033,15 @@ describe('Impostazioni: uscita', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('chiede conferma prima di uscire con un parametro modificato e non salvato', async () => {
+  it('chiede conferma prima di uscire con uno strumento modificato e non salvato', async () => {
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaParametro('Altezza'))
-    await utente.type(aperta(rigaParametro('Altezza')).getByLabelText('Nome'), ' pianta')
+    await utente.click(rigaStrumento('Metro'))
+    await utente.type(aperta(rigaStrumento('Metro')).getByLabelText('Nome dello strumento'), ' lungo')
     // Chiuso l'editor, la modifica resta (e lo si vede).
-    await utente.click(rigaParametro('Altezza'))
-    expect(rigaParametro('Altezza pianta')).toHaveTextContent('Modifiche non salvate')
+    await utente.click(rigaStrumento('Metro lungo'))
+    expect(rigaStrumento('Metro lungo')).toHaveTextContent('Modifiche non salvate')
 
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Scartare le modifiche non salvate?' })
@@ -635,5 +1051,18 @@ describe('Impostazioni: uscita', () => {
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
     await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E$/))
+  })
+})
+
+describe('Impostazioni: uscita, tabella fenologica', () => {
+  it('chiede conferma anche con una voce della tabella modificata e non salvata', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaValore(tabella(), 'Note'))
+    await utente.type(aperta(rigaValore(tabella(), 'Note')).getByLabelText('Nome'), ' libere')
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    expect(await screen.findByRole('dialog', { name: 'Scartare le modifiche non salvate?' })).toBeInTheDocument()
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/impostazioni')
   })
 })

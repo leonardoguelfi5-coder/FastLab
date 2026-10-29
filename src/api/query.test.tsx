@@ -6,17 +6,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
-vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn() }))
+vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati } from './configurazione'
+import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { caricaMisura, misureDelGiorno, misurePianta } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useParametriConDati, usePianteConDati, useSonoAdmin,
+  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati,
 } from './query'
 
 function wrapper() {
@@ -47,7 +47,9 @@ describe('chiavi', () => {
   it('i parametri e le piante con dati stanno sotto la configurazione: si invalidano con lei', () => {
     expect(chiavi.parametriConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.pianteConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
+    expect(chiavi.strumentiConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.parametriConDati('E')).not.toEqual(chiavi.pianteConDati('E'))
+    expect(chiavi.strumentiConDati('E')).not.toEqual(chiavi.parametriConDati('E'))
   })
 
   it('il catalogo è condiviso tra esperimenti: la sua chiave sta fuori dal prefisso della configurazione', () => {
@@ -173,9 +175,23 @@ describe('parametri e piante con dati', () => {
     await waitFor(() => expect(dopo.result.current.isFetching).toBe(false))
   })
 
+  it('useStrumentiConDati legge gli id degli strumenti con misure e si rilegge a ogni apertura', async () => {
+    vi.mocked(strumentiConDati).mockResolvedValue(new Set(['pa1']))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
+    const conClient = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const prima = renderHook(() => useStrumentiConDati('E'), { wrapper: conClient })
+    await waitFor(() => expect(prima.result.current.data).toEqual(new Set(['pa1'])))
+    expect(strumentiConDati).toHaveBeenCalledWith('E')
+    prima.unmount()
+    renderHook(() => useStrumentiConDati('E'), { wrapper: conClient })
+    await waitFor(() => expect(strumentiConDati).toHaveBeenCalledTimes(2))
+  })
+
   it('senza esperimento non interrogano il database', () => {
     renderHook(() => useParametriConDati(undefined), { wrapper: wrapper() })
     renderHook(() => usePianteConDati(undefined), { wrapper: wrapper() })
+    renderHook(() => useStrumentiConDati(undefined), { wrapper: wrapper() })
+    expect(strumentiConDati).not.toHaveBeenCalled()
     expect(parametriConDati).not.toHaveBeenCalled()
     expect(pianteConDati).not.toHaveBeenCalled()
   })
