@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { contaPerPianta } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
-import type { ConfigEsperimento, Passata } from '@/domain/tipi'
+import type { ConfigEsperimento, Strumento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { percorsoImpostazioni, percorsoPianta } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
@@ -20,25 +20,25 @@ import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
 
 /**
- * Le passate come scelte esclusive in una riga che scorre di lato (DESIGN.md, Chips). Sono vere scelte radio
+ * Gli strumenti come scelte esclusive in una riga che scorre di lato (DESIGN.md, Chips). Sono vere scelte radio
  * nascoste dentro un'etichetta da 44px: tastiera, lettori di schermo e "una sola scelta" arrivano dal browser.
  * La scelta selezionata è inchiostro pieno con un ✓ (non solo colore).
  */
-function SceltaPassata({ passate, sceltaId, onScegli }: { passate: Passata[]; sceltaId: string | null; onScegli: (id: string) => void }) {
+function SceltaStrumento({ strumenti, sceltaId, onScegli }: { strumenti: Strumento[]; sceltaId: string | null; onScegli: (id: string) => void }) {
   const idEtichetta = useId()
   const nome = useId()
   const riga = useRef<HTMLDivElement>(null)
 
-  // La passata ricordata dall'ultima volta può essere fuori dallo schermo, in fondo alla riga.
+  // Lo strumento ricordato dall'ultima volta può essere fuori dallo schermo, in fondo alla riga.
   useEffect(() => {
     riga.current?.querySelector('input:checked')?.closest('label')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
   }, [sceltaId])
 
   return (
     <div className="flex flex-col gap-1.5">
-      <p id={idEtichetta} className="text-label text-grafite-tenue">Passata</p>
+      <p id={idEtichetta} className="text-label text-grafite-tenue">Strumento</p>
       <div ref={riga} role="radiogroup" aria-labelledby={idEtichetta} className="-mx-4 flex gap-2 scroll-px-4 overflow-x-auto px-4 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {passate.map(p => {
+        {strumenti.map(p => {
           const selezionata = p.id === sceltaId
           return (
             // `relative`: la scelta nascosta (sr-only, in posizione assoluta) resta dentro la riga e non allarga la pagina.
@@ -90,7 +90,7 @@ function DataRilievo({ espId }: { espId: string }) {
  * Il campo "N° pianta": l'unico testo grande della schermata. "Apri scheda pianta" è l'azione principale, nella
  * barra in basso (fissa, quindi il modulo la contiene senza farle occupare posto).
  */
-function CampoPianta({ espId, config, passata }: { espId: string; config: ConfigEsperimento; passata: Passata | null }) {
+function CampoPianta({ espId, config, strumento }: { espId: string; config: ConfigEsperimento; strumento: Strumento | null }) {
   const navigate = useNavigate()
   const idCampo = useId()
   const idMessaggio = useId()
@@ -102,7 +102,7 @@ function CampoPianta({ espId, config, passata }: { espId: string; config: Config
   function apri(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
     const cercata = testo.trim()
-    if (!passata || cercata === '') return
+    if (!strumento || cercata === '') return
     const pianta = trovaPianta(config.piante, cercata)
     if (pianta) {
       navigate(percorsoPianta(espId, pianta.id))
@@ -129,19 +129,19 @@ function CampoPianta({ espId, config, passata }: { espId: string; config: Config
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        disabled={!passata}
+        disabled={!strumento}
         value={testo}
         aria-invalid={errore ? true : undefined}
-        aria-describedby={errore || !passata ? idMessaggio : undefined}
+        aria-describedby={errore || !strumento ? idMessaggio : undefined}
         onChange={e => { setTesto(e.target.value); setErrore(null) }}
       />
       {errore ? (
         <TestoErrore id={idMessaggio} role="alert">{errore}</TestoErrore>
-      ) : !passata ? (
-        <p id={idMessaggio} className="text-sm text-grafite-tenue">Scegli una passata</p>
+      ) : !strumento ? (
+        <p id={idMessaggio} className="text-sm text-grafite-tenue">Scegli uno strumento</p>
       ) : null}
       <BarraAzioni>
-        <Button type="submit" size="lg" className="w-full" disabled={!passata || testo.trim() === ''}>Apri scheda pianta</Button>
+        <Button type="submit" size="lg" className="w-full" disabled={!strumento || testo.trim() === ''}>Apri scheda pianta</Button>
       </BarraAzioni>
     </form>
   )
@@ -159,21 +159,21 @@ function descrizioneCella(etichetta: string, conteggio: number | undefined): str
   return conteggio === 1 ? `Pianta ${etichetta}, misurata` : `Pianta ${etichetta}, misurata ${conteggio} volte`
 }
 
-/** Quali piante sono già state misurate con la passata scelta, alla data di rilievo. */
-function GrigliaPiante({ espId, config, passata, dataRilievo }: { espId: string; config: ConfigEsperimento; passata: Passata; dataRilievo: string }) {
+/** Quali piante sono già state misurate con lo strumento scelto, alla data di rilievo. */
+function GrigliaPiante({ espId, config, strumento, dataRilievo }: { espId: string; config: ConfigEsperimento; strumento: Strumento; dataRilievo: string }) {
   const misure = useMisureGiorno(espId, dataRilievo)
   const piante = useMemo(() => [...config.piante].sort((a, b) => a.ordine - b.ordine), [config.piante])
-  const conteggi = useMemo(() => (misure.data ? contaPerPianta(misure.data, passata.id) : null), [misure.data, passata.id])
+  const conteggi = useMemo(() => (misure.data ? contaPerPianta(misure.data, strumento.id) : null), [misure.data, strumento.id])
 
   if (piante.length === 0) return <p className="text-grafite-tenue">Questo esperimento non ha piante.</p>
 
   const fatte = conteggi ? piante.filter(p => (conteggi.get(p.id) ?? 0) > 0).length : 0
 
   return (
-    <section aria-label="Avanzamento della passata" className="flex flex-col gap-3">
+    <section aria-label="Avanzamento dello strumento" className="flex flex-col gap-3">
       {conteggi ? (
         <p className="text-dato font-sans text-grafite tabular-nums">
-          {`Fatte ${fatte}/${piante.length} · ${passata.nome} · ${formattaData(dataRilievo)}`}
+          {`Fatte ${fatte}/${piante.length} · ${strumento.nome} · ${formattaData(dataRilievo)}`}
         </p>
       ) : misure.isError ? (
         <ErroreConRiprova errore={misure.error} onRiprova={() => void misure.refetch()} />
@@ -219,32 +219,32 @@ function GrigliaPiante({ espId, config, passata, dataRilievo }: { espId: string;
 /** Il contenuto della schermata, a configurazione caricata. */
 function CampoCaricato({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const oggi = useOggi()
-  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
-  const setPassata = useCampoStore(s => s.setPassata)
-  const passate = useMemo(() => [...config.passate].sort((a, b) => a.ordine - b.ordine), [config.passate])
-  // Una passata salvata e poi cancellata dalle impostazioni è come nessuna scelta.
-  const passata = passate.find(p => p.id === passataId) ?? null
+  const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
+  const setStrumento = useCampoStore(s => s.setStrumento)
+  const strumenti = useMemo(() => [...config.strumenti].sort((a, b) => a.ordine - b.ordine), [config.strumenti])
+  // Uno strumento salvato e poi cancellato dalle impostazioni è come nessuna scelta.
+  const strumento = strumenti.find(p => p.id === strumentoId) ?? null
 
   return (
     <>
       <div className="flex flex-col gap-4">
-        {passate.length > 0 ? (
-          <SceltaPassata passate={passate} sceltaId={passata?.id ?? null} onScegli={id => setPassata(espId, id)} />
+        {strumenti.length > 0 ? (
+          <SceltaStrumento strumenti={strumenti} sceltaId={strumento?.id ?? null} onScegli={id => setStrumento(espId, id)} />
         ) : (
-          <p className="text-grafite-tenue">Questo esperimento non ha passate: aggiungine una dalle impostazioni.</p>
+          <p className="text-grafite-tenue">Questo esperimento non ha strumenti: aggiungine uno dalle impostazioni.</p>
         )}
         <DataRilievo espId={espId} />
         <BannerData espId={espId} />
       </div>
 
-      <CampoPianta espId={espId} config={config} passata={passata} />
+      <CampoPianta espId={espId} config={config} strumento={strumento} />
 
-      {passata && <GrigliaPiante espId={espId} config={config} passata={passata} dataRilievo={dataRilievo} />}
+      {strumento && <GrigliaPiante espId={espId} config={config} strumento={strumento} dataRilievo={dataRilievo} />}
     </>
   )
 }
 
-/** Schermata in campo di un esperimento: passata, data di rilievo, numero della pianta e avanzamento. */
+/** Schermata in campo di un esperimento: strumento, data di rilievo, numero della pianta e avanzamento. */
 export function Campo() {
   const { espId = '' } = useParams()
   const config = useConfig(espId)

@@ -19,7 +19,7 @@ vi.mock('@/api/esperimenti', () => ({
 vi.mock('@/api/configurazione', () => ({
   salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
   archiviaParametro: vi.fn(),
-  salvaPassata: vi.fn(), eliminaPassata: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
+  salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
   aggiornaTrattamento: vi.fn(),
 }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
@@ -30,8 +30,8 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaPassata, eliminaPianta,
-  parametriConDati, pianteConDati, salvaParametro, salvaPassata,
+  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta,
+  parametriConDati, pianteConDati, salvaParametro, salvaStrumento,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
@@ -78,8 +78,8 @@ async function pronta() {
 const rigaPianta = (etichetta: string) =>
   sezione('Piante').getByRole('button', { name: new RegExp(`^#${etichetta}(?!\\d)`) })
 const rigaParametro = (nome: string) => sezione('Parametri').getByRole('button', { name: new RegExp(`^${nome}`) })
-// Aperta, una passata mostra anche i pulsanti "Sposta «…» su/giù" dei suoi parametri.
-const rigaPassata = (nome: string) => sezione('Passate').getByRole('button', { name: new RegExp(`^(?!Sposta).*${nome}`) })
+// Aperta, uno strumento mostra anche i pulsanti "Sposta «…» su/giù" dei suoi parametri.
+const rigaStrumento = (nome: string) => sezione('Strumenti').getByRole('button', { name: new RegExp(`^(?!Sposta).*${nome}`) })
 /** Il contenuto aperto di una voce espandibile. */
 const aperta = (riga: HTMLElement) => within(riga.closest('li') as HTMLElement)
 
@@ -115,12 +115,12 @@ beforeEach(() => {
     config.parametri = config.parametri.filter(x => x.id !== p.id)
     return 'eliminato'
   })
-  vi.mocked(salvaPassata).mockImplementation(async (_e, p) => {
-    config.passate = config.passate.some(x => x.id === p.id)
-      ? config.passate.map(x => (x.id === p.id ? p : x))
-      : [...config.passate, p]
+  vi.mocked(salvaStrumento).mockImplementation(async (_e, p) => {
+    config.strumenti = config.strumenti.some(x => x.id === p.id)
+      ? config.strumenti.map(x => (x.id === p.id ? p : x))
+      : [...config.strumenti, p]
   })
-  vi.mocked(eliminaPassata).mockImplementation(async (_e, id) => { config.passate = config.passate.filter(p => p.id !== id) })
+  vi.mocked(eliminaStrumento).mockImplementation(async (_e, id) => { config.strumenti = config.strumenti.filter(p => p.id !== id) })
 })
 
 describe('Impostazioni: dal piano', () => {
@@ -368,14 +368,14 @@ describe('Impostazioni: parametri', () => {
     expect(await parametri.findByRole('button', { name: /^Note/ })).toBeInTheDocument()
   })
 
-  it('un parametro che non sta in nessuna passata lo dice nel riassunto', async () => {
+  it('un parametro che non sta in nessuno strumento lo dice nel riassunto', async () => {
     const spad = par('SPAD').id
-    config.passate = config.passate.map(p => ({ ...p, parametri: p.parametri.filter(pp => pp.parametro_id !== spad) }))
+    config.strumenti = config.strumenti.map(p => ({ ...p, parametri: p.parametri.filter(pp => pp.parametro_id !== spad) }))
     apri()
     await pronta()
 
-    expect(rigaParametro('SPAD')).toHaveTextContent('in nessuna passata')
-    expect(rigaParametro('Temp aria')).not.toHaveTextContent('in nessuna passata')
+    expect(rigaParametro('SPAD')).toHaveTextContent('in nessuno strumento')
+    expect(rigaParametro('Temp aria')).not.toHaveTextContent('in nessuno strumento')
   })
 
   it('"+ Parametro" ne crea uno non salvato in fondo all\'ordine; si salva con il suo "Salva"', async () => {
@@ -530,77 +530,77 @@ describe('Impostazioni: parametri', () => {
   })
 })
 
-describe('Impostazioni: passate', () => {
-  it('"Elimina passata" con misure fallisce con il messaggio del database', async () => {
-    vi.mocked(eliminaPassata).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
+describe('Impostazioni: strumenti', () => {
+  it('"Elimina strumento" con misure fallisce con il messaggio del database', async () => {
+    vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaPassata('SPAD'))
-    await utente.click(aperta(rigaPassata('SPAD')).getByRole('button', { name: 'Elimina passata' }))
-    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare la passata «SPAD»?' })
+    await utente.click(rigaStrumento('SPAD'))
+    await utente.click(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare lo strumento «SPAD»?' })
     await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Questo elemento ha dati collegati e non può essere eliminato.'))
-    expect(eliminaPassata).toHaveBeenCalledWith('E', config.passate[1].id)
-    expect(rigaPassata('SPAD')).toBeInTheDocument()
+    expect(eliminaStrumento).toHaveBeenCalledWith('E', config.strumenti[1].id)
+    expect(rigaStrumento('SPAD')).toBeInTheDocument()
   })
 
-  it('una passata si modifica e si salva; "+ Passata" non si salva senza nome e parametri', async () => {
-    const prima = structuredClone(config.passate[1])
+  it('uno strumento si modifica e si salva; "+ Strumento" non si salva senza nome e parametri', async () => {
+    const prima = structuredClone(config.strumenti[1])
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaPassata('SPAD'))
-    const voce = aperta(rigaPassata('SPAD'))
-    await utente.type(voce.getByLabelText('Nome della passata'), ' fogliare')
+    await utente.click(rigaStrumento('SPAD'))
+    const voce = aperta(rigaStrumento('SPAD'))
+    await utente.type(voce.getByLabelText('Nome dello strumento'), ' fogliare')
     await utente.click(voce.getByRole('button', { name: 'Salva' }))
-    await waitFor(() => expect(salvaPassata).toHaveBeenCalledWith('E', { ...prima, nome: 'SPAD fogliare' }))
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledWith('E', { ...prima, nome: 'SPAD fogliare' }))
 
-    await utente.click(sezione('Passate').getByRole('button', { name: '+ Passata' }))
-    const nuova = aperta(rigaPassata('Senza nome'))
-    expect(nuova.getByText('Una passata non ha nome.')).toBeInTheDocument()
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Strumento' }))
+    const nuova = aperta(rigaStrumento('Senza nome'))
+    expect(nuova.getByText('Uno strumento non ha nome.')).toBeInTheDocument()
     expect(nuova.getByRole('button', { name: 'Salva' })).toBeDisabled()
   })
 })
 
-describe('Impostazioni: passate, casi limite', () => {
-  it('una passata nuova arrivata in configurazione nonostante un errore non compare due volte', async () => {
-    vi.mocked(salvaPassata).mockImplementationOnce(async (_e, p) => {
-      config.passate = [...config.passate, p]
+describe('Impostazioni: strumenti, casi limite', () => {
+  it('uno strumento nuovo arrivato in configurazione nonostante un errore non compare due volte', async () => {
+    vi.mocked(salvaStrumento).mockImplementationOnce(async (_e, p) => {
+      config.strumenti = [...config.strumenti, p]
       throw new TypeError('Failed to fetch')
     })
     const { utente } = apri()
     await pronta()
 
-    await utente.click(sezione('Passate').getByRole('button', { name: '+ Passata' }))
-    const nuova = aperta(rigaPassata('Senza nome'))
-    await utente.type(nuova.getByLabelText('Nome della passata'), 'Diametro')
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Strumento' }))
+    const nuova = aperta(rigaStrumento('Senza nome'))
+    await utente.type(nuova.getByLabelText('Nome dello strumento'), 'Diametro')
     const riga = within(nuova.getByText('Altezza', { selector: '[data-testid="nome-parametro"]' }).closest('li') as HTMLElement)
     await utente.click(riga.getByRole('switch', { name: /Incluso/ }))
     await utente.click(nuova.getByRole('button', { name: 'Salva' }))
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled())
     await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
-    await waitFor(() => expect(sezione('Passate').getAllByRole('button', { name: /^(?!Sposta).*Diametro/ })).toHaveLength(1))
+    await waitFor(() => expect(sezione('Strumenti').getAllByRole('button', { name: /^(?!Sposta).*Diametro/ })).toHaveLength(1))
   })
 
-  it('salvando una passata, i parametri eliminati nel frattempo non si mandano', async () => {
+  it('salvando uno strumento, i parametri eliminati nel frattempo non si mandano', async () => {
     const tempAria = par('Temp aria').id
     const { utente } = apri()
     await pronta()
 
-    await utente.click(rigaPassata('Termometro'))
-    await utente.type(aperta(rigaPassata('Termometro')).getByLabelText('Nome della passata'), ' mattino')
+    await utente.click(rigaStrumento('Termometro'))
+    await utente.type(aperta(rigaStrumento('Termometro')).getByLabelText('Nome dello strumento'), ' mattino')
     // Intanto "Temp pianta" (senza dati) viene eliminato.
     await utente.click(rigaParametro('Temp pianta'))
     await utente.click(aperta(rigaParametro('Temp pianta')).getByRole('button', { name: 'Elimina' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro eliminato.'))
 
-    await utente.click(aperta(rigaPassata('Termometro')).getByRole('button', { name: 'Salva' }))
-    await waitFor(() => expect(salvaPassata).toHaveBeenCalledTimes(1))
-    const [, salvata] = vi.mocked(salvaPassata).mock.calls[0]
+    await utente.click(aperta(rigaStrumento('Termometro')).getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(salvaStrumento).toHaveBeenCalledTimes(1))
+    const [, salvata] = vi.mocked(salvaStrumento).mock.calls[0]
     expect(salvata.nome).toBe('Termometro mattino')
     expect(salvata.parametri.map(pp => pp.parametro_id)).toEqual([tempAria])
   })

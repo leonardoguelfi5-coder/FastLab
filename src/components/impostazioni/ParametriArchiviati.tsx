@@ -33,7 +33,7 @@ export function ParametriArchiviati({ archiviati, inCorso, onRipristina }: Param
       {aperti && (
         <div id={id} className="flex flex-col gap-2">
           <Spiegazione>
-            Non compaiono nei moduli delle passate; i loro dati restano nella storia delle piante e nell'export.
+            Non compaiono nei moduli degli strumenti; i loro dati restano nella storia delle piante e nell'export.
           </Spiegazione>
           <ul className="flex flex-col border-t border-riga">
             {archiviati.map(p => (

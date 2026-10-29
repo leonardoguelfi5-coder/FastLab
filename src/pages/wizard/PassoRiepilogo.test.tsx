@@ -20,14 +20,14 @@ function rendi(bozza: BozzaEsperimento) {
   )
 }
 
-describe('PassoRiepilogo: parametri in nessuna passata', () => {
+describe('PassoRiepilogo: parametri in nessuno strumento', () => {
   it('li nomina in un avviso che non blocca la creazione', () => {
     const b = conPiante(['1'])
     b.parametri.push(parametro(' SPAD '), parametro('Note', { tipo: 'testo' }))
     rendi(b)
 
     expect(screen.getByText(
-      '"SPAD", "Note" non sono in nessuna passata: non si potranno misurare finché non li aggiungi a una passata (anche dopo, dalle impostazioni).',
+      '"SPAD", "Note" non sono in nessuno strumento: non si potranno misurare finché non li aggiungi a uno strumento (anche dopo, dalle impostazioni).',
     )).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Crea esperimento' })).toBeEnabled()
   })
@@ -38,12 +38,12 @@ describe('PassoRiepilogo: parametri in nessuna passata', () => {
     rendi(b)
 
     expect(screen.getByText(
-      '"SPAD" non è in nessuna passata: non si potrà misurare finché non lo aggiungi a una passata (anche dopo, dalle impostazioni).',
+      '"SPAD" non è in nessuno strumento: non si potrà misurare finché non lo aggiungi a uno strumento (anche dopo, dalle impostazioni).',
     )).toBeInTheDocument()
   })
 
-  it('senza parametri fuori dalle passate non c\'è l\'avviso', () => {
+  it('senza parametri fuori dagli strumenti non c\'è l\'avviso', () => {
     rendi(conPiante(['1']))
-    expect(screen.queryByText(/in nessuna passata/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/in nessuno strumento/)).not.toBeInTheDocument()
   })
 })

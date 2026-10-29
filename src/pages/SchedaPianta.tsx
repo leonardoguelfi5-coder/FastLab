@@ -22,7 +22,7 @@ interface SchedaCaricataProps {
   espId: string
   config: ConfigEsperimento
   piantaId: string
-  passataId: string
+  strumentoId: string
   dataRilievo: string
   oggi: string
   misure: UseQueryResult<Misura[]>
@@ -32,12 +32,12 @@ interface SchedaCaricataProps {
 
 /** La scheda a configurazione caricata: intestazione della pianta, riquadro di oggi e storia. */
 function SchedaCaricata({
-  espId, config, piantaId, passataId, dataRilievo, oggi, misure, conferma, onModifiche,
+  espId, config, piantaId, strumentoId, dataRilievo, oggi, misure, conferma, onModifiche,
 }: SchedaCaricataProps) {
   const pianta = config.piante.find(p => p.id === piantaId)
-  const passata = config.passate.find(p => p.id === passataId)
-  // Una passata scelta e poi cancellata dalle impostazioni è come nessuna scelta: si torna a sceglierla.
-  if (!passata) return <Navigate to={percorsoCampo(espId)} replace />
+  const strumento = config.strumenti.find(p => p.id === strumentoId)
+  // Uno strumento scelto e poi cancellato dalle impostazioni è come nessuna scelta: si torna a sceglierlo.
+  if (!strumento) return <Navigate to={percorsoCampo(espId)} replace />
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
 
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
@@ -68,13 +68,13 @@ function SchedaCaricata({
           : <Caricamento />
       ) : (
         <>
-          {/* Una data o una passata diversa è un riquadro nuovo: una misura in correzione non passa a un altro giorno. */}
+          {/* Una data o uno strumento diversi sono un riquadro nuovo: una misura in correzione non passa a un altro giorno. */}
           <RiquadroOggi
-            key={`${passata.id}:${dataRilievo}`}
+            key={`${strumento.id}:${dataRilievo}`}
             espId={espId}
             config={config}
             pianta={pianta}
-            passata={passata}
+            strumento={strumento}
             misure={misure.data}
             dataRilievo={dataRilievo}
             oggi={oggi}
@@ -90,7 +90,7 @@ function SchedaCaricata({
 }
 
 /**
- * Scheda della pianta: si inseriscono i valori di oggi per la passata scelta nella schermata in campo e si passa
+ * Scheda della pianta: si inseriscono i valori di oggi per lo strumento scelto nella schermata in campo e si passa
  * alla pianta successiva; sotto, la storia. Vale anche per gli esperimenti conclusi: i dati restano modificabili.
  */
 export function SchedaPianta() {
@@ -113,7 +113,7 @@ export function SchedaPianta() {
     if (campo.dati(espId, prima).dataRilievo === prima) campo.setData(espId, prima)
   }, [espId])
   const oggi = useOggi(tieniIlGiorno)
-  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
+  const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
   const [inAttesa, setInAttesa] = useState<{ esegui: () => void } | null>(null)
   const onModifiche = useCallback((stato: StatoModulo | null) => { modulo.current = stato }, [])
   const conferma = useCallback((esegui: () => void) => {
@@ -139,8 +139,8 @@ export function SchedaPianta() {
     azione?.esegui()
   }
 
-  // La scheda serve a inserire i valori di una passata: senza, si torna a sceglierla.
-  if (!passataId) return <Navigate to={percorsoCampo(espId)} replace />
+  // La scheda serve a inserire i valori di uno strumento: senza, si torna a sceglierlo.
+  if (!strumentoId) return <Navigate to={percorsoCampo(espId)} replace />
 
   const dati = config.data
   return (
@@ -164,7 +164,7 @@ export function SchedaPianta() {
           espId={espId}
           config={dati}
           piantaId={piantaId}
-          passataId={passataId}
+          strumentoId={strumentoId}
           dataRilievo={dataRilievo}
           oggi={oggi}
           misure={misure}

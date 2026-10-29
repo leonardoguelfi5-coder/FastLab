@@ -2,7 +2,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(27);
 
--- Fixture (superuser): due esperimenti, ciascuno con trattamento, pianta e passata;
+-- Fixture (superuser): due esperimenti, ciascuno con trattamento, pianta e strumento;
 -- nel primo un parametro con dati (P), uno senza (Q) e una misura che usa P.
 -- L'utente si registra solo con un invito (email e codice).
 insert into inviti (email, codice) values ('a@test.it', 'CODICEA2');
@@ -33,15 +33,15 @@ insert into parametri (id, esperimento_id, nome, tipo, ordine) values
   ('c1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000001', 'Altezza', 'numero', 0),
   ('c1000000-0000-0000-0000-000000000002', 'e1000000-0000-0000-0000-000000000001', 'Note', 'testo', 1);
 
-insert into passate (id, esperimento_id, nome, ordine) values
+insert into strumenti (id, esperimento_id, nome, ordine) values
   ('d1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000001', 'Settimanale', 0),
   ('d2000000-0000-0000-0000-000000000002', 'e2000000-0000-0000-0000-000000000002', 'Settimanale', 0);
-insert into passata_parametri (esperimento_id, passata_id, parametro_id, ordine) values
+insert into strumento_parametri (esperimento_id, strumento_id, parametro_id, ordine) values
   ('e1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001', 'c1000000-0000-0000-0000-000000000001', 0);
 
--- aggiornato_il parte da una data passata, cosi' il trigger e' osservabile
+-- aggiornato_il parte dal 2020, cosi' il trigger e' osservabile
 -- (dentro una transazione now() e' costante).
-insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori, creato_da, aggiornato_il) values
+insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori, creato_da, aggiornato_il) values
   ('a1000000-0000-0000-0000-000000000001', 'e1000000-0000-0000-0000-000000000001',
    'b1000000-0000-0000-0000-000000000001', 'd1000000-0000-0000-0000-000000000001',
    '2026-10-28', '10:30:00', '{"c1000000-0000-0000-0000-000000000001": [12]}',
@@ -72,7 +72,7 @@ select lives_ok(
 
 -- FK composte: niente riferimenti incrociati tra esperimenti
 select throws_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, creato_da)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, creato_da)
      values (gen_random_uuid(), 'e1000000-0000-0000-0000-000000000001',
              'b2000000-0000-0000-0000-000000000002', 'd1000000-0000-0000-0000-000000000001',
              '2026-10-28', '11:00:00', 'a0000000-0000-0000-0000-000000000001') $$,
@@ -80,12 +80,12 @@ select throws_ok(
   'una misura non puo'' usare la pianta di un altro esperimento');
 
 select throws_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, creato_da)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, creato_da)
      values (gen_random_uuid(), 'e1000000-0000-0000-0000-000000000001',
              'b1000000-0000-0000-0000-000000000001', 'd2000000-0000-0000-0000-000000000002',
              '2026-10-28', '11:00:00', 'a0000000-0000-0000-0000-000000000001') $$,
   '23503', null,
-  'una misura non puo'' usare la passata di un altro esperimento');
+  'una misura non puo'' usare lo strumento di un altro esperimento');
 
 select throws_ok(
   $$ insert into piante (esperimento_id, trattamento_id, etichetta, ordine)
@@ -118,7 +118,7 @@ select is(
      union all select 1 from piante where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
      union all select 1 from trattamenti where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
      union all select 1 from parametri where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
-     union all select 1 from passate where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
+     union all select 1 from strumenti where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
      union all select 1 from fattori where esperimento_id = 'e1000000-0000-0000-0000-000000000001'
    ) x),
   0,
@@ -130,7 +130,7 @@ select set_config('request.jwt.claims',
   json_build_object('sub', 'a0000000-0000-0000-0000-000000000001', 'role', 'authenticated')::text, true);
 
 -- crea_esperimento: bozza completa (1 fattore con 2 livelli, 2 trattamenti, 3 piante,
--- 2 parametri, 1 passata con 2 parametri).
+-- 2 parametri, 1 strumento con 2 parametri).
 select is(
   crea_esperimento('{
     "esperimento": {"id": "e3000000-0000-0000-0000-000000000003", "nome": "Prova RPC", "data_inizio": "2026-10-01",
@@ -157,7 +157,7 @@ select is(
       {"id": "c3000000-0000-0000-0000-000000000002", "nome": "Foglie", "unita": null, "tipo": "lista", "ordine": 1,
        "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
        "valore_min": null, "valore_max": null, "sotto_campi": [{"chiave": "l", "nome": "Lunghezza", "unita": "cm"}]}],
-    "passate": [{"id": "d3000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": "ruler", "ordine": 0,
+    "strumenti": [{"id": "d3000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": "ruler", "ordine": 0,
       "parametri": [
         {"parametro_id": "c3000000-0000-0000-0000-000000000001", "obbligatorio": true, "ordine": 0},
         {"parametro_id": "c3000000-0000-0000-0000-000000000002", "obbligatorio": false, "ordine": 1}]}]
@@ -173,8 +173,8 @@ select is(
         (select count(*)::int from trattamento_livelli where esperimento_id = 'e3000000-0000-0000-0000-000000000003'),
         (select count(*)::int from piante where esperimento_id = 'e3000000-0000-0000-0000-000000000003'),
         (select count(*)::int from parametri where esperimento_id = 'e3000000-0000-0000-0000-000000000003'),
-        (select count(*)::int from passate where esperimento_id = 'e3000000-0000-0000-0000-000000000003'),
-        (select count(*)::int from passata_parametri where esperimento_id = 'e3000000-0000-0000-0000-000000000003')],
+        (select count(*)::int from strumenti where esperimento_id = 'e3000000-0000-0000-0000-000000000003'),
+        (select count(*)::int from strumento_parametri where esperimento_id = 'e3000000-0000-0000-0000-000000000003')],
   array[1, 1, 2, 2, 2, 3, 2, 1, 2],
   'crea_esperimento inserisce tutte le righe della bozza con l''esperimento_id della bozza');
 
@@ -208,13 +208,13 @@ select results_eq(
   'piante, trattamenti e livelli sono collegati come nella bozza');
 
 select results_eq(
-  $$ select pa.nome, pa.icona, pp.parametro_id, pp.obbligatorio, pp.ordine
-       from passata_parametri pp join passate pa on pa.id = pp.passata_id
-      where pp.esperimento_id = 'e3000000-0000-0000-0000-000000000003'
-      order by pp.ordine $$,
+  $$ select s.nome, s.icona, sp.parametro_id, sp.obbligatorio, sp.ordine
+       from strumento_parametri sp join strumenti s on s.id = sp.strumento_id
+      where sp.esperimento_id = 'e3000000-0000-0000-0000-000000000003'
+      order by sp.ordine $$,
   $$ values ('Settimanale'::text, 'ruler'::text, 'c3000000-0000-0000-0000-000000000001'::uuid, true, 0),
             ('Settimanale', 'ruler', 'c3000000-0000-0000-0000-000000000002', false, 1) $$,
-  'la passata ha i parametri della bozza');
+  'lo strumento ha i parametri della bozza');
 
 select is(
   (select ruolo from membri_esperimento
@@ -240,7 +240,7 @@ select throws_ok(
        "parametri": [{"id": "c4000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero",
                       "ordine": 0, "archiviato": false, "progressivo": false, "ricorda_tra_piante": false,
                       "n_letture": 1, "valore_min": null, "valore_max": null, "sotto_campi": []}],
-       "passate": [{"id": "d4000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
+       "strumenti": [{"id": "d4000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                     "parametri": [{"parametro_id": "c4000000-0000-0000-0000-000000000001", "obbligatorio": false,
                                    "ordine": 0}]}]
      }'::jsonb) $$,
@@ -259,15 +259,15 @@ select is(
      union all select 1 from trattamento_livelli where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
      union all select 1 from piante where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
      union all select 1 from parametri where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
-     union all select 1 from passate where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
-     union all select 1 from passata_parametri where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
+     union all select 1 from strumenti where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
+     union all select 1 from strumento_parametri where esperimento_id = 'e4000000-0000-0000-0000-000000000004'
    ) x),
   0,
   'crea_esperimento e'' atomica: della bozza fallita non resta nessuna riga');
 
 -- Misure su e3: pianta 1 il 20/10 e due volte il 28/10, pianta 2 il 28/10; solo "Altezza" ha dati.
 set local role authenticated;
-insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori) values
+insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori) values
   ('a3000000-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000003',
    'b3000000-0000-0000-0000-000000000001', 'd3000000-0000-0000-0000-000000000001',
    '2026-10-20', '09:00', '{"c3000000-0000-0000-0000-000000000001": [10, 11, 12]}'),

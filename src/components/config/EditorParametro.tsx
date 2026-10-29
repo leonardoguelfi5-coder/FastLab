@@ -191,7 +191,7 @@ export function EditorParametro({
       {p.tipo === 'numero' && (
         <Interruttore
           etichetta="Ricorda tra piante"
-          aiuto="Durante una passata il valore resta da una pianta all'altra, es. la temperatura dell'aria."
+          aiuto="Con lo stesso strumento il valore resta da una pianta all'altra, es. la temperatura dell'aria."
           checked={p.ricorda_tra_piante}
           onCheckedChange={(v) => cambia({ ricorda_tra_piante: v })}
         />

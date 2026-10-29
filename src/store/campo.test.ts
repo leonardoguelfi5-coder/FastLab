@@ -27,8 +27,8 @@ afterEach(() => {
 })
 
 describe('useCampoStore: valori predefiniti', () => {
-  it('senza nulla di salvato: nessuna passata, data di oggi, nessun valore ricordato', () => {
-    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: null, dataRilievo: '2026-10-28', ricordati: {} })
+  it('senza nulla di salvato: nessuno strumento, data di oggi, nessun valore ricordato', () => {
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', ricordati: {} })
   })
 
   it('la data predefinita è quella di oggi: segue il cambio di giorno', () => {
@@ -37,10 +37,10 @@ describe('useCampoStore: valori predefiniti', () => {
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-29')
   })
 
-  it('scegliere la passata non fissa la data: il giorno dopo vale ancora oggi', () => {
-    useCampoStore.getState().setPassata('E', 'p1')
+  it('scegliere lo strumento non fissa la data: il giorno dopo vale ancora oggi', () => {
+    useCampoStore.getState().setStrumento('E', 'p1')
     vi.setSystemTime(new Date(2026, 9, 29, 8, 0))
-    expect(useCampoStore.getState().dati('E')).toMatchObject({ passataId: 'p1', dataRilievo: '2026-10-29' })
+    expect(useCampoStore.getState().dati('E')).toMatchObject({ strumentoId: 'p1', dataRilievo: '2026-10-29' })
   })
 
   it('ricordare un valore non fissa la data', () => {
@@ -50,7 +50,7 @@ describe('useCampoStore: valori predefiniti', () => {
   })
 })
 
-describe('useCampoStore: passata e data', () => {
+describe('useCampoStore: strumento e data', () => {
   it('setData salva la data e la mantiene nel localStorage', () => {
     useCampoStore.getState().setData('E', '2026-10-27')
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-27')
@@ -71,24 +71,24 @@ describe('useCampoStore: passata e data', () => {
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-29')
   })
 
-  it('setPassata salva la scelta e non tocca data e valori ricordati', () => {
+  it('setStrumento salva la scelta e non tocca data e valori ricordati', () => {
     useCampoStore.getState().setData('E', '2026-10-27')
     useCampoStore.getState().ricorda('E', [tempAria], { [tempAria.id]: [24.5] })
-    useCampoStore.getState().setPassata('E', 'p1')
+    useCampoStore.getState().setStrumento('E', 'p1')
     expect(useCampoStore.getState().dati('E')).toEqual({
-      passataId: 'p1', dataRilievo: '2026-10-27', ricordati: { [tempAria.id]: [24.5] },
+      strumentoId: 'p1', dataRilievo: '2026-10-27', ricordati: { [tempAria.id]: [24.5] },
     })
-    expect(salvato().state.stato.E.passataId).toBe('p1')
+    expect(salvato().state.stato.E.strumentoId).toBe('p1')
   })
 
   it('ogni esperimento ha le sue scelte', () => {
-    useCampoStore.getState().setPassata('E', 'p1')
+    useCampoStore.getState().setStrumento('E', 'p1')
     useCampoStore.getState().setData('E', '2026-10-27')
-    expect(useCampoStore.getState().dati('F')).toEqual({ passataId: null, dataRilievo: '2026-10-28', ricordati: {} })
+    expect(useCampoStore.getState().dati('F')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', ricordati: {} })
   })
 
   it('dopo il ricaricamento della pagina le scelte tornano dal localStorage', async () => {
-    useCampoStore.getState().setPassata('E', 'p1')
+    useCampoStore.getState().setStrumento('E', 'p1')
     useCampoStore.getState().setData('E', '2026-10-27')
     useCampoStore.getState().ricorda('E', [tempAria], { [tempAria.id]: [24.5] })
 
@@ -96,16 +96,30 @@ describe('useCampoStore: passata e data', () => {
     const sulDisco = localStorage.getItem(CHIAVE)!
     useCampoStore.setState({ stato: {} })
     localStorage.setItem(CHIAVE, sulDisco)
-    expect(useCampoStore.getState().dati('E').passataId).toBeNull()
+    expect(useCampoStore.getState().dati('E').strumentoId).toBeNull()
     await useCampoStore.persist.rehydrate()
 
     expect(useCampoStore.getState().dati('E')).toEqual({
-      passataId: 'p1', dataRilievo: '2026-10-27', ricordati: { [tempAria.id]: [24.5] },
+      strumentoId: 'p1', dataRilievo: '2026-10-27', ricordati: { [tempAria.id]: [24.5] },
     })
   })
 
+  it('un salvataggio di prima della rinomina (passataId) vale come strumento scelto', async () => {
+    localStorage.setItem(CHIAVE, JSON.stringify({
+      state: { stato: { E: { passataId: 'p1', ricordati: {} }, F: { passataId: 'vecchio', strumentoId: 'nuovo', ricordati: {} } } },
+      version: 1,
+    }))
+    await useCampoStore.persist.rehydrate()
+    expect(useCampoStore.getState().dati('E').strumentoId).toBe('p1')
+    // Se ci sono tutte e due, vale la chiave nuova.
+    expect(useCampoStore.getState().dati('F').strumentoId).toBe('nuovo')
+    // La prossima scrittura salva solo la chiave nuova.
+    useCampoStore.getState().setData('E', '2026-10-27')
+    expect(salvato().state.stato.E).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-27', ricordati: {} })
+  })
+
   it('si salva solo lo stato, non le funzioni', () => {
-    useCampoStore.getState().setPassata('E', 'p1')
+    useCampoStore.getState().setStrumento('E', 'p1')
     expect(Object.keys(salvato().state)).toEqual(['stato'])
   })
 })
@@ -133,7 +147,7 @@ describe('useCampoStore: ricorda', () => {
     expect(useCampoStore.getState().dati('E').ricordati).toEqual({})
   })
 
-  it('un parametro assente dai valori (non è nella passata) resta com\'era', () => {
+  it('un parametro assente dai valori (non è nello strumento) resta com\'era', () => {
     useCampoStore.getState().ricorda('E', [tempAria], { [tempAria.id]: [24.5] })
     useCampoStore.getState().ricorda('E', [tempAria], {})
     expect(useCampoStore.getState().dati('E').ricordati).toEqual({ [tempAria.id]: [24.5] })
@@ -188,36 +202,36 @@ describe('useCampoStore: salvataggio con valori non validi', () => {
     ['non scritta come testo', 20261027],
     ['nulla', null],
   ])('una data %s vale come nessuna data scelta: oggi', (_nome, data) => {
-    salvaCosi({ passataId: null, dataRilievo: data, ricordati: {} })
+    salvaCosi({ strumentoId: null, dataRilievo: data, ricordati: {} })
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-28')
   })
 
   it('una data nel formato AAAA-MM-GG si tiene', () => {
-    salvaCosi({ passataId: null, dataRilievo: '2026-10-27', ricordati: {} })
+    salvaCosi({ strumentoId: null, dataRilievo: '2026-10-27', ricordati: {} })
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-27')
   })
 
-  it('anche passata e valori ricordati del tipo sbagliato si ignorano', () => {
-    salvaCosi({ passataId: 5, dataRilievo: '2026-10-27', ricordati: 'xyz' })
-    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: null, dataRilievo: '2026-10-27', ricordati: {} })
+  it('anche strumento e valori ricordati del tipo sbagliato si ignorano', () => {
+    salvaCosi({ strumentoId: 5, dataRilievo: '2026-10-27', ricordati: 'xyz' })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-27', ricordati: {} })
   })
 
   it('una voce che non è un oggetto vale come vuota', () => {
     salvaCosi('boh')
-    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: null, dataRilievo: '2026-10-28', ricordati: {} })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', ricordati: {} })
   })
 
   it('le scelte nuove si scrivono sopra una voce rovinata senza trascinarsi i campi sbagliati', () => {
-    salvaCosi({ passataId: 5, dataRilievo: 'ieri', ricordati: 'xyz' })
-    useCampoStore.getState().setPassata('E', 'p1')
+    salvaCosi({ strumentoId: 5, dataRilievo: 'ieri', ricordati: 'xyz' })
+    useCampoStore.getState().setStrumento('E', 'p1')
     useCampoStore.getState().ricorda('E', [tempAria], { [tempAria.id]: [24.5] })
-    expect(useCampoStore.getState().stato.E).toEqual({ passataId: 'p1', ricordati: { [tempAria.id]: [24.5] } })
+    expect(useCampoStore.getState().stato.E).toEqual({ strumentoId: 'p1', ricordati: { [tempAria.id]: [24.5] } })
   })
 
   it('dopo il ricaricamento una data rovinata nel localStorage vale oggi', async () => {
-    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { passataId: 'p1', dataRilievo: 'ieri', ricordati: {} } } }, version: 1 }))
+    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { strumentoId: 'p1', dataRilievo: 'ieri', ricordati: {} } } }, version: 1 }))
     await useCampoStore.persist.rehydrate()
-    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: 'p1', dataRilievo: '2026-10-28', ricordati: {} })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', ricordati: {} })
   })
 })
 
@@ -226,8 +240,8 @@ describe('useCampoStore: salvataggio che non funziona', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('piena', 'QuotaExceededError')
     })
-    expect(() => useCampoStore.getState().setPassata('E', 'p1')).not.toThrow()
-    expect(useCampoStore.getState().dati('E').passataId).toBe('p1')
+    expect(() => useCampoStore.getState().setStrumento('E', 'p1')).not.toThrow()
+    expect(useCampoStore.getState().dati('E').strumentoId).toBe('p1')
   })
 
   it('se il localStorage non si può leggere il negozio riparte vuoto, senza errori', async () => {
@@ -235,16 +249,16 @@ describe('useCampoStore: salvataggio che non funziona', () => {
       throw new DOMException('negato', 'SecurityError')
     })
     await expect(useCampoStore.persist.rehydrate()).resolves.not.toThrow()
-    expect(useCampoStore.getState().dati('E').passataId).toBeNull()
+    expect(useCampoStore.getState().dati('E').strumentoId).toBeNull()
   })
 
   it('un salvataggio rovinato (JSON non valido o forma sbagliata) non fa cadere la pagina', async () => {
     localStorage.setItem(CHIAVE, '{non è json')
     await useCampoStore.persist.rehydrate()
-    expect(useCampoStore.getState().dati('E').passataId).toBeNull()
+    expect(useCampoStore.getState().dati('E').strumentoId).toBeNull()
 
-    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { passataId: 'p1' } } }, version: 1 }))
+    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { strumentoId: 'p1' } } }, version: 1 }))
     await useCampoStore.persist.rehydrate()
-    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: 'p1', dataRilievo: '2026-10-28', ricordati: {} })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', ricordati: {} })
   })
 })

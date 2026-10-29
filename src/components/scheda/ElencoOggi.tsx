@@ -11,7 +11,7 @@ interface ElencoOggiProps {
   onCorreggi: (m: Misura) => void
 }
 
-/** Le misure già fatte oggi con questa passata, come righe di quaderno: toccandone una la si corregge. */
+/** Le misure già fatte oggi con questo strumento, come righe di quaderno: toccandone una la si corregge. */
 export function ElencoOggi({ misure, parametri, attivaId, onCorreggi }: ElencoOggiProps) {
   return (
     <ul aria-label="Misure già registrate" className="-mx-2 border-y border-riga">

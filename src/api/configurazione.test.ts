@@ -4,11 +4,11 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
-import type { Parametro, Passata, Pianta } from '@/domain/tipi'
+import type { Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaPassata,
-  eliminaPianta, pianteConDati, parametriConDati, salvaParametro, salvaPassata,
+  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro, eliminaStrumento,
+  eliminaPianta, pianteConDati, parametriConDati, salvaParametro, salvaStrumento,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -135,72 +135,96 @@ describe('archiviaParametro', () => {
   })
 })
 
-describe('salvaPassata', () => {
-  const passata: Passata = {
-    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0,
+const RIGA_STRUMENTO = {
+  id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+}
+
+describe('salvaStrumento', () => {
+  const strumento: Strumento = {
+    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
     parametri: [
       { parametro_id: 'par1', obbligatorio: true, ordine: 0 },
       { parametro_id: 'par2', obbligatorio: false, ordine: 1 },
     ],
   }
 
-  it('fa upsert della passata, poi dei collegamenti, poi toglie quelli non più presenti', async () => {
-    await salvaPassata('E', passata)
+  it('fa upsert dello strumento, poi dei collegamenti, poi toglie quelli non più presenti', async () => {
+    await salvaStrumento('E', strumento)
 
     expect(mock.chiamate.map(c => [c.sorgente, c.metodo, ...c.args])).toEqual([
-      ['passate', 'upsert', { id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0 }, { onConflict: 'id' }],
-      ['passata_parametri', 'upsert', [
-        { esperimento_id: 'E', passata_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0 },
-        { esperimento_id: 'E', passata_id: 'pa1', parametro_id: 'par2', obbligatorio: false, ordine: 1 },
-      ], { onConflict: 'passata_id,parametro_id' }],
-      ['passata_parametri', 'delete'],
-      ['passata_parametri', 'eq', 'passata_id', 'pa1'],
-      ['passata_parametri', 'eq', 'esperimento_id', 'E'],
-      ['passata_parametri', 'not', 'parametro_id', 'in', '(par1,par2)'],
+      ['strumenti', 'upsert', RIGA_STRUMENTO, { onConflict: 'id' }],
+      ['strumento_parametri', 'upsert', [
+        { esperimento_id: 'E', strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0 },
+        { esperimento_id: 'E', strumento_id: 'pa1', parametro_id: 'par2', obbligatorio: false, ordine: 1 },
+      ], { onConflict: 'strumento_id,parametro_id' }],
+      ['strumento_parametri', 'delete'],
+      ['strumento_parametri', 'eq', 'strumento_id', 'pa1'],
+      ['strumento_parametri', 'eq', 'esperimento_id', 'E'],
+      ['strumento_parametri', 'not', 'parametro_id', 'in', '(par1,par2)'],
     ])
   })
 
-  it('senza parametri elimina tutti i collegamenti della passata', async () => {
-    await salvaPassata('E', { ...passata, parametri: [] })
+  it('senza parametri elimina tutti i collegamenti dello strumento', async () => {
+    await salvaStrumento('E', { ...strumento, parametri: [] })
 
     expect(mock.chiamate.map(c => [c.sorgente, c.metodo, ...c.args])).toEqual([
-      ['passate', 'upsert', { id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0 }, { onConflict: 'id' }],
-      ['passata_parametri', 'delete'],
-      ['passata_parametri', 'eq', 'passata_id', 'pa1'],
-      ['passata_parametri', 'eq', 'esperimento_id', 'E'],
+      ['strumenti', 'upsert', RIGA_STRUMENTO, { onConflict: 'id' }],
+      ['strumento_parametri', 'delete'],
+      ['strumento_parametri', 'eq', 'strumento_id', 'pa1'],
+      ['strumento_parametri', 'eq', 'esperimento_id', 'E'],
     ])
   })
 
   it('si ferma al primo errore', async () => {
-    mock.risponde('passate', { error: errore })
-    await expect(salvaPassata('E', passata)).rejects.toBe(errore)
-    expect(mock.di('passata_parametri')).toEqual([])
+    mock.risponde('strumenti', { error: errore })
+    await expect(salvaStrumento('E', strumento)).rejects.toBe(errore)
+    expect(mock.di('strumento_parametri')).toEqual([])
   })
 
   it('lancia l\'errore dei collegamenti', async () => {
-    mock.risponde('passata_parametri', { error: errore })
-    await expect(salvaPassata('E', passata)).rejects.toBe(errore)
+    mock.risponde('strumento_parametri', { error: errore })
+    await expect(salvaStrumento('E', strumento)).rejects.toBe(errore)
   })
 })
 
-describe('eliminaPassata', () => {
+describe('eliminaStrumento', () => {
   it('elimina per id e esperimento', async () => {
-    mock.risponde('passate', toccata('pa1'))
-    await eliminaPassata('E', 'pa1')
-    expect(mock.di('passate').map(c => [c.metodo, ...c.args])).toEqual([
+    mock.risponde('strumenti', toccata('pa1'))
+    await eliminaStrumento('E', 'pa1')
+    expect(mock.di('strumenti').map(c => [c.metodo, ...c.args])).toEqual([
       ['delete'], ['eq', 'id', 'pa1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
   })
 
   it('se non ha eliminato nulla lo dice', async () => {
-    mock.risponde('passate', { data: [] })
-    await expect(eliminaPassata('E', 'pa1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
+    mock.risponde('strumenti', { data: [] })
+    await expect(eliminaStrumento('E', 'pa1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('lancia l\'errore (misure collegate: 23503)', async () => {
     const e = { code: '23503', message: 'violates foreign key constraint' }
-    mock.risponde('passate', { error: e })
-    await expect(eliminaPassata('E', 'pa1')).rejects.toBe(e)
+    mock.risponde('strumenti', { error: e })
+    await expect(eliminaStrumento('E', 'pa1')).rejects.toBe(e)
+  })
+})
+
+describe('archiviaStrumento', () => {
+  it('segna lo strumento come archiviato, per id e esperimento (mai una delete)', async () => {
+    mock.risponde('strumenti', toccata('pa1'))
+    await archiviaStrumento('E', 'pa1')
+    expect(mock.di('strumenti').map(c => [c.metodo, ...c.args])).toEqual([
+      ['update', { archiviato: true }], ['eq', 'id', 'pa1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+    ])
+  })
+
+  it('se non ha toccato nulla lo dice', async () => {
+    mock.risponde('strumenti', { data: [] })
+    await expect(archiviaStrumento('E', 'pa1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('strumenti', { error: errore })
+    await expect(archiviaStrumento('E', 'pa1')).rejects.toBe(errore)
   })
 })
 

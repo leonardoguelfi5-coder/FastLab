@@ -8,7 +8,7 @@ import { BarraAzioni } from '@/components/BarraAzioni'
 import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
 import { validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
-import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta, ValoriMisura } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { percorsoPianta } from '@/lib/percorsi'
@@ -51,7 +51,7 @@ interface ModuloOggiProps {
   espId: string
   config: ConfigEsperimento
   pianta: Pianta
-  passata: Passata
+  strumento: Strumento
   titolo: string
   parametri: Parametro[]
   obbligatori: Set<string>
@@ -88,7 +88,7 @@ interface ModuloOggiProps {
  * (id diverso), quindi lo stato qui dentro vale per un solo modulo.
  */
 export function ModuloOggi({
-  espId, config, pianta, passata, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
+  espId, config, pianta, strumento, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
   dataRilievo, oggi, successiva, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
@@ -227,10 +227,10 @@ export function ModuloOggi({
     const daSalvare: Misura = {
       id,
       pianta_id: pianta.id,
-      passata_id: misura?.passata_id ?? passata.id,
+      strumento_id: misura?.strumento_id ?? strumento.id,
       data_rilievo: misura?.data_rilievo ?? dataRilievo,
       ora: oraMisura,
-      // Correggendo si tengono le chiavi che il modulo non mostra (altre passate, parametri archiviati); un parametro
+      // Correggendo si tengono le chiavi che il modulo non mostra (altri strumenti, parametri archiviati); un parametro
       // lasciato vuoto che la misura non aveva non si scrive (la chiave direbbe "ha dati").
       valori: valoriDaSalvare(misura?.valori ?? null, valori),
     }
@@ -333,7 +333,7 @@ export function ModuloOggi({
           {parametri.length > 0 ? (
             <FormMisura parametri={parametri} obbligatori={obbligatori} valori={valori} onChange={cambia} />
           ) : (
-            <p className="text-grafite-tenue">Questa passata non ha parametri da compilare: aggiungili dalle impostazioni.</p>
+            <p className="text-grafite-tenue">Questo strumento non ha parametri da compilare: aggiungili dalle impostazioni.</p>
           )}
         </div>
       </div>

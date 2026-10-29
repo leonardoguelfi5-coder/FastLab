@@ -23,12 +23,12 @@ export function PassoParametri({ bozza, onChange }: PassoParametriProps) {
     setAperto(p.id)
   }
 
-  // Un parametro eliminato sparisce anche dalle passate che lo includevano.
+  // Un parametro eliminato sparisce anche dagli strumenti che lo includevano.
   function elimina(id: string) {
     onChange({
       ...bozza,
       parametri: bozza.parametri.filter(p => p.id !== id).map((p, ordine) => ({ ...p, ordine })),
-      passate: bozza.passate.map(pa => ({
+      strumenti: bozza.strumenti.map(pa => ({
         ...pa,
         parametri: pa.parametri.filter(pp => pp.parametro_id !== id).map((pp, ordine) => ({ ...pp, ordine })),
       })),
@@ -39,7 +39,7 @@ export function PassoParametri({ bozza, onChange }: PassoParametriProps) {
     <div className="flex flex-col gap-4">
       <p className="max-w-[65ch] text-grafite-tenue">
         I parametri sono le cose che misuri su ogni pianta, es. altezza, temperatura, note. Per ognuno scegli il tipo; nel
-        passo successivo li raggruppi nelle passate. Tocca un parametro per modificarlo.
+        passo successivo li raggruppi negli strumenti. Tocca un parametro per modificarlo.
       </p>
       {bozza.parametri.length === 0 && <p className="text-sm text-grafite-tenue">Nessun parametro ancora.</p>}
       <ul aria-label="Parametri" className="-mx-4 flex flex-col border-t border-riga empty:hidden">

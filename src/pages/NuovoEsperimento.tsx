@@ -18,13 +18,13 @@ import {
 import { Conferma } from '@/components/Conferma'
 import { PassoGenerale } from './wizard/PassoGenerale'
 import { PassoParametri } from './wizard/PassoParametri'
-import { PassoPassate } from './wizard/PassoPassate'
+import { PassoStrumenti } from './wizard/PassoStrumenti'
 import { PassoPiante } from './wizard/PassoPiante'
 import { PassoRiepilogo } from './wizard/PassoRiepilogo'
 import { motivoBlocco } from './wizard/righeTrattamenti'
 import { SceltaIniziale } from './wizard/SceltaIniziale'
 
-const PASSI = ['Generale', 'Fattori e piante', 'Parametri', 'Passate', 'Riepilogo'] as const
+const PASSI = ['Generale', 'Fattori e piante', 'Parametri', 'Strumenti', 'Riepilogo'] as const
 const ULTIMO = PASSI.length - 1
 const TITOLO = 'Nuovo esperimento'
 
@@ -158,7 +158,7 @@ function Procedura({ chiave, crea }: ProceduraProps) {
             <PassoPiante bozza={lavoro.bozza} righe={lavoro.righe} onChange={(bozza, righe) => aggiorna({ bozza, righe })} />
           )}
           {passo === 2 && <PassoParametri bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
-          {passo === 3 && <PassoPassate bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
+          {passo === 3 && <PassoStrumenti bozza={lavoro.bozza} onChange={(bozza) => aggiorna({ bozza })} />}
           {passo === ULTIMO && (
             <PassoRiepilogo
               bozza={lavoro.bozza}

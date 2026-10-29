@@ -3,17 +3,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
-import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
 import { ModuloOggi, type ArrivoScheda, type StatoModulo } from './ModuloOggi'
 
 const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
-/** I parametri da compilare con una passata: nel suo ordine, senza gli archiviati. */
-function parametriDellaPassata(config: ConfigEsperimento, passata: Passata): Parametro[] {
+/** I parametri da compilare con uno strumento: nel suo ordine, senza gli archiviati. */
+function parametriDelloStrumento(config: ConfigEsperimento, strumento: Strumento): Parametro[] {
   const perId = new Map(config.parametri.map(p => [p.id, p]))
-  return [...passata.parametri]
+  return [...strumento.parametri]
     .sort((a, b) => a.ordine - b.ordine)
     .map(pp => perId.get(pp.parametro_id))
     .filter((p): p is Parametro => p !== undefined && !p.archiviato)
@@ -23,7 +23,7 @@ interface RiquadroOggiProps {
   espId: string
   config: ConfigEsperimento
   pianta: Pianta
-  passata: Passata
+  strumento: Strumento
   /** Tutte le misure della pianta, già caricate. */
   misure: Misura[]
   /** Fissa per tutta la vita del riquadro: la pagina lo rimonta quando cambia (vedi SchedaPianta). */
@@ -37,24 +37,24 @@ interface RiquadroOggiProps {
 }
 
 /**
- * Il riquadro "Oggi · 🌡 Termometro" della scheda: le misure già fatte con questa passata alla data di rilievo e il
+ * Il riquadro "Oggi · 🌡 Termometro" della scheda: le misure già fatte con questo strumento alla data di rilievo e il
  * modulo per una misura nuova o per correggerne una. Il modulo ha un id (quello della misura nuova, o quello della
  * misura che si corregge) e si rimonta quando cambia: così un "Annulla" in sospeso non finisce nella misura sbagliata.
  */
 export function RiquadroOggi({
-  espId, config, pianta, passata, misure, dataRilievo, oggi, successiva, conferma, onModifiche,
+  espId, config, pianta, strumento, misure, dataRilievo, oggi, successiva, conferma, onModifiche,
 }: RiquadroOggiProps) {
   const location = useLocation()
   const queryClient = useQueryClient()
-  const base = { espId, piantaId: pianta.id, passataId: passata.id, dataRilievo }
+  const base = { espId, piantaId: pianta.id, strumentoId: strumento.id, dataRilievo }
   const chiaveNuova = chiaveBozza({ ...base, misuraId: null })
   const aperto = chiaveAperto(base)
 
   const misureOggi = useMemo(
     () => misure
-      .filter(m => m.passata_id === passata.id && m.data_rilievo === dataRilievo)
+      .filter(m => m.strumento_id === strumento.id && m.data_rilievo === dataRilievo)
       .sort((a, b) => confronta(a.ora, b.ora)),
-    [misure, passata.id, dataRilievo],
+    [misure, strumento.id, dataRilievo],
   )
 
   // L'id di una misura nuova cambia solo dopo un salvataggio riuscito: un nuovo tentativo dopo un errore, "Scarta" sulla
@@ -81,10 +81,10 @@ export function RiquadroOggi({
     if (idSuccessiva) void queryClient.prefetchQuery(opzioniMisurePianta(idSuccessiva))
   }, [queryClient, idSuccessiva])
 
-  const parametri = useMemo(() => parametriDellaPassata(config, passata), [config, passata])
+  const parametri = useMemo(() => parametriDelloStrumento(config, strumento), [config, strumento])
   const obbligatori = useMemo(
-    () => new Set(passata.parametri.filter(pp => pp.obbligatorio).map(pp => pp.parametro_id)),
-    [passata],
+    () => new Set(strumento.parametri.filter(pp => pp.obbligatorio).map(pp => pp.parametro_id)),
+    [strumento],
   )
   // I precompilati del modulo dopo un salvataggio partono dalla misura appena salvata, anche prima che la cache la riporti.
   const misurePerIniziali = useMemo(
@@ -117,7 +117,7 @@ export function RiquadroOggi({
     setPrimoCampo(false)
   }
 
-  const titolo = `${dataRilievo === oggi ? 'Oggi' : formattaData(dataRilievo)} · ${passata.icona ? `${passata.icona} ` : ''}${passata.nome}`
+  const titolo = `${dataRilievo === oggi ? 'Oggi' : formattaData(dataRilievo)} · ${strumento.icona ? `${strumento.icona} ` : ''}${strumento.nome}`
 
   return (
     <ModuloOggi
@@ -125,7 +125,7 @@ export function RiquadroOggi({
       espId={espId}
       config={config}
       pianta={pianta}
-      passata={passata}
+      strumento={strumento}
       titolo={titolo}
       parametri={parametri}
       obbligatori={obbligatori}

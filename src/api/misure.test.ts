@@ -9,7 +9,7 @@ import { aRigaMisura } from './mappers'
 import { caricaMisura, eliminaMisura, misureDelGiorno, misurePianta, salvaMisura } from './misure'
 
 const misura: Misura = {
-  id: 'm1', pianta_id: 'p1', passata_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12',
+  id: 'm1', pianta_id: 'p1', strumento_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12',
   valori: { par1: [24.5] },
 }
 const riga = { ...aRigaMisura('E', misura), ora: '09:12:00', creato_da: 'u1', creato_il: 'x', aggiornato_il: 'y' }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { clonaConfig } from '@/domain/bozza'
-import type { Misura, Parametro, Passata, Pianta } from '@/domain/tipi'
+import type { Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import {
-  aRigaMisura, aRigaParametro, aRigaPassata, aRigaPassataParametro, aRigaPianta,
+  aRigaMisura, aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta,
   daRigaMisura, daRigheConfig,
   type RigaMisura, type RigheConfig,
 } from './mappers'
@@ -53,14 +53,14 @@ function righe(): RigheConfig {
         sotto_campi: [],
       },
     ],
-    passate: [
-      { id: 'pa2', ...DB, nome: 'Fenologici', icona: null, ordine: 1 },
-      { id: 'pa1', ...DB, nome: 'Altezza', icona: '📏', ordine: 0 },
+    strumenti: [
+      { id: 'pa2', ...DB, nome: 'Fenologici', icona: null, ordine: 1, tipo: 'fenologico', archiviato: true },
+      { id: 'pa1', ...DB, nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false },
     ],
-    passata_parametri: [
-      { ...DB, passata_id: 'pa1', parametro_id: 'par2', obbligatorio: false, ordine: 1 },
-      { ...DB, passata_id: 'pa2', parametro_id: 'par2', obbligatorio: false, ordine: 0 },
-      { ...DB, passata_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0 },
+    strumento_parametri: [
+      { ...DB, strumento_id: 'pa1', parametro_id: 'par2', obbligatorio: false, ordine: 1 },
+      { ...DB, strumento_id: 'pa2', parametro_id: 'par2', obbligatorio: false, ordine: 0 },
+      { ...DB, strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0 },
     ],
   }
 }
@@ -86,12 +86,13 @@ describe('daRigheConfig', () => {
     ])
     expect(c.parametri.map(p => p.id)).toEqual(['par1', 'par2'])
     expect(c.parametri[1].sotto_campi).toEqual([{ chiave: 'n_foglie', nome: 'N foglie', unita: null }])
-    expect(c.passate.map(p => p.id)).toEqual(['pa1', 'pa2'])
-    expect(c.passate[0].parametri).toEqual([
+    expect(c.strumenti.map(p => p.id)).toEqual(['pa1', 'pa2'])
+    expect(c.strumenti.map(p => [p.tipo, p.archiviato])).toEqual([['strumento', false], ['fenologico', true]])
+    expect(c.strumenti[0].parametri).toEqual([
       { parametro_id: 'par1', obbligatorio: true, ordine: 0 },
       { parametro_id: 'par2', obbligatorio: false, ordine: 1 },
     ])
-    expect(c.passate[1].parametri).toEqual([{ parametro_id: 'par2', obbligatorio: false, ordine: 0 }])
+    expect(c.strumenti[1].parametri).toEqual([{ parametro_id: 'par2', obbligatorio: false, ordine: 0 }])
   })
 
   it('toglie esperimento_id e le altre colonne solo del database da ogni oggetto', () => {
@@ -100,7 +101,7 @@ describe('daRigheConfig', () => {
     expect(json).not.toContain('creato_da')
     expect(json).not.toContain('creato_il')
     expect(json).not.toContain('fattore_id')
-    expect(json).not.toContain('passata_id')
+    expect(json).not.toContain('strumento_id')
   })
 
   it('clonaConfig sulla configurazione letta non copia colonne del database', () => {
@@ -116,24 +117,24 @@ describe('daRigheConfig', () => {
     const r = righe()
     const vuota = daRigheConfig({
       ...r, fattori: [], livelli: [], trattamenti: [], trattamento_livelli: [], piante: [],
-      parametri: [], passate: [], passata_parametri: [],
+      parametri: [], strumenti: [], strumento_parametri: [],
     })
     expect(vuota.fattori).toEqual([])
     expect(vuota.trattamenti).toEqual([])
     expect(vuota.piante).toEqual([])
     expect(vuota.parametri).toEqual([])
-    expect(vuota.passate).toEqual([])
+    expect(vuota.strumenti).toEqual([])
   })
 })
 
 const misura: Misura = {
-  id: 'm1', pianta_id: 'p1', passata_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12',
+  id: 'm1', pianta_id: 'p1', strumento_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12',
   valori: { par1: [24.5, null], note: 'ok' },
 }
 
 describe('daRigaMisura', () => {
   const riga: RigaMisura = {
-    id: 'm1', esperimento_id: E, pianta_id: 'p1', passata_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12:00',
+    id: 'm1', esperimento_id: E, pianta_id: 'p1', strumento_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12:00',
     valori: { par1: [24.5, null], note: 'ok' },
     creato_da: 'u1', creato_il: '2026-10-28T09:12:03+00:00', aggiornato_il: '2026-10-28T09:12:03+00:00',
   }
@@ -149,7 +150,7 @@ describe('daRigaMisura', () => {
   it('restituisce esattamente una Misura, senza colonne del database', () => {
     expect(daRigaMisura(riga)).toEqual(misura)
     expect(Object.keys(daRigaMisura(riga)).sort()).toEqual(
-      ['data_rilievo', 'id', 'ora', 'passata_id', 'pianta_id', 'valori'],
+      ['data_rilievo', 'id', 'ora', 'pianta_id', 'strumento_id', 'valori'],
     )
   })
 })
@@ -165,11 +166,11 @@ describe('aRigaMisura', () => {
     const conExtra = { ...misura, creato_da: 'u1', esperimento_id: 'altro' } as Misura
     const r = aRigaMisura('E', conExtra)
     expect(r).toEqual({
-      id: 'm1', esperimento_id: 'E', pianta_id: 'p1', passata_id: 'pa1',
+      id: 'm1', esperimento_id: 'E', pianta_id: 'p1', strumento_id: 'pa1',
       data_rilievo: '2026-10-28', ora: '09:12', valori: misura.valori,
     })
     expect(Object.keys(r).sort()).toEqual(
-      ['data_rilievo', 'esperimento_id', 'id', 'ora', 'passata_id', 'pianta_id', 'valori'],
+      ['data_rilievo', 'esperimento_id', 'id', 'ora', 'pianta_id', 'strumento_id', 'valori'],
     )
   })
 })
@@ -180,8 +181,8 @@ describe('mapper di scrittura della configurazione', () => {
     ricorda_tra_piante: true, n_letture: 3, valore_min: 0, valore_max: 300, sotto_campi: [],
   }
   const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
-  const passata: Passata = {
-    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0,
+  const strumento: Strumento = {
+    id: 'pa1', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
     parametri: [{ parametro_id: 'par1', obbligatorio: true, ordine: 0 }],
   }
 
@@ -194,13 +195,18 @@ describe('mapper di scrittura della configurazione', () => {
     expect(aRigaPianta('E', pianta)).toEqual({ ...pianta, esperimento_id: 'E' })
   })
 
-  it('aRigaPassata porta solo le colonne della passata, senza i parametri annidati', () => {
-    expect(aRigaPassata('E', passata)).toEqual({ id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0 })
+  it('aRigaStrumento porta solo le colonne dello strumento, senza i parametri annidati', () => {
+    expect(aRigaStrumento('E', strumento)).toEqual({
+      id: 'pa1', esperimento_id: 'E', nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
+    })
+    expect(aRigaStrumento('E', { ...strumento, tipo: 'fenologico', archiviato: true })).toMatchObject({
+      tipo: 'fenologico', archiviato: true,
+    })
   })
 
-  it('aRigaPassataParametro collega passata e parametro nello stesso esperimento', () => {
-    expect(aRigaPassataParametro('E', 'pa1', passata.parametri[0])).toEqual({
-      esperimento_id: 'E', passata_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0,
+  it('aRigaStrumentoParametro collega strumento e parametro nello stesso esperimento', () => {
+    expect(aRigaStrumentoParametro('E', 'pa1', strumento.parametri[0])).toEqual({
+      esperimento_id: 'E', strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0,
     })
   })
 })

@@ -49,8 +49,8 @@ export function conPiante(etichette: string[]): BozzaEsperimento {
   b.trattamenti = [{ id: trattamentoId, etichetta: 'Controllo', ordine: 0, livello_ids: [] }]
   b.piante = piante(etichette, trattamentoId)
   b.parametri = [par]
-  b.passate = [{
-    id: crypto.randomUUID(), nome: 'Altezza', icona: null, ordine: 0,
+  b.strumenti = [{
+    id: crypto.randomUUID(), nome: 'Altezza', icona: null, ordine: 0, tipo: 'strumento', archiviato: false,
     parametri: [{ parametro_id: par.id, obbligatorio: false, ordine: 0 }],
   }]
   return b
@@ -58,7 +58,7 @@ export function conPiante(etichette: string[]): BozzaEsperimento {
 
 /**
  * Configurazione completa e valida: 2 fattori, 4 trattamenti, 4 piante,
- * parametri di ogni tipo (compreso uno archiviato) e due passate.
+ * parametri di ogni tipo (compreso uno archiviato) e due strumenti.
  */
 export function configDiEsempio(): ConfigEsperimento {
   const stress = fattore('Stress', ['Controllo', 'S1'])
@@ -85,16 +85,16 @@ export function configDiEsempio(): ConfigEsperimento {
       id: crypto.randomUUID(), trattamento_id: t.id, etichetta: String(i + 1), blocco: null, ordine: i,
     })),
     parametri: [altezza, palchi, note, vecchio],
-    passate: [
+    strumenti: [
       {
-        id: crypto.randomUUID(), nome: 'Altezza', icona: '📏', ordine: 0,
+        id: crypto.randomUUID(), nome: 'Altezza', icona: '📏', ordine: 0, tipo: 'strumento', archiviato: false,
         parametri: [
           { parametro_id: altezza.id, obbligatorio: true, ordine: 0 },
           { parametro_id: vecchio.id, obbligatorio: false, ordine: 1 },
         ],
       },
       {
-        id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 1,
+        id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 1, tipo: 'strumento', archiviato: false,
         parametri: [
           { parametro_id: palchi.id, obbligatorio: false, ordine: 0 },
           { parametro_id: note.id, obbligatorio: false, ordine: 1 },

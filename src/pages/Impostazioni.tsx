@@ -7,14 +7,14 @@ import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { ContestoModifiche } from '@/components/impostazioni/modifiche'
 import { SezioneGenerale } from '@/components/impostazioni/SezioneGenerale'
 import { SezioneParametri } from '@/components/impostazioni/SezioneParametri'
-import { SezionePassate } from '@/components/impostazioni/SezionePassate'
+import { SezioneStrumenti } from '@/components/impostazioni/SezioneStrumenti'
 import { SezionePiante } from '@/components/impostazioni/SezionePiante'
 import { SezioneTrattamenti } from '@/components/impostazioni/SezioneTrattamenti'
 import { percorsoCampo } from '@/lib/percorsi'
 
 /**
  * Impostazioni di un esperimento già avviato (spec §5.3, "Modifiche a esperimento avviato"): dati generali, etichette
- * dei trattamenti, piante, parametri e passate. Ogni elemento si salva da sé, con il suo esito; quel che non è salvato
+ * dei trattamenti, piante, parametri e strumenti. Ogni elemento si salva da sé, con il suo esito; quel che non è salvato
  * resta nella pagina (anche se la configurazione si ricarica) e uscire con la freccia chiede se scartarlo.
  */
 export function Impostazioni() {
@@ -63,7 +63,7 @@ export function Impostazioni() {
             <SezioneTrattamenti espId={espId} config={dati} />
             <SezionePiante espId={espId} config={dati} conDati={pianteConDati} />
             <SezioneParametri espId={espId} config={dati} conDati={parametriConDati} />
-            <SezionePassate espId={espId} config={dati} />
+            <SezioneStrumenti espId={espId} config={dati} />
           </div>
         </ContestoModifiche.Provider>
       )}

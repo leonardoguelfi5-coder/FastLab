@@ -25,10 +25,10 @@ insert into piante (id, esperimento_id, trattamento_id, etichetta, ordine) value
 insert into parametri (id, esperimento_id, nome, tipo, ordine) values
   ('c3000000-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000001', 'Altezza', 'numero', 0);
 
-insert into passate (id, esperimento_id, nome, ordine) values
+insert into strumenti (id, esperimento_id, nome, ordine) values
   ('d3000000-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000001', 'Settimanale', 0);
 
-insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori, creato_da) values
+insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori, creato_da) values
   ('a3000000-0000-0000-0000-000000000001', 'e3000000-0000-0000-0000-000000000001',
    'b3000000-0000-0000-0000-000000000001', 'd3000000-0000-0000-0000-000000000001',
    '2026-10-28', '10:30:00', '{"c3000000-0000-0000-0000-000000000001": [12]}',
@@ -94,10 +94,10 @@ select throws_ok(
   'nemmeno con un upsert sull''id di un parametro dell''altro esperimento');
 
 select throws_ok(
-  $$ update passate set esperimento_id = 'e4000000-0000-0000-0000-000000000002'
+  $$ update strumenti set esperimento_id = 'e4000000-0000-0000-0000-000000000002'
       where id = 'd3000000-0000-0000-0000-000000000001' $$,
   'P0001', 'ESPERIMENTO_NON_MODIFICABILE',
-  'una passata non passa a un altro esperimento');
+  'uno strumento non passa a un altro esperimento');
 
 select throws_ok(
   $$ update misure set esperimento_id = 'e4000000-0000-0000-0000-000000000002'

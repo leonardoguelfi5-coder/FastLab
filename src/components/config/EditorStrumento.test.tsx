@@ -2,38 +2,38 @@ import { describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { Parametro, Passata } from '@/domain/tipi'
+import type { Parametro, Strumento } from '@/domain/tipi'
 import { parametro } from '@/domain/test-helpers'
-import { EditorPassata } from './EditorPassata'
+import { EditorStrumento } from './EditorStrumento'
 
 const altezza = parametro('Altezza', { unita: 'cm', ordine: 0 })
 const spad = parametro('SPAD', { ordine: 1 })
 const vecchio = parametro('Vecchio', { ordine: 2, archiviato: true })
 const PARAMETRI = [altezza, spad, vecchio]
 
-function passata(parametri: Passata['parametri']): Passata {
-  return { id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 0, parametri }
+function strumento(parametri: Strumento['parametri']): Strumento {
+  return { id: crypto.randomUUID(), nome: 'Fenologici', icona: '🌱', ordine: 0, tipo: 'strumento', archiviato: false, parametri }
 }
 
-function rendi(iniziale: Passata, parametri: Parametro[] = PARAMETRI) {
-  const onChange = vi.fn<(p: Passata) => void>()
+function rendi(iniziale: Strumento, parametri: Parametro[] = PARAMETRI) {
+  const onChange = vi.fn<(p: Strumento) => void>()
   function Banco() {
     const [p, setP] = useState(iniziale)
-    return <EditorPassata valore={p} parametri={parametri} onChange={(nuova) => { onChange(nuova); setP(nuova) }} />
+    return <EditorStrumento valore={p} parametri={parametri} onChange={(nuova) => { onChange(nuova); setP(nuova) }} />
   }
   render(<Banco />)
   return onChange
 }
 
-const ultima = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1)?.[0] as Passata
+const ultima = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1)?.[0] as Strumento
 const riga = (nome: string) => within(screen.getByText(nome).closest('li') as HTMLElement)
 
-describe('EditorPassata', () => {
+describe('EditorStrumento', () => {
   it('ha nome e icona modificabili; l\'icona vuota diventa null', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(passata([]))
+    const onChange = rendi(strumento([]))
 
-    expect(screen.getByLabelText('Nome della passata')).toHaveValue('Fenologici')
+    expect(screen.getByLabelText('Nome dello strumento')).toHaveValue('Fenologici')
     await utente.clear(screen.getByLabelText('Icona'))
     expect(ultima(onChange).icona).toBeNull()
     await utente.type(screen.getByLabelText('Icona'), '📏')
@@ -41,7 +41,7 @@ describe('EditorPassata', () => {
   })
 
   it('elenca solo i parametri non archiviati, ognuno con "Incluso" e "Obbligatorio"', () => {
-    rendi(passata([]))
+    rendi(strumento([]))
     expect(screen.queryByText('Vecchio')).not.toBeInTheDocument()
     for (const nome of ['Altezza', 'SPAD']) {
       expect(riga(nome).getByRole('switch', { name: /Incluso/ })).toBeInTheDocument()
@@ -50,14 +50,14 @@ describe('EditorPassata', () => {
   })
 
   it('"Obbligatorio" è attivo solo se il parametro è incluso', () => {
-    rendi(passata([{ parametro_id: altezza.id, obbligatorio: false, ordine: 0 }]))
+    rendi(strumento([{ parametro_id: altezza.id, obbligatorio: false, ordine: 0 }]))
     expect(riga('Altezza').getByRole('switch', { name: /Obbligatorio/ })).not.toHaveAttribute('aria-disabled', 'true')
     expect(riga('SPAD').getByRole('switch', { name: /Obbligatorio/ })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('includere un parametro lo aggiunge in fondo; escluderlo lo toglie e rinumera', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(passata([{ parametro_id: altezza.id, obbligatorio: true, ordine: 0 }]))
+    const onChange = rendi(strumento([{ parametro_id: altezza.id, obbligatorio: true, ordine: 0 }]))
 
     await utente.click(riga('SPAD').getByRole('switch', { name: /Incluso/ }))
     expect(ultima(onChange).parametri).toEqual([
@@ -71,7 +71,7 @@ describe('EditorPassata', () => {
 
   it('"Obbligatorio" si accende e si spegne', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(passata([{ parametro_id: altezza.id, obbligatorio: false, ordine: 0 }]))
+    const onChange = rendi(strumento([{ parametro_id: altezza.id, obbligatorio: false, ordine: 0 }]))
 
     await utente.click(riga('Altezza').getByRole('switch', { name: /Obbligatorio/ }))
     expect(ultima(onChange).parametri[0].obbligatorio).toBe(true)
@@ -79,7 +79,7 @@ describe('EditorPassata', () => {
 
   it('le frecce cambiano l\'ordine dei parametri inclusi', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(passata([
+    const onChange = rendi(strumento([
       { parametro_id: altezza.id, obbligatorio: false, ordine: 0 },
       { parametro_id: spad.id, obbligatorio: true, ordine: 1 },
     ]))
@@ -98,9 +98,9 @@ describe('EditorPassata', () => {
     expect(nomi).toEqual(['SPAD', 'Altezza'])
   })
 
-  it('non perde i parametri archiviati già presenti nella passata', async () => {
+  it('non perde i parametri archiviati già presenti nello strumento', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(passata([
+    const onChange = rendi(strumento([
       { parametro_id: vecchio.id, obbligatorio: false, ordine: 0 },
       { parametro_id: altezza.id, obbligatorio: false, ordine: 1 },
     ]))
@@ -110,7 +110,7 @@ describe('EditorPassata', () => {
   })
 
   it('senza parametri lo dice', () => {
-    rendi(passata([]), [])
+    rendi(strumento([]), [])
     expect(screen.getByText('Non ci sono ancora parametri da includere.')).toBeInTheDocument()
   })
 })

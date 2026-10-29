@@ -86,7 +86,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
       await salvaParametro(espId, daSalvare)
     }, {
       messaggio: nuovo
-        ? `Parametro «${daSalvare.nome}» salvato. Per misurarlo, aggiungilo a una passata.`
+        ? `Parametro «${daSalvare.nome}» salvato. Per misurarlo, aggiungilo a uno strumento.`
         : `Parametro «${daSalvare.nome}» salvato.`,
       aggiorna: c => ({ ...c, parametri: sostituisci(c.parametri, daSalvare) }),
     })
@@ -107,7 +107,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
         : {
             ...c,
             parametri: c.parametri.filter(x => x.id !== p.id),
-            passate: c.passate.map(pa => ({ ...pa, parametri: pa.parametri.filter(pp => pp.parametro_id !== p.id) })),
+            strumenti: c.strumenti.map(pa => ({ ...pa, parametri: pa.parametri.filter(pp => pp.parametro_id !== p.id) })),
           },
     })
     if (riuscito) chiudi(p.id)
@@ -143,7 +143,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
     })
   }
 
-  const inPassata = new Set(config.passate.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
+  const inStrumento = new Set(config.strumenti.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
   const voci = [
     ...salvati.map(p => ({ salvato: p as Parametro | null, valore: bozze.valore(p) })),
     ...nuovi.map(p => ({ salvato: null, valore: bozze.valore(p) })),
@@ -153,7 +153,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
     <Sezione titolo="Parametri">
       <Spiegazione>
         Un parametro con dati non si elimina: si archivia, e i suoi dati restano nella storia e nell'export. Il suo tipo
-        non si cambia. Un parametro nuovo si misura dopo averlo aggiunto a una passata.
+        non si cambia. Un parametro nuovo si misura dopo averlo aggiunto a uno strumento.
       </Spiegazione>
       {dati === undefined && (conDati.isError
         ? <ErroreConRiprova errore={conDati.error} onRiprova={() => void conDati.refetch()} />
@@ -164,8 +164,8 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
           const haDati = salvato ? dati?.has(salvato.id) : false
           const modificato = salvato === null || bozze.modificato(salvato)
           const elenco = problemi(valore, salvato)
-          // Un parametro fuori da ogni passata non si misura: lo si vede anche a voce chiusa.
-          const riassunto = [riassuntoParametro(valore), haDati && 'ha dati', !inPassata.has(valore.id) && 'in nessuna passata']
+          // Un parametro fuori da ogni strumento non si misura: lo si vede anche a voce chiusa.
+          const riassunto = [riassuntoParametro(valore), haDati && 'ha dati', !inStrumento.has(valore.id) && 'in nessuno strumento']
             .filter(Boolean)
             .join(' · ')
           return (
@@ -229,7 +229,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
       <Conferma
         aperta={daEliminare?.aperto ?? false}
         titolo={`Eliminare il parametro «${daEliminare?.parametro.nome ?? ''}»?`}
-        testo="Il parametro non ha dati: sparisce anche dalle passate che lo includono. L'operazione non si può annullare."
+        testo="Il parametro non ha dati: sparisce anche dagli strumenti che lo includono. L'operazione non si può annullare."
         annulla="Annulla"
         conferma="Elimina"
         onAnnulla={() => setDaEliminare(d => d && { ...d, aperto: false })}

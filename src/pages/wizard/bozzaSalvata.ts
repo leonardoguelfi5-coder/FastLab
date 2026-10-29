@@ -33,7 +33,8 @@ export function chiaveBozza(utente: string, modo: string): string {
   return `fastlab:bozza:${utente}:${modo}`
 }
 
-const VERSIONE = 1
+// 2: la bozza porta `strumenti` (con tipo e archiviato) al posto della forma del Piano 1, che non si rilegge.
+const VERSIONE = 2
 
 // Se lo storage non c'è o è pieno la procedura funziona lo stesso: la bozza resta solo in memoria.
 export function salvaBozza(chiave: string, l: Lavoro): void {
@@ -52,7 +53,7 @@ function bozzaValida(b: unknown): b is BozzaEsperimento {
   if (typeof b !== 'object' || b === null) return false
   const o = b as Record<string, unknown>
   return typeof o.esperimento === 'object' && o.esperimento !== null
-    && ['fattori', 'trattamenti', 'piante', 'parametri', 'passate'].every(k => Array.isArray(o[k]))
+    && ['fattori', 'trattamenti', 'piante', 'parametri', 'strumenti'].every(k => Array.isArray(o[k]))
 }
 
 /** La bozza salvata, oppure null se non c'è o non è leggibile (es. salvata da una versione diversa dell'app). */

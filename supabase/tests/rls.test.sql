@@ -50,14 +50,14 @@ select is(
     "parametri": [{"id": "ca000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
                    "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
                    "valore_min": null, "valore_max": null, "sotto_campi": []}],
-    "passate": [{"id": "da000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
+    "strumenti": [{"id": "da000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                  "parametri": [{"parametro_id": "ca000000-0000-0000-0000-000000000001", "obbligatorio": false, "ordine": 0}]}]
   }'::jsonb),
   'ea000000-0000-0000-0000-000000000001'::uuid,
   'A crea un esperimento con crea_esperimento');
 
 select lives_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori)
      values ('ab000000-0000-0000-0000-000000000001', 'ea000000-0000-0000-0000-000000000001',
              'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
              '2026-10-28', '09:00', '{"ca000000-0000-0000-0000-000000000001": [10]}') $$,
@@ -102,18 +102,18 @@ select throws_ok(
   'creato_da di una misura non si modifica');
 
 select lives_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori)
      values ('ab000000-0000-0000-0000-000000000001', 'ea000000-0000-0000-0000-000000000001',
              'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
              '2026-10-28', '09:05', '{"ca000000-0000-0000-0000-000000000001": [11]}')
      on conflict (id) do update set
        id = excluded.id, esperimento_id = excluded.esperimento_id, pianta_id = excluded.pianta_id,
-       passata_id = excluded.passata_id, data_rilievo = excluded.data_rilievo, ora = excluded.ora,
+       strumento_id = excluded.strumento_id, data_rilievo = excluded.data_rilievo, ora = excluded.ora,
        valori = excluded.valori $$,
   'upsert di una misura senza creato_da nel payload: riesce');
 
 select throws_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora, valori, creato_da)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora, valori, creato_da)
      values ('ab000000-0000-0000-0000-000000000001', 'ea000000-0000-0000-0000-000000000001',
              'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
              '2026-10-28', '09:05', '{"ca000000-0000-0000-0000-000000000001": [12]}',
@@ -138,8 +138,8 @@ select is(
         (select count(*)::int from livelli),
         (select count(*)::int from trattamenti),
         (select count(*)::int from trattamento_livelli),
-        (select count(*)::int from passate),
-        (select count(*)::int from passata_parametri),
+        (select count(*)::int from strumenti),
+        (select count(*)::int from strumento_parametri),
         (select count(*)::int from misure)],
   array[0, 0, 0, 0, 0, 0, 0],
   'B vede 0 righe in tutte le altre tabelle di A');
@@ -162,7 +162,7 @@ select is_empty(
   'B: delete dell''esperimento di A tocca 0 righe');
 
 select throws_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora)
      values ('ab000000-0000-0000-0000-000000000002', 'ea000000-0000-0000-0000-000000000001',
              'ba000000-0000-0000-0000-000000000001', 'da000000-0000-0000-0000-000000000001',
              '2026-10-28', '10:00') $$,
@@ -198,14 +198,14 @@ select is(
     "parametri": [{"id": "cb000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
                    "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
                    "valore_min": null, "valore_max": null, "sotto_campi": []}],
-    "passate": [{"id": "db000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
+    "strumenti": [{"id": "db000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                  "parametri": [{"parametro_id": "cb000000-0000-0000-0000-000000000001", "obbligatorio": false, "ordine": 0}]}]
   }'::jsonb),
   'eb000000-0000-0000-0000-000000000001'::uuid,
   'B crea il proprio esperimento');
 
 select throws_ok(
-  $$ insert into misure (id, esperimento_id, pianta_id, passata_id, data_rilievo, ora)
+  $$ insert into misure (id, esperimento_id, pianta_id, strumento_id, data_rilievo, ora)
      values ('bc000000-0000-0000-0000-000000000001', 'eb000000-0000-0000-0000-000000000001',
              'ba000000-0000-0000-0000-000000000001', 'db000000-0000-0000-0000-000000000001',
              '2026-10-28', '10:00') $$,
@@ -264,7 +264,7 @@ select is(
      union all select 1 from misure where esperimento_id = 'ea000000-0000-0000-0000-000000000001'
      union all select 1 from piante where esperimento_id = 'ea000000-0000-0000-0000-000000000001'
      union all select 1 from parametri where esperimento_id = 'ea000000-0000-0000-0000-000000000001'
-     union all select 1 from passate where esperimento_id = 'ea000000-0000-0000-0000-000000000001'
+     union all select 1 from strumenti where esperimento_id = 'ea000000-0000-0000-0000-000000000001'
    ) x),
   0,
   'l''eliminazione di A va a cascata anche sotto RLS');

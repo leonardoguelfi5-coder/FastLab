@@ -102,7 +102,7 @@ describe('BannerData: il giorno che cambia mentre la pagina è aperta', () => {
     expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
   })
 
-  it('la stessa data, alla mezzanotte dopo, è passata: il banner torna', () => {
+  it('la stessa data, alla mezzanotte dopo, è ormai ieri: il banner torna', () => {
     useCampoStore.getState().setData('E', '2026-10-29')
     render(<BannerData espId="E" />)
     act(() => { vi.advanceTimersByTime(31_000) })

@@ -132,7 +132,7 @@ describe('NuovoEsperimento: inizio', () => {
     await avanti(utente)
     expect(titoloPasso()).toHaveTextContent('Parametri')
     await avanti(utente)
-    expect(titoloPasso()).toHaveTextContent('Passate')
+    expect(titoloPasso()).toHaveTextContent('Strumenti')
     await avanti(utente)
     expect(titoloPasso()).toHaveTextContent('Riepilogo')
     expect(screen.queryByRole('button', { name: 'Avanti' })).not.toBeInTheDocument()
@@ -273,7 +273,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
     expect(conteggio('Trattamenti')).toHaveTextContent('8')
     expect(conteggio('Piante')).toHaveTextContent('56')
     expect(conteggio('Parametri')).toHaveTextContent('11')
-    expect(conteggio('Passate')).toHaveTextContent('4')
+    expect(conteggio('Strumenti')).toHaveTextContent('4')
     expect(screen.queryByRole('list', { name: 'Da sistemare' })).not.toBeInTheDocument()
     expect(screen.getByText('Tutto pronto: puoi creare l\'esperimento.')).toBeInTheDocument()
 
@@ -401,7 +401,7 @@ describe('NuovoEsperimento: errori della bozza', () => {
     expect(screen.getByRole('button', { name: 'Crea esperimento' })).toBeDisabled()
     const errori = screen.getByRole('list', { name: 'Da sistemare' })
     for (const e of ['Dai un nome all\'esperimento.', 'Crea almeno un trattamento.', 'Aggiungi almeno una pianta.',
-      'Aggiungi almeno un parametro.', 'Crea almeno una passata.']) {
+      'Aggiungi almeno un parametro.', 'Crea almeno uno strumento.']) {
       expect(within(errori).getByText(e)).toBeInTheDocument()
     }
     expect(creaEsperimento).not.toHaveBeenCalled()
@@ -432,7 +432,7 @@ describe('NuovoEsperimento: errori della bozza', () => {
 })
 
 describe('NuovoEsperimento: da zero', () => {
-  it('1 fattore con 3 livelli, 2 piante per trattamento da 101, 2 parametri e 1 passata', async () => {
+  it('1 fattore con 3 livelli, 2 piante per trattamento da 101, 2 parametri e 1 strumento', async () => {
     vi.mocked(creaEsperimento).mockResolvedValue('esp-zero')
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo')
@@ -461,15 +461,15 @@ describe('NuovoEsperimento: da zero', () => {
     await utente.selectOptions(screen.getByLabelText('Tipo'), 'testo')
     await avanti(utente)
 
-    await utente.click(screen.getByRole('button', { name: '+ Passata' }))
-    await utente.type(screen.getByLabelText('Nome della passata'), 'Fenologici')
+    await utente.click(screen.getByRole('button', { name: '+ Strumento' }))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'Fenologici')
     for (const interruttore of screen.getAllByRole('switch', { name: /Incluso/ })) await utente.click(interruttore)
     await avanti(utente)
 
     expect(conteggio('Trattamenti')).toHaveTextContent('3')
     expect(conteggio('Piante')).toHaveTextContent('6')
     expect(conteggio('Parametri')).toHaveTextContent('2')
-    expect(conteggio('Passate')).toHaveTextContent('1')
+    expect(conteggio('Strumenti')).toHaveTextContent('1')
     expect(sessionStorage.length).toBe(1)
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
 
@@ -481,7 +481,7 @@ describe('NuovoEsperimento: da zero', () => {
     expect(b.trattamenti.map(t => t.etichetta)).toEqual(['0', '50', '100'])
     expect(b.piante.map(p => p.etichetta)).toEqual(['101', '102', '103', '104', '105', '106'])
     expect(b.parametri.map(p => [p.nome, p.tipo, p.unita])).toEqual([['Altezza', 'numero', 'cm'], ['Note', 'testo', null]])
-    expect(b.passate.map(p => [p.nome, p.parametri.map(pp => pp.parametro_id)]))
+    expect(b.strumenti.map(p => [p.nome, p.parametri.map(pp => pp.parametro_id)]))
       .toEqual([['Fenologici', b.parametri.map(p => p.id)]])
   }, LUNGO)
 })
@@ -500,7 +500,7 @@ describe('NuovoEsperimento: duplicazione', () => {
     expect(conteggio('Trattamenti')).toHaveTextContent('4')
     expect(conteggio('Piante')).toHaveTextContent('4')
     expect(conteggio('Parametri')).toHaveTextContent('3')
-    expect(conteggio('Passate')).toHaveTextContent('2')
+    expect(conteggio('Strumenti')).toHaveTextContent('2')
     expect(screen.getByRole('button', { name: 'Crea esperimento' })).toBeEnabled()
   })
 

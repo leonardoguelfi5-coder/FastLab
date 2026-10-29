@@ -25,12 +25,12 @@ export async function listaEsperimenti(): Promise<RiepilogoEsperimento[]> {
   return (data ?? []) as RiepilogoEsperimento[]
 }
 
-/** Legge tutta la configurazione di un esperimento (esperimento, fattori, trattamenti, piante, parametri, passate). */
+/** Legge tutta la configurazione di un esperimento (esperimento, fattori, trattamenti, piante, parametri, strumenti). */
 export async function caricaConfig(espId: string): Promise<ConfigEsperimento> {
   // Un id che non è un uuid (un link sbagliato) non si chiede nemmeno: il database darebbe un errore di formato.
   if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
   const figlie = (tabella: string) => supabase.from(tabella).select('*').eq('esperimento_id', espId)
-  const [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, passate, passataParametri] =
+  const [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, strumenti, strumentoParametri] =
     await Promise.all([
       supabase.from('esperimenti').select('*').eq('id', espId).maybeSingle(),
       figlie('fattori'),
@@ -39,11 +39,11 @@ export async function caricaConfig(espId: string): Promise<ConfigEsperimento> {
       figlie('trattamento_livelli'),
       figlie('piante'),
       figlie('parametri'),
-      figlie('passate'),
-      figlie('passata_parametri'),
+      figlie('strumenti'),
+      figlie('strumento_parametri'),
     ])
 
-  for (const r of [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, passate, passataParametri]) {
+  for (const r of [esperimento, fattori, livelli, trattamenti, trattamentoLivelli, piante, parametri, strumenti, strumentoParametri]) {
     if (r.error) throw r.error
   }
   if (!esperimento.data) throw new Error(ESPERIMENTO_NON_TROVATO)
@@ -56,8 +56,8 @@ export async function caricaConfig(espId: string): Promise<ConfigEsperimento> {
     trattamento_livelli: trattamentoLivelli.data ?? [],
     piante: piante.data ?? [],
     parametri: parametri.data ?? [],
-    passate: passate.data ?? [],
-    passata_parametri: passataParametri.data ?? [],
+    strumenti: strumenti.data ?? [],
+    strumento_parametri: strumentoParametri.data ?? [],
   }
   return daRigheConfig(righe)
 }

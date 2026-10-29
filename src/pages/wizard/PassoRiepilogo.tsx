@@ -26,17 +26,17 @@ interface PassoRiepilogoProps {
 }
 
 /**
- * I parametri che non stanno in nessuna passata: non sono un errore (si possono aggiungere dopo), ma finché restano
+ * I parametri che non stanno in nessuno strumento: non sono un errore (si possono aggiungere dopo), ma finché restano
  * così non si misurano. L'avviso li nomina.
  */
-function avvisoSenzaPassata(bozza: BozzaEsperimento): string | null {
-  const inPassata = new Set(bozza.passate.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
-  const fuori = bozza.parametri.filter(p => !p.archiviato && p.nome.trim() !== '' && !inPassata.has(p.id))
+function avvisoSenzaStrumento(bozza: BozzaEsperimento): string | null {
+  const inStrumento = new Set(bozza.strumenti.flatMap(p => p.parametri.map(pp => pp.parametro_id)))
+  const fuori = bozza.parametri.filter(p => !p.archiviato && p.nome.trim() !== '' && !inStrumento.has(p.id))
   if (fuori.length === 0) return null
   const nomi = fuori.map(p => `"${p.nome.trim()}"`).join(', ')
   return fuori.length === 1
-    ? `${nomi} non è in nessuna passata: non si potrà misurare finché non lo aggiungi a una passata (anche dopo, dalle impostazioni).`
-    : `${nomi} non sono in nessuna passata: non si potranno misurare finché non li aggiungi a una passata (anche dopo, dalle impostazioni).`
+    ? `${nomi} non è in nessuno strumento: non si potrà misurare finché non lo aggiungi a uno strumento (anche dopo, dalle impostazioni).`
+    : `${nomi} non sono in nessuno strumento: non si potranno misurare finché non li aggiungi a uno strumento (anche dopo, dalle impostazioni).`
 }
 
 const codice = (e: unknown) => (typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined)
@@ -64,7 +64,7 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const errori = [...altriErrori, ...validaBozza(bozza)]
-  const avviso = avvisoSenzaPassata(bozza)
+  const avviso = avvisoSenzaStrumento(bozza)
 
   const creazione = useMutation({
     mutationFn: crea,
@@ -89,7 +89,7 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
     ['Trattamenti', bozza.trattamenti.length],
     ['Piante', bozza.piante.length],
     ['Parametri', bozza.parametri.filter(p => !p.archiviato).length],
-    ['Passate', bozza.passate.length],
+    ['Strumenti', bozza.strumenti.length],
   ] as const
 
   return (
@@ -131,7 +131,7 @@ export function PassoRiepilogo({ bozza, altriErrori = [], giaTentato, onTentativ
       )}
 
       <p className="max-w-[65ch] text-sm text-grafite-tenue">
-        Dopo la creazione potrai ancora aggiungere piante, parametri e passate dalle impostazioni dell'esperimento.
+        Dopo la creazione potrai ancora aggiungere piante, parametri e strumenti dalle impostazioni dell'esperimento.
       </p>
 
       <BarraAzioni>

@@ -19,7 +19,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { parametriDiUnaMisura, validaMisura, valoriDaSalvare, valoriDeiParametri } from '@/domain/misure'
-import type { ConfigEsperimento, Misura, Passata, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Strumento, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { eUuid, percorsoCampo, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
@@ -59,7 +59,7 @@ interface ModuloMisuraProps {
   config: ConfigEsperimento
   misura: Misura
   pianta: Pianta
-  passata: Passata
+  strumento: Strumento
   trattamento: Trattamento | undefined
   /** Torna alla scheda della pianta senza lasciare questa pagina nella cronologia. */
   esci: () => void
@@ -70,12 +70,12 @@ interface ModuloMisuraProps {
  * La misura caricata: data, ora e valori da correggere, "Salva" nella barra in basso e, a parte, "Elimina misura".
  * I valori di partenza si leggono una volta, all'apertura: un ricaricamento in background non cancella quel che si scrive.
  */
-function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esci, onModifiche }: ModuloMisuraProps) {
+function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, esci, onModifiche }: ModuloMisuraProps) {
   const idData = useId()
   const idOra = useId()
   const queryClient = useQueryClient()
 
-  const [{ parametri, obbligatori }] = useState(() => parametriDiUnaMisura(config, passata, misura.valori))
+  const [{ parametri, obbligatori }] = useState(() => parametriDiUnaMisura(config, strumento, misura.valori))
   const [valori, setValori] = useState<ValoriMisura>(() => valoriDeiParametri(parametri, misura.valori))
   const [data, setData] = useState(misura.data_rilievo)
   const [ora, setOra] = useState(misura.ora)
@@ -155,7 +155,7 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
       if (istante() - avvisoAlle.current < ATTESA_CONFERMA_MS) return
     }
 
-    // Lo stesso id: l'upsert aggiorna la riga. Le chiavi che il modulo non mostra (altre passate, parametri che non
+    // Lo stesso id: l'upsert aggiorna la riga. Le chiavi che il modulo non mostra (altri strumenti, parametri che non
     // esistono più) restano com'erano, e un parametro che la misura non aveva e resta vuoto non si scrive.
     const daSalvare: Misura = { ...misura, data_rilievo: data, ora, valori: valoriDaSalvare(misura.valori, valori) }
 
@@ -229,8 +229,8 @@ function ModuloMisura({ espId, config, misura, pianta, passata, trattamento, esc
           )}
         </div>
         <p className="flex items-center gap-2 font-medium text-grafite">
-          {passata.icona && <span aria-hidden>{passata.icona}</span>}
-          {passata.nome}
+          {strumento.icona && <span aria-hidden>{strumento.icona}</span>}
+          {strumento.nome}
         </p>
       </div>
 
@@ -339,12 +339,12 @@ export function ModificaMisura() {
     return () => window.removeEventListener('beforeunload', avvisa)
   }, [])
 
-  // Una misura è di questo esperimento se la sua pianta e la sua passata sono nella configurazione: la lettura per id
+  // Una misura è di questo esperimento se la sua pianta e il suo strumento sono nella configurazione: la lettura per id
   // non dice di quale esperimento sia, e una di un altro si tratta come se non ci fosse.
   const dati = config.data
   const trovata = misura.data
   const pianta = dati && trovata ? dati.piante.find(p => p.id === trovata.pianta_id) : undefined
-  const passata = dati && trovata ? dati.passate.find(p => p.id === trovata.passata_id) : undefined
+  const strumento = dati && trovata ? dati.strumenti.find(p => p.id === trovata.strumento_id) : undefined
   const alla = pianta ? percorsoPianta(espId, pianta.id) : null
 
   // Tornati alla scheda la modifica non deve restare nella cronologia: dalla storia della pianta si torna indietro di
@@ -376,7 +376,7 @@ export function ModificaMisura() {
         : <Caricamento />
     }
     if (trovata === undefined) return <Caricamento />
-    if (!pianta || !passata) return <NonTrovata espId={espId} />
+    if (!pianta || !strumento) return <NonTrovata espId={espId} />
     return (
       <ModuloMisura
         key={trovata.id}
@@ -384,7 +384,7 @@ export function ModificaMisura() {
         config={dati}
         misura={trovata}
         pianta={pianta}
-        passata={passata}
+        strumento={strumento}
         trattamento={dati.trattamenti.find(t => t.id === pianta.trattamento_id)}
         esci={esci}
         onModifiche={onModifiche}

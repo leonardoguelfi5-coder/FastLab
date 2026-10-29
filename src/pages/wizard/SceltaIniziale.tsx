@@ -14,7 +14,7 @@ export function SceltaIniziale({ onModello, onDaZero }: { onModello: () => void;
           <span className="flex min-w-0 flex-col gap-1">
             <span className="text-title text-grafite">Parti dal modello Hydrochar</span>
             <span className="text-dato font-sans text-grafite-tenue">
-              Fattori Stress × Hydrochar, 8 trattamenti, 56 piante, parametri e passate già pronti: li modifichi come vuoi.
+              Fattori Stress × Hydrochar, 8 trattamenti, 56 piante, parametri e strumenti già pronti: li modifichi come vuoi.
             </span>
           </span>
           <ChevronRight aria-hidden className="text-grafite-tenue" />
@@ -22,7 +22,7 @@ export function SceltaIniziale({ onModello, onDaZero }: { onModello: () => void;
         <Button variant="quiet" onClick={onDaZero} className={SCELTA}>
           <span className="flex min-w-0 flex-col gap-1">
             <span className="text-title text-grafite">Parti da zero</span>
-            <span className="text-dato font-sans text-grafite-tenue">Definisci tu fattori, piante, parametri e passate.</span>
+            <span className="text-dato font-sans text-grafite-tenue">Definisci tu fattori, piante, parametri e strumenti.</span>
           </span>
           <ChevronRight aria-hidden className="text-grafite-tenue" />
         </Button>

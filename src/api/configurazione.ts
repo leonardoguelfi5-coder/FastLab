@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
-import type { Parametro, Passata, Pianta } from '@/domain/tipi'
+import type { Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { controllaRighe } from './righe'
-import { aRigaParametro, aRigaPassata, aRigaPassataParametro, aRigaPianta } from './mappers'
+import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } from './mappers'
 
 /** Crea o aggiorna un parametro (upsert per id). Cambiare il tipo di un parametro con dati fallisce con PARAMETRO_CON_DATI. */
 export async function salvaParametro(espId: string, p: Parametro): Promise<void> {
@@ -42,24 +42,29 @@ export async function archiviaParametro(espId: string, id: string): Promise<void
   controllaRighe(await supabase.from('parametri').update({ archiviato: true }).eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
+/** Archivia uno strumento (mai eliminato): sparisce dalla scelta in misura, le sue misure restano. */
+export async function archiviaStrumento(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('strumenti').update({ archiviato: true }).eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
 /**
- * Salva una passata e sostituisce i suoi parametri. Prima si scrive la passata, poi i
+ * Salva uno strumento e sostituisce i suoi parametri. Prima si scrive lo strumento, poi i
  * collegamenti nuovi o modificati, infine si tolgono quelli non più presenti: se un passo
- * fallisce la passata resta con più collegamenti, mai con meno.
+ * fallisce lo strumento resta con più collegamenti, mai con meno.
  */
-export async function salvaPassata(espId: string, p: Passata): Promise<void> {
-  const { error: erroreRiga } = await supabase.from('passate').upsert(aRigaPassata(espId, p), { onConflict: 'id' })
+export async function salvaStrumento(espId: string, p: Strumento): Promise<void> {
+  const { error: erroreRiga } = await supabase.from('strumenti').upsert(aRigaStrumento(espId, p), { onConflict: 'id' })
   if (erroreRiga) throw erroreRiga
 
   if (p.parametri.length > 0) {
     const { error } = await supabase
-      .from('passata_parametri')
-      .upsert(p.parametri.map(pp => aRigaPassataParametro(espId, p.id, pp)), { onConflict: 'passata_id,parametro_id' })
+      .from('strumento_parametri')
+      .upsert(p.parametri.map(pp => aRigaStrumentoParametro(espId, p.id, pp)), { onConflict: 'strumento_id,parametro_id' })
     if (error) throw error
   }
 
   // Gli id sono uuid (solo cifre esadecimali e trattini): sicuri nella lista del filtro `in`.
-  let elimina = supabase.from('passata_parametri').delete().eq('passata_id', p.id).eq('esperimento_id', espId)
+  let elimina = supabase.from('strumento_parametri').delete().eq('strumento_id', p.id).eq('esperimento_id', espId)
   if (p.parametri.length > 0) {
     elimina = elimina.not('parametro_id', 'in', `(${p.parametri.map(pp => pp.parametro_id).join(',')})`)
   }
@@ -67,9 +72,9 @@ export async function salvaPassata(espId: string, p: Passata): Promise<void> {
   if (error) throw error
 }
 
-/** Elimina una passata dell'esperimento (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
-export async function eliminaPassata(espId: string, id: string): Promise<void> {
-  controllaRighe(await supabase.from('passate').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
+/** Elimina uno strumento dell'esperimento (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
+export async function eliminaStrumento(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('strumenti').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
 export async function aggiungiPiante(espId: string, piante: Pianta[]): Promise<void> {

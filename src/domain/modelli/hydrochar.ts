@@ -1,5 +1,5 @@
 import { nuovoId } from '@/lib/id'
-import type { BozzaEsperimento, Fattore, Parametro, Passata } from '../tipi'
+import type { BozzaEsperimento, Fattore, Parametro, Strumento } from '../tipi'
 import { bozzaVuota } from '../bozza'
 import { generaTrattamenti } from '../trattamenti'
 import { generaPiante } from '../piante'
@@ -31,20 +31,22 @@ function parametro(nome: string, ordine: number, extra: Partial<Parametro> = {})
   }
 }
 
-/** Passata con i parametri nell'ordine dato, tutti facoltativi. */
-function passata(nome: string, icona: string, ordine: number, parametri: Parametro[]): Passata {
+/** Strumento con i parametri nell'ordine dato, tutti facoltativi. */
+function strumento(nome: string, icona: string, ordine: number, parametri: Parametro[]): Strumento {
   return {
     id: nuovoId(),
     nome,
     icona,
     ordine,
+    tipo: 'strumento',
+    archiviato: false,
     parametri: parametri.map((p, i) => ({ parametro_id: p.id, obbligatorio: false, ordine: i })),
   }
 }
 
 /**
  * Modello "Hydrochar × Cuore di Bue": la configurazione della v2 (elenco piante, parametri
- * e passate dell'app) espressa come bozza di esperimento v3.
+ * e strumenti dell'app) espressa come bozza di esperimento v3.
  * Piante 1–56: 14 di Controllo, poi 6 per ciascuno degli altri 7 trattamenti.
  */
 export function bozzaHydrochar(): BozzaEsperimento {
@@ -83,11 +85,12 @@ export function bozzaHydrochar(): BozzaEsperimento {
   const note = parametro('Note', 10, { tipo: 'testo' })
   bozza.parametri = [tempAria, tempPianta, spad, altezza, nPalchi, nFiori, nFrutti, nInvaiati, palchi, infiorescenze, note]
 
-  bozza.passate = [
-    passata('Termometro', '🌡', 0, [tempAria, tempPianta]),
-    passata('SPAD', '💚', 1, [spad]),
-    passata('Altezza', '📏', 2, [altezza]),
-    passata('Fenologici', '🌱', 3, [altezza, nPalchi, nFiori, nFrutti, nInvaiati, palchi, infiorescenze, note]),
+  bozza.strumenti = [
+    strumento('Termometro', '🌡', 0, [tempAria, tempPianta]),
+    strumento('SPAD', '💚', 1, [spad]),
+    strumento('Altezza', '📏', 2, [altezza]),
+    // Senza Altezza: la misura il suo strumento, e un parametro sta in un solo strumento.
+    strumento('Fenologici', '🌱', 3, [nPalchi, nFiori, nFrutti, nInvaiati, palchi, infiorescenze, note]),
   ]
 
   return bozza

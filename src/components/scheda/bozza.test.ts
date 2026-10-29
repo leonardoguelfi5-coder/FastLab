@@ -5,9 +5,9 @@ import {
 } from './bozza'
 
 const misura: Misura = {
-  id: 'm1', pianta_id: 'p1', passata_id: 'pa1', data_rilievo: '2026-10-21', ora: '09:12', valori: {},
+  id: 'm1', pianta_id: 'p1', strumento_id: 'pa1', data_rilievo: '2026-10-21', ora: '09:12', valori: {},
 }
-const base = { espId: 'E', piantaId: 'p1', passataId: 'pa1', dataRilievo: '2026-10-21' }
+const base = { espId: 'E', piantaId: 'p1', strumentoId: 'pa1', dataRilievo: '2026-10-21' }
 
 beforeEach(() => sessionStorage.clear())
 

@@ -12,9 +12,12 @@ export interface Pianta { id: string; trattamento_id: string; etichetta: string;
 export interface Parametro { id: string; nome: string; unita: string | null; tipo: TipoParametro; ordine: number;
   archiviato: boolean; progressivo: boolean; ricorda_tra_piante: boolean; n_letture: number;
   valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[] }
-export interface PassataParametro { parametro_id: string; obbligatorio: boolean; ordine: number }
-export interface Passata { id: string; nome: string; icona: string | null; ordine: number; parametri: PassataParametro[] }
+export interface StrumentoParametro { parametro_id: string; obbligatorio: boolean; ordine: number }
+/** 'strumento': un gruppo di parametri misurati insieme in campo; 'fenologico': la tabella fenologica (al massimo una). */
+export type TipoStrumento = 'strumento' | 'fenologico'
+export interface Strumento { id: string; nome: string; icona: string | null; ordine: number; tipo: TipoStrumento;
+  archiviato: boolean; parametri: StrumentoParametro[] }
 export interface ConfigEsperimento { esperimento: Esperimento; fattori: Fattore[]; trattamenti: Trattamento[];
-  piante: Pianta[]; parametri: Parametro[]; passate: Passata[] }
+  piante: Pianta[]; parametri: Parametro[]; strumenti: Strumento[] }
 export type BozzaEsperimento = ConfigEsperimento   // stessa forma; ids generati dal client con nuovoId() (src/lib/id.ts)
-export interface Misura { id: string; pianta_id: string; passata_id: string; data_rilievo: string; ora: string; valori: ValoriMisura }
+export interface Misura { id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string; valori: ValoriMisura }

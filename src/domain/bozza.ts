@@ -1,7 +1,7 @@
 import { nuovoId } from '@/lib/id'
-import type { BozzaEsperimento, ConfigEsperimento, Parametro, Passata } from './tipi'
+import type { BozzaEsperimento, ConfigEsperimento, Parametro, Strumento, TipoStrumento } from './tipi'
 
-/** Bozza di un nuovo esperimento: nessun fattore, trattamento, pianta, parametro o passata. */
+/** Bozza di un nuovo esperimento: nessun fattore, trattamento, pianta, parametro o strumento. */
 export function bozzaVuota(): BozzaEsperimento {
   return {
     esperimento: { id: nuovoId(), nome: '', data_inizio: null, note: '', stato: 'in_corso' },
@@ -9,7 +9,7 @@ export function bozzaVuota(): BozzaEsperimento {
     trattamenti: [],
     piante: [],
     parametri: [],
-    passate: [],
+    strumenti: [],
   }
 }
 
@@ -31,9 +31,9 @@ export function nuovoParametro(ordine: number): Parametro {
   }
 }
 
-/** Passata nuova, senza nome, icona né parametri. */
-export function nuovaPassata(ordine: number): Passata {
-  return { id: nuovoId(), nome: '', icona: null, ordine, parametri: [] }
+/** Strumento nuovo, senza nome, icona né parametri; di tipo 'strumento' se non si dice altro. */
+export function nuovoStrumento(ordine: number, tipo: TipoStrumento = 'strumento'): Strumento {
+  return { id: nuovoId(), nome: '', icona: null, ordine, tipo, archiviato: false, parametri: [] }
 }
 
 type Rimappa = Map<string, string>
@@ -50,8 +50,8 @@ function rimappa(mappa: Rimappa, id: string): string {
 
 /**
  * Copia la configurazione di un esperimento (non i dati) in una nuova bozza: tutti gli id
- * sono nuovi e i riferimenti rimappati. I parametri archiviati non si copiano, e spariscono
- * anche dalle passate. La copia riparte "in corso", senza data di inizio; le note restano.
+ * sono nuovi e i riferimenti rimappati. I parametri e gli strumenti archiviati non si
+ * copiano; i parametri archiviati spariscono anche dagli strumenti. La copia riparte "in corso", senza data di inizio; le note restano.
  */
 export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
   const livelli = nuoviId(c.fattori.flatMap(f => f.livelli))
@@ -59,7 +59,8 @@ export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
   const trattamenti = nuoviId(c.trattamenti)
   const attivi = c.parametri.filter(p => !p.archiviato)
   const parametri = nuoviId(attivi)
-  const passate = nuoviId(c.passate)
+  const strumentiAttivi = c.strumenti.filter(p => !p.archiviato)
+  const strumenti = nuoviId(strumentiAttivi)
 
   return {
     esperimento: {
@@ -89,9 +90,9 @@ export function clonaConfig(c: ConfigEsperimento): BozzaEsperimento {
       id: rimappa(parametri, p.id),
       sotto_campi: p.sotto_campi.map(s => ({ ...s })),
     })),
-    passate: c.passate.map(p => ({
+    strumenti: strumentiAttivi.map(p => ({
       ...p,
-      id: rimappa(passate, p.id),
+      id: rimappa(strumenti, p.id),
       parametri: p.parametri
         .filter(pp => parametri.has(pp.parametro_id))
         .map(pp => ({ ...pp, parametro_id: rimappa(parametri, pp.parametro_id) })),
@@ -142,8 +143,8 @@ export function validaBozza(b: BozzaEsperimento): string[] {
   if (parametri.length === 0) errori.push('Aggiungi almeno un parametro.')
   for (const p of parametri) errori.push(...problemiParametro(p, parametri))
 
-  if (b.passate.length === 0) errori.push('Crea almeno una passata.')
-  for (const p of b.passate) errori.push(...problemiPassata(p, b.passate))
+  if (b.strumenti.length === 0) errori.push('Crea almeno uno strumento.')
+  for (const p of b.strumenti) errori.push(...problemiStrumento(p, b.strumenti))
 
   return errori
 }
@@ -180,19 +181,19 @@ export function problemiParametro(p: Parametro, altri: Parametro[]): string[] {
 }
 
 /**
- * I problemi di una passata da sola (gli stessi controlli di `validaBozza`), più il nome unico tra `altre`.
- * Con `attivi` (gli id dei parametri non archiviati) contano solo quei parametri: una passata che ha solo
+ * I problemi di uno strumento da solo (gli stessi controlli di `validaBozza`), più il nome unico tra `altre`.
+ * Con `attivi` (gli id dei parametri non archiviati) contano solo quei parametri: uno strumento che ha solo
  * parametri archiviati non ha nulla da misurare.
  */
-export function problemiPassata(p: Passata, altre: Passata[], attivi?: Set<string>): string[] {
+export function problemiStrumento(p: Strumento, altre: Strumento[], attivi?: Set<string>): string[] {
   const nome = p.nome.trim()
-  if (nome === '') return ['Una passata non ha nome.']
+  if (nome === '') return ['Uno strumento non ha nome.']
 
   const errori: string[] = []
   const omonima = altre.find(a => a.id !== p.id && normalizza(a.nome) === normalizza(nome))
-  if (omonima) errori.push(`C'è già una passata che si chiama "${omonima.nome.trim()}".`)
+  if (omonima) errori.push(`C'è già uno strumento che si chiama "${omonima.nome.trim()}".`)
   const inclusi = attivi ? p.parametri.filter(pp => attivi.has(pp.parametro_id)) : p.parametri
-  if (inclusi.length === 0) errori.push(`La passata "${nome}" non ha parametri.`)
+  if (inclusi.length === 0) errori.push(`Lo strumento "${nome}" non ha parametri.`)
   return errori
 }
 
@@ -218,6 +219,6 @@ export function pulisciBozza(b: BozzaEsperimento): BozzaEsperimento {
     trattamenti: b.trattamenti.map(t => ({ ...t, etichetta: t.etichetta.trim() })),
     piante: b.piante.map(p => ({ ...p, etichetta: p.etichetta.trim(), blocco: p.blocco?.trim() || null })),
     parametri: b.parametri.map(pulisciParametro),
-    passate: b.passate.map(p => ({ ...p, nome: p.nome.trim(), icona: p.icona?.trim() || null })),
+    strumenti: b.strumenti.map(p => ({ ...p, nome: p.nome.trim(), icona: p.icona?.trim() || null })),
   }
 }

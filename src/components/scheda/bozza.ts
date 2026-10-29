@@ -15,7 +15,7 @@ export interface Bozza {
 export interface ChiaveBozza {
   espId: string
   piantaId: string
-  passataId: string
+  strumentoId: string
   dataRilievo: string
   /** La misura che si corregge; `null` per la misura nuova. */
   misuraId: string | null
@@ -28,15 +28,15 @@ export interface ChiaveBozza {
 export const PREFISSO_BOZZE = 'fastlab-bozza:'
 
 export function chiaveBozza(c: ChiaveBozza): string {
-  return PREFISSO_BOZZE + [c.espId, c.piantaId, c.passataId, c.dataRilievo, c.misuraId ?? 'nuova'].join(':')
+  return PREFISSO_BOZZE + [c.espId, c.piantaId, c.strumentoId, c.dataRilievo, c.misuraId ?? 'nuova'].join(':')
 }
 
 /**
- * Dove si ricorda quale modulo era aperto in un riquadro (esperimento, pianta, passata, data): la correzione di una
+ * Dove si ricorda quale modulo era aperto in un riquadro (esperimento, pianta, strumento, data): la correzione di una
  * misura, se ne aveva una bozza. Assente vale "la misura nuova". Si scrive e si cancella insieme alla bozza.
  */
 export function chiaveAperto(c: Omit<ChiaveBozza, 'misuraId'>): string {
-  return PREFISSO_BOZZE + ['aperto', c.espId, c.piantaId, c.passataId, c.dataRilievo].join(':')
+  return PREFISSO_BOZZE + ['aperto', c.espId, c.piantaId, c.strumentoId, c.dataRilievo].join(':')
 }
 
 /** La misura che si stava correggendo, o `null` (la misura nuova, o il sessionStorage non si legge). */
@@ -91,7 +91,7 @@ export function cancellaBozza(chiave: string): void {
  * senza, la scheda riproporrebbe i valori vecchi sopra la modifica appena fatta. Le bozze di altre misure restano.
  */
 export function cancellaBozzaCorrezione(espId: string, m: Misura): void {
-  const base = { espId, piantaId: m.pianta_id, passataId: m.passata_id, dataRilievo: m.data_rilievo }
+  const base = { espId, piantaId: m.pianta_id, strumentoId: m.strumento_id, dataRilievo: m.data_rilievo }
   cancellaBozza(chiaveBozza({ ...base, misuraId: m.id }))
   const aperto = chiaveAperto(base)
   if (leggiAperto(aperto) === m.id) scriviAperto(aperto, null)

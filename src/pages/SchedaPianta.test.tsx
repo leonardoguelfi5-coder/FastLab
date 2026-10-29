@@ -45,14 +45,14 @@ let config: ConfigEsperimento
 /** Le misure "nel database": `misurePianta` le legge, `salvaMisura` le scrive (upsert per id). */
 let archivio: Misura[]
 
-const idPassata = (nome: string) => config.passate.find(p => p.nome === nome)!.id
+const idStrumento = (nome: string) => config.strumenti.find(p => p.nome === nome)!.id
 const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
 
 /** Una misura della pianta 35 (di norma: Termometro, oggi alle 09:12). */
 function misura(extra: Partial<Misura> & { valori: ValoriMisura }): Misura {
   return {
-    id: crypto.randomUUID(), pianta_id: idPianta('35'), passata_id: idPassata('Termometro'),
+    id: crypto.randomUUID(), pianta_id: idPianta('35'), strumento_id: idStrumento('Termometro'),
     data_rilievo: OGGI, ora: '09:12', ...extra,
   }
 }
@@ -74,11 +74,11 @@ function IndietroDiSistema() {
 }
 
 /**
- * Apre la scheda della pianta con la passata già scelta nella schermata in campo (`null`: nessuna passata), arrivando
+ * Apre la scheda della pianta con lo strumento già scelto nella schermata in campo (`null`: nessuno strumento), arrivando
  * dalla schermata in campo (è la voce precedente della cronologia).
  */
-function apri(etichetta = '35', passata: string | null = 'Termometro') {
-  if (passata) useCampoStore.getState().setPassata('E', idPassata(passata))
+function apri(etichetta = '35', strumento: string | null = 'Termometro') {
+  if (strumento) useCampoStore.getState().setStrumento('E', idStrumento(strumento))
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalida = vi.spyOn(client, 'invalidateQueries')
   const id = config.piante.find(p => p.etichetta === etichetta)?.id ?? etichetta
@@ -156,7 +156,7 @@ describe('SchedaPianta: salvataggio', () => {
     const [espId, m] = vi.mocked(salvaMisura).mock.calls[0]
     expect(espId).toBe('E')
     expect(m.id).toMatch(UUID)
-    expect(m).toMatchObject({ pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: OGGI })
+    expect(m).toMatchObject({ pianta_id: idPianta('35'), strumento_id: idStrumento('Termometro'), data_rilievo: OGGI })
     expect(m.ora).toMatch(/^\d{2}:\d{2}$/)
     expect(m.ora).toBe('10:00')
     expect(m.valori[par('Temp aria').id]).toEqual([24.5])
@@ -197,7 +197,7 @@ describe('SchedaPianta: salvataggio', () => {
     await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('36')}`))
   })
 
-  it('un nuovo tentativo tiene l\'ora del primo, anche se nel frattempo il tempo è passato', async () => {
+  it('un nuovo tentativo tiene l\'ora del primo, anche se nel frattempo il tempo è trascorso', async () => {
     vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     apri('35')
@@ -493,7 +493,7 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
     return fine
   }
   const bozzaNuova = (data = OGGI) =>
-    leggiBozza(chiaveBozza({ espId: 'E', piantaId: idPianta('35'), passataId: idPassata('Termometro'), dataRilievo: data, misuraId: null }))
+    leggiBozza(chiaveBozza({ espId: 'E', piantaId: idPianta('35'), strumentoId: idStrumento('Termometro'), dataRilievo: data, misuraId: null }))
 
   it('con una data che non è oggi il messaggio dice con quale data riaprire la pianta', async () => {
     useCampoStore.getState().setData('E', IERI)
@@ -587,7 +587,7 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
 
   it('cambiando pianta un "Annulla" rimasto in sospeso sparisce con la lista', async () => {
     archivio = [misura({
-      passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-21',
+      strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-21',
       valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }] },
     })]
     const utente = userEvent.setup()
@@ -595,7 +595,7 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
     await pronta()
     await utente.click(within(screen.getByRole('group', { name: 'Palchi' })).getByRole('button', { name: 'Rimuovi ultimo' }))
     expect(toast).toHaveBeenCalledWith('Palchi 1 rimosso.', expect.anything())
-    await utente.type(campo('Altezza'), '42')
+    await utente.type(campo('N frutti'), '4')
     await utente.click(pulsante('Salva e vai alla #36'))
 
     await screen.findByRole('heading', { name: 'Pianta #36' })
@@ -607,15 +607,15 @@ describe('SchedaPianta: valori precompilati', () => {
   it('i parametri progressivi (Palchi) ripartono dai valori della volta precedente', async () => {
     archivio = [
       misura({
-        passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-14', ora: '09:00',
+        strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-14', ora: '09:00',
         valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 4 } }], [par('N palchi totali').id]: [1] },
       }),
       misura({
-        passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-21', ora: '09:00',
+        strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-21', ora: '09:00',
         valori: {
           [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }],
           [par('N palchi totali').id]: [2],
-          [par('Altezza').id]: [38],
+          [par('N fiori fioriti').id]: [6],
         },
       }),
     ]
@@ -626,10 +626,10 @@ describe('SchedaPianta: valori precompilati', () => {
     expect(within(screen.getByRole('group', { name: 'Palchi 1' })).getByLabelText('N foglie')).toHaveValue('5')
     expect(within(screen.getByRole('group', { name: 'Palchi 2' })).getByLabelText('N foglie')).toHaveValue('7')
     expect(campo('N palchi totali')).toHaveValue('2')
-    // Altezza non è progressiva: si misura da capo.
-    expect(campo('Altezza')).toHaveValue('')
+    // N fiori fioriti non è progressivo: si misura da capo.
+    expect(campo('N fiori fioriti')).toHaveValue('')
 
-    await utente.type(campo('Altezza'), '42')
+    await utente.type(campo('N fiori fioriti'), '4')
     // Oggi c'è un palco in più.
     await utente.click(pulsante('+ Palchi'))
     await utente.type(within(screen.getByRole('group', { name: 'Palchi 3' })).getByLabelText('N foglie'), '9')
@@ -641,10 +641,10 @@ describe('SchedaPianta: valori precompilati', () => {
     expect(valori[par('Palchi').id]).toEqual([
       { n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }, { n: 3, valori: { n_foglie: 9 } },
     ])
-    expect(valori[par('Altezza').id]).toEqual([42])
+    expect(valori[par('N fiori fioriti').id]).toEqual([4])
     expect(valori[par('N palchi totali').id]).toEqual([3])
     // Il modulo successivo riparte dalla misura appena salvata, non da quella del 21/10.
-    expect(await screen.findByRole('button', { name: /^10:00 · Altezza 42 cm/ })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /^10:00 · N palchi totali 3/ })).toBeInTheDocument()
     expect(campo('N palchi totali')).toHaveValue('3')
     expect(within(screen.getByRole('group', { name: 'Palchi 3' })).getByLabelText('N foglie')).toHaveValue('9')
   })
@@ -654,16 +654,16 @@ describe('SchedaPianta: più misure nello stesso giorno', () => {
   function dueMisure() {
     const ta = par('Temp aria').id
     const tp = par('Temp pianta').id
-    const mattina = misura({ ora: '09:12', valori: { [ta]: [24.5], [tp]: [25.1], 'chiave-di-un-altra-passata': 'da tenere' } })
+    const mattina = misura({ ora: '09:12', valori: { [ta]: [24.5], [tp]: [25.1], 'chiave-di-un-altro-strumento': 'da tenere' } })
     const pomeriggio = misura({ ora: '15:40', valori: { [ta]: [27], [tp]: [28.3] } })
-    // Una misura di un'altra passata e una di ieri non sono "di oggi per questa passata".
-    const spad = misura({ passata_id: idPassata('SPAD'), ora: '11:00', valori: { [par('SPAD').id]: [38.1] } })
+    // Una misura di un altro strumento e una di ieri non sono "di oggi per questo strumento".
+    const spad = misura({ strumento_id: idStrumento('SPAD'), ora: '11:00', valori: { [par('SPAD').id]: [38.1] } })
     const ieri = misura({ data_rilievo: IERI, ora: '09:00', valori: { [ta]: [20] } })
     archivio = [pomeriggio, spad, ieri, mattina]
     return { mattina, pomeriggio, ta, tp }
   }
 
-  it('sopra il modulo elenca le misure di oggi della passata, in ordine di ora', async () => {
+  it('sopra il modulo elenca le misure di oggi dello strumento, in ordine di ora', async () => {
     dueMisure()
     apri('35')
     const elenco = await screen.findByRole('list', { name: 'Misure già registrate' })
@@ -674,7 +674,7 @@ describe('SchedaPianta: più misure nello stesso giorno', () => {
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
   })
 
-  it('toccando una misura la si corregge: il salvataggio usa il suo id e tiene le chiavi di altre passate', async () => {
+  it('toccando una misura la si corregge: il salvataggio usa il suo id e tiene le chiavi di altri strumenti', async () => {
     const { mattina, ta, tp } = dueMisure()
     const utente = userEvent.setup()
     apri('35')
@@ -691,8 +691,8 @@ describe('SchedaPianta: più misure nello stesso giorno', () => {
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     expect(salvaMisura).toHaveBeenCalledWith('E', {
-      id: mattina.id, pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: OGGI, ora: '09:12',
-      valori: { [ta]: [24.5], [tp]: [25.3], 'chiave-di-un-altra-passata': 'da tenere' },
+      id: mattina.id, pianta_id: idPianta('35'), strumento_id: idStrumento('Termometro'), data_rilievo: OGGI, ora: '09:12',
+      valori: { [ta]: [24.5], [tp]: [25.3], 'chiave-di-un-altro-strumento': 'da tenere' },
     })
     // Dopo la correzione si torna a una misura nuova.
     expect(await screen.findByText('Nuova misura')).toBeInTheDocument()
@@ -810,10 +810,10 @@ describe('SchedaPianta: intestazione e storia', () => {
     expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
   })
 
-  it('la storia elenca le misure per giorno (dal più recente), con l\'icona della passata e i parametri archiviati', async () => {
+  it('la storia elenca le misure per giorno (dal più recente), con l\'icona dello strumento e i parametri archiviati', async () => {
     par('SPAD').archiviato = true
     const oggi = misura({ ora: '09:12', valori: { [par('Temp aria').id]: [24.5], [par('Temp pianta').id]: [null] } })
-    const spad = misura({ passata_id: idPassata('SPAD'), data_rilievo: '2026-10-21', ora: '09:00', valori: { [par('SPAD').id]: [38.1] } })
+    const spad = misura({ strumento_id: idStrumento('SPAD'), data_rilievo: '2026-10-21', ora: '09:00', valori: { [par('SPAD').id]: [38.1] } })
     const temp = misura({ data_rilievo: '2026-10-21', ora: '08:30', valori: { [par('Temp aria').id]: [22] } })
     archivio = [oggi, spad, temp]
     apri('35')
@@ -848,13 +848,13 @@ describe('SchedaPianta: intestazione e storia', () => {
 })
 
 describe('SchedaPianta: casi limite', () => {
-  it('senza una passata scelta torna alla schermata in campo', async () => {
+  it('senza uno strumento scelto torna alla schermata in campo', async () => {
     apri('35', null)
     await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
   })
 
-  it('con una passata che non esiste più torna alla schermata in campo', async () => {
-    useCampoStore.getState().setPassata('E', 'passata-cancellata')
+  it('con uno strumento che non esiste più torna alla schermata in campo', async () => {
+    useCampoStore.getState().setStrumento('E', 'strumento-cancellato')
     apri('35', null)
     await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
   })

@@ -111,14 +111,14 @@ describe('caricaConfig', () => {
       id: 'par1', esperimento_id: E, nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false,
       progressivo: false, ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
     }],
-    passate: [{ id: 'pa1', esperimento_id: E, nome: 'Altezza', icona: null, ordine: 0 }],
-    passata_parametri: [{ esperimento_id: E, passata_id: 'pa1', parametro_id: 'par1', obbligatorio: false, ordine: 0 }],
+    strumenti: [{ id: 'pa1', esperimento_id: E, nome: 'Altezza', icona: null, ordine: 0, tipo: 'strumento', archiviato: false }],
+    strumento_parametri: [{ esperimento_id: E, strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: false, ordine: 0 }],
   }
 
   function rispondeConRighe() {
     mock.risponde('esperimenti', { data: righe.esperimento })
     for (const t of [
-      'fattori', 'livelli', 'trattamenti', 'trattamento_livelli', 'piante', 'parametri', 'passate', 'passata_parametri',
+      'fattori', 'livelli', 'trattamenti', 'trattamento_livelli', 'piante', 'parametri', 'strumenti', 'strumento_parametri',
     ] as const) mock.risponde(t, { data: righe[t] })
   }
 
@@ -131,7 +131,7 @@ describe('caricaConfig', () => {
     expect(c.fattori[0].livelli.map(l => l.nome)).toEqual(['Controllo'])
     expect(c.trattamenti[0].livello_ids).toEqual(['l1'])
     expect(c.piante.map(p => p.etichetta)).toEqual(['1'])
-    expect(c.passate[0].parametri).toEqual([{ parametro_id: 'par1', obbligatorio: false, ordine: 0 }])
+    expect(c.strumenti[0].parametri).toEqual([{ parametro_id: 'par1', obbligatorio: false, ordine: 0 }])
     expect(JSON.stringify(c)).not.toContain('esperimento_id')
     expect(JSON.stringify(c)).not.toContain('creato_da')
     // la configurazione letta si può clonare senza portarsi dietro colonne del database
@@ -143,7 +143,7 @@ describe('caricaConfig', () => {
     await caricaConfig(E)
 
     for (const t of [
-      'fattori', 'livelli', 'trattamenti', 'trattamento_livelli', 'piante', 'parametri', 'passate', 'passata_parametri',
+      'fattori', 'livelli', 'trattamenti', 'trattamento_livelli', 'piante', 'parametri', 'strumenti', 'strumento_parametri',
     ]) {
       expect(mock.di(t).filter(c => c.metodo === 'eq').map(c => c.args)).toEqual([['esperimento_id', E]])
     }

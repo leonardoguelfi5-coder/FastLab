@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
-import type { ConfigEsperimento, ElementoLista, Misura, Passata, ValoriMisura } from './tipi'
+import type { ConfigEsperimento, ElementoLista, Misura, Strumento, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
 
 const D = '2026-10-28'
@@ -21,10 +21,10 @@ const note = parametro('Note', { tipo: 'testo' })
 const siNo = parametro('Fioritura', { tipo: 'sino' })
 
 let contatore = 0
-/** Misura di test: pianta P1 e passata "Fenologici" salvo diversa indicazione. */
+/** Misura di test: pianta P1 e strumento "Fenologici" salvo diversa indicazione. */
 function mis(data: string, ora: string, valori: ValoriMisura, extra: Partial<Misura> = {}): Misura {
   contatore += 1
-  return { id: `m${contatore}`, pianta_id: 'P1', passata_id: 'PA1', data_rilievo: data, ora, valori, ...extra }
+  return { id: `m${contatore}`, pianta_id: 'P1', strumento_id: 'PA1', data_rilievo: data, ora, valori, ...extra }
 }
 
 describe('valoreVuoto', () => {
@@ -313,20 +313,20 @@ describe('validaMisura', () => {
 })
 
 describe('contaPerPianta', () => {
-  it('conta solo la passata indicata', () => {
+  it('conta solo lo strumento indicato', () => {
     const misure = [
-      mis(D, '09:00', {}, { pianta_id: 'P1', passata_id: 'Termometro' }),
-      mis(D, '10:00', {}, { pianta_id: 'P1', passata_id: 'Termometro' }),
-      mis(D, '11:00', {}, { pianta_id: 'P1', passata_id: 'SPAD' }),
+      mis(D, '09:00', {}, { pianta_id: 'P1', strumento_id: 'Termometro' }),
+      mis(D, '10:00', {}, { pianta_id: 'P1', strumento_id: 'Termometro' }),
+      mis(D, '11:00', {}, { pianta_id: 'P1', strumento_id: 'SPAD' }),
     ]
     expect(contaPerPianta(misure, 'Termometro')).toEqual(new Map([['P1', 2]]))
   })
   it('una voce per ogni pianta che ha misure, nessuna per le altre', () => {
     const misure = [
-      mis(D, '09:00', {}, { pianta_id: 'P1', passata_id: 'T' }),
-      mis(D, '09:05', {}, { pianta_id: 'P2', passata_id: 'T' }),
-      mis(D, '09:10', {}, { pianta_id: 'P2', passata_id: 'T' }),
-      mis(D, '09:15', {}, { pianta_id: 'P3', passata_id: 'ALTRA' }),
+      mis(D, '09:00', {}, { pianta_id: 'P1', strumento_id: 'T' }),
+      mis(D, '09:05', {}, { pianta_id: 'P2', strumento_id: 'T' }),
+      mis(D, '09:10', {}, { pianta_id: 'P2', strumento_id: 'T' }),
+      mis(D, '09:15', {}, { pianta_id: 'P3', strumento_id: 'ALTRA' }),
     ]
     const m = contaPerPianta(misure, 'T')
     expect(m.get('P1')).toBe(1)
@@ -425,40 +425,40 @@ describe('parametriDiUnaMisura', () => {
   const staccato = parametro('Staccato')
   const vuoto = parametro('Mai misurato')
   const config = { parametri: [altezza, tempAria, vecchio, staccato, vuoto, note] } as ConfigEsperimento
-  const passata: Passata = {
-    id: 'PA', nome: 'Termometro', icona: null, ordine: 0,
+  const strumento: Strumento = {
+    id: 'PA', nome: 'Termometro', icona: null, ordine: 0, tipo: 'strumento', archiviato: false,
     parametri: [
       { parametro_id: tempAria.id, obbligatorio: true, ordine: 1 },
       { parametro_id: vecchio.id, obbligatorio: false, ordine: 0 },
     ],
   }
 
-  it('prima i parametri della passata nel suo ordine, anche gli archiviati con "(archiviato)"', () => {
-    const { parametri } = parametriDiUnaMisura(config, passata, {})
+  it('prima i parametri dello strumento nel suo ordine, anche gli archiviati con "(archiviato)"', () => {
+    const { parametri } = parametriDiUnaMisura(config, strumento, {})
     expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria'])
   })
 
-  it('poi quelli che non sono nella passata ma hanno un valore, nell\'ordine della configurazione', () => {
+  it('poi quelli che non sono nello strumento ma hanno un valore, nell\'ordine della configurazione', () => {
     const valori: ValoriMisura = { [note.id]: 'ok', [altezza.id]: [3], [vuoto.id]: [null], 'chiave-estranea': 'x' }
-    const { parametri } = parametriDiUnaMisura(config, passata, valori)
+    const { parametri } = parametriDiUnaMisura(config, strumento, valori)
     expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria', 'Altezza', 'Note'])
   })
 
-  it('un parametro archiviato che non è nella passata porta lo stesso suffisso, e la configurazione non cambia', () => {
-    const { parametri } = parametriDiUnaMisura(config, passata, { [vecchio.id]: [1], [staccato.id]: [2] })
+  it('un parametro archiviato che non è nello strumento porta lo stesso suffisso, e la configurazione non cambia', () => {
+    const { parametri } = parametriDiUnaMisura(config, strumento, { [vecchio.id]: [1], [staccato.id]: [2] })
     expect(parametri.map(p => p.nome)).toEqual(['Vecchio (archiviato)', 'Temp. aria', 'Staccato'])
     expect(vecchio.nome).toBe('Vecchio')
     expect(parametri[0]).toMatchObject({ id: vecchio.id, archiviato: true })
   })
 
-  it('gli obbligatori sono quelli segnati nella passata per cui la misura ha già un valore', () => {
-    const { obbligatori } = parametriDiUnaMisura(config, passata, { [tempAria.id]: [21], [altezza.id]: [3] })
+  it('gli obbligatori sono quelli segnati nello strumento per cui la misura ha già un valore', () => {
+    const { obbligatori } = parametriDiUnaMisura(config, strumento, { [tempAria.id]: [21], [altezza.id]: [3] })
     expect([...obbligatori]).toEqual([tempAria.id])
   })
 
   it('un obbligatorio senza valore nella misura (aggiunto dopo) o con il valore vuoto non lo è: la misura vecchia si corregge', () => {
-    expect([...parametriDiUnaMisura(config, passata, { [altezza.id]: [3] }).obbligatori]).toEqual([])
-    expect([...parametriDiUnaMisura(config, passata, { [tempAria.id]: [null] }).obbligatori]).toEqual([])
+    expect([...parametriDiUnaMisura(config, strumento, { [altezza.id]: [3] }).obbligatori]).toEqual([])
+    expect([...parametriDiUnaMisura(config, strumento, { [tempAria.id]: [null] }).obbligatori]).toEqual([])
   })
 })
 

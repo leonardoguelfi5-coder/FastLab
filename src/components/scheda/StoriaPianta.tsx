@@ -2,19 +2,19 @@ import { useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { raggruppaStoria } from '@/domain/misure'
-import type { ConfigEsperimento, Misura, Passata } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Strumento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { percorsoMisura, type ArrivoMisura } from '@/lib/percorsi'
 import { VociMisura } from './VociMisura'
 import { vociMisura } from './voci'
 
-/** L'icona della passata scelta dall'utente; a chi non la vede si legge il nome. Senza icona, il nome in chiaro. */
-function NomePassata({ passata }: { passata: Passata }) {
-  if (!passata.icona) return <span className="text-grafite-tenue">{passata.nome}</span>
+/** L'icona dello strumento scelto dall'utente; a chi non la vede si legge il nome. Senza icona, il nome in chiaro. */
+function NomeStrumento({ strumento }: { strumento: Strumento }) {
+  if (!strumento.icona) return <span className="text-grafite-tenue">{strumento.nome}</span>
   return (
     <>
-      <span aria-hidden>{passata.icona}</span>
-      <span className="sr-only">{passata.nome}</span>
+      <span aria-hidden>{strumento.icona}</span>
+      <span className="sr-only">{strumento.nome}</span>
     </>
   )
 }
@@ -36,7 +36,7 @@ interface StoriaPiantaProps {
 export function StoriaPianta({ espId, config, misure }: StoriaPiantaProps) {
   const id = useId()
   const giorni = useMemo(() => raggruppaStoria(misure), [misure])
-  const passate = useMemo(() => new Map(config.passate.map(p => [p.id, p])), [config.passate])
+  const strumenti = useMemo(() => new Map(config.strumenti.map(p => [p.id, p])), [config.strumenti])
 
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
@@ -50,7 +50,7 @@ export function StoriaPianta({ espId, config, misure }: StoriaPiantaProps) {
               <h4 className="pb-1.5 font-mono text-dato font-medium text-grafite tabular-nums">{formattaData(g.data)}</h4>
               <ul className="border-t border-riga">
                 {g.misure.map(m => {
-                  const passata = passate.get(m.passata_id)
+                  const strumento = strumenti.get(m.strumento_id)
                   return (
                     <li key={m.id} className="border-b border-riga">
                       <Link
@@ -60,7 +60,7 @@ export function StoriaPianta({ espId, config, misure }: StoriaPiantaProps) {
                       >
                         <span className="min-w-0 flex-1">
                           <span className="font-mono text-grafite tabular-nums">{m.ora}</span>
-                          {passata && <>{' · '}<NomePassata passata={passata} /></>}
+                          {strumento && <>{' · '}<NomeStrumento strumento={strumento} /></>}
                           {' · '}
                           <VociMisura voci={vociMisura(m, config.parametri)} />
                         </span>

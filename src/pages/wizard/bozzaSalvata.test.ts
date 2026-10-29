@@ -38,7 +38,12 @@ describe('bozzaSalvata', () => {
     expect(leggiBozza(CHIAVE)).toBeNull()
     sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 99, ...nuovoLavoro(bozzaVuota()) }))
     expect(leggiBozza(CHIAVE)).toBeNull()
-    sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 1, bozza: { esperimento: {} }, righe: [], iniziale: '' }))
+    sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 2, bozza: { esperimento: {} }, righe: [], iniziale: '' }))
+    expect(leggiBozza(CHIAVE)).toBeNull()
+  })
+
+  it('ignora una bozza della versione 1 (la forma di prima degli strumenti)', () => {
+    sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 1, ...nuovoLavoro(bozzaHydrochar()) }))
     expect(leggiBozza(CHIAVE)).toBeNull()
   })
 })

@@ -1,40 +1,40 @@
 import { useState } from 'react'
-import { eliminaPassata, salvaPassata } from '@/api/configurazione'
-import { EditorPassata } from '@/components/config/EditorPassata'
+import { eliminaStrumento, salvaStrumento } from '@/api/configurazione'
+import { EditorStrumento } from '@/components/config/EditorStrumento'
 import { Conferma } from '@/components/Conferma'
 import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
-import { nuovaPassata, problemiPassata } from '@/domain/bozza'
-import type { ConfigEsperimento, Passata } from '@/domain/tipi'
+import { nuovoStrumento, problemiStrumento } from '@/domain/bozza'
+import type { ConfigEsperimento, Strumento } from '@/domain/tipi'
 import { useAzione } from './azione'
 import { useBozze, useSegnalaModifiche } from './modifiche'
 import { Sezione, Spiegazione } from './Sezione'
 
-const sostituisci = (elenco: Passata[], p: Passata) =>
+const sostituisci = (elenco: Strumento[], p: Strumento) =>
   elenco.some(x => x.id === p.id) ? elenco.map(x => (x.id === p.id ? p : x)) : [...elenco, p]
 
 /**
- * Le passate, una alla volta in un editor che si apre, con il proprio "Salva"; "+ Passata" ne prepara una nuova. Una
- * passata con misure non si elimina: lo dice il database (23503) e il messaggio lo spiega.
+ * Gli strumenti, uno alla volta in un editor che si apre, con il proprio "Salva"; "+ Strumento" ne prepara uno nuovo. Uno
+ * strumento con misure non si elimina: lo dice il database (23503) e il messaggio lo spiega.
  */
-export function SezionePassate({ espId, config }: { espId: string; config: ConfigEsperimento }) {
+export function SezioneStrumenti({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const { inCorso, esegui } = useAzione(espId)
-  const bozze = useBozze<Passata>()
-  // Le passate nuove come sono state create: quel che si scrive sta nelle bozze, come per quelle salvate.
-  const [create, setCreate] = useState<Passata[]>([])
+  const bozze = useBozze<Strumento>()
+  // Gli strumenti nuovi come sono stati creati: quel che si scrive sta nelle bozze, come per quelli salvati.
+  const [create, setCreate] = useState<Strumento[]>([])
   const [aperta, setAperta] = useState<string | null>(null)
-  const [daEliminare, setDaEliminare] = useState<{ passata: Passata; aperto: boolean } | null>(null)
+  const [daEliminare, setDaEliminare] = useState<{ strumento: Strumento; aperto: boolean } | null>(null)
 
-  // Una nuova già arrivata in configurazione (salvata anche se la risposta si è persa) è ormai una passata salvata.
-  const inConfig = new Set(config.passate.map(p => p.id))
+  // Uno nuovo già arrivato in configurazione (salvato anche se la risposta si è persa) è ormai uno strumento salvato.
+  const inConfig = new Set(config.strumenti.map(p => p.id))
   const nuove = create.filter(p => !inConfig.has(p.id))
   const attivi = new Set(config.parametri.filter(p => !p.archiviato).map(p => p.id))
-  useSegnalaModifiche('passate', nuove.length > 0 || config.passate.some(p => bozze.modificato(p)))
+  useSegnalaModifiche('strumenti', nuove.length > 0 || config.strumenti.some(p => bozze.modificato(p)))
 
   function aggiungi() {
-    const ordine = Math.max(-1, ...config.passate.map(p => p.ordine), ...nuove.map(p => p.ordine)) + 1
-    const p = nuovaPassata(ordine)
+    const ordine = Math.max(-1, ...config.strumenti.map(p => p.ordine), ...nuove.map(p => p.ordine)) + 1
+    const p = nuovoStrumento(ordine)
     setCreate(n => [...n, p])
     setAperta(p.id)
   }
@@ -44,30 +44,30 @@ export function SezionePassate({ espId, config }: { espId: string; config: Confi
     bozze.scarta(id)
   }
 
-  async function salva(inviata: Passata, nuova: boolean) {
+  async function salva(inviata: Strumento, nuova: boolean) {
     // Un parametro eliminato nel frattempo non si manda: il collegamento fallirebbe (23503).
     const esistenti = new Set(config.parametri.map(p => p.id))
-    const daSalvare: Passata = {
+    const daSalvare: Strumento = {
       ...inviata,
       nome: inviata.nome.trim(),
       icona: inviata.icona?.trim() || null,
       parametri: inviata.parametri.filter(pp => esistenti.has(pp.parametro_id)),
     }
-    const riuscito = await esegui(() => salvaPassata(espId, daSalvare), {
-      messaggio: `Passata «${daSalvare.nome}» salvata.`,
-      aggiorna: c => ({ ...c, passate: sostituisci(c.passate, daSalvare) }),
+    const riuscito = await esegui(() => salvaStrumento(espId, daSalvare), {
+      messaggio: `Strumento «${daSalvare.nome}» salvato.`,
+      aggiorna: c => ({ ...c, strumenti: sostituisci(c.strumenti, daSalvare) }),
     })
     if (!riuscito) return
     if (nuova) setCreate(n => n.filter(x => x.id !== inviata.id))
     bozze.salvata(inviata)
   }
 
-  async function elimina(p: Passata) {
-    setDaEliminare({ passata: p, aperto: false })
-    const riuscito = await esegui(() => eliminaPassata(espId, p.id), {
-      messaggio: 'Passata eliminata.',
+  async function elimina(p: Strumento) {
+    setDaEliminare({ strumento: p, aperto: false })
+    const riuscito = await esegui(() => eliminaStrumento(espId, p.id), {
+      messaggio: 'Strumento eliminato.',
       neutro: true,
-      aggiorna: c => ({ ...c, passate: c.passate.filter(x => x.id !== p.id) }),
+      aggiorna: c => ({ ...c, strumenti: c.strumenti.filter(x => x.id !== p.id) }),
     })
     if (riuscito) {
       setCreate(n => n.filter(x => x.id !== p.id))
@@ -77,32 +77,32 @@ export function SezionePassate({ espId, config }: { espId: string; config: Confi
   }
 
   const voci = [
-    ...config.passate.map(p => ({ salvata: p as Passata | null, valore: bozze.valore(p) })),
+    ...config.strumenti.map(p => ({ salvata: p as Strumento | null, valore: bozze.valore(p) })),
     ...nuove.map(p => ({ salvata: null, valore: bozze.valore(p) })),
   ]
-  // Il nome si confronta con le passate salvate e con le nuove (come per i parametri).
-  const altre = [...config.passate, ...nuove.map(bozze.valore)]
+  // Il nome si confronta con gli strumenti salvati e con quelli nuovi (come per i parametri).
+  const altre = [...config.strumenti, ...nuove.map(bozze.valore)]
 
   return (
-    <Sezione titolo="Passate">
+    <Sezione titolo="Strumenti">
       <Spiegazione>
-        Una passata raggruppa i parametri che rilevi insieme in campo. Si elimina solo se non ha ancora misure.
+        Uno strumento raggruppa i parametri che rilevi insieme in campo. Si elimina solo se non ha ancora misure.
       </Spiegazione>
-      <ul aria-label="Passate dell'esperimento" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
+      <ul aria-label="Strumenti dell'esperimento" className="-mx-4 flex flex-col border-t border-riga empty:hidden">
         {voci.map(({ salvata, valore }) => {
           const modificata = salvata === null || bozze.modificato(salvata)
-          const problemi = problemiPassata(valore, altre, attivi)
+          const problemi = problemiStrumento(valore, altre, attivi)
           const n = valore.parametri.filter(pp => attivi.has(pp.parametro_id)).length
           return (
             <Espandibile
               key={valore.id}
               titolo={[valore.icona, valore.nome.trim() || 'Senza nome'].filter(Boolean).join(' ')}
               riassunto={n === 0 ? 'Nessun parametro' : n === 1 ? '1 parametro' : `${n} parametri`}
-              nota={salvata === null ? 'Non salvata' : modificata ? 'Modifiche non salvate' : undefined}
+              nota={salvata === null ? 'Non salvato' : modificata ? 'Modifiche non salvate' : undefined}
               aperto={aperta === valore.id}
               onCambia={() => setAperta(aperta === valore.id ? null : valore.id)}
             >
-              <EditorPassata valore={valore} parametri={config.parametri} onChange={bozze.cambia} />
+              <EditorStrumento valore={valore} parametri={config.parametri} onChange={bozze.cambia} />
               {problemi.length > 0 && (
                 <div className="flex flex-col gap-1">{problemi.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
               )}
@@ -126,25 +126,25 @@ export function SezionePassate({ espId, config }: { espId: string; config: Confi
                   size="sm"
                   className="self-start"
                   disabled={inCorso}
-                  onClick={() => setDaEliminare({ passata: salvata, aperto: true })}
+                  onClick={() => setDaEliminare({ strumento: salvata, aperto: true })}
                 >
-                  Elimina passata
+                  Elimina strumento
                 </Button>
               )}
             </Espandibile>
           )
         })}
       </ul>
-      <Button variant="outline" onClick={aggiungi}>+ Passata</Button>
+      <Button variant="outline" onClick={aggiungi}>+ Strumento</Button>
 
       <Conferma
         aperta={daEliminare?.aperto ?? false}
-        titolo={`Eliminare la passata «${daEliminare?.passata.nome ?? ''}»?`}
-        testo="Si può eliminare solo una passata senza misure: i parametri restano. L'operazione non si può annullare."
+        titolo={`Eliminare lo strumento «${daEliminare?.strumento.nome ?? ''}»?`}
+        testo="Si può eliminare solo uno strumento senza misure: i parametri restano. L'operazione non si può annullare."
         annulla="Annulla"
         conferma="Elimina"
         onAnnulla={() => setDaEliminare(d => d && { ...d, aperto: false })}
-        onConferma={() => { if (daEliminare) void elimina(daEliminare.passata) }}
+        onConferma={() => { if (daEliminare) void elimina(daEliminare.strumento) }}
       />
     </Sezione>
   )

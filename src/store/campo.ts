@@ -6,10 +6,10 @@ import { oggiLocale } from '@/lib/date'
 
 /** Le scelte fatte in campo per un esperimento, come stanno nel localStorage. */
 interface ScelteCampo {
-  passataId: string | null
+  strumentoId: string | null
   /**
    * AAAA-MM-GG scelta da chi rileva. Assente se non è stata scelta nessuna data: vale allora la data di oggi,
-   * che cambia con il giorno (così scegliere la passata, o riaprire l'app domani, non fissa il rilievo a ieri).
+   * che cambia con il giorno (così scegliere lo strumento, o riaprire l'app domani, non fissa il rilievo a ieri).
    */
   dataRilievo?: string
   /** Gli ultimi valori dei parametri "ricorda tra piante", per precompilare la pianta dopo. */
@@ -18,7 +18,7 @@ interface ScelteCampo {
 
 /** Quello che serve a una schermata: sempre completo, con la data di oggi se non ne è stata scelta un'altra. */
 export interface DatiCampo {
-  passataId: string | null
+  strumentoId: string | null
   dataRilievo: string
   ricordati: ValoriMisura
 }
@@ -31,12 +31,12 @@ interface CampoStore {
    * stato e il giorno non cambiano: `useCampoStore(s => s.dati(espId, oggi))` si può usare così com'è nei componenti.
    */
   dati: (espId: string, oggi?: string) => DatiCampo
-  setPassata: (espId: string, passataId: string | null) => void
+  setStrumento: (espId: string, strumentoId: string | null) => void
   /** Scegliere la data di oggi riporta a "oggi" (non la fissa): domani il rilievo sarà di domani. */
   setData: (espId: string, data: string) => void
   /**
    * Dopo un salvataggio: ricorda i valori dei soli parametri con `ricorda_tra_piante`. Un parametro presente ma
-   * vuoto cancella il valore ricordato; uno assente dai `valori` (non è nella passata) resta com'era.
+   * vuoto cancella il valore ricordato; uno assente dai `valori` (non è nello strumento) resta com'era.
    */
   ricorda: (espId: string, parametri: Parametro[], valori: ValoriMisura) => void
 }
@@ -71,8 +71,10 @@ const eOggetto = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
  */
 function pulite(scelte: unknown): ScelteCampo {
   const s = eOggetto(scelte) ? scelte : {}
+  // Prima della rinomina lo strumento scelto si salvava come `passataId`: vale finché non si scrive la chiave nuova.
+  const strumentoId = typeof s.strumentoId === 'string' ? s.strumentoId : typeof s.passataId === 'string' ? s.passataId : null
   const risultato: ScelteCampo = {
-    passataId: typeof s.passataId === 'string' ? s.passataId : null,
+    strumentoId,
     ricordati: eOggetto(s.ricordati) ? (s.ricordati as ValoriMisura) : senzaValori,
   }
   if (typeof s.dataRilievo === 'string' && DATA_ISO.test(s.dataRilievo)) risultato.dataRilievo = s.dataRilievo
@@ -81,7 +83,7 @@ function pulite(scelte: unknown): ScelteCampo {
 
 // Il risultato dipende solo dalle scelte e dal giorno: si tiene per ogni coppia, così chi chiede con un giorno
 // diverso (un componente non ancora aggiornato) non fa perdere a un altro il suo oggetto.
-const SENZA_SCELTE = Object.freeze({ passataId: null, ricordati: senzaValori }) as ScelteCampo
+const SENZA_SCELTE = Object.freeze({ strumentoId: null, ricordati: senzaValori }) as ScelteCampo
 const memo = new WeakMap<ScelteCampo, Map<string, DatiCampo>>()
 
 function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string): DatiCampo {
@@ -91,8 +93,8 @@ function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string):
   if (!perGiorno) memo.set(chiave, (perGiorno = new Map()))
   let dati = perGiorno.get(oggi)
   if (!dati) {
-    const { passataId, dataRilievo, ricordati } = pulite(salvate)
-    perGiorno.set(oggi, (dati = { passataId, dataRilievo: dataRilievo ?? oggi, ricordati }))
+    const { strumentoId, dataRilievo, ricordati } = pulite(salvate)
+    perGiorno.set(oggi, (dati = { strumentoId, dataRilievo: dataRilievo ?? oggi, ricordati }))
   }
   return dati
 }
@@ -103,8 +105,8 @@ export const useCampoStore = create<CampoStore>()(
     (set, get) => ({
       stato: {},
       dati: (espId, oggi = oggiLocale()) => leggi(get().stato, espId, oggi),
-      setPassata: (espId, passataId) =>
-        set(s => ({ stato: { ...s.stato, [espId]: { ...pulite(s.stato[espId]), passataId } } })),
+      setStrumento: (espId, strumentoId) =>
+        set(s => ({ stato: { ...s.stato, [espId]: { ...pulite(s.stato[espId]), strumentoId } } })),
       setData: (espId, data) =>
         set(s => {
           const scelte = pulite(s.stato[espId])

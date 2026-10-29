@@ -220,7 +220,7 @@ describe('svuotaCacheAlCambioUtente', () => {
   })
 
   describe('le bozze della scheda pianta', () => {
-    const riquadro = { espId: 'E', piantaId: 'p35', passataId: 'termo', dataRilievo: '2026-10-28' }
+    const riquadro = { espId: 'E', piantaId: 'p35', strumentoId: 'termo', dataRilievo: '2026-10-28' }
     const bozza = chiaveBozza({ ...riquadro, misuraId: null })
     const aperto = chiaveAperto(riquadro)
     const scrivi = () => {

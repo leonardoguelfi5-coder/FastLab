@@ -1,6 +1,6 @@
 import type {
-  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Parametro, Passata, PassataParametro, Pianta,
-  SottoCampo, Trattamento, TipoParametro, ValoriMisura,
+  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Parametro, Strumento, StrumentoParametro, Pianta,
+  SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura,
 } from '@/domain/tipi'
 
 // Righe come le restituisce PostgREST (select('*')). Le colonne esperimento_id, creato_da,
@@ -24,12 +24,14 @@ export interface RigaParametro {
   archiviato: boolean; progressivo: boolean; ricorda_tra_piante: boolean; n_letture: number
   valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[]
 }
-export interface RigaPassata { id: string; esperimento_id: string; nome: string; icona: string | null; ordine: number }
-export interface RigaPassataParametro {
-  esperimento_id: string; passata_id: string; parametro_id: string; obbligatorio: boolean; ordine: number
+export interface RigaStrumento {
+  id: string; esperimento_id: string; nome: string; icona: string | null; ordine: number; tipo: TipoStrumento; archiviato: boolean
+}
+export interface RigaStrumentoParametro {
+  esperimento_id: string; strumento_id: string; parametro_id: string; obbligatorio: boolean; ordine: number
 }
 export interface RigaMisura {
-  id: string; esperimento_id: string; pianta_id: string; passata_id: string; data_rilievo: string; ora: string
+  id: string; esperimento_id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string
   valori: ValoriMisura; creato_da?: string; creato_il?: string; aggiornato_il?: string
 }
 
@@ -41,8 +43,8 @@ export interface RigheConfig {
   trattamento_livelli: RigaTrattamentoLivello[]
   piante: RigaPianta[]
   parametri: RigaParametro[]
-  passate: RigaPassata[]
-  passata_parametri: RigaPassataParametro[]
+  strumenti: RigaStrumento[]
+  strumento_parametri: RigaStrumentoParametro[]
 }
 
 const perOrdine = <T extends { ordine: number }>(a: T, b: T): number => a.ordine - b.ordine
@@ -113,20 +115,22 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     sotto_campi: p.sotto_campi.map(s => ({ chiave: s.chiave, nome: s.nome, unita: s.unita })),
   }))
 
-  const parametriPerPassata = raggruppa([...r.passata_parametri].sort(perOrdine), pp => pp.passata_id)
-  const passate: Passata[] = [...r.passate].sort(perOrdine).map(p => ({
+  const parametriPerStrumento = raggruppa([...r.strumento_parametri].sort(perOrdine), pp => pp.strumento_id)
+  const strumenti: Strumento[] = [...r.strumenti].sort(perOrdine).map(p => ({
     id: p.id,
     nome: p.nome,
     icona: p.icona,
     ordine: p.ordine,
-    parametri: (parametriPerPassata.get(p.id) ?? []).map((pp): PassataParametro => ({
+    tipo: p.tipo,
+    archiviato: p.archiviato,
+    parametri: (parametriPerStrumento.get(p.id) ?? []).map((pp): StrumentoParametro => ({
       parametro_id: pp.parametro_id,
       obbligatorio: pp.obbligatorio,
       ordine: pp.ordine,
     })),
   }))
 
-  return { esperimento, fattori, trattamenti, piante, parametri, passate }
+  return { esperimento, fattori, trattamenti, piante, parametri, strumenti }
 }
 
 /** Da riga del database a Misura: `ora` passa da HH:MM:SS a HH:MM; le colonne solo-database cadono. */
@@ -134,7 +138,7 @@ export function daRigaMisura(r: RigaMisura): Misura {
   return {
     id: r.id,
     pianta_id: r.pianta_id,
-    passata_id: r.passata_id,
+    strumento_id: r.strumento_id,
     data_rilievo: r.data_rilievo,
     ora: r.ora.slice(0, 5),
     valori: r.valori,
@@ -147,7 +151,7 @@ export function aRigaMisura(espId: string, m: Misura) {
     id: m.id,
     esperimento_id: espId,
     pianta_id: m.pianta_id,
-    passata_id: m.passata_id,
+    strumento_id: m.strumento_id,
     data_rilievo: m.data_rilievo,
     ora: m.ora,
     valori: m.valori,
@@ -183,15 +187,15 @@ export function aRigaPianta(espId: string, p: Pianta): RigaPianta {
   }
 }
 
-/** Solo la riga della passata: i suoi parametri vanno in passata_parametri (aRigaPassataParametro). */
-export function aRigaPassata(espId: string, p: Passata): RigaPassata {
-  return { id: p.id, esperimento_id: espId, nome: p.nome, icona: p.icona, ordine: p.ordine }
+/** Solo la riga dello strumento: i suoi parametri vanno in strumento_parametri (aRigaStrumentoParametro). */
+export function aRigaStrumento(espId: string, p: Strumento): RigaStrumento {
+  return { id: p.id, esperimento_id: espId, nome: p.nome, icona: p.icona, ordine: p.ordine, tipo: p.tipo, archiviato: p.archiviato }
 }
 
-export function aRigaPassataParametro(espId: string, passataId: string, pp: PassataParametro): RigaPassataParametro {
+export function aRigaStrumentoParametro(espId: string, strumentoId: string, pp: StrumentoParametro): RigaStrumentoParametro {
   return {
     esperimento_id: espId,
-    passata_id: passataId,
+    strumento_id: strumentoId,
     parametro_id: pp.parametro_id,
     obbligatorio: pp.obbligatorio,
     ordine: pp.ordine,

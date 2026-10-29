@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { conPiante, parametro } from '@/domain/test-helpers'
 import type { BozzaEsperimento } from '@/domain/tipi'
 import { PassoParametri } from './PassoParametri'
-import { PassoPassate } from './PassoPassate'
+import { PassoStrumenti } from './PassoStrumenti'
 
 function rendi(Passo: typeof PassoParametri, iniziale: BozzaEsperimento) {
   const onChange = vi.fn<(b: BozzaEsperimento) => void>()
@@ -19,7 +19,7 @@ function rendi(Passo: typeof PassoParametri, iniziale: BozzaEsperimento) {
 
 const ultima = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1)?.[0] as BozzaEsperimento
 
-/** Bozza con Altezza (in una passata) e Palchi. */
+/** Bozza con Altezza (in uno strumento) e Palchi. */
 function bozza(): BozzaEsperimento {
   const b = conPiante(['1'])
   b.parametri.push(parametro('Palchi', {
@@ -58,7 +58,7 @@ describe('PassoParametri', () => {
     expect(screen.getByRole('button', { name: /SPAD/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('eliminare un parametro lo toglie anche dalle passate', async () => {
+  it('eliminare un parametro lo toglie anche dagli strumenti', async () => {
     const utente = userEvent.setup({ delay: null })
     const onChange = rendi(PassoParametri, bozza())
 
@@ -67,7 +67,7 @@ describe('PassoParametri', () => {
 
     const b = ultima(onChange)
     expect(b.parametri.map(p => [p.nome, p.ordine])).toEqual([['Palchi', 0]])
-    expect(b.passate[0].parametri).toEqual([])
+    expect(b.strumenti[0].parametri).toEqual([])
   })
 
   it('un nome già usato (anche con spazi o maiuscole) è segnalato nel parametro, con "Da completare" a voce chiusa', async () => {
@@ -84,14 +84,14 @@ describe('PassoParametri', () => {
   })
 })
 
-describe('PassoPassate', () => {
-  it('mostra icona, nome e numero di parametri; "+ Passata" ne aggiunge una e la apre', async () => {
+describe('PassoStrumenti', () => {
+  it('mostra icona, nome e numero di parametri; "+ Strumento" ne aggiunge uno e lo apre', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(PassoPassate, bozza())
+    const onChange = rendi(PassoStrumenti, bozza())
 
     expect(screen.getByRole('button', { name: /Altezza/ })).toHaveTextContent('1 parametro')
-    await utente.click(screen.getByRole('button', { name: '+ Passata' }))
-    expect(ultima(onChange).passate).toHaveLength(2)
+    await utente.click(screen.getByRole('button', { name: '+ Strumento' }))
+    expect(ultima(onChange).strumenti).toHaveLength(2)
 
     const nuova = screen.getByRole('button', { name: /Senza nome/ })
     expect(nuova).toHaveAttribute('aria-expanded', 'true')
@@ -101,24 +101,24 @@ describe('PassoPassate', () => {
     expect(nuova).toHaveTextContent('1 parametro')
   })
 
-  it('"Elimina passata" la toglie e rinumera le altre', async () => {
+  it('"Elimina strumento" lo toglie e rinumera gli altri', async () => {
     const utente = userEvent.setup({ delay: null })
-    const onChange = rendi(PassoPassate, bozza())
+    const onChange = rendi(PassoStrumenti, bozza())
 
     await utente.click(screen.getByRole('button', { name: /Altezza/ }))
-    await utente.click(screen.getByRole('button', { name: 'Elimina passata' }))
-    expect(ultima(onChange).passate).toEqual([])
-    expect(screen.getByText('Nessuna passata ancora.')).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Elimina strumento' }))
+    expect(ultima(onChange).strumenti).toEqual([])
+    expect(screen.getByText('Nessuno strumento ancora.')).toBeInTheDocument()
   })
 
-  it('un nome già usato (anche con spazi o maiuscole) è segnalato nella passata, con "Da completare" a voce chiusa', async () => {
+  it('un nome già usato (anche con spazi o maiuscole) è segnalato nello strumento, con "Da completare" a voce chiusa', async () => {
     const utente = userEvent.setup({ delay: null })
-    rendi(PassoPassate, bozza())
+    rendi(PassoStrumenti, bozza())
 
-    await utente.click(screen.getByRole('button', { name: '+ Passata' }))
-    await utente.type(screen.getByLabelText('Nome della passata'), 'altezza ')
+    await utente.click(screen.getByRole('button', { name: '+ Strumento' }))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'altezza ')
 
-    expect(screen.getByText('C\'è già una passata che si chiama "Altezza".')).toBeInTheDocument()
+    expect(screen.getByText('C\'è già uno strumento che si chiama "Altezza".')).toBeInTheDocument()
     const nuova = screen.getAllByRole('button', { name: /altezza/i })[1]
     expect(nuova).toHaveTextContent('Da completare')
   })

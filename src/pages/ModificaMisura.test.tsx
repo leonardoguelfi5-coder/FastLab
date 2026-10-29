@@ -45,7 +45,7 @@ let archivio: Misura[]
 /** La misura aperta nei test: pianta 35, Termometro, 21/10/2026 alle 09:12. */
 let m: Misura
 
-const idPassata = (nome: string) => config.passate.find(p => p.nome === nome)!.id
+const idStrumento = (nome: string) => config.strumenti.find(p => p.nome === nome)!.id
 const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
 
@@ -116,11 +116,11 @@ beforeEach(() => {
   config.esperimento.id = 'E'
   par('SPAD').archiviato = true
   m = {
-    id: crypto.randomUUID(), pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: DATA, ora: '09:12',
+    id: crypto.randomUUID(), pianta_id: idPianta('35'), strumento_id: idStrumento('Termometro'), data_rilievo: DATA, ora: '09:12',
     valori: {
       [par('Temp aria').id]: [24.5],
       [par('Temp pianta').id]: [25.1],
-      // Un parametro archiviato che non è nella passata, e una chiave che non è di nessun parametro: restano.
+      // Un parametro archiviato che non è nello strumento, e una chiave che non è di nessun parametro: restano.
       [par('SPAD').id]: [38.1],
       'chiave-estranea': 'da tenere',
     },
@@ -148,7 +148,7 @@ afterEach(() => {
 })
 
 describe('ModificaMisura: cosa mostra', () => {
-  it('titolo, pianta con trattamento, passata e i valori della misura', async () => {
+  it('titolo, pianta con trattamento, strumento e i valori della misura', async () => {
     apri()
     await pronta()
 
@@ -165,19 +165,19 @@ describe('ModificaMisura: cosa mostra', () => {
     expect(campo('Temp pianta')).toHaveValue('25,1')
   })
 
-  it('mostra i parametri della passata e, con il suffisso "(archiviato)", quelli archiviati presenti nei valori', async () => {
+  it('mostra i parametri dello strumento e, con il suffisso "(archiviato)", quelli archiviati presenti nei valori', async () => {
     apri()
     await pronta()
 
     expect(campo('SPAD (archiviato)')).toHaveValue('38,1')
     // I parametri della configurazione non cambiano.
     expect(par('SPAD').nome).toBe('SPAD')
-    // Gli altri parametri, né della passata né nella misura, non ci sono.
+    // Gli altri parametri, né dello strumento né nella misura, non ci sono.
     expect(screen.queryByLabelText('Altezza')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('N frutti')).not.toBeInTheDocument()
   })
 
-  it('"Temp aria" e "Temp pianta" (della passata) vengono prima dell\'archiviato, che segue l\'ordine della configurazione', async () => {
+  it('"Temp aria" e "Temp pianta" (dello strumento) vengono prima dell\'archiviato, che segue l\'ordine della configurazione', async () => {
     apri()
     await pronta()
     const etichette = screen.getAllByRole('textbox').map(e => e.getAttribute('id')).filter(Boolean)
@@ -188,8 +188,8 @@ describe('ModificaMisura: cosa mostra', () => {
   })
 
   it('un obbligatorio che la misura ha già non si può svuotare', async () => {
-    const passata = config.passate.find(p => p.nome === 'Termometro')!
-    passata.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
+    const strumento = config.strumenti.find(p => p.nome === 'Termometro')!
+    strumento.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
     const utente = userEvent.setup()
     apri()
     await pronta()
@@ -201,8 +201,8 @@ describe('ModificaMisura: cosa mostra', () => {
   })
 
   it('un obbligatorio aggiunto dopo la misura (che non ne ha il valore) non la blocca: si corregge senza inventarlo', async () => {
-    const passata = config.passate.find(p => p.nome === 'Termometro')!
-    passata.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
+    const strumento = config.strumenti.find(p => p.nome === 'Termometro')!
+    strumento.parametri.find(pp => pp.parametro_id === par('Temp pianta').id)!.obbligatorio = true
     delete m.valori[par('Temp pianta').id]
     const utente = userEvent.setup()
     apri()
@@ -252,7 +252,7 @@ describe('ModificaMisura: salvataggio', () => {
 
     expect(salvaMisura).toHaveBeenCalledTimes(1)
     expect(salvaMisura).toHaveBeenCalledWith('E', {
-      id: m.id, pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: '2026-10-20', ora: '09:12',
+      id: m.id, pianta_id: idPianta('35'), strumento_id: idStrumento('Termometro'), data_rilievo: '2026-10-20', ora: '09:12',
       valori: {
         [par('Temp aria').id]: [26.2],
         [par('Temp pianta').id]: [25.1],
@@ -657,7 +657,7 @@ describe('ModificaMisura: eliminazione', () => {
 describe('ModificaMisura: bozza della scheda', () => {
   /** La bozza che la scheda tiene per la correzione di questa misura (alla sua data), con il ricordo che era aperta. */
   function bozzaDellaScheda(misuraId: string, dataRilievo = DATA) {
-    const base = { espId: 'E', piantaId: idPianta('35'), passataId: idPassata('Termometro'), dataRilievo }
+    const base = { espId: 'E', piantaId: idPianta('35'), strumentoId: idStrumento('Termometro'), dataRilievo }
     const chiave = chiaveBozza({ ...base, misuraId })
     scriviBozza(chiave, { id: misuraId, valori: { [par('Temp aria').id]: [99] }, ora: '09:12' })
     scriviAperto(chiaveAperto(base), misuraId)
@@ -666,7 +666,7 @@ describe('ModificaMisura: bozza della scheda', () => {
 
   it('dopo il salvataggio la bozza di correzione di quella misura sparisce; quella di un\'altra misura resta', async () => {
     const mia = bozzaDellaScheda(m.id)
-    const altra = chiaveBozza({ espId: 'E', piantaId: idPianta('35'), passataId: idPassata('Termometro'), dataRilievo: DATA, misuraId: 'altra' })
+    const altra = chiaveBozza({ espId: 'E', piantaId: idPianta('35'), strumentoId: idStrumento('Termometro'), dataRilievo: DATA, misuraId: 'altra' })
     scriviBozza(altra, { id: 'altra', valori: {}, ora: null })
     const utente = userEvent.setup()
     apri()

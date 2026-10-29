@@ -11,7 +11,7 @@ describe('bozzaHydrochar', () => {
       ['Controllo', 'Controllo + HC', 'S1', 'S1 + HC', 'W1', 'W1 + HC', 'S1W1', 'S1W1 + HC'])
     const tratt = (et: string) => b.trattamenti.find(t => t.id === b.piante.find(p => p.etichetta === et)!.trattamento_id)!.etichetta
     expect([tratt('14'), tratt('15'), tratt('21'), tratt('56')]).toEqual(['Controllo', 'Controllo + HC', 'S1', 'S1W1 + HC'])
-    expect(b.passate.map(p => p.nome)).toEqual(['Termometro', 'SPAD', 'Altezza', 'Fenologici'])
+    expect(b.strumenti.map(p => p.nome)).toEqual(['Termometro', 'SPAD', 'Altezza', 'Fenologici'])
     const par = (n: string) => b.parametri.find(p => p.nome === n)!
     expect(par('Palchi').progressivo && par('Infiorescenze').progressivo && par('N palchi totali').progressivo).toBe(true)
     expect(par('Temp aria').ricorda_tra_piante).toBe(true)
@@ -43,7 +43,7 @@ describe('bozzaHydrochar', () => {
     expect(hc.livello_ids.map(id => livelloNome.get(id))).toEqual(['S1', 'Sì'])
   })
 
-  it('parametri e passate', () => {
+  it('parametri e strumenti', () => {
     const b = bozzaHydrochar()
     expect(b.parametri.map(p => [p.nome, p.unita, p.tipo])).toEqual([
       ['Temp aria', '°C', 'numero'], ['Temp pianta', '°C', 'numero'], ['SPAD', null, 'numero'], ['Altezza', 'cm', 'numero'],
@@ -54,15 +54,22 @@ describe('bozzaHydrochar', () => {
     expect(par('Infiorescenze').sotto_campi.map(s => s.nome)).toEqual(['N fiori'])
     expect(par('N fiori fioriti').progressivo).toBe(false)
     expect(par('Temp pianta').ricorda_tra_piante).toBe(false)
-    const nomiParametri = (nome: string) => b.passate.find(p => p.nome === nome)!.parametri
+    const nomiParametri = (nome: string) => b.strumenti.find(p => p.nome === nome)!.parametri
       .map(pp => b.parametri.find(p => p.id === pp.parametro_id)!.nome)
     expect(nomiParametri('Termometro')).toEqual(['Temp aria', 'Temp pianta'])
     expect(nomiParametri('SPAD')).toEqual(['SPAD'])
     expect(nomiParametri('Altezza')).toEqual(['Altezza'])
+    // Altezza la misura solo il suo strumento: un parametro sta in un solo strumento (indice unico nel database).
     expect(nomiParametri('Fenologici')).toEqual(
-      ['Altezza', 'N palchi totali', 'N fiori fioriti', 'N frutti', 'N frutti invaiati', 'Palchi', 'Infiorescenze', 'Note'])
-    expect(b.passate.map(p => p.icona)).toEqual(['🌡', '💚', '📏', '🌱'])
-    expect(b.passate.flatMap(p => p.parametri).some(pp => pp.obbligatorio)).toBe(false)
+      ['N palchi totali', 'N fiori fioriti', 'N frutti', 'N frutti invaiati', 'Palchi', 'Infiorescenze', 'Note'])
+    expect(b.strumenti.map(p => p.icona)).toEqual(['🌡', '💚', '📏', '🌱'])
+    expect(b.strumenti.flatMap(p => p.parametri).some(pp => pp.obbligatorio)).toBe(false)
+    expect(b.strumenti.every(p => p.tipo === 'strumento' && !p.archiviato)).toBe(true)
+  })
+
+  it('nessun parametro sta in due strumenti', () => {
+    const ids = bozzaHydrochar().strumenti.flatMap(p => p.parametri.map(pp => pp.parametro_id))
+    expect(new Set(ids).size).toBe(ids.length)
   })
 
   it('ogni chiamata genera id nuovi', () => {

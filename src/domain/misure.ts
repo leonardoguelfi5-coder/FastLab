@@ -1,5 +1,5 @@
 import { formattaNumero } from '@/lib/numeri'
-import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Passata, ValoreParametro, ValoriMisura } from './tipi'
+import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, ValoreParametro, ValoriMisura } from './tipi'
 
 const TRATTINO = '—'
 type Lettura = number | null
@@ -99,25 +99,25 @@ export function valoriDaSalvare(prima: ValoriMisura | null, modulo: ValoriMisura
 }
 
 /**
- * I parametri del modulo per correggere una misura già salvata: tutti quelli della sua passata (nel suo ordine, anche
- * gli archiviati: il dato c'è, e per i campi obbligatori si vede) e, dopo, quelli che non sono nella passata ma hanno
- * un valore nella misura (tolti dalla passata o archiviati), nell'ordine della configurazione. Un parametro archiviato
+ * I parametri del modulo per correggere una misura già salvata: tutti quelli del suo strumento (nel suo ordine, anche
+ * gli archiviati: il dato c'è, e per i campi obbligatori si vede) e, dopo, quelli che non sono nello strumento ma hanno
+ * un valore nella misura (tolti dallo strumento o archiviati), nell'ordine della configurazione. Un parametro archiviato
  * porta " (archiviato)" nel nome: è una copia, la configurazione non cambia. Le chiavi dei valori che non sono di nessun
- * parametro non compaiono, e chi salva le tiene com'erano. Gli obbligatori sono quelli segnati nella passata.
+ * parametro non compaiono, e chi salva le tiene com'erano. Gli obbligatori sono quelli segnati nello strumento.
  */
 export function parametriDiUnaMisura(
-  config: ConfigEsperimento, passata: Passata, valori: ValoriMisura,
+  config: ConfigEsperimento, strumento: Strumento, valori: ValoriMisura,
 ): { parametri: Parametro[]; obbligatori: Set<string> } {
   const perId = new Map(config.parametri.map(p => [p.id, p]))
-  const dellaPassata = [...passata.parametri]
+  const delloStrumento = [...strumento.parametri]
     .sort((a, b) => a.ordine - b.ordine)
     .map(pp => perId.get(pp.parametro_id))
     .filter((p): p is Parametro => p !== undefined)
-  const inPassata = new Set(dellaPassata.map(p => p.id))
-  const inPiu = config.parametri.filter(p => !inPassata.has(p.id) && !eVuoto(p, valori[p.id]))
-  const parametri = [...dellaPassata, ...inPiu].map(p => (p.archiviato ? { ...p, nome: `${p.nome} (archiviato)` } : p))
+  const inStrumento = new Set(delloStrumento.map(p => p.id))
+  const inPiu = config.parametri.filter(p => !inStrumento.has(p.id) && !eVuoto(p, valori[p.id]))
+  const parametri = [...delloStrumento, ...inPiu].map(p => (p.archiviato ? { ...p, nome: `${p.nome} (archiviato)` } : p))
   const obbligatori = new Set(
-    dellaPassata.filter(p => passata.parametri.some(pp => pp.parametro_id === p.id && pp.obbligatorio) && !eVuoto(p, valori[p.id])).map(p => p.id),
+    delloStrumento.filter(p => strumento.parametri.some(pp => pp.parametro_id === p.id && pp.obbligatorio) && !eVuoto(p, valori[p.id])).map(p => p.id),
   )
   return { parametri, obbligatori }
 }
@@ -174,11 +174,11 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
   return { errori, avvisi }
 }
 
-/** Quante misure della passata indicata ha ogni pianta (le piante senza misure non compaiono). */
-export function contaPerPianta(misure: Misura[], passataId: string): Map<string, number> {
+/** Quante misure dello strumento indicato ha ogni pianta (le piante senza misure non compaiono). */
+export function contaPerPianta(misure: Misura[], strumentoId: string): Map<string, number> {
   const conteggi = new Map<string, number>()
   for (const m of misure) {
-    if (m.passata_id === passataId) conteggi.set(m.pianta_id, (conteggi.get(m.pianta_id) ?? 0) + 1)
+    if (m.strumento_id === strumentoId) conteggi.set(m.pianta_id, (conteggi.get(m.pianta_id) ?? 0) + 1)
   }
   return conteggi
 }
