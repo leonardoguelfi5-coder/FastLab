@@ -20,8 +20,6 @@ interface NumericFieldProps {
   obbligatorio?: boolean
   /** Ammette valori negativi: tastiera con il segno meno, che quella decimale di iOS non ha. */
   negativo?: boolean
-  /** Solo per i moduli della versione 2, che lo usano ancora: attributo `required` nativo. */
-  required?: boolean
 }
 
 const ERRORE = 'Scrivi un numero, es. 12,5.'
@@ -37,7 +35,7 @@ const testoDa = (v: number | null) => (v === null || Number.isNaN(v) ? '' : form
  * configurazione non riscrive mai quel che è stato digitato: il `NaN` arriva fino al salvataggio,
  * che si ferma. Il testo si riallinea a `value` solo se `value` cambia da fuori e non coincide già.
  */
-export function NumericField({ label, value, onChange, unita, avviso, placeholder, obbligatorio, negativo, required }: NumericFieldProps) {
+export function NumericField({ label, value, onChange, unita, avviso, placeholder, obbligatorio, negativo }: NumericFieldProps) {
   const id = useId()
   const [testo, setTesto] = useState(() => testoDa(value))
   const [valorePrecedente, setValorePrecedente] = useState(value)
@@ -69,7 +67,6 @@ export function NumericField({ label, value, onChange, unita, avviso, placeholde
           autoComplete="off"
           value={testo}
           placeholder={placeholder}
-          required={required}
           aria-required={obbligatorio || undefined}
           aria-invalid={errore || undefined}
           aria-describedby={descrizione || undefined}

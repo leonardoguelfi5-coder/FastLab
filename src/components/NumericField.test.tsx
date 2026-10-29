@@ -112,11 +112,6 @@ describe('NumericField', () => {
     expect(screen.queryByText('*')).not.toBeInTheDocument()
   })
 
-  it('required (usato dai moduli della versione 2) arriva al campo', () => {
-    render(<NumericField label="ID Pianta" required value={null} onChange={() => {}} />)
-    expect(campo()).toBeRequired()
-  })
-
   it('l\'avviso compare sotto il campo, non blocca e non è un errore', () => {
     render(<NumericField label="SPAD" value={120} onChange={() => {}} avviso="Fuori dall'intervallo atteso (0–100)." />)
     expect(campo()).toHaveAccessibleDescription("Fuori dall'intervallo atteso (0–100).")
