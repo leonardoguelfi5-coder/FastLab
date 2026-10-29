@@ -228,3 +228,10 @@ Ruling: vercel.json committed on the v3 branch (affects only deploys of this bra
 Task 16: minor (deferred): vite-plugin-pwa in devDependencies non usato (togliere nel Piano 2 con xlsx); sessioni aperte restano valide dopo reset password
 Task 16: complete (commits 8a41d83.., review clean); test:db e percorso completo nel browser DA FARE IN LOCALE
 Final review: dispatched (opus) on merge-base(main)..HEAD with all "minor (deferred)" lines of this ledger
+Final review (opus, 3 aree in parallelo: fin-db, fin-campo, fin-config): tutte "Pronto dopo correzioni"; 812 test, tsc/lint/build verdi; nessun Critical
+Final review: Important — (campo I1) doppio tocco subito dopo un salvataggio veloce salva una seconda misura / la pianta dopo; (campo I2) toast d'errore tardivo sparisce in 4 s; (db I1) esci() esce da tutti i dispositivi; (config I-1) il wizard accetta nomi doppi di parametri/passate/fattori che le impostazioni rifiutano
+Ruling: giro unico di correzione finale = campo I1, I2, M1, M2, M5; db I1, M1 (revoca invito già usato), M2 (email già invitata), M3 (esperimento non trovato / id non uuid, eUuid in percorsi), M4 (README 8 caratteri); config I-1, M-1 (pulisciBozza), M-2..M-8 — brief in scratchpad fix-finale.md — cost if wrong: small
+Ruling: rimandati dopo la prova sul telefono: doppia ✓ nel toast (testo "salvata ✓" + icona), scroll-padding con tastiera iOS (index.css:176) — si decidono guardandoli
+Question for user: i valori "ricorda tra piante" valgono anche il giorno dopo (la prima pianta di oggi parte con la Temp aria di ieri, come nella v2) — tenerli solo per la stessa data di rilievo?
+Final review: minor (deferred, Piano 2 o dopo locale): limite 1000 righe di PostgREST su misureDelGiorno/export; pagina bianca se mancano VITE_* nel deploy; errori GoTrue 429/"Signups not allowed" in inglese; utente con esperimenti non eliminabile dal Dashboard (FK senza cascade); indici FK; lacune pgTAP su cascate e FK incrociate; data router per useBlocker (indietro di sistema); codice duplicato (confronta, intestazione pianta, beforeunload); vite-plugin-pwa e xlsx
+Final fix round: dispatched implementer (opus)
