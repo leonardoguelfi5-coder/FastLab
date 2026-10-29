@@ -175,3 +175,10 @@ Ruling: OS/browser back gesture (no data router → no useBlocker) handled by pe
 Ruling: fold minors 5 (explicit [saved, ...misure] to next form + stronger test), 6 (prefetch next plant's misure), 8 (navigate replace for Salva e vai) — speed/correctness in field — cost if wrong: trivial
 Task 13: minor (deferred): stale cache on reopen (30s staleTime); RiquadroOggi size/ElencoOggi split; confronta duplicated; n_letture reduced on edit (T10)
 Task 13: fix round 1 implemented a0c8297 (667 tests); re-review pending
+
+## Ripresa nella sessione cloud (29/10/2026)
+
+Ledger ricreato da questo registro. Branch di lavoro: `claude/wonderful-gates-8het2q` (designato dalla sessione cloud), tenuto allineato con `claude/app-review-improvements-c26294` (stesso commit di partenza 0f492ae, push su entrambi).
+Ruling: le skill superpowers:subagent-driven-development e impeccable non sono installate nell'ambiente cloud — il controller segue lo stesso metodo a mano (brief scritti, implementatore → revisore → giri di correzione, ledger qui) e i brief UI riportano le regole di PRODUCT.md/DESIGN.md/.impeccable/design.json — cost if wrong: nessuno sul codice, solo meno automazione
+Ruling: Docker assente nel cloud — `npm run test:db` e prove nel browser con il DB locale restano da fare in locale; le migration eventualmente nuove si scrivono con i loro test pgTAP e si segnalano come non verificate — cost if wrong: un giro in locale
+Base cloud: 667 test verdi, tsc -b pulito, lint 0 errori (1 warning in FormPianta.tsx della v2)
