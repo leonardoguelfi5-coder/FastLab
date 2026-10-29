@@ -82,6 +82,12 @@ describe('ultimoValore', () => {
     const misure = [mis(D, '08:00', { x: uno(1) }), mis(D, '17:30', { x: uno(2) }), mis(D, '09:00', { x: uno(3) })]
     expect(ultimoValore(misure, 'x', D)).toEqual([2])
   })
+  it('a parità di data e ora vince la misura che compare dopo nell\'array', () => {
+    const prima = mis(D, '09:00', { x: uno(1) })
+    const dopo = mis(D, '09:00', { x: uno(2) })
+    expect(ultimoValore([prima, dopo], 'x', D)).toEqual([2])
+    expect(ultimoValore([dopo, prima], 'x', D)).toEqual([1])
+  })
   it('ignora le misure dopo finoA ma include il giorno stesso', () => {
     const misure = [mis('2026-10-27', '09:00', { x: uno(1) }), mis('2026-10-28', '09:00', { x: uno(2) }), mis('2026-10-29', '09:00', { x: uno(3) })]
     expect(ultimoValore(misure, 'x', '2026-10-28')).toEqual([2])
@@ -169,6 +175,27 @@ describe('valoriIniziali', () => {
       ricordati: { [prog.id]: [{ n: 1, valori: { f: 1 } }] } })
     expect(senzaStoria[prog.id]).toEqual([{ n: 1, valori: { f: 1 } }])
   })
+  describe('letture adattate a n_letture attuale', () => {
+    const prog = parametro('Diametro', { progressivo: true, ricorda_tra_piante: true, n_letture: 3 })
+    const storia = (valori: (number | null)[]) => [mis('2026-10-14', '09:00', { [prog.id]: valori })]
+    const iniziali = (misurePianta: Misura[], ricordati: ValoriMisura = {}) =>
+      valoriIniziali({ parametri: [prog], misurePianta, dataRilievo: D, ricordati })[prog.id]
+    it('progressivo con meno letture di n_letture → completato con null', () => {
+      expect(iniziali(storia([4]))).toEqual([4, null, null])
+    })
+    it('progressivo con più letture di n_letture → troncato', () => {
+      expect(iniziali(storia([1, 2, 3, 4, 5]))).toEqual([1, 2, 3])
+    })
+    it('ricordato con meno letture → completato con null', () => {
+      expect(iniziali([], { [prog.id]: [7, 8] })).toEqual([7, 8, null])
+    })
+    it('ricordato con più letture → troncato', () => {
+      expect(iniziali([], { [prog.id]: [1, 2, 3, 4] })).toEqual([1, 2, 3])
+    })
+    it('lunghezza già corretta → invariata', () => {
+      expect(iniziali(storia([1, null, 3]))).toEqual([1, null, 3])
+    })
+  })
   it('un parametro non progressivo non usa la storia', () => {
     const misure = [mis('2026-10-14', '09:00', { [altezza.id]: [10] })]
     const v = valoriIniziali({ parametri: [altezza], misurePianta: misure, dataRilievo: D, ricordati: {} })
@@ -238,6 +265,34 @@ describe('validaMisura', () => {
   it('un numero non valido non produce anche l\'avviso di intervallo', () => {
     const r = validaMisura([altezza], new Set(), { [altezza.id]: [NaN] })
     expect(r.avvisi).toEqual([])
+  })
+  describe('liste', () => {
+    const conNomi = parametro('Palchi', {
+      tipo: 'lista',
+      sotto_campi: [{ chiave: 'f', nome: 'N foglie', unita: null }, { chiave: 'l', nome: 'Lunghezza', unita: 'cm' }],
+    })
+    const valida = (valori: ElementoLista[]) => validaMisura([conNomi], new Set(), { [conNomi.id]: valori })
+    it('lista valida → nessun errore né avviso', () => {
+      expect(valida([{ n: 1, valori: { f: 4, l: 2.5 } }, { n: 2, valori: { f: 0, l: null } }])).toEqual({ errori: [], avvisi: [] })
+    })
+    it('un NaN in un sotto-campo → un solo errore con elemento e sotto-campo', () => {
+      expect(valida([{ n: 1, valori: { f: 4, l: 1 } }, { n: 2, valori: { f: NaN, l: 1 } }]).errori)
+        .toEqual(['«Palchi» 2, N foglie: numero non valido.'])
+    })
+    it('Infinity e -Infinity sono non validi', () => {
+      expect(valida([{ n: 1, valori: { f: Infinity, l: -Infinity } }]).errori)
+        .toEqual(['«Palchi» 1, N foglie: numero non valido.', '«Palchi» 1, Lunghezza: numero non valido.'])
+    })
+    it('valori null o mancanti nei sotto-campi non sono errori', () => {
+      expect(valida([{ n: 1, valori: { f: null } }]).errori).toEqual([])
+    })
+    it('una lista con soli valori non validi non è "nessun valore"', () => {
+      expect(valida([{ n: 1, valori: { f: NaN } }]).errori).toEqual(['«Palchi» 1, N foglie: numero non valido.'])
+    })
+    it('una lista obbligatoria vuota resta "obbligatorio"', () => {
+      expect(validaMisura([conNomi], new Set([conNomi.id]), { [conNomi.id]: [] }).errori)
+        .toEqual(['«Palchi» è obbligatorio.'])
+    })
   })
   it('tutto vuoto e niente di obbligatorio → "Nessun valore inserito."', () => {
     expect(validaMisura([altezza, note], new Set(), { [altezza.id]: [null], [note.id]: '  ' }).errori)
@@ -320,8 +375,9 @@ describe('formattaValore', () => {
     expect(formattaValore(palchi, [{ n: 1, valori: { f: 12 } }, { n: 2, valori: { f: 10 } }])).toBe('2 (12, 10)')
     expect(formattaValore(palchi, [{ n: 1, valori: { f: 12.5 } }, { n: 2, valori: { f: null } }])).toBe('2 (12,5, —)')
   })
-  it('lista con più sotto-campi: solo il conteggio', () => {
-    expect(formattaValore(listaDueCampi, [{ n: 1, valori: { a: 1, b: 2 } }])).toBe('1 elementi')
+  it('lista con più sotto-campi: solo il conteggio, con il plurale corretto', () => {
+    expect(formattaValore(listaDueCampi, [{ n: 1, valori: { a: 1, b: 2 } }])).toBe('1 elemento')
+    expect(formattaValore(listaDueCampi, [{ n: 1, valori: { a: 1, b: 2 } }, { n: 2, valori: { a: 3, b: 4 } }])).toBe('2 elementi')
   })
   it('valori mancanti o vuoti → trattino', () => {
     expect(formattaValore(altezza, undefined)).toBe('—')

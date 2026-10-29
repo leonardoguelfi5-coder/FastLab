@@ -6,6 +6,8 @@ describe('date', () => {
     expect(oggiLocale(new Date(2026, 9, 28, 0, 30))).toBe('2026-10-28')
     expect(oggiLocale(new Date(2026, 9, 27, 23, 59))).toBe('2026-10-27')
   })
+  it('il fuso dei test è fissato a Europe/Rome (vite.config.ts): 23:30 UTC è già il giorno dopo', () =>
+    expect(oggiLocale(new Date(Date.UTC(2026, 9, 27, 23, 30)))).toBe('2026-10-28'))
   it('oraLocale', () => expect(oraLocale(new Date(2026, 9, 28, 9, 5))).toBe('09:05'))
   it('formattaData', () => expect(formattaData('2026-10-28')).toBe('28/10/2026'))
 })

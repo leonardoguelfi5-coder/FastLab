@@ -37,6 +37,12 @@ function copiaProfonda(v: ValoreParametro): ValoreParametro {
   return (v as (Lettura | ElementoLista)[]).map(x => (x !== null && typeof x === 'object' ? { n: x.n, valori: { ...x.valori } } : x)) as ValoreParametro
 }
 
+/** Un parametro numerico può cambiare `n_letture` dopo che esistono dati: completa con null o tronca alle letture attuali. */
+function adattaLetture(p: Parametro, v: ValoreParametro): ValoreParametro {
+  if (p.tipo !== 'numero' || !Array.isArray(v)) return v
+  return Array.from({ length: p.n_letture }, (_, i): Lettura => (v as Lettura[])[i] ?? null)
+}
+
 const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
 /**
@@ -65,8 +71,8 @@ export function valoriIniziali(a: {
   for (const p of a.parametri) {
     const storico = p.progressivo ? ultimoValore(a.misurePianta, p.id, a.dataRilievo) : undefined
     const ricordato = p.ricorda_tra_piante ? a.ricordati[p.id] : undefined
-    if (storico !== undefined) valori[p.id] = storico
-    else if (ricordato !== undefined && !eVuoto(p, ricordato)) valori[p.id] = copiaProfonda(ricordato)
+    if (storico !== undefined) valori[p.id] = adattaLetture(p, storico)
+    else if (ricordato !== undefined && !eVuoto(p, ricordato)) valori[p.id] = adattaLetture(p, copiaProfonda(ricordato))
     else valori[p.id] = valoreVuoto(p)
   }
   return valori
@@ -90,6 +96,15 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
     const v = valori[p.id]
     if (eVuoto(p, v)) {
       if (obbligatori.has(p.id)) errori.push(`«${p.nome}» è obbligatorio.`)
+      continue
+    }
+    if (p.tipo === 'lista') {
+      for (const e of v as ElementoLista[]) {
+        for (const c of p.sotto_campi) {
+          const x = e.valori[c.chiave]
+          if (x !== null && x !== undefined && !Number.isFinite(x)) errori.push(`«${p.nome}» ${e.n}, ${c.nome}: numero non valido.`)
+        }
+      }
       continue
     }
     if (p.tipo !== 'numero') continue
@@ -141,7 +156,7 @@ export function formattaValore(p: Parametro, v: ValoreParametro | undefined): st
     case 'sino': return v ? 'Sì' : 'No'
     case 'lista': {
       const elementi = v as ElementoLista[]
-      if (p.sotto_campi.length !== 1) return `${elementi.length} elementi`
+      if (p.sotto_campi.length !== 1) return elementi.length === 1 ? '1 elemento' : `${elementi.length} elementi`
       const chiave = p.sotto_campi[0].chiave
       const valori = elementi.map(e => {
         const x = e.valori[chiave]
