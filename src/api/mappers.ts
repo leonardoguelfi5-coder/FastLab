@@ -101,7 +101,14 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     ordine: p.ordine,
   }))
 
-  const parametri: Parametro[] = [...r.parametri].sort(perOrdine).map(p => ({
+  const parametri: Parametro[] = [...r.parametri].sort(perOrdine).map(daRigaParametro)
+  const strumenti: Strumento[] = daRigheStrumenti(r.strumenti, r.strumento_parametri)
+
+  return { esperimento, fattori, trattamenti, piante, parametri, strumenti }
+}
+
+export function daRigaParametro(p: RigaParametro): Parametro {
+  return {
     id: p.id,
     nome: p.nome,
     unita: p.unita,
@@ -115,10 +122,13 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     sotto_campi: p.sotto_campi.map(s => ({ chiave: s.chiave, nome: s.nome, unita: s.unita })),
     // `?? null`: una riga letta da un database senza la colonna non lascia undefined nel dominio.
     catalogo_chiave: p.catalogo_chiave ?? null,
-  }))
+  }
+}
 
-  const parametriPerStrumento = raggruppa([...r.strumento_parametri].sort(perOrdine), pp => pp.strumento_id)
-  const strumenti: Strumento[] = [...r.strumenti].sort(perOrdine).map(p => ({
+/** Gli strumenti con i loro collegamenti ai parametri, tutto ordinato per `ordine`. */
+export function daRigheStrumenti(strumenti: RigaStrumento[], collegamenti: RigaStrumentoParametro[]): Strumento[] {
+  const parametriPerStrumento = raggruppa([...collegamenti].sort(perOrdine), pp => pp.strumento_id)
+  return [...strumenti].sort(perOrdine).map(p => ({
     id: p.id,
     nome: p.nome,
     icona: p.icona,
@@ -132,8 +142,6 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
       ordine: pp.ordine,
     })),
   }))
-
-  return { esperimento, fattori, trattamenti, piante, parametri, strumenti }
 }
 
 /** Da riga del database a Misura: `ora` passa da HH:MM:SS a HH:MM; le colonne solo-database cadono. */

@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Parametro, Strumento, Pianta } from '@/domain/tipi'
+import type { Parametro, Strumento, StrumentoParametro, Pianta } from '@/domain/tipi'
 import { controllaRighe } from './righe'
 import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } from './mappers'
 
@@ -7,6 +7,16 @@ import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } 
 export async function salvaParametro(espId: string, p: Parametro): Promise<void> {
   const { error } = await supabase.from('parametri').upsert(aRigaParametro(espId, p), { onConflict: 'id' })
   if (error) throw error
+}
+
+/**
+ * Aggiorna di un parametro solo i campi che il catalogo può cambiare (nome, unità, minimo, massimo, letture), con un
+ * update e non un upsert: tipo, archiviato e progressivo restano quelli del database anche se nel frattempo sono
+ * cambiati altrove, e un parametro eliminato nel frattempo fa fallire l'operazione invece di essere ricreato.
+ */
+export async function aggiornaParametroDaCatalogo(espId: string, p: Parametro): Promise<void> {
+  const campi = { nome: p.nome, unita: p.unita, valore_min: p.valore_min, valore_max: p.valore_max, n_letture: p.n_letture }
+  controllaRighe(await supabase.from('parametri').update(campi).eq('id', p.id).eq('esperimento_id', espId).select('id'))
 }
 
 /** Ids dei parametri dell'esperimento che compaiono in almeno una misura: non si possono eliminare. */
@@ -56,12 +66,7 @@ export async function salvaStrumento(espId: string, p: Strumento): Promise<void>
   const { error: erroreRiga } = await supabase.from('strumenti').upsert(aRigaStrumento(espId, p), { onConflict: 'id' })
   if (erroreRiga) throw erroreRiga
 
-  if (p.parametri.length > 0) {
-    const { error } = await supabase
-      .from('strumento_parametri')
-      .upsert(p.parametri.map(pp => aRigaStrumentoParametro(espId, p.id, pp)), { onConflict: 'strumento_id,parametro_id' })
-    if (error) throw error
-  }
+  await collegaParametri(espId, p.id, p.parametri)
 
   // Gli id sono uuid (solo cifre esadecimali e trattini): sicuri nella lista del filtro `in`.
   let elimina = supabase.from('strumento_parametri').delete().eq('strumento_id', p.id).eq('esperimento_id', espId)
@@ -69,6 +74,15 @@ export async function salvaStrumento(espId: string, p: Strumento): Promise<void>
     elimina = elimina.not('parametro_id', 'in', `(${p.parametri.map(pp => pp.parametro_id).join(',')})`)
   }
   const { error } = await elimina
+  if (error) throw error
+}
+
+/** Aggiunge o aggiorna dei collegamenti di uno strumento ai suoi parametri; gli altri collegamenti restano. */
+export async function collegaParametri(espId: string, strumentoId: string, collegamenti: StrumentoParametro[]): Promise<void> {
+  if (collegamenti.length === 0) return
+  const { error } = await supabase
+    .from('strumento_parametri')
+    .upsert(collegamenti.map(pp => aRigaStrumentoParametro(espId, strumentoId, pp)), { onConflict: 'strumento_id,parametro_id' })
   if (error) throw error
 }
 

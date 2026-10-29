@@ -140,12 +140,21 @@ export function validaBozza(b: BozzaEsperimento): string[] {
   if (b.piante.some(p => p.etichetta.trim() === '')) errori.push('Una pianta non ha etichetta.')
   for (const e of duplicate(b.piante.map(p => p.etichetta))) errori.push(`Etichetta pianta duplicata: "${e}".`)
 
+  // I parametri non si aggiungono da soli: stanno dentro gli strumenti (e la tabella fenologica), che li chiedono.
   const parametri = b.parametri.filter(p => !p.archiviato)
-  if (parametri.length === 0) errori.push('Aggiungi almeno un parametro.')
   for (const p of parametri) errori.push(...problemiParametro(p, parametri))
 
-  if (b.strumenti.length === 0) errori.push('Crea almeno uno strumento.')
-  for (const p of b.strumenti) errori.push(...problemiStrumento(p, b.strumenti))
+  const strumenti = b.strumenti.filter(s => !s.archiviato)
+  if (strumenti.length === 0) errori.push('Aggiungi almeno uno strumento o la tabella fenologica.')
+  if (strumenti.filter(s => s.tipo === 'fenologico').length > 1) errori.push('Può esserci una sola tabella fenologica.')
+  const attivi = new Set(parametri.map(p => p.id))
+  for (const s of strumenti) errori.push(...problemiStrumento(s, b.strumenti, attivi))
+
+  // Un parametro sta in un solo strumento (indice unico nel database, che conta anche gli strumenti archiviati).
+  for (const p of parametri) {
+    const quanti = b.strumenti.filter(s => s.parametri.some(pp => pp.parametro_id === p.id)).length
+    if (quanti > 1) errori.push(`Il parametro "${p.nome.trim()}" è in più di uno strumento.`)
+  }
 
   return errori
 }
@@ -182,9 +191,9 @@ export function problemiParametro(p: Parametro, altri: Parametro[]): string[] {
 }
 
 /**
- * I problemi di uno strumento da solo (gli stessi controlli di `validaBozza`), più il nome unico tra `altre`.
- * Con `attivi` (gli id dei parametri non archiviati) contano solo quei parametri: uno strumento che ha solo
- * parametri archiviati non ha nulla da misurare.
+ * I problemi di uno strumento da solo (gli stessi controlli di `validaBozza`; vale anche per la tabella fenologica),
+ * più il nome unico tra `altre`. Con `attivi` (gli id dei parametri non archiviati) contano solo quei parametri:
+ * uno strumento che ha solo parametri archiviati non ha nulla da misurare.
  */
 export function problemiStrumento(p: Strumento, altre: Strumento[], attivi?: Set<string>): string[] {
   const nome = p.nome.trim()
@@ -194,7 +203,7 @@ export function problemiStrumento(p: Strumento, altre: Strumento[], attivi?: Set
   const omonima = altre.find(a => a.id !== p.id && normalizza(a.nome) === normalizza(nome))
   if (omonima) errori.push(`C'è già uno strumento che si chiama "${omonima.nome.trim()}".`)
   const inclusi = attivi ? p.parametri.filter(pp => attivi.has(pp.parametro_id)) : p.parametri
-  if (inclusi.length === 0) errori.push(`Lo strumento "${nome}" non ha parametri.`)
+  if (inclusi.length === 0) errori.push(`Lo strumento "${nome}" non ha valori.`)
   return errori
 }
 

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
-  INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore,
+  INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
 } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -32,6 +32,10 @@ describe('messaggioErrore', () => {
     expect(messaggioErrore(new Error(EMAIL_GIA_INVITATA))).toBe('Questa email è già stata invitata: trovi l\'invito nell\'elenco.')
     expect(messaggioErrore(new Error(ESPERIMENTO_NON_TROVATO)))
       .toBe('Esperimento non trovato: forse è stato eliminato, o il link non è giusto.')
+  })
+
+  it('senza sessione: il messaggio dell\'app passa com\'è', () => {
+    expect(messaggioErrore(new Error(SENZA_SESSIONE))).toBe('Sessione scaduta: accedi di nuovo.')
   })
 
   it('eEsperimentoNonTrovato riconosce solo l\'errore di caricaConfig', () => {

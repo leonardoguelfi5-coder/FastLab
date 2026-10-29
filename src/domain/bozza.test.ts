@@ -3,6 +3,7 @@ import {
   bozzaVuota, clonaConfig, nuovoStrumento, nuovoParametro, problemiParametro, problemiStrumento, pulisciBozza,
   pulisciParametro, validaBozza,
 } from './bozza'
+import type { BozzaEsperimento, Parametro, Strumento } from './tipi'
 import { conPiante, configDiEsempio, fattore, parametro } from './test-helpers'
 
 describe('bozza', () => {
@@ -17,7 +18,10 @@ describe('bozza', () => {
     const b = bozzaVuota()
     expect(validaBozza(b)).toEqual(expect.arrayContaining([
       'Dai un nome all\'esperimento.', 'Crea almeno un trattamento.', 'Aggiungi almeno una pianta.',
-      'Aggiungi almeno un parametro.', 'Crea almeno uno strumento.']))
+      'Aggiungi almeno uno strumento o la tabella fenologica.']))
+  })
+  it('una bozza senza strumenti non chiede anche i parametri, che si aggiungono negli strumenti', () => {
+    expect(validaBozza(bozzaVuota())).not.toContain('Aggiungi almeno un parametro.')
   })
   it('una bozza completa è valida', () => expect(validaBozza(conPiante(['1', '2']))).toEqual([]))
   it('il nome di soli spazi non vale', () => {
@@ -61,7 +65,7 @@ describe('bozza', () => {
     expect(validaBozza(b)).toEqual([
       'Il parametro "Palchi" deve avere almeno un sotto-campo.',
       'Il parametro "Diametro" ha il minimo maggiore del massimo.',
-      'Lo strumento "SPAD" non ha parametri.',
+      'Lo strumento "SPAD" non ha valori.',
     ])
   })
   it('parametro senza nome', () => {
@@ -86,7 +90,7 @@ describe('bozza', () => {
   it('i parametri archiviati non contano', () => {
     const b = conPiante(['1'])
     b.parametri[0].archiviato = true
-    expect(validaBozza(b)).toContain('Aggiungi almeno un parametro.')
+    expect(validaBozza(b)).toContain('Lo strumento "Altezza" non ha valori.')
     b.parametri.push(parametro('Vecchio', { archiviato: true, n_letture: 0 }))
     expect(validaBozza(b)).not.toContain('Il parametro "Vecchio" deve avere almeno una lettura.')
   })
@@ -136,11 +140,95 @@ describe('bozza', () => {
   })
   it('due strumenti con lo stesso nome (anche con spazi o maiuscole)', () => {
     const b = conPiante(['1'])
-    b.strumenti.push({ ...b.strumenti[0], id: crypto.randomUUID(), nome: 'ALTEZZA ', ordine: 1 })
+    // Un parametro per strumento, come vuole il database.
+    const altro = parametro('Larghezza')
+    b.parametri.push(altro)
+    b.strumenti.push({
+      ...b.strumenti[0], id: crypto.randomUUID(), nome: 'ALTEZZA ', ordine: 1,
+      parametri: [{ parametro_id: altro.id, obbligatorio: false, ordine: 0 }],
+    })
     expect(validaBozza(b)).toEqual([
       'C\'è già uno strumento che si chiama "ALTEZZA".',
       'C\'è già uno strumento che si chiama "Altezza".',
     ])
+  })
+
+  describe('strumenti e tabella fenologica', () => {
+    /** Strumento in più nella bozza, con i parametri dati (già in `b.parametri` o da aggiungere). */
+    const aggiungi = (b: BozzaEsperimento, nome: string, parametri: Parametro[], extra: Partial<Strumento> = {}) => {
+      for (const p of parametri) if (!b.parametri.includes(p)) b.parametri.push(p)
+      const st: Strumento = {
+        ...nuovoStrumento(b.strumenti.length), nome, ...extra,
+        parametri: parametri.map((p, i) => ({ parametro_id: p.id, obbligatorio: false, ordine: i })),
+      }
+      b.strumenti.push(st)
+      return st
+    }
+
+    it('nessuno strumento non archiviato: serve almeno uno strumento o la tabella fenologica', () => {
+      const b = conPiante(['1'])
+      b.strumenti[0].archiviato = true
+      expect(validaBozza(b)).toEqual(['Aggiungi almeno uno strumento o la tabella fenologica.'])
+    })
+
+    it('la sola tabella fenologica basta', () => {
+      const b = conPiante(['1'])
+      b.strumenti[0].tipo = 'fenologico'
+      b.strumenti[0].nome = 'Tabella fenologica'
+      expect(validaBozza(b)).toEqual([])
+    })
+
+    it('più di una tabella fenologica: un solo messaggio', () => {
+      const b = conPiante(['1'])
+      b.strumenti[0].tipo = 'fenologico'
+      aggiungi(b, 'Altra tabella', [parametro('Note', { tipo: 'testo' })], { tipo: 'fenologico' })
+      aggiungi(b, 'Ancora una', [parametro('Fiori')], { tipo: 'fenologico' })
+      expect(validaBozza(b)).toEqual(['Può esserci una sola tabella fenologica.'])
+    })
+
+    it('una tabella fenologica archiviata non conta tra quelle in più', () => {
+      const b = conPiante(['1'])
+      b.strumenti[0].tipo = 'fenologico'
+      aggiungi(b, 'Vecchia tabella', [parametro('Note', { tipo: 'testo' })], { tipo: 'fenologico', archiviato: true })
+      expect(validaBozza(b)).toEqual([])
+    })
+
+    it('uno strumento senza valori, anche la tabella fenologica, con il suo nome', () => {
+      const b = conPiante(['1'])
+      aggiungi(b, 'SPAD', [])
+      aggiungi(b, 'Tabella fenologica', [], { tipo: 'fenologico' })
+      expect(validaBozza(b)).toEqual([
+        'Lo strumento "SPAD" non ha valori.', 'Lo strumento "Tabella fenologica" non ha valori.'])
+    })
+
+    it('uno strumento archiviato senza valori non dà problemi', () => {
+      const b = conPiante(['1'])
+      aggiungi(b, 'SPAD', [], { archiviato: true })
+      expect(validaBozza(b)).toEqual([])
+    })
+
+    it('un parametro in due strumenti: un messaggio per parametro', () => {
+      const b = conPiante(['1'])
+      const spad = parametro('SPAD')
+      const clorofilla = parametro('Clorofilla')
+      aggiungi(b, 'SPAD', [spad, clorofilla])
+      aggiungi(b, 'Altro SPAD', [spad, clorofilla])
+      aggiungi(b, 'Terzo', [spad])
+      // L'altezza sta in un solo strumento: nessun messaggio.
+      expect(validaBozza(b)).toEqual([
+        'Il parametro "SPAD" è in più di uno strumento.', 'Il parametro "Clorofilla" è in più di uno strumento.'])
+    })
+
+    it('lo stesso parametro due volte nello stesso strumento non è "in più strumenti"', () => {
+      const b = conPiante(['1'])
+      b.strumenti[0].parametri.push({ ...b.strumenti[0].parametri[0], ordine: 1 })
+      expect(validaBozza(b)).toEqual([])
+    })
+
+    it('i messaggi non parlano più di passate', () => {
+      const messaggi = validaBozza(bozzaVuota()).join(' ')
+      expect(messaggi).not.toMatch(/passat/i)
+    })
   })
 
   it('nuovoParametro: numerico, vuoto, con id nuovo e con l\'ordine dato', () => {
@@ -286,7 +374,7 @@ describe('problemiStrumento', () => {
   it('uno strumento valido non ha problemi', () => expect(problemiStrumento(strumento('SPAD'), [])).toEqual([]))
   it('senza nome o senza parametri', () => {
     expect(problemiStrumento(strumento(' '), [])).toEqual(['Uno strumento non ha nome.'])
-    expect(problemiStrumento(strumento('SPAD', 0), [])).toEqual(['Lo strumento "SPAD" non ha parametri.'])
+    expect(problemiStrumento(strumento('SPAD', 0), [])).toEqual(['Lo strumento "SPAD" non ha valori.'])
   })
   it('il nome è unico tra gli altri strumenti', () => {
     const altra = strumento('Termometro')
@@ -294,7 +382,7 @@ describe('problemiStrumento', () => {
     expect(problemiStrumento({ ...altra, icona: '🌡' }, [altra])).toEqual([])
   })
   it('con l\'elenco dei parametri attivi contano solo quelli', () => {
-    expect(problemiStrumento(strumento('SPAD', 1), [], new Set())).toEqual(['Lo strumento "SPAD" non ha parametri.'])
+    expect(problemiStrumento(strumento('SPAD', 1), [], new Set())).toEqual(['Lo strumento "SPAD" non ha valori.'])
     expect(problemiStrumento(strumento('SPAD', 1), [], new Set(['p0']))).toEqual([])
   })
 })

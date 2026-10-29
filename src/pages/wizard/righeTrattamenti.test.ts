@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bozzaVuota, clonaConfig } from '@/domain/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import { generaPiante } from '@/domain/piante'
 import { configDiEsempio, fattore } from '@/domain/test-helpers'
 import type { BozzaEsperimento } from '@/domain/tipi'
@@ -22,7 +23,7 @@ function pianteDa(righe: RigaTrattamento[]) {
 
 describe('righeDaBozza', () => {
   it('Hydrochar: 8 righe incluse con N uguale alle piante di ogni trattamento, e nessun blocco', () => {
-    const b = bozzaHydrochar()
+    const b = bozzaHydrochar(SEMI_CATALOGO)
     const righe = righeDaBozza(b)
     expect(righe).toHaveLength(8)
     expect(righe.every(r => r.incluso)).toBe(true)

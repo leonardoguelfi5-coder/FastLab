@@ -137,7 +137,7 @@ function Procedura({ chiave, crea }: ProceduraProps) {
       )}
 
       {lavoro === null ? (
-        <SceltaIniziale onModello={() => parti(bozzaHydrochar())} onDaZero={() => parti(bozzaVuota())} />
+        <SceltaIniziale onModello={() => parti(bozzaHydrochar([]))} onDaZero={() => parti(bozzaVuota())} />
       ) : (
         <>
           <div className="flex flex-col gap-3">
@@ -262,5 +262,5 @@ export function NuovoEsperimento() {
     )
   }
   if (da) return <Duplica key={chiave} espId={da} chiave={chiave} />
-  return <Procedura key={chiave} chiave={chiave} crea={() => (hydrochar ? bozzaHydrochar() : null)} />
+  return <Procedura key={chiave} chiave={chiave} crea={() => (hydrochar ? bozzaHydrochar([]) : null)} />
 }

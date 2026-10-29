@@ -35,6 +35,7 @@ import {
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { Impostazioni } from './Impostazioni'
@@ -85,7 +86,7 @@ const aperta = (riga: HTMLElement) => within(riga.closest('li') as HTMLElement)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  config = bozzaHydrochar()
+  config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   config.esperimento.note = 'serra 2'
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })

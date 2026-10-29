@@ -31,6 +31,7 @@ import { misurePianta, salvaMisura } from '@/api/misure'
 import { chiavi } from '@/api/query'
 import { chiaveBozza, leggiBozza } from '@/components/scheda/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
@@ -134,7 +135,7 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   useCampoStore.setState({ stato: {} })
-  config = bozzaHydrochar()
+  config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   archivio = []
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
@@ -729,12 +730,12 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
   })
 
   it('la casella c\'è per numeri, testo e sì/no e non per le liste ripetute', async () => {
-    apri('35', 'Fenologici')
+    apri('35', 'Tabella fenologica')
     await pronta()
     expect(screen.getByRole('group', { name: 'Palchi' })).toBeInTheDocument()
     // Fenologici: N frutti, ecc. sono numeri, Note è testo; Palchi e Infiorescenze sono liste.
     const numeroDiCaselle = screen.getAllByRole('checkbox', { name: MANTIENI }).length
-    const nonListe = config.strumenti.find(st => st.nome === 'Fenologici')!.parametri
+    const nonListe = config.strumenti.find(st => st.nome === 'Tabella fenologica')!.parametri
       .map(pp => par2(pp.parametro_id)).filter(p => p.tipo !== 'lista' && !p.archiviato).length
     expect(numeroDiCaselle).toBe(nonListe)
   })
@@ -765,11 +766,11 @@ describe('SchedaPianta: passaggio alla pianta successiva', () => {
 
   it('cambiando pianta un "Annulla" rimasto in sospeso sparisce con la lista', async () => {
     archivio = [misura({
-      strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-21',
+      strumento_id: idStrumento('Tabella fenologica'), data_rilievo: '2026-10-21',
       valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }] },
     })]
     const utente = userEvent.setup()
-    apri('35', 'Fenologici')
+    apri('35', 'Tabella fenologica')
     await pronta()
     await utente.click(within(screen.getByRole('group', { name: 'Palchi' })).getByRole('button', { name: 'Rimuovi ultimo' }))
     expect(toast).toHaveBeenCalledWith('Palchi 1 rimosso.', expect.anything())
@@ -785,11 +786,11 @@ describe('SchedaPianta: valori precompilati', () => {
   it('i parametri progressivi (Palchi) ripartono dai valori della volta precedente', async () => {
     archivio = [
       misura({
-        strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-14', ora: '09:00',
+        strumento_id: idStrumento('Tabella fenologica'), data_rilievo: '2026-10-14', ora: '09:00',
         valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 4 } }], [par('N palchi totali').id]: [1] },
       }),
       misura({
-        strumento_id: idStrumento('Fenologici'), data_rilievo: '2026-10-21', ora: '09:00',
+        strumento_id: idStrumento('Tabella fenologica'), data_rilievo: '2026-10-21', ora: '09:00',
         valori: {
           [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }],
           [par('N palchi totali').id]: [2],
@@ -798,7 +799,7 @@ describe('SchedaPianta: valori precompilati', () => {
       }),
     ]
     const utente = userEvent.setup()
-    apri('35', 'Fenologici')
+    apri('35', 'Tabella fenologica')
     await pronta()
 
     expect(within(screen.getByRole('group', { name: 'Palchi 1' })).getByLabelText('N foglie')).toHaveValue('5')

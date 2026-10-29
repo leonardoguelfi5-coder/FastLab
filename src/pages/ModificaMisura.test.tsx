@@ -30,6 +30,7 @@ import { caricaMisura, eliminaMisura, misurePianta, salvaMisura } from '@/api/mi
 import { chiavi } from '@/api/query'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza, scriviAperto, scriviBozza } from '@/components/scheda/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
@@ -112,7 +113,7 @@ beforeEach(() => {
   localStorage.clear()
   sessionStorage.clear()
   useCampoStore.setState({ stato: {} })
-  config = bozzaHydrochar()
+  config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   par('SPAD').archiviato = true
   m = {

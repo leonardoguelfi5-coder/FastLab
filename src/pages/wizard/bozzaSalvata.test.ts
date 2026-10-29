@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { bozzaVuota } from '@/domain/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import { chiaveBozza, leggiBozza, modificato, nuovoLavoro, rimuoviBozza, salvaBozza } from './bozzaSalvata'
 
 const CHIAVE = chiaveBozza('u1', 'hydrochar')
@@ -14,14 +15,14 @@ describe('bozzaSalvata', () => {
   })
 
   it('un lavoro nuovo non è modificato; lo diventa cambiando la bozza o la tabella', () => {
-    const l = nuovoLavoro(bozzaHydrochar())
+    const l = nuovoLavoro(bozzaHydrochar(SEMI_CATALOGO))
     expect(modificato(l)).toBe(false)
     expect(modificato({ ...l, bozza: { ...l.bozza, esperimento: { ...l.bozza.esperimento, nome: 'Altro' } } })).toBe(true)
     expect(modificato({ ...l, righe: l.righe.map((r, i) => (i === 0 ? { ...r, n: '15' } : r)) })).toBe(true)
   })
 
   it('salva e rilegge bozza, tabella, partenza e tentativo', () => {
-    const l = { ...nuovoLavoro(bozzaHydrochar()), tentato: true }
+    const l = { ...nuovoLavoro(bozzaHydrochar(SEMI_CATALOGO)), tentato: true }
     l.bozza.esperimento.nome = 'Modificato'
     salvaBozza(CHIAVE, l)
     const letto = leggiBozza(CHIAVE)
@@ -43,7 +44,7 @@ describe('bozzaSalvata', () => {
   })
 
   it('ignora una bozza della versione 1 (la forma di prima degli strumenti)', () => {
-    sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 1, ...nuovoLavoro(bozzaHydrochar()) }))
+    sessionStorage.setItem(CHIAVE, JSON.stringify({ versione: 1, ...nuovoLavoro(bozzaHydrochar(SEMI_CATALOGO)) }))
     expect(leggiBozza(CHIAVE)).toBeNull()
   })
 })

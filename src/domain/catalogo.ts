@@ -1,5 +1,23 @@
 import { nuovoId } from '@/lib/id'
-import type { Parametro, Strumento, VoceCatalogo } from './tipi'
+import type { Parametro, ParametroCatalogo, Strumento, StrumentoParametro, VoceCatalogo } from './tipi'
+
+/** Un parametro numerico nuovo, copiato da un valore del catalogo e collegato a esso con `catalogo_chiave`. */
+function parametroDaCatalogo(pc: ParametroCatalogo, ordine: number): Parametro {
+  return {
+    id: nuovoId(),
+    nome: pc.nome,
+    unita: pc.unita,
+    tipo: 'numero',
+    ordine,
+    archiviato: false,
+    progressivo: false,
+    n_letture: pc.n_letture,
+    valore_min: pc.valore_min,
+    valore_max: pc.valore_max,
+    sotto_campi: [],
+    catalogo_chiave: pc.chiave,
+  }
+}
 
 /**
  * Copia una voce del catalogo in uno strumento dell'esperimento, con un parametro numerico per ogni valore della
@@ -8,20 +26,7 @@ import type { Parametro, Strumento, VoceCatalogo } from './tipi'
  * I parametri sono tutti facoltativi, nell'ordine della voce.
  */
 export function strumentoDaCatalogo(v: VoceCatalogo, ordine: number): { strumento: Strumento; parametri: Parametro[] } {
-  const parametri: Parametro[] = v.parametri.map((pc, i) => ({
-    id: nuovoId(),
-    nome: pc.nome,
-    unita: pc.unita,
-    tipo: 'numero',
-    ordine: i,
-    archiviato: false,
-    progressivo: false,
-    n_letture: pc.n_letture,
-    valore_min: pc.valore_min,
-    valore_max: pc.valore_max,
-    sotto_campi: [],
-    catalogo_chiave: pc.chiave,
-  }))
+  const parametri: Parametro[] = v.parametri.map((pc, i) => parametroDaCatalogo(pc, i))
 
   const strumento: Strumento = {
     id: nuovoId(),
@@ -35,4 +40,134 @@ export function strumentoDaCatalogo(v: VoceCatalogo, ordine: number): { strument
   }
 
   return { strumento, parametri }
+}
+
+/** Uno strumento copiato da una voce del catalogo in un esperimento di cui l'utente è proprietario. */
+export interface CopiaStrumento {
+  espId: string
+  esperimentoNome: string
+  strumento: Strumento
+  /** I parametri collegati allo strumento, archiviati compresi. */
+  parametri: Parametro[]
+  /** Ids dei parametri dell'esperimento che compaiono in almeno una misura. */
+  conDati: Set<string>
+  /**
+   * Il massimo `ordine` tra tutti i parametri dell'esperimento (anche di altri strumenti e archiviati), -1 se non ce ne
+   * sono: i parametri aggiunti vanno dopo, senza mescolarsi a quelli degli altri strumenti.
+   */
+  ordineMassimo: number
+}
+
+export interface AggiuntaDaCatalogo {
+  espId: string
+  strumentoId: string
+  parametro: Parametro
+  /** Il collegamento del parametro nuovo allo strumento, in coda e facoltativo. */
+  collegamento: StrumentoParametro
+}
+export interface ModificaDaCatalogo { espId: string; parametro: Parametro }
+export interface PianoAggiornamento { aggiunte: AggiuntaDaCatalogo[]; modifiche: ModificaDaCatalogo[]; saltati: string[] }
+
+type ValoriCatalogo = Pick<ParametroCatalogo, 'nome' | 'unita' | 'valore_min' | 'valore_max' | 'n_letture'>
+
+/**
+ * I campi che il catalogo può aggiornare nelle copie, nell'ordine in cui si controllano. `confronto` porta un valore
+ * nella forma in cui si confronta (nome e unità senza spazi ai lati, unità vuota come nessuna unità); `bloccatoDaiDati`:
+ * con misure già salvate il campo non si aggiorna (meno letture troncherebbero i valori, un'altra unità
+ * reinterpreterebbe i numeri già scritti).
+ */
+const CAMPI: { campo: keyof ValoriCatalogo; etichetta: string; confronto: (v: ValoriCatalogo) => unknown; bloccatoDaiDati: boolean }[] = [
+  { campo: 'nome', etichetta: 'nome', confronto: v => v.nome.trim(), bloccatoDaiDati: false },
+  { campo: 'unita', etichetta: 'unità', confronto: v => (v.unita ?? '').trim(), bloccatoDaiDati: true },
+  { campo: 'valore_min', etichetta: 'minimo', confronto: v => v.valore_min, bloccatoDaiDati: false },
+  { campo: 'valore_max', etichetta: 'massimo', confronto: v => v.valore_max, bloccatoDaiDati: false },
+  { campo: 'n_letture', etichetta: 'letture', confronto: v => v.n_letture, bloccatoDaiDati: true },
+]
+
+/** Valori per chiave; con chiavi doppie vale la prima, come nel resto del confronto. */
+function perChiave(parametri: ParametroCatalogo[]): Map<string, ParametroCatalogo> {
+  const m = new Map<string, ParametroCatalogo>()
+  for (const pc of parametri) if (!m.has(pc.chiave)) m.set(pc.chiave, pc)
+  return m
+}
+
+/**
+ * Cosa cambiare nelle copie di una voce quando la voce passa da `vecchia` a `nuova`, confrontando i parametri per
+ * `catalogo_chiave`. Solo modifiche sicure (spec §6.3):
+ * - una chiave nuova (assente dalla vecchia voce e dalla copia) diventa un parametro aggiunto in coda; una chiave che
+ *   c'era già e che l'utente ha tolto dalla copia non torna;
+ * - un campo (nome, unità, minimo, massimo, letture) si aggiorna solo se nella copia è ancora uguale al vecchio valore
+ *   del catalogo: se è stato ritoccato a mano resta com'è e finisce tra i `saltati`;
+ * - con misure già salvate unità e letture non si aggiornano;
+ * - non si elimina nulla (una chiave tolta dal catalogo resta nella copia), il tipo non si tocca, i parametri
+ *   archiviati o aggiunti a mano (senza chiave) restano come sono, nome e icona dello strumento pure.
+ * Funzione pura: le copie nell'ordine ricevuto, i loro parametri per `ordine`.
+ */
+export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, copie: CopiaStrumento[]): PianoAggiornamento {
+  const piano: PianoAggiornamento = { aggiunte: [], modifiche: [], saltati: [] }
+  const vecchi = perChiave(vecchia.parametri)
+  const nuovi = perChiave(nuova.parametri)
+  // Più copie nello stesso esperimento: gli ordini dei parametri aggiunti continuano da una copia all'altra.
+  const ordineMassimo = new Map<string, number>()
+
+  for (const copia of copie) {
+    // Una copia di un'altra voce non si tocca, anche se arrivasse qui per sbaglio.
+    if (copia.strumento.catalogo_id !== nuova.id) continue
+
+    for (const p of [...copia.parametri].sort((a, b) => a.ordine - b.ordine)) {
+      if (p.archiviato || p.catalogo_chiave === null) continue
+      const v = vecchi.get(p.catalogo_chiave)
+      const n = nuovi.get(p.catalogo_chiave)
+      if (!v || !n) continue
+
+      const dove = `${copia.esperimentoNome} · ${copia.strumento.nome} · ${p.nome}`
+      const aggiornato: Parametro = { ...p }
+      for (const { campo, etichetta, confronto, bloccatoDaiDati } of CAMPI) {
+        if (confronto(v) === confronto(n)) continue
+        // Già come nel catalogo nuovo (l'utente l'aveva corretto da sé): niente da fare, niente da segnalare.
+        if (confronto(p) === confronto(n)) continue
+        if (confronto(p) !== confronto(v)) {
+          piano.saltati.push(`${dove}: ${etichetta} modificato a mano`)
+        } else if (bloccatoDaiDati && copia.conDati.has(p.id)) {
+          piano.saltati.push(`${dove}: ${etichetta} non aggiornato, ci sono già misure`)
+        } else {
+          Object.assign(aggiornato, { [campo]: n[campo] })
+        }
+      }
+
+      // Un minimo nuovo oltre un massimo ritoccato a mano (o viceversa) darebbe un parametro che la configurazione
+      // rifiuta: quel limite resta com'era.
+      if (aggiornato.valore_min !== null && aggiornato.valore_max !== null && aggiornato.valore_min > aggiornato.valore_max) {
+        if (aggiornato.valore_max !== p.valore_max) {
+          aggiornato.valore_max = p.valore_max
+          piano.saltati.push(`${dove}: massimo non aggiornato, sarebbe sotto il minimo`)
+        }
+        if (aggiornato.valore_min !== p.valore_min) {
+          aggiornato.valore_min = p.valore_min
+          piano.saltati.push(`${dove}: minimo non aggiornato, supererebbe il massimo`)
+        }
+      }
+
+      if (CAMPI.some(({ campo }) => aggiornato[campo] !== p[campo])) {
+        piano.modifiche.push({ espId: copia.espId, parametro: aggiornato })
+      }
+    }
+
+    const presenti = new Set(copia.parametri.map(p => p.catalogo_chiave))
+    let ordine = Math.max(ordineMassimo.get(copia.espId) ?? -1, copia.ordineMassimo)
+    let ordineCollegamento = Math.max(-1, ...copia.strumento.parametri.map(pp => pp.ordine)) + 1
+    for (const pc of nuovi.values()) {
+      if (vecchi.has(pc.chiave) || presenti.has(pc.chiave)) continue
+      const parametro = parametroDaCatalogo(pc, ++ordine)
+      piano.aggiunte.push({
+        espId: copia.espId,
+        strumentoId: copia.strumento.id,
+        parametro,
+        collegamento: { parametro_id: parametro.id, obbligatorio: false, ordine: ordineCollegamento++ },
+      })
+    }
+    ordineMassimo.set(copia.espId, ordine)
+  }
+
+  return piano
 }

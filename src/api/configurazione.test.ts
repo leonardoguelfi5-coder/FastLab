@@ -7,8 +7,9 @@ import { simulaSupabase } from '@/test/supabase-mock'
 import type { Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro, eliminaStrumento,
-  eliminaPianta, pianteConDati, parametriConDati, salvaParametro, salvaStrumento,
+  aggiornaParametroDaCatalogo, aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento,
+  collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, parametriConDati, salvaParametro,
+  salvaStrumento,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -41,6 +42,31 @@ describe('salvaParametro', () => {
     const e = { code: 'P0001', message: 'PARAMETRO_CON_DATI' }
     mock.risponde('parametri', { error: e })
     await expect(salvaParametro('E', parametro)).rejects.toBe(e)
+  })
+})
+
+describe('aggiornaParametroDaCatalogo', () => {
+  const daCatalogo: Parametro = { ...parametro, tipo: 'testo', archiviato: true, progressivo: true, unita: 'mm', n_letture: 2, valore_min: 1, valore_max: 9 }
+
+  it('aggiorna solo nome, unità, minimo, massimo e letture (mai tipo, archiviato o progressivo) e controlla la riga', async () => {
+    mock.risponde('parametri', toccata('par1'))
+
+    await aggiornaParametroDaCatalogo('E', daCatalogo)
+
+    expect(mock.di('parametri').map(c => [c.metodo, ...c.args])).toEqual([
+      ['update', { nome: 'Altezza', unita: 'mm', valore_min: 1, valore_max: 9, n_letture: 2 }],
+      ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+    ])
+  })
+
+  it('se il parametro non c\'è più lo dice, invece di ricrearlo', async () => {
+    mock.risponde('parametri', { data: [] })
+    await expect(aggiornaParametroDaCatalogo('E', daCatalogo)).rejects.toThrow(ELEMENTO_NON_TROVATO)
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('parametri', { error: errore })
+    await expect(aggiornaParametroDaCatalogo('E', daCatalogo)).rejects.toBe(errore)
   })
 })
 
@@ -185,6 +211,28 @@ describe('salvaStrumento', () => {
   it('lancia l\'errore dei collegamenti', async () => {
     mock.risponde('strumento_parametri', { error: errore })
     await expect(salvaStrumento('E', strumento)).rejects.toBe(errore)
+  })
+})
+
+describe('collegaParametri', () => {
+  it('aggiunge o aggiorna i collegamenti indicati, senza toccare gli altri dello strumento', async () => {
+    await collegaParametri('E', 'pa1', [{ parametro_id: 'par3', obbligatorio: false, ordine: 2 }])
+
+    expect(mock.chiamate.map(c => [c.sorgente, c.metodo, ...c.args])).toEqual([
+      ['strumento_parametri', 'upsert', [
+        { esperimento_id: 'E', strumento_id: 'pa1', parametro_id: 'par3', obbligatorio: false, ordine: 2 },
+      ], { onConflict: 'strumento_id,parametro_id' }],
+    ])
+  })
+
+  it('senza collegamenti non scrive nulla', async () => {
+    await collegaParametri('E', 'pa1', [])
+    expect(mock.chiamate).toEqual([])
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('strumento_parametri', { error: errore })
+    await expect(collegaParametri('E', 'pa1', [{ parametro_id: 'par3', obbligatorio: false, ordine: 2 }])).rejects.toBe(errore)
   })
 })
 

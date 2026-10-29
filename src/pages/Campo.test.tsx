@@ -25,6 +25,7 @@ import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { misureDelGiorno } from '@/api/misure'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import { piante as creaPiante } from '@/domain/test-helpers'
 import type { ConfigEsperimento, Misura, Pianta } from '@/domain/tipi'
 import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
@@ -37,7 +38,7 @@ const IERI = '2026-10-27'
 
 /** L'esperimento di prova ("E"): il modello Hydrochar, 56 piante numerate da 1 a 56 e quattro strumenti. */
 function esperimento(): ConfigEsperimento {
-  const config = bozzaHydrochar()
+  const config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   return config
 }
@@ -158,7 +159,7 @@ describe('Campo: scelta dello strumento', () => {
     vaiAllaPagina()
     const gruppo = await screen.findByRole('radiogroup', { name: 'Strumento' })
     expect(within(gruppo).getAllByRole('radio')).toHaveLength(4)
-    for (const nome of ['Termometro', 'SPAD', 'Altezza', 'Fenologici']) {
+    for (const nome of ['Termometro', 'SPAD', 'Metro', 'Tabella fenologica']) {
       expect(within(gruppo).getByRole('radio', { name: nome })).not.toBeChecked()
     }
   })
@@ -169,7 +170,7 @@ describe('Campo: scelta dello strumento', () => {
     vaiAllaPagina()
     const gruppo = await screen.findByRole('radiogroup', { name: 'Strumento' })
     const nomi = within(gruppo).getAllByRole('radio').map(r => (r as HTMLInputElement).labels?.[0].textContent ?? '')
-    expect(nomi.map(n => ['Termometro', 'SPAD', 'Altezza', 'Fenologici'].findIndex(x => n.includes(x)))).toEqual([0, 1, 2, 3])
+    expect(nomi.map(n => ['Termometro', 'SPAD', 'Metro', 'Tabella fenologica'].findIndex(x => n.includes(x)))).toEqual([0, 1, 2, 3])
   })
 
   it('toccare uno strumento lo sceglie, lo salva e ne resta uno solo', async () => {
@@ -181,16 +182,16 @@ describe('Campo: scelta dello strumento', () => {
     expect(useCampoStore.getState().dati('E').strumentoId).toBe(idStrumento('SPAD'))
     expect(JSON.parse(localStorage.getItem('fastlab-campo')!).state.stato.E.strumentoId).toBe(idStrumento('SPAD'))
 
-    await utente.click(screen.getByRole('radio', { name: 'Altezza' }))
+    await utente.click(screen.getByRole('radio', { name: 'Metro' }))
 
-    expect(screen.getByRole('radio', { name: 'Altezza' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Metro' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'SPAD' })).not.toBeChecked()
-    expect(useCampoStore.getState().dati('E').strumentoId).toBe(idStrumento('Altezza'))
+    expect(useCampoStore.getState().dati('E').strumentoId).toBe(idStrumento('Metro'))
   })
 
   it('lo strumento scelto in precedenza è già selezionato all\'apertura', async () => {
-    await paginaConStrumento('Fenologici')
-    expect(screen.getByRole('radio', { name: 'Fenologici' })).toBeChecked()
+    await paginaConStrumento('Tabella fenologica')
+    expect(screen.getByRole('radio', { name: 'Tabella fenologica' })).toBeChecked()
     expect(screen.getByRole('radio', { name: 'Termometro' })).not.toBeChecked()
   })
 

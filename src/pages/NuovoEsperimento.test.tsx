@@ -401,7 +401,7 @@ describe('NuovoEsperimento: errori della bozza', () => {
     expect(screen.getByRole('button', { name: 'Crea esperimento' })).toBeDisabled()
     const errori = screen.getByRole('list', { name: 'Da sistemare' })
     for (const e of ['Dai un nome all\'esperimento.', 'Crea almeno un trattamento.', 'Aggiungi almeno una pianta.',
-      'Aggiungi almeno un parametro.', 'Crea almeno uno strumento.']) {
+      'Aggiungi almeno uno strumento o la tabella fenologica.']) {
       expect(within(errori).getByText(e)).toBeInTheDocument()
     }
     expect(creaEsperimento).not.toHaveBeenCalled()

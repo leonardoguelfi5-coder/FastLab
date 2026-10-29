@@ -18,6 +18,9 @@ export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\
 /** Un nome già usato da un'altra voce non archiviata del catalogo (indice unico `catalogo_strumenti_nome_unico`). */
 const MSG_NOME_NEL_CATALOGO = 'Nel catalogo c\'è già uno strumento con questo nome.'
 
+/** Una lettura che dipende da chi è l'utente (es. `copieDiProprieta`) senza una sessione attiva. */
+export const SENZA_SESSIONE = 'Sessione scaduta: accedi di nuovo.'
+
 /** `caricaConfig` non trova l'esperimento: id non valido, eliminato o non accessibile. */
 export const ESPERIMENTO_NON_TROVATO = 'Esperimento non trovato: forse è stato eliminato, o il link non è giusto.'
 
@@ -65,7 +68,9 @@ export function messaggioErrore(e: unknown): string {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
   // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
-  if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO].includes(messaggio)) return messaggio
+  if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO, SENZA_SESSIONE].includes(messaggio)) {
+    return messaggio
+  }
   if (code === '23505' && messaggio.includes('catalogo_strumenti_nome_unico')) return MSG_NOME_NEL_CATALOGO
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   // catalogo_id di uno strumento che punta a una voce che non c'è (crea_esperimento o salvaStrumento).
