@@ -122,3 +122,10 @@ Task 9: minor (carry to T12): SchedaPianta aperta dall'elenco torna a /misura e,
 Task 9: minor (carry to T11): la home legge le misure del giorno anche senza strumento scelto → `useMisureGiorno(strumentoId ? espId : undefined, …)`
 Task 9: minor (carry to T13): DESIGN.md dice che le emoji sono ammesse solo come icona della passata → aggiornare (icone delle sezioni della home e degli strumenti); mockup della home ancora con Mappa e badge (riferimento storico); emoji dello strumento nello stato della striscia letta dai lettori di schermo
 Task 9: complete (commits 232fbcd..8464ad6, review clean)
+
+## Come riprendere (istruzione dell'utente, 29/10/2026)
+Se i crediti di utilizzo finiscono, il lavoro riprende **in questa stessa sessione cloud** (non in un'altra app o sessione). Alla ripresa:
+1. `git status` e `git log --oneline -5` sul branch `claude/app-review-improvements-c26294`: il lavoro non committato di un implementatore interrotto resta nel checkout; si controlla, si completa o si scarta con un nuovo implementatore sullo stesso task.
+2. Si riparte dalla prima riga di "Avanzamento" senza `complete`. Ordine restante: T7 → T8 → T11 → T12 → T13 → revisione finale (opus) → un giro di correzioni.
+3. I brief stanno nella scratchpad della sessione (`briefs/`); se non ci sono più, si riscrivono dal piano e dai Ruling di questo registro.
+4. DB senza Docker: `pg_ctlcluster 16 main start`, poi `scripts/db-senza-docker/test-db.sh` (servono `postgresql-16-pgtap` e `libtap-parser-sourcehandler-pgtap-perl`, e `trust` per postgres in pg_hba).
