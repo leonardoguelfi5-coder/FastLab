@@ -44,7 +44,7 @@ export async function archiviaVoceCatalogo(id: string): Promise<void> {
  * solo queste si possono aggiornare dal catalogo, quelle degli altri non cambiano mai (spec §5.10). Il filtro su
  * `creato_da` è nella query e non affidato alla sola RLS, che lascia vedere anche gli esperimenti di cui si è membri.
  * Ogni copia porta tutti i parametri collegati allo strumento (archiviati compresi), i parametri con dati
- * dell'esperimento e il massimo `ordine` dei suoi parametri. Esperimenti per nome, strumenti per `ordine`.
+ * dell'esperimento, il massimo `ordine` dei suoi parametri e i nomi di tutti i suoi parametri. Esperimenti per nome, strumenti per `ordine`.
  */
 export async function copieDiProprieta(catalogoId: string): Promise<CopiaStrumento[]> {
   const { data: sessione, error: erroreSessione } = await supabase.auth.getSession()
@@ -80,6 +80,7 @@ export async function copieDiProprieta(catalogoId: string): Promise<CopiaStrumen
     const delEsperimento = righeParametri.filter(p => p.esperimento_id === e.id)
     const perId = new Map(delEsperimento.map(p => [p.id, daRigaParametro(p)]))
     const ordineMassimo = Math.max(-1, ...delEsperimento.map(p => p.ordine))
+    const nomiEsperimento = delEsperimento.map(p => p.nome)
     const suoi = daRigheStrumenti(strumentiDi(e.id), righeCollegamenti)
     return suoi.map((strumento): CopiaStrumento => ({
       espId: e.id,
@@ -90,6 +91,7 @@ export async function copieDiProprieta(catalogoId: string): Promise<CopiaStrumen
         .sort((a, b) => a.ordine - b.ordine),
       conDati: conDati[i],
       ordineMassimo,
+      nomiEsperimento,
     }))
   })
 }

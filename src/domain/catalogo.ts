@@ -195,6 +195,11 @@ export interface CopiaStrumento {
    * sono: i parametri aggiunti vanno dopo, senza mescolarsi a quelli degli altri strumenti.
    */
   ordineMassimo: number
+  /**
+   * I nomi di tutti i parametri dell'esperimento (anche di altri strumenti e archiviati): un nome nuovo dal catalogo
+   * non deve doppiare un valore che c'è già.
+   */
+  nomiEsperimento: string[]
 }
 
 export interface AggiuntaDaCatalogo {
@@ -232,6 +237,9 @@ const CAMPI: { campo: keyof ValoriCatalogo; etichetta: string; confronto: (v: Va
   { campo: 'n_letture', etichetta: 'letture', confronto: v => v.n_letture, bloccatoDaiDati: true },
 ]
 
+/** Un nome nella forma in cui si confronta con gli altri dell'esperimento, come in `problemiParametro`. */
+const normalizzaNome = (nome: string) => nome.trim().toLowerCase()
+
 /** Valori per chiave; con chiavi doppie vale la prima, come nel resto del confronto. */
 function perChiave(parametri: ParametroCatalogo[]): Map<string, ParametroCatalogo> {
   const m = new Map<string, ParametroCatalogo>()
@@ -249,7 +257,9 @@ function perChiave(parametri: ParametroCatalogo[]): Map<string, ParametroCatalog
  * - con misure già salvate unità e letture non si aggiornano;
  * - non si elimina nulla (una chiave tolta dal catalogo resta nella copia), il tipo non si tocca, i parametri
  *   archiviati o aggiunti a mano (senza chiave) restano come sono, nome e icona dello strumento pure;
- * - uno strumento archiviato riceve le modifiche ma nessun parametro nuovo (non si misura più).
+ * - uno strumento archiviato riceve le modifiche ma nessun parametro nuovo (non si misura più);
+ * - un nome (rinominato o aggiunto) già usato da un altro valore dell'esperimento, archiviati compresi, non si scrive e
+ *   finisce tra i `saltati`: due valori con lo stesso nome non si distinguerebbero nella misura e nell'esportazione.
  * Funzione pura: le copie nell'ordine ricevuto, i loro parametri per `ordine`. Se `vecchia` e `nuova` non sono la
  * stessa voce lancia `VOCI_DIVERSE`: un errore di chi chiama, che non deve sembrare un aggiornamento riuscito a vuoto.
  */
@@ -260,10 +270,16 @@ export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, c
   const nuovi = perChiave(nuova.parametri)
   // Più copie nello stesso esperimento: gli ordini dei parametri aggiunti continuano da una copia all'altra.
   const ordineMassimo = new Map<string, number>()
+  // Per esperimento i nomi già presi, compresi quelli che il piano stesso sta dando: un nome liberato da una rinomina
+  // resta preso (prudenza: se la rinomina non arrivasse, il nome sarebbe doppio).
+  const nomiPresi = new Map<string, Set<string>>()
 
   for (const copia of copie) {
     // Una copia di un'altra voce non si tocca, anche se arrivasse qui per sbaglio.
     if (copia.strumento.catalogo_id !== nuova.id) continue
+    const presi = nomiPresi.get(copia.espId) ?? new Set<string>()
+    for (const nome of [...copia.nomiEsperimento, ...copia.parametri.map(p => p.nome)]) presi.add(normalizzaNome(nome))
+    nomiPresi.set(copia.espId, presi)
 
     for (const p of [...copia.parametri].sort((a, b) => a.ordine - b.ordine)) {
       if (p.archiviato || p.catalogo_chiave === null) continue
@@ -282,7 +298,11 @@ export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, c
           piano.saltati.push(`${dove}: ${etichetta} modificato a mano`)
         } else if (bloccatoDaiDati && copia.conDati.has(p.id)) {
           piano.saltati.push(`${dove}: ${etichetta} non aggiornato, ci sono già misure`)
+        } else if (campo === 'nome' && normalizzaNome(n.nome) !== normalizzaNome(p.nome) && presi.has(normalizzaNome(n.nome))) {
+          // Una rinomina che cambia solo maiuscole o spazi resta lo stesso nome: si fa.
+          piano.saltati.push(`${dove}: nome non aggiornato, c'è già un valore con questo nome`)
         } else {
+          if (campo === 'nome') presi.add(normalizzaNome(n.nome))
           Object.assign(aggiornato, { [campo]: n[campo] })
           Object.assign(campi, { [campo]: n[campo] })
         }
@@ -314,6 +334,11 @@ export function pianoAggiornamento(vecchia: VoceCatalogo, nuova: VoceCatalogo, c
     let ordineCollegamento = Math.max(-1, ...copia.strumento.parametri.map(pp => pp.ordine)) + 1
     for (const pc of nuovi.values()) {
       if (vecchi.has(pc.chiave) || presenti.has(pc.chiave)) continue
+      if (presi.has(normalizzaNome(pc.nome))) {
+        piano.saltati.push(`${copia.esperimentoNome} · ${copia.strumento.nome} · ${pc.nome.trim()}: non aggiunto, c'è già un valore con questo nome`)
+        continue
+      }
+      presi.add(normalizzaNome(pc.nome))
       const parametro = parametroDaCatalogo(pc, ++ordine)
       piano.aggiunte.push({
         espId: copia.espId,

@@ -234,7 +234,8 @@ export function Catalogo() {
           )}
 
           {modifica.vecchia && (
-            <Button variant="destructive" size="sm" className="self-start" disabled={occupato} onClick={() => setConferma('archivia')}>
+            // Secondario e non rosso, come "Archivia strumento" nelle impostazioni: archiviare non cancella nulla.
+            <Button variant="outline" size="sm" className="self-start" disabled={occupato} onClick={() => setConferma('archivia')}>
               Archivia dal catalogo
             </Button>
           )}
@@ -268,7 +269,11 @@ export function Catalogo() {
               <TestoErrore className="text-base">
                 {`Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati: ${esito.messaggio}`}
               </TestoErrore>
-              <Button variant="ghost" size="sm" className="-ml-3" disabled={occupato} onClick={() => riprova(esito)}>Riprova</Button>
+              <div className="-ml-3 flex flex-wrap gap-2">
+                <Button variant="ghost" size="sm" disabled={occupato} onClick={() => riprova(esito)}>Riprova</Button>
+                {/* Chiudere non riprova: gli esperimenti restano come sono, si aggiornano salvando di nuovo la voce. */}
+                <Button variant="ghost" size="sm" disabled={occupato} onClick={() => setEsito(null)}>Chiudi</Button>
+              </div>
             </div>
           )}
 
@@ -310,7 +315,8 @@ export function Catalogo() {
       <Conferma
         aperta={conferma === 'archivia'}
         titolo="Archiviare lo strumento?"
-        testo={`Archiviare "${modifica?.vecchia?.nome ?? ''}"? Non comparirà più tra gli strumenti da aggiungere; gli esperimenti che lo usano non cambiano.`}
+        testo={`Archiviare "${modifica?.vecchia?.nome ?? ''}"? Non comparirà più tra gli strumenti da aggiungere; gli esperimenti che lo usano non cambiano.`
+          + (modificato ? ' Le modifiche non salvate di questa voce andranno perse.' : '')}
         annulla="Annulla"
         conferma="Archivia"
         onAnnulla={() => setConferma(null)}

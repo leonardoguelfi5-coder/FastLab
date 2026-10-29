@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useCatalogo } from '@/api/query'
@@ -22,6 +22,8 @@ interface SezioneStrumentiProps {
   config: ConfigEsperimento
   datiParametri: UseQueryResult<Set<string>>
   datiStrumenti: UseQueryResult<Set<string>>
+  /** Il tocco su "Gestisci il catalogo": la pagina lo ferma se ci sono modifiche non salvate, e chiede prima. */
+  onGestisciCatalogo?: (evento: MouseEvent<HTMLAnchorElement>) => void
 }
 
 /**
@@ -29,7 +31,7 @@ interface SezioneStrumentiProps {
  * aggiungono dal catalogo o si creano nuovi (e allora entrano anche nel catalogo). Uno strumento con misure si archivia;
  * senza misure si può anche eliminare, con i valori che ha. La tabella fenologica ha la sua sezione.
  */
-export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti }: SezioneStrumentiProps) {
+export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti, onGestisciCatalogo }: SezioneStrumentiProps) {
   const g = useStrumenti({ espId, config, tipo: 'strumento', chiave: 'strumenti', datiParametri, datiStrumenti })
   const catalogo = useCatalogo()
   const [dalCatalogo, setDalCatalogo] = useState(false)
@@ -98,7 +100,9 @@ export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti }
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" aria-expanded={dalCatalogo} onClick={() => setDalCatalogo(a => !a)}>+ Aggiungi dal catalogo</Button>
-        <Link to={percorsoCatalogo} className={buttonVariants({ variant: 'ghost' })}>Gestisci il catalogo</Link>
+        <Link to={percorsoCatalogo} onClick={onGestisciCatalogo} className={buttonVariants({ variant: 'ghost' })}>
+          Gestisci il catalogo
+        </Link>
       </div>
       {dalCatalogo && (
         <SceltaDalCatalogo

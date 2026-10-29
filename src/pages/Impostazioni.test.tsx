@@ -1151,6 +1151,33 @@ describe('Impostazioni: uscita', () => {
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
     await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E$/))
   })
+
+  it('senza modifiche "Gestisci il catalogo" porta subito al catalogo', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' }))
+    expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/catalogo$/)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('con una modifica non salvata "Gestisci il catalogo" chiede conferma: si resta con la modifica, o si scarta e si va', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    await utente.type(aperta(rigaStrumento('Metro')).getByLabelText('Nome dello strumento'), ' lungo')
+
+    await utente.click(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Scartare le modifiche non salvate?' })
+    await utente.click(within(dialogo).getByRole('button', { name: 'Continua a modificare' }))
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/impostazioni')
+    expect(aperta(rigaStrumento('Metro lungo')).getByLabelText('Nome dello strumento')).toHaveValue('Metro lungo')
+
+    await utente.click(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/catalogo$/))
+  })
 })
 
 describe('Impostazioni: uscita, tabella fenologica', () => {

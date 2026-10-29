@@ -238,6 +238,9 @@ describe('copieDiProprieta', () => {
     })
     expect(copie[0].parametri[1]).toMatchObject({ id: 'pB', archiviato: true, catalogo_chiave: 'temp_pianta' })
     expect(copie[0].conDati).toEqual(new Set(['pA']))
+    // I nomi di tutti i parametri dell'esperimento, anche archiviati o di altri strumenti.
+    expect(copie[0].nomiEsperimento).toEqual(['pB', 'pA', 'pAltro'])
+    expect(copie[2].nomiEsperimento).toEqual(['pC'])
   })
 
   it('senza sessione non legge nulla e lo dice', async () => {

@@ -204,6 +204,7 @@ describe('pianoAggiornamento', () => {
       parametri,
       conDati: new Set(),
       ordineMassimo: 7,
+      nomiEsperimento: parametri.map(p => p.nome),
       ...extra,
     }
   }
@@ -310,7 +311,7 @@ describe('pianoAggiornamento', () => {
     })
   })
 
-  it('più chiavi nuove in due copie dello stesso esperimento: ordini crescenti, senza sovrapposizioni', () => {
+  it('più chiavi nuove: ordini crescenti; nella seconda copia dello stesso esperimento i nomi sono già presi', () => {
     const nuova: VoceCatalogo = {
       ...vecchia,
       parametri: [
@@ -321,14 +322,67 @@ describe('pianoAggiornamento', () => {
     }
     const prima = copia()
     const seconda: CopiaStrumento = {
-      ...copia(), strumento: { ...copia().strumento, id: 'S2', parametri: [] }, parametri: [],
+      ...copia(), strumento: { ...copia().strumento, id: 'S2', nome: 'Ciras bis', parametri: [] }, parametri: [],
     }
 
     const piano = pianoAggiornamento(vecchia, nuova, [prima, seconda])
 
     expect(piano.aggiunte.map(a => [a.strumentoId, a.parametro.catalogo_chiave, a.parametro.ordine, a.collegamento.ordine]))
-      .toEqual([['S1', 'e', 8, 2], ['S1', 'ci', 9, 3], ['S2', 'e', 10, 0], ['S2', 'ci', 11, 1]])
-    expect(new Set(piano.aggiunte.map(a => a.parametro.id)).size).toBe(4)
+      .toEqual([['S1', 'e', 8, 2], ['S1', 'ci', 9, 3]])
+    expect(new Set(piano.aggiunte.map(a => a.parametro.id)).size).toBe(2)
+    expect(piano.saltati).toEqual([
+      'Pomodoro 2026 · Ciras bis · E: non aggiunto, c\'è già un valore con questo nome',
+      'Pomodoro 2026 · Ciras bis · Ci: non aggiunto, c\'è già un valore con questo nome',
+    ])
+  })
+
+  it('una chiave nuova con il nome di un valore aggiunto a mano nell\'esperimento non si aggiunge: è un saltato', () => {
+    // «Umidità» aggiunta a mano al Termometro, poi la stessa «umidità » aggiunta al catalogo del Ciras.
+    const nuova: VoceCatalogo = {
+      ...vecchia,
+      parametri: [
+        ...vecchia.parametri,
+        { chiave: 'umidita', nome: 'umidità ', unita: '%', n_letture: 1, valore_min: null, valore_max: null },
+        { chiave: 'e', nome: 'E', unita: null, n_letture: 1, valore_min: null, valore_max: null },
+      ],
+    }
+    const c = copia({ nomiEsperimento: ['A', 'gs', 'Temperatura', 'Umidità'] })
+
+    const piano = pianoAggiornamento(vecchia, nuova, [c])
+
+    expect(piano.aggiunte.map(a => a.parametro.nome)).toEqual(['E'])
+    expect(piano.saltati).toEqual(['Pomodoro 2026 · Ciras · umidità: non aggiunto, c\'è già un valore con questo nome'])
+  })
+
+  it('un nome nuovo già usato da un altro valore dell\'esperimento (anche archiviato) non si scrive, gli altri campi sì', () => {
+    const c = copia({ nomiEsperimento: ['A', 'gs', 'Conduttanza'] })
+    const nuova = conValore(vecchia, 'gs', { nome: ' conduttanza', unita: 'mmol m⁻² s⁻¹' })
+
+    expect(pianoAggiornamento(vecchia, nuova, [c])).toEqual({
+      aggiunte: [],
+      modifiche: [modifica(parametroDi(c, 'gs'), { unita: 'mmol m⁻² s⁻¹' })],
+      saltati: ['Pomodoro 2026 · Ciras · gs: nome non aggiornato, c\'è già un valore con questo nome'],
+    })
+  })
+
+  it('una rinomina che cambia solo le maiuscole si fa; un nome dato dal piano non si dà una seconda volta', () => {
+    const nuova: VoceCatalogo = {
+      ...conValore(conValore(vecchia, 'gs', { nome: 'GS' }), 'a', { nome: 'Assimilazione' }),
+      parametri: [
+        ...conValore(conValore(vecchia, 'gs', { nome: 'GS' }), 'a', { nome: 'Assimilazione' }).parametri,
+        { chiave: 'assim', nome: 'Assimilazione', unita: null, n_letture: 1, valore_min: null, valore_max: null },
+      ],
+    }
+    const c = copia()
+
+    const piano = pianoAggiornamento(vecchia, nuova, [c])
+
+    expect(piano.modifiche).toEqual([
+      modifica(parametroDi(c, 'a'), { nome: 'Assimilazione' }),
+      modifica(parametroDi(c, 'gs'), { nome: 'GS' }),
+    ])
+    expect(piano.aggiunte).toEqual([])
+    expect(piano.saltati).toEqual(['Pomodoro 2026 · Ciras · Assimilazione: non aggiunto, c\'è già un valore con questo nome'])
   })
 
   it('una chiave nuova già presente nella copia (anche archiviata) non si aggiunge di nuovo', () => {

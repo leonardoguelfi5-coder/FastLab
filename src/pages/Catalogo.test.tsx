@@ -85,6 +85,7 @@ function copiaCiras(ritocchi: Record<string, Partial<CopiaStrumento['parametri']
     parametri: parametri.map(p => ({ ...p, ...(ritocchi[p.catalogo_chiave as string] ?? {}) })),
     conDati: new Set(),
     ordineMassimo: parametri.length - 1,
+    nomiEsperimento: parametri.map(p => p.nome),
   }
 }
 
@@ -316,6 +317,21 @@ describe('Catalogo: salvare una voce', () => {
     expect(screen.getByRole('button', { name: 'Riprova' })).toBeEnabled()
   })
 
+  it('l\'errore degli esperimenti si chiude con "Chiudi" senza riprovare', async () => {
+    vi.mocked(copieDiProprieta).mockRejectedValueOnce({ message: 'Failed to fetch' })
+    const { utente } = apri()
+    await apriVoce(utente, 'SPAD')
+    await utente.click(casella())
+    await utente.type(screen.getByLabelText('Nome dello strumento'), ' 2')
+    await salva(utente)
+
+    const avviso = await screen.findByRole('alert')
+    await utente.click(within(avviso).getByRole('button', { name: 'Chiudi' }))
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(copieDiProprieta).toHaveBeenCalledTimes(1)
+  })
+
   it('se il salvataggio della voce fallisce non si toccano gli esperimenti: l\'errore resta nell\'editor e si può riprovare', async () => {
     vi.mocked(salvaVoceCatalogo).mockRejectedValueOnce({ message: 'Failed to fetch' })
     const { utente } = apri()
@@ -502,6 +518,7 @@ describe('Catalogo: archiviare', () => {
     const dialogo = await screen.findByRole('dialog')
     expect(dialogo).toHaveTextContent('Archiviare "Ciras"? Non comparirà più tra gli strumenti da aggiungere; gli esperimenti che lo usano non cambiano.')
     expect(archiviaVoceCatalogo).not.toHaveBeenCalled()
+    expect(dialogo).not.toHaveTextContent('Le modifiche non salvate')
 
     await utente.click(within(dialogo).getByRole('button', { name: 'Archivia' }))
 
@@ -511,6 +528,28 @@ describe('Catalogo: archiviare', () => {
     expect(toastSalvato).not.toHaveBeenCalled()
     expect(await pronta()).toBeInTheDocument()
     expect(listaCatalogo).toHaveBeenCalledTimes(2)
+  })
+
+  it('"Archivia dal catalogo" è un pulsante secondario, non rosso: archiviare non cancella', async () => {
+    const { utente } = apri()
+    await apriVoce(utente, 'Ciras')
+
+    const archivia = screen.getByRole('button', { name: 'Archivia dal catalogo' })
+    expect(archivia).toHaveClass('border-riga-controllo')
+    expect(archivia).not.toHaveClass('text-errore')
+  })
+
+  it('con modifiche aperte la conferma dice che andranno perse', async () => {
+    const { utente } = apri()
+    await apriVoce(utente, 'Ciras')
+    await utente.type(screen.getByLabelText('Nome dello strumento'), ' 2')
+
+    await utente.click(screen.getByRole('button', { name: 'Archivia dal catalogo' }))
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent(
+      'Archiviare "Ciras"? Non comparirà più tra gli strumenti da aggiungere; gli esperimenti che lo usano non cambiano. '
+      + 'Le modifiche non salvate di questa voce andranno perse.',
+    )
   })
 
   it('"Annulla" nella conferma lascia tutto com\'è', async () => {

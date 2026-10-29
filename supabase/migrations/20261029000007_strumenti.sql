@@ -55,11 +55,12 @@ create unique index strumenti_un_fenologico on strumenti (esperimento_id) where 
 -- ===== 3. Un parametro in un solo strumento =====
 -- Nel Piano 1 un parametro poteva stare in piu' passate (il modello Hydrochar metteva Altezza
 -- sia in "Altezza" sia in "Fenologici"). Non si sceglie qui quale collegamento togliere:
--- se ci sono doppioni la migration si ferma con un messaggio chiaro.
+-- se ci sono doppioni la migration si ferma con un messaggio chiaro. Fermandosi si annulla per intero:
+-- la tabella da correggere ha ancora il nome del Piano 1.
 do $$
 begin
   if exists (select 1 from public.strumento_parametri group by parametro_id having count(*) > 1) then
-    raise exception 'PARAMETRO_IN_PIU_STRUMENTI: togliere i doppioni da strumento_parametri prima di questa migration';
+    raise exception 'PARAMETRO_IN_PIU_STRUMENTI: togliere i doppioni da passata_parametri (o ricreare il database con npx supabase db reset)';
   end if;
 end
 $$;
