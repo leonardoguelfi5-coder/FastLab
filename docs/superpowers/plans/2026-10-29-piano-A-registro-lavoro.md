@@ -174,3 +174,88 @@ Final review (opus, 2 aree): fin-campo → "Pronto dopo correzioni", 0 Critical/
 Ruling: giro unico di correzione finale = fin-dati I1, I2, minor 45 (testo di PARAMETRO_IN_PIU_STRUMENTI), "Chiudi" sull'errore del catalogo, coerenza dell'archiviazione; fin-campo T12 m1, m3, m5, m6, m7, progresso che resta dopo una rilettura fallita (T11), emoji aria-hidden nella striscia (T9), "ultima volta" riletta dopo un salvataggio, README/DESIGN corretti (regola della domanda nel giro, unità e letture con misure, elenco dei test) — brief in scratchpad fix-finale-dati.md e fix-finale-campo.md — cost if wrong: small
 Final review: minor (deferred, Piani B–D o dopo la prova in locale): modifiche contemporanee nel catalogo (nessun controllo su aggiornato_il; una voce archiviata da altri può tornare attiva); `creato_il`/`aggiornato_il` riscrivibili (anche in misure dal Piano 1); voci di menu di AppShell senza conferma con modifiche aperte; domanda decisa su cache di 30 s (m2); "Scarta" su bozza ripresa senza domanda (m4); misure del giorno senza paginazione (> 1000 misure al giorno); strumento archiviato da un collega durante il giro (valori solo nella bozza); un valore aggiunto a giro iniziato rende "incomplete" le piante fatte; DESIGN "Chips"/"cella-pianta" senza uso (Piano B); `progressoOggi` senza chiamanti (per Oggi, Piano B)
 Final fix round: dispatched implementer (opus)
+Final fix round: implemented 7fa66ee (dati: nomi doppi dal catalogo saltati, conferma prima di "Gestisci il catalogo", testo di PARAMETRO_IN_PIU_STRUMENTI, "Chiudi" sull'errore del catalogo, archiviazione in contorno), bf1b772 (campo: `useAttesaArrivo` anche su FineGiro, "Vai alla pianta" sulla pianta attuale, ore ripetute "09:12 (1)/(2)", "Manca 12", `percorsoMisuraPianta`, `misureStrumentoNelGiorno`, progresso e "ultima volta" che restano dopo una rilettura fallita, icona della striscia aria-hidden, "ultima volta" riletta dopo un salvataggio), ee6ba5d (README, DESIGN, design.json)
+Ruling: accettate le deviazioni del giro finale: un nome liberato da una rinomina resta preso per tutto il piano (prudenza); la seconda copia dello stesso strumento nello stesso esperimento non riceve valori già aggiunti alla prima (sarebbero doppi); stesso criterio "dati che restano dopo un errore di rilettura" anche per "ultima volta" — cost if wrong: qualche "saltato" in più da sistemare a mano
+Verifica del controller dopo il giro finale (ee6ba5d): 189 pgTAP PASS (emulato, 7 file), 1288 Vitest verdi (60 file), tsc 0, lint 0, build OK
+Piano A: COMPLETE nel cloud (commits 93065bd..ee6ba5d + registro). Restano solo le verifiche in locale qui sotto.
+
+## Decisioni del Piano A (elenco finale)
+
+Decisioni del controller (Ruling), in ordine di task:
+1. **DB nel cloud:** strato che imita Supabase su PostgreSQL 16 + pgTAP (`scripts/db-senza-docker/`), committato per i prossimi piani; non sostituisce `npx supabase db reset` + `npm run test:db`.
+2. **T1:** "Altezza" tolta dallo strumento "Fenologici" del modello Hydrochar già nella rinomina (nuovo indice: un parametro in un solo strumento). La migration 0007 si ferma con `PARAMETRO_IN_PIU_STRUMENTI` invece di scegliere da sola quale collegamento togliere. `clonaConfig` non copia gli strumenti archiviati. Lo store legge ancora la vecchia chiave `passataId`.
+3. **T2:** "Mantieni" cablato subito in `ModuloOggi`. Vale per esperimento, strumento e data; si azzera cambiando strumento o data (salvo la data trattenuta a mezzanotte). Il segno `mantenuto` resta solo finché il valore è quello mantenuto e la spunta è attiva, anche su una bozza ripresa.
+4. **T3:** `crea_esperimento` legge anche `catalogo_id`/`catalogo_chiave`. Nel catalogo: insert solo a proprio nome, `creato_da` non aggiornabile e `on delete set null`, id non modificabili (`ID_NON_MODIFICABILE`), nessun delete, niente per anon. In lettura, i valori senza chiave si scartano.
+5. **T4:** regole dell'aggiornamento dal catalogo:
+   - si aggiungono solo le chiavi nuove;
+   - un campo si aggiorna solo se nella copia è uguale al vecchio valore del catalogo;
+   - con misure già salvate non cambiano né l'unità né il numero di letture;
+   - si scrivono solo i campi cambiati (`aggiornaParametroDaCatalogo`, mai l'upsert);
+   - un parametro rimasto orfano si elimina;
+   - uno strumento archiviato non riceve aggiunte;
+   - un nome doppio nell'esperimento va tra i "saltati";
+   - i saltati hanno stringhe esatte;
+   - solo esperimenti di cui si è proprietari (`creato_da` filtrato nella query).
+6. **T5:** semi del catalogo duplicati in `src/domain/modelli/semi.ts`, con un test che li confronta con la migration; `validaBozza` con i 4 messaggi del piano.
+7. **T6:**
+   - la bozza del wizard si aggiorna sempre con una funzione della bozza corrente, così un salvataggio lento non la riporta indietro;
+   - un modulo "Nuovo strumento" tiene lo stesso id tra un tentativo e l'altro;
+   - su un nome doppio il modulo resta aperto;
+   - con un errore di rete la copia resta non collegata;
+   - con una bozza salvata non si aspetta il catalogo;
+   - "Obbligatorio" esiste solo nella tabella fenologica.
+8. **T7:**
+   - nuova lettura `strumentiConDati`; "Elimina" uno strumento solo con dati noti e dopo un ricontrollo fresco;
+   - un valore con dati si archivia, mai eliminato;
+   - elenco "Valori senza strumento";
+   - la tabella fenologica non si archivia, si elimina solo senza misure;
+   - "Aggiungi dal catalogo" rispetta i controlli sui nomi.
+9. **T8:** la chiave di un valore rinominato non cambia. Archiviare mostra un toast neutro (il verde solo per "salvato"). L'errore della fase esperimenti resta con "Riprova" (sulla voce vecchia) e "Chiudi". Prima di tornare all'elenco si aspetta la rilettura del catalogo.
+10. **T9:**
+    - `/misura` ha montato `Campo` finché c'è stata la scelta dello strumento;
+    - percorsi con nomi chiari in `src/lib/percorsi.ts`;
+    - Impostazioni e creazione guidata tornano alla home;
+    - nessun numerino su Oggi (Piano B).
+11. **T10:** per la tabella fenologica contano solo le voci obbligatorie (senza obbligatorie: "fatta" con un valore), per gli strumenti semplici tutti i valori. Una pianta toccata senza le obbligatorie è "incompleta".
+12. **T11:**
+    - con una data diversa da oggi la riga dice "il GG/MM";
+    - le righe restano toccabili anche con le misure in caricamento o in errore;
+    - progresso e "ultima volta" restano dopo una rilettura fallita.
+13. **T12:**
+    - arrivando su una pianta con misure di quello strumento in quella data si chiede **sempre** "Correggi / Nuova misura", anche nel giro (piante incomplete), salvo una bozza da riprendere;
+    - con più misure il testo è "Correggere una di quelle delle … o aggiungerne una nuova?", con ore ripetute numerate;
+    - finestra di 500 ms anche sulla domanda e su FineGiro;
+    - "Salva" resta anche sull'ultima pianta;
+    - `useModuloProtetto` è condiviso da SchedaPianta e MisuraPianta;
+    - `Campo.tsx` eliminato.
+14. **Metodo:** dopo un incidente (due implementatori in parallelo con un solo indice git: eb9b336 contiene T4 + T5), un solo implementatore alla volta; i revisori lavorano su copie `git archive`.
+
+Decisioni dell'utente rispettate:
+- spunta "Mantieni questo parametro uguale anche nelle prossime misure" al posto di "ricorda tra piante";
+- "Correggi" o "Nuova misura" arrivando apposta su una pianta già misurata;
+- niente mappa;
+- grafici prima della tabella (Piano D);
+- catalogo condiviso;
+- ripresa del lavoro in questa sessione cloud se i crediti finiscono.
+
+## Verifiche da fare in locale
+
+1. **Test del database con Supabase vero** (GoTrue, PostgREST e privilegi reali non sono emulati nel cloud):
+   - `npm ci`, poi `npx supabase db reset` (applica da zero 0001–0010, comprese le nuove `20261029000007_strumenti.sql`, `…08_mantieni.sql`, `…09_catalogo.sql`, `…10_ultime_misure.sql`);
+   - `npm run test:db` → atteso 7 file, 189 test, PASS (nuovi: `strumenti.test.sql`, `catalogo.test.sql`, `ultime_misure.test.sql`);
+   - attenzione: un DB locale con dati del Piano 1 (Altezza in due passate) fa fermare la 0007 con `PARAMETRO_IN_PIU_STRUMENTI`, quindi serve il reset.
+2. **Prova nel browser con il DB locale** (375 px; passo 3 del Task 12, mai fatto nel cloud):
+   - creazione dal modello Hydrochar: 3 strumenti dal catalogo + tabella fenologica, riepilogo senza errori;
+   - home: striscia "Nuova misura", sette icone, quelle "In arrivo";
+   - Nuova misura → SPAD su 3 piante ("Salva e vai alla #N", piante fatte saltate);
+   - "Vai alla pianta" 2 → "Correggere quella delle HH:MM o aggiungerne una nuova?": "Correggi" modifica la stessa misura, "Nuova misura" ne aggiunge una (controllare nel DB: nessun doppione);
+   - fine giro con "Mancano …" e "Vai alle mancanti";
+   - Termometro con "Mantieni" su Temp aria: la pianta dopo ha il valore con il segno `mantenuto`; cambiando strumento o data non c'è più;
+   - Impostazioni: aggiungi Ciras dal catalogo, archivia e ripristina uno strumento, "Gestisci il catalogo" con modifiche aperte chiede conferma;
+   - Catalogo: modifica di un'unità con "Aggiorna anche i miei esperimenti" (un esperimento senza misure cambia, uno con misure finisce in "Non aggiornati:"); con un secondo utente, verificare che i suoi esperimenti non cambino.
+3. **Prova sul telefono** (via hotspot o deploy di anteprima):
+   - barra d'azione sopra la tastiera numerica (iOS e Android);
+   - posizione del ✓ nella casella "Mantieni" su Safari iOS;
+   - bersagli della home e della domanda Correggi/Nuova col pollice;
+   - toast sopra la barra;
+   - il primo tocco su "Salva e vai" alla prima pianta della sessione (osservazione del Piano 1).
