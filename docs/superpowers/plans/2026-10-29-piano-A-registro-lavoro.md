@@ -101,3 +101,4 @@ Task 4: re-review fix round 1 → Approved (1018 Vitest su copia del commit)
 Task 4: fix round 1/5 (4 addressed, 0 open; commits eb9b336 (parte T4)..7ecc502)
 Task 4: minor (deferred): rete che cade tra salvataggio del parametro aggiunto e pulizia → orfano (serve una transazione nel DB); `VOCI_DIVERSE` mostrato come errore generico (errore di programmazione)
 Task 4: complete (review clean)
+Ruling (T12): arrivando su una pianta che ha già misure di quello strumento in quella data si chiede sempre "Correggi / Nuova misura", qualunque sia la provenienza. Il giro automatico raggiunge solo piante non fatte, ma una pianta incompleta ha già una misura: un'altra va decisa, non creata in silenzio. Una bozza non salvata da riprendere ha la precedenza sulla domanda — cost if wrong: un tocco in più sulle piante incomplete del giro.
