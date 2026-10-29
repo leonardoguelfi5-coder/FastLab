@@ -193,3 +193,8 @@ Ruling: bozze legate all'utente (proprietario in sessionStorage), cancellate sol
 Task 13: minor (deferred): bozza "nuova" ripresa con id già in elenco si presenta come "Nuova misura" (salva come aggiornamento, niente doppioni); cancellaTutto ripetuto in onModifiche
 Task 13: fix round 3 implemented 8f358ff (688 tests) — proprietario delle bozze in `fastlab-bozza:utente`, assegnaBozze(uid) cancella solo per un utente diverso; toast tardivo con la data; nessuna sovrascrittura/cancellazione di una bozza con id diverso
 Ruling: accept extra (pulizia dopo salvataggio tardivo e "Scarta" toccano la bozza solo se ha l'id del modulo) and the one-time wipe of owner-less drafts (v3 not yet deployed: no real drafts exist) — cost if wrong: none
+Task 13: re-review fix round 3 → Approved
+Task 13: minor (deferred): commento di soloDelModulo fuori posto (ModuloOggi ~45); chiave `aperto` unica per riquadro (un salvataggio tardivo può riportarla a "nuova" mentre si corregge X; la bozza di X non si perde)
+Task 13: fix round 3/5 (giri 1–3: 7 + 5 + 3 addressed, 0 open; commits c54ce8b..8f358ff)
+Task 13: complete (commits c54ce8b..8f358ff, review clean)
+Task 14: dispatched implementer (sonnet), BASE (commit di questo registro)
