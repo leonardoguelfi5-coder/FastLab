@@ -58,6 +58,9 @@ export function messaggioErrore(e: unknown): string {
   if (messaggio.includes('PIANTA_CON_DATI')) {
     return 'Questa pianta ha già delle misure: il trattamento non si può cambiare. Etichetta e blocco sì.'
   }
+  if (messaggio.includes('ID_NON_MODIFICABILE')) {
+    return 'L\'identificativo di una voce del catalogo non si può cambiare. Ricarica la pagina.'
+  }
   if (messaggio.includes('ESPERIMENTO_NON_MODIFICABILE')) {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
@@ -65,6 +68,10 @@ export function messaggioErrore(e: unknown): string {
   if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO].includes(messaggio)) return messaggio
   if (code === '23505' && messaggio.includes('catalogo_strumenti_nome_unico')) return MSG_NOME_NEL_CATALOGO
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
+  // catalogo_id di uno strumento che punta a una voce che non c'è (crea_esperimento o salvaStrumento).
+  if (code === '23503' && messaggio.includes('strumenti_catalogo_id_fkey')) {
+    return 'Questo strumento del catalogo non esiste più: ricarica la pagina e riprova.'
+  }
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
 
   return messaggio === '' ? 'Errore imprevisto.' : `Errore imprevisto: ${messaggio}`

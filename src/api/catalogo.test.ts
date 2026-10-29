@@ -71,6 +71,19 @@ describe('listaCatalogo', () => {
     }])
   })
 
+  it('scarta i valori senza chiave (o con chiave vuota): il confronto per chiave non li distinguerebbe', async () => {
+    mock.risponde('catalogo_strumenti', {
+      data: [{
+        ...riga(termometro),
+        parametri: [
+          { nome: 'Senza chiave' }, { chiave: '   ', nome: 'Spazi' }, { chiave: 7, nome: 'Numero' }, null,
+          ...termometro.parametri,
+        ],
+      }],
+    })
+    expect((await listaCatalogo())[0].parametri).toEqual(termometro.parametri)
+  })
+
   it('parametri che non sono un array diventano un elenco vuoto', async () => {
     mock.risponde('catalogo_strumenti', { data: [{ ...riga(termometro), parametri: null }] })
     expect((await listaCatalogo())[0].parametri).toEqual([])

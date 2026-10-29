@@ -5,7 +5,8 @@
 -- ne copia lo strumento e i parametri, che restano collegati con strumenti.catalogo_id e
 -- parametri.catalogo_chiave (per aggiornare in seguito le proprie copie dal catalogo).
 -- 1. catalogo_strumenti: lettura, inserimento e aggiornamento per authenticated; nessun
---    delete (le voci si archiviano); niente per anon; creato_da non aggiornabile.
+--    delete (le voci si archiviano); niente per anon; creato_da e id non modificabili; una
+--    voce sopravvive al suo autore.
 -- 2. I semi: le voci di partenza, con id fissi e senza autore.
 -- 3. I collegamenti negli esperimenti e crea_esperimento che li legge dalla bozza.
 
@@ -20,7 +21,8 @@ create table catalogo_strumenti (
   parametri jsonb not null default '[]'
     constraint catalogo_strumenti_parametri_array check (jsonb_typeof(parametri) = 'array'),
   archiviato boolean not null default false,
-  creato_da uuid references auth.users (id) default auth.uid(),
+  -- La voce e' di tutti: se l'autore viene eliminato resta, senza autore (come i semi).
+  creato_da uuid references auth.users (id) on delete set null default auth.uid(),
   creato_il timestamptz not null default now(),
   aggiornato_il timestamptz not null default now()
 );
@@ -33,6 +35,27 @@ create unique index catalogo_strumenti_nome_unico on catalogo_strumenti (lower(b
 create trigger catalogo_strumenti_aggiornato_il
   before update on catalogo_strumenti
   for each row execute function public.imposta_aggiornato_il();
+
+-- L'id di una voce non cambia: le copie negli esperimenti la ritrovano con catalogo_id. Il
+-- privilegio di update su id resta (l'upsert di PostgREST mette id nel SET, con lo stesso
+-- valore): la guardia scatta solo se l'id cambia davvero. security definer come le altre
+-- guardie, cosi' non dipende dai privilegi di chi aggiorna.
+create function guardia_id_catalogo() returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  raise exception 'ID_NON_MODIFICABILE';
+end
+$$;
+
+revoke execute on function guardia_id_catalogo() from public, anon, authenticated;
+
+create trigger guardia_id_catalogo
+  before update of id on catalogo_strumenti
+  for each row when (new.id is distinct from old.id)
+  execute function guardia_id_catalogo();
 
 alter table catalogo_strumenti enable row level security;
 

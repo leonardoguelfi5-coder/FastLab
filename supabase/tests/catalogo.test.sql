@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(41);
+select plan(46);
 
 -- ===== Struttura =====
 select has_table('public', 'catalogo_strumenti', 'la tabella catalogo_strumenti esiste');
@@ -17,6 +17,8 @@ select policies_are('public', 'catalogo_strumenti',
   'catalogo_strumenti ha le sole policy di select, insert e update (nessuna di delete)');
 select has_trigger('public', 'catalogo_strumenti', 'catalogo_strumenti_aggiornato_il',
   'aggiornato_il segue ogni modifica');
+select fk_ok('public', 'catalogo_strumenti', 'creato_da', 'auth', 'users', 'id',
+  'catalogo_strumenti.creato_da punta a auth.users');
 
 -- Privilegi: authenticated legge, inserisce e aggiorna (non creato_da), non elimina.
 select ok(not has_table_privilege('authenticated', 'public.catalogo_strumenti', 'DELETE'),
@@ -136,6 +138,18 @@ select lives_ok(
        parametri = excluded.parametri, archiviato = excluded.archiviato $$,
   'B aggiorna la voce di A con un upsert per id');
 
+select throws_ok(
+  $$ update catalogo_strumenti set id = 'c9000000-0000-0000-0000-0000000000ff'
+      where id = 'c9000000-0000-0000-0000-000000000001' $$,
+  'P0001', 'ID_NON_MODIFICABILE',
+  'l''id di una voce non cambia');
+
+select throws_ok(
+  $$ insert into catalogo_strumenti (id, nome) values ('c0000000-0000-0000-0000-000000000003', 'Ciras')
+     on conflict (id) do update set id = 'c9000000-0000-0000-0000-0000000000fe', nome = excluded.nome $$,
+  'P0001', 'ID_NON_MODIFICABILE',
+  'nemmeno un upsert cambia l''id di una voce');
+
 select results_eq(
   $$ select descrizione, parametri, creato_da from catalogo_strumenti
       where id = 'c9000000-0000-0000-0000-000000000001' $$,
@@ -239,6 +253,17 @@ select throws_ok(
 
 -- ===== aggiornato_il =====
 reset role;
+-- ===== Una voce sopravvive al suo autore =====
+delete from auth.users where id = '09000000-0000-0000-0000-00000000000a';
+select results_eq(
+  $$ select nome, creato_da from catalogo_strumenti where id = 'c9000000-0000-0000-0000-000000000001' $$,
+  $$ values ('Porometro'::text, null::uuid) $$,
+  'eliminando l''autore la voce resta, senza autore');
+select is(
+  (select count(*)::int from catalogo_strumenti),
+  7,
+  'il catalogo non perde voci quando un utente viene eliminato');
+
 update catalogo_strumenti set aggiornato_il = '2000-01-01' where id = 'c0000000-0000-0000-0000-000000000004';
 select is(
   (select aggiornato_il from catalogo_strumenti where id = 'c0000000-0000-0000-0000-000000000004'),

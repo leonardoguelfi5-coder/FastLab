@@ -105,6 +105,18 @@ describe('messaggioErrore', () => {
     })).toBe('Nel catalogo c\'è già uno strumento con questo nome.')
   })
 
+  it('strumento collegato a una voce del catalogo che non c\'è (23503 su strumenti_catalogo_id_fkey)', () => {
+    expect(messaggioErrore({
+      code: '23503',
+      message: 'insert or update on table "strumenti" violates foreign key constraint "strumenti_catalogo_id_fkey"',
+    })).toBe('Questo strumento del catalogo non esiste più: ricarica la pagina e riprova.')
+  })
+
+  it('id di una voce del catalogo cambiato (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'ID_NON_MODIFICABILE' }))
+      .toBe('L\'identificativo di una voce del catalogo non si può cambiare. Ricarica la pagina.')
+  })
+
   it('il nome dell\'indice del catalogo senza 23505 non basta', () => {
     expect(messaggioErrore({ code: 'P0001', message: 'catalogo_strumenti_nome_unico' }))
       .not.toBe('Nel catalogo c\'è già uno strumento con questo nome.')

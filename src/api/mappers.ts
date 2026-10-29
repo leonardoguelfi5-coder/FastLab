@@ -220,12 +220,16 @@ const numeroONull = (x: unknown): number | null => (typeof x === 'number' && Num
  * Un valore della voce dal JSON del database. Il JSON non ha schema nel database (solo "è un array"): un campo
  * mancante o di tipo sbagliato prende il default (unità e limiti null, una lettura) invece di rompere la pagina.
  * Le letture valide sono quelle che accetta `parametri.n_letture` (da 1 a 20).
+ * Un valore senza chiave (o con la chiave vuota, anche dopo trim) si scarta: le copie negli esperimenti si
+ * aggiornano confrontando `catalogo_chiave` con la chiave, e due chiavi vuote non si distinguerebbero. Restituisce
+ * null per un valore da scartare.
  */
-function daJsonParametroCatalogo(x: unknown): ParametroCatalogo {
+function daJsonParametroCatalogo(x: unknown): ParametroCatalogo | null {
   const o = (typeof x === 'object' && x !== null ? x : {}) as Record<string, unknown>
+  if (typeof o.chiave !== 'string' || o.chiave.trim() === '') return null
   const n = o.n_letture
   return {
-    chiave: typeof o.chiave === 'string' ? o.chiave : '',
+    chiave: o.chiave,
     nome: typeof o.nome === 'string' ? o.nome : '',
     unita: typeof o.unita === 'string' ? o.unita : null,
     n_letture: typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 20 ? n : 1,
@@ -241,7 +245,9 @@ export function daRigaCatalogo(r: RigaCatalogo): VoceCatalogo {
     nome: r.nome,
     icona: r.icona ?? null,
     descrizione: r.descrizione ?? '',
-    parametri: Array.isArray(r.parametri) ? r.parametri.map(daJsonParametroCatalogo) : [],
+    parametri: Array.isArray(r.parametri)
+      ? r.parametri.map(daJsonParametroCatalogo).filter((p): p is ParametroCatalogo => p !== null)
+      : [],
     archiviato: r.archiviato,
   }
 }
