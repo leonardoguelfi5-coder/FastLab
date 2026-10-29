@@ -179,7 +179,7 @@ Neutri caldi da carta e un solo inchiostro freddo: il contrasto tra carta e inch
 **Character:** Una sola famiglia sans per tutta l'interfaccia, sobria e moderna; la sua gemella monospaziata porta il tono da registro su ciò che è dato: numeri delle piante, valori, date, ore, codici invito. Il contrasto è tra prosa e dato, non tra stili decorativi.
 
 ### Hierarchy
-- **Numero pianta** (Geist Mono 600, 2.25rem, 1.1, cifre tabellari): l'etichetta della pianta in testa alla scheda e nel campo "N° pianta". È l'unico elemento grande di una schermata di campo.
+- **Numero pianta** (Geist Mono 600, 2.25rem, 1.1, cifre tabellari): l'etichetta della pianta in testa alla scheda e alla misura. È l'unico elemento grande di una schermata di campo.
 - **Headline** (Geist 650, 1.5rem, 1.2, −0.015em): titolo di pagina nella barra in alto e titoli dei passi della creazione guidata.
 - **Title** (Geist 600, 1.125rem, 1.3): titoli di sezione, nome dell'esperimento nelle righe della lista, testo dei pulsanti principali.
 - **Body** (Geist 400, 1rem, 1.5): testo corrente, descrizioni, messaggi. Righe di prosa entro 65ch.

@@ -39,10 +39,10 @@ Comandi utili:
 - `rls.test.sql`: chi può leggere e scrivere cosa (policy di sicurezza per riga);
 - `inviti.test.sql`: registrazione solo su invito, con email e codice;
 - `rpc.test.sql`: le funzioni del database usate dall'app;
-- `guardie.test.sql`: le guardie sulle piante (una pianta con misure non cambia trattamento) e sul cambio di esperimento delle righe, aggiunte con la migration `20261029000006_guardie_piante.sql`.
-
+- `guardie.test.sql`: le guardie sulle piante (una pianta con misure non cambia trattamento) e sul cambio di esperimento delle righe, aggiunte con la migration `20261029000006_guardie_piante.sql`;
 - `strumenti.test.sql`: gli strumenti (tipo, archiviazione, vincoli) e la funzione che crea un esperimento;
-- `catalogo.test.sql`: il catalogo condiviso, le sue policy e il collegamento delle copie.
+- `catalogo.test.sql`: il catalogo condiviso, le sue policy e il collegamento delle copie;
+- `ultime_misure.test.sql`: la data dell'ultima misura di ogni strumento ("ultima volta"), letta rispettando le policy.
 
 Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
 
@@ -66,9 +66,9 @@ Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piant
 
 1. **Scegli lo strumento.** "Nuova misura" mostra gli strumenti dell'esperimento, ognuno con il progresso (per esempio "34/56 oggi", oppure "ultima volta 21/10" o "mai misurato"). La data di rilievo è oggi, ma si può cambiare. Lo strumento del giro in corso sta in cima, con il pulsante "Riprendi dalla pianta 35".
 2. **Misura una pianta dopo l'altra.** Si parte dalla prima pianta da misurare. Dopo ogni salvataggio l'app passa alla pianta successiva. Le piante già fatte con quello strumento, nella data di rilievo, si saltano da sole. Una pianta con solo una parte dei valori resta "incompleta" e non si salta.
-3. **Una pianta già misurata.** Se ci arrivi apposta (digitando il numero o con "Vai alle mancanti") su una pianta già misurata quel giorno, l'app chiede "Correggi" (apre la misura che c'è, con lo stesso id) o "Nuova misura" (ne aggiunge una in più). Nel giro automatico non chiede: salta.
+3. **Una pianta già misurata.** Arrivando su una pianta che ha già misure di quello strumento in quella data (anche nel giro, su una pianta incompleta), l'app chiede "Correggi" (modifica la misura che c'è) o "Nuova misura" (ne aggiunge un'altra). Se c'erano valori non salvati, si riprendono quelli senza chiedere. Le piante già fatte il giro le salta.
 4. **Mantieni uguale.** Sotto i campi numerici, di testo e sì/no c'è "Mantieni questo parametro uguale anche nelle prossime misure". Con la spunta il valore si ripropone sulle piante seguenti, con un segno "mantenuto" ben visibile, finché non la togli o cambi strumento o data. Le liste ripetute non hanno la spunta: sono sempre della pianta.
-5. **Fine giro.** Finite le piante, l'app dice quante sono fatte e elenca quelle che mancano, comprese le incomplete. Il pulsante "Vai alle mancanti" riparte dalla prima.
+5. **Fine giro.** Finite le piante, l'app dice quante sono fatte ed elenca quelle che mancano, comprese le incomplete. Il pulsante "Vai alle mancanti" riparte dalla prima.
 
 ### Strumenti e catalogo condiviso
 
@@ -77,9 +77,10 @@ Uno strumento (per esempio SPAD, Termometro, Ciras) raggruppa i parametri che si
 Chiunque può modificare una voce del catalogo. La modifica vale per gli esperimenti futuri. Per gli esperimenti già avviati c'è la casella **"Aggiorna anche i miei esperimenti"**, con regole prudenti:
 
 - tocca solo gli esperimenti di cui sei proprietario;
-- aggiunge valori nuovi, rinomina, cambia unità e intervalli;
-- non elimina valori, non cambia tipi e non tocca i valori che hanno già misure;
-- se una copia era stata ritoccata a mano, quei campi restano come sono e l'app elenca cosa non è stato aggiornato.
+- aggiunge valori nuovi, rinomina, cambia unità, numero di letture e intervalli;
+- non elimina valori e non cambia tipi; a un valore che ha già misure salvate non cambia unità e numero di letture, mentre nome, minimo e massimo sì;
+- non aggiunge né rinomina un valore con un nome già usato nell'esperimento;
+- se una copia era stata ritoccata a mano, quei campi restano come sono; l'app elenca cosa non è stato aggiornato.
 
 Le voci del catalogo non si cancellano: si **archiviano** ("Archivia dal catalogo"). Spariscono dalla scelta, ma restano collegate alle copie esistenti. Anche uno strumento di un esperimento, se ha già misure, si archivia invece di eliminarlo: i dati restano e, dalle Impostazioni, si può ripristinare.
 

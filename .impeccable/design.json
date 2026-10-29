@@ -17,7 +17,7 @@
       "errore": { "role": "semantic", "displayName": "Errore", "canonical": "oklch(49% 0.16 28)" }
     },
     "typographyMeta": {
-      "numero-pianta": { "displayName": "Numero pianta", "purpose": "Etichetta della pianta in testa alla scheda e nel campo N° pianta; unico testo grande in campo." },
+      "numero-pianta": { "displayName": "Numero pianta", "purpose": "Etichetta della pianta in testa alla scheda e alla misura; unico testo grande in campo." },
       "campo": { "displayName": "Campo", "purpose": "Testo digitato nei campi numerici e di etichetta." },
       "dato": { "displayName": "Dato", "purpose": "Valori, date, ore, contatori, celle della griglia." }
     },
