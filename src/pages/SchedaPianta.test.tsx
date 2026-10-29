@@ -1,0 +1,589 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import type { Session } from '@supabase/supabase-js'
+
+// Si prova la pagina con i veri hook e la vera cache di React Query (così si vedono anche invalidazioni e
+// ricaricamenti): si finge il livello API, che è quello che i hook chiamano, e il client Supabase non si raggiunge mai.
+vi.mock('@/lib/supabase', () => ({ supabase: {} }))
+vi.mock('@/api/auth', () => ({
+  accedi: vi.fn(), registrati: vi.fn(), esci: vi.fn(), useSessione: vi.fn(),
+}))
+vi.mock('@/api/inviti', () => ({
+  sonoAdmin: vi.fn(), listaInviti: vi.fn(), creaInvito: vi.fn(), revocaInvito: vi.fn(),
+}))
+vi.mock('@/api/esperimenti', () => ({
+  listaEsperimenti: vi.fn(), caricaConfig: vi.fn(), creaEsperimento: vi.fn(), aggiornaEsperimento: vi.fn(),
+}))
+vi.mock('@/api/misure', () => ({
+  misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
+}))
+vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
+vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }) }))
+
+import { toast } from 'sonner'
+import { useSessione } from '@/api/auth'
+import { sonoAdmin } from '@/api/inviti'
+import { caricaConfig } from '@/api/esperimenti'
+import { misurePianta, salvaMisura } from '@/api/misure'
+import { chiavi } from '@/api/query'
+import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
+import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
+import { toastSalvato } from '@/lib/toastSalvato'
+import { useCampoStore } from '@/store/campo'
+import { SchedaPianta } from './SchedaPianta'
+
+const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
+const OGGI = '2026-10-28'
+const IERI = '2026-10-27'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
+let config: ConfigEsperimento
+/** Le misure "nel database": `misurePianta` le legge, `salvaMisura` le scrive (upsert per id). */
+let archivio: Misura[]
+
+const idPassata = (nome: string) => config.passate.find(p => p.nome === nome)!.id
+const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
+const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
+
+/** Una misura della pianta 35 (di norma: Termometro, oggi alle 09:12). */
+function misura(extra: Partial<Misura> & { valori: ValoriMisura }): Misura {
+  return {
+    id: crypto.randomUUID(), pianta_id: idPianta('35'), passata_id: idPassata('Termometro'),
+    data_rilievo: OGGI, ora: '09:12', ...extra,
+  }
+}
+
+function Posizione() {
+  const { pathname } = useLocation()
+  return <p data-testid="posizione">{pathname}</p>
+}
+
+/** Apre la scheda della pianta con la passata già scelta nella schermata in campo (`null`: nessuna passata). */
+function apri(etichetta = '35', passata: string | null = 'Termometro') {
+  if (passata) useCampoStore.getState().setPassata('E', idPassata(passata))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const invalida = vi.spyOn(client, 'invalidateQueries')
+  const id = config.piante.find(p => p.etichetta === etichetta)?.id ?? etichetta
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[`/esperimenti/E/piante/${id}`]}>
+        <Routes>
+          <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
+          <Route path="*" element={null} />
+        </Routes>
+        <Posizione />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  return { client, invalida }
+}
+
+const posizione = () => screen.getByTestId('posizione').textContent
+const campo = (nome: string) => screen.getByLabelText(nome) as HTMLInputElement
+const pulsante = (nome: string | RegExp) => screen.getByRole('button', { name: nome })
+/** Aspetta che la scheda sia pronta: il modulo compare solo con configurazione e misure arrivate. */
+const pronta = () => screen.findByRole('button', { name: /^Ora: / })
+const salvate = () => vi.mocked(salvaMisura).mock.calls.map(([, m]) => m)
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  // Solo `Date`: i timer veri servono a React Query e a userEvent. 28 ottobre 2026, ore 10:00 (ora locale).
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 28, 10, 0))
+  localStorage.clear()
+  useCampoStore.setState({ stato: {} })
+  config = bozzaHydrochar()
+  config.esperimento.id = 'E'
+  archivio = []
+  vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+  vi.mocked(sonoAdmin).mockResolvedValue(false)
+  vi.mocked(caricaConfig).mockImplementation(async () => config)
+  vi.mocked(misurePianta).mockImplementation(async id => archivio.filter(m => m.pianta_id === id))
+  vi.mocked(salvaMisura).mockImplementation(async (_esp, m) => {
+    archivio = [m, ...archivio.filter(x => x.id !== m.id)]
+  })
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+describe('SchedaPianta: salvataggio', () => {
+  it('"Salva e vai alla #36" salva una volta sola anche con due tocchi rapidi, poi apre la #36', async () => {
+    let finisci!: () => void
+    vi.mocked(salvaMisura).mockImplementationOnce(() => new Promise<void>(r => { finisci = r }))
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+
+    const vai = pulsante('Salva e vai alla #36')
+    // Due tocchi prima che React ridisegni: il pulsante non è ancora disabilitato.
+    act(() => {
+      fireEvent.click(vai)
+      fireEvent.click(vai)
+    })
+
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    const [espId, m] = vi.mocked(salvaMisura).mock.calls[0]
+    expect(espId).toBe('E')
+    expect(m.id).toMatch(UUID)
+    expect(m).toMatchObject({ pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: OGGI })
+    expect(m.ora).toMatch(/^\d{2}:\d{2}$/)
+    expect(m.ora).toBe('10:00')
+    expect(m.valori[par('Temp aria').id]).toEqual([24.5])
+    expect(m).not.toHaveProperty('creato_da')
+
+    // Mentre salva i pulsanti sono disabilitati.
+    expect(pulsante('Salvataggio…')).toBeDisabled()
+    expect(pulsante('Salva')).toBeDisabled()
+
+    await act(async () => finisci())
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('36')}`))
+    expect(await screen.findByRole('heading', { name: 'Pianta #36' })).toBeInTheDocument()
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+  })
+
+  it('se il salvataggio fallisce spiega cosa è successo, i valori restano e "Riprova" usa lo stesso id', async () => {
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    const errore = await screen.findByRole('alert')
+    expect(errore).toHaveTextContent('Pianta #35 non salvata.')
+    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('35')}`)
+    expect(toastSalvato).not.toHaveBeenCalled()
+
+    await utente.click(within(errore).getByRole('button', { name: 'Riprova' }))
+
+    expect(salvaMisura).toHaveBeenCalledTimes(2)
+    const [primo, secondo] = salvate()
+    expect(secondo.id).toBe(primo.id)
+    expect(secondo.valori).toEqual(primo.valori)
+    // "Riprova" ripete l'azione scelta: salvata, si va alla pianta dopo.
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('36')}`))
+  })
+
+  it('un nuovo tentativo tiene l\'ora del primo, anche se nel frattempo il tempo è passato', async () => {
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('alert')
+    expect(pulsante('Ora: 10:00')).toBeInTheDocument()
+
+    vi.setSystemTime(new Date(2026, 9, 28, 10, 7))
+    await utente.click(pulsante('Riprova'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    expect(salvate().map(m => m.ora)).toEqual(['10:00', '10:00'])
+  })
+
+  it('con un valore fuori dall\'intervallo il primo tocco avvisa e il pulsante diventa "Salva comunque", il secondo salva', async () => {
+    par('Temp aria').valore_max = 40
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '45')
+    await utente.click(pulsante('Salva'))
+
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('«Temp aria» = 45 °C è fuori dall\'intervallo atteso (≤ 40).')
+    expect(pulsante('Salva comunque')).toBeInTheDocument()
+    expect(pulsante('Salva comunque e vai alla #36')).toBeInTheDocument()
+
+    await utente.click(pulsante('Salva comunque'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori[par('Temp aria').id]).toEqual([45])
+  })
+
+  it('cambiando un valore dopo l\'avviso si torna a "Salva": il nuovo valore va ricontrollato', async () => {
+    par('Temp aria').valore_max = 40
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '45')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    expect(pulsante('Salva comunque e vai alla #36')).toBeInTheDocument()
+
+    await utente.type(campo('Temp aria'), '46')
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(pulsante('Salva e vai alla #36')).toBeInTheDocument()
+    await utente.click(pulsante('Salva e vai alla #36'))
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent('«Temp aria» = 46 °C')
+  })
+
+  it('senza nessun valore non salva e dice "Nessun valore inserito.", con il focus sul messaggio', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    const errori = screen.getByRole('alert')
+    expect(errori).toHaveTextContent('Nessun valore inserito.')
+    expect(errori).toHaveFocus()
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('35')}`)
+  })
+
+  it('un numero lasciato a metà ("-") blocca il salvataggio e il messaggio nomina il campo', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '-')
+    await utente.type(campo('Temp pianta'), '25')
+    await utente.click(pulsante('Salva'))
+
+    expect(screen.getByRole('alert')).toHaveTextContent('«Temp aria»: numero non valido.')
+    expect(screen.getByRole('alert')).toHaveFocus()
+    expect(salvaMisura).not.toHaveBeenCalled()
+  })
+
+  it('se riesce: toast "Pianta #35 salvata ✓" e invalidazione di misure della pianta, del giorno ed esperimenti', async () => {
+    const utente = userEvent.setup()
+    const { invalida } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
+    expect(toastSalvato).toHaveBeenCalledTimes(1)
+    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misurePianta(idPianta('35')) })
+    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', OGGI) })
+    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.esperimenti })
+  })
+
+  it('con la data di rilievo di ieri la misura si salva con quella data', async () => {
+    useCampoStore.getState().setData('E', IERI)
+    const utente = userEvent.setup()
+    const { invalida } = apri('35')
+    await pronta()
+    expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '27/10/2026 · 🌡 Termometro' })).toBeInTheDocument()
+
+    await utente.type(campo('Temp aria'), '21')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].data_rilievo).toBe(IERI)
+    await waitFor(() => expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', IERI) }))
+  })
+
+  it('"Salva" resta sulla pianta: la misura compare tra quelle di oggi e il modulo ricomincia con un id nuovo', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(pulsante('Salva'))
+
+    expect(await screen.findByRole('button', { name: '10:00 · Temp aria 24,5 °C · Temp pianta 25,1 °C' })).toBeInTheDocument()
+    expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓')
+    expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('35')}`)
+    // Il modulo nuovo parte da valoriIniziali: Temp aria è ricordata, Temp pianta no.
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(campo('Temp pianta')).toHaveValue('')
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+
+    await utente.type(campo('Temp pianta'), '26')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [prima, seconda] = salvate()
+    expect(seconda.id).toMatch(UUID)
+    expect(seconda.id).not.toBe(prima.id)
+  })
+
+  it('un esperimento concluso resta modificabile', async () => {
+    config.esperimento.stato = 'concluso'
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+  })
+
+  it('l\'ora si può cambiare: "Ora: 10:00" apre il campo e la misura si salva con l\'ora scelta', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await pronta())
+    const ora = screen.getByLabelText('Ora')
+    expect(ora).toHaveValue('10:00')
+    fireEvent.change(ora, { target: { value: '08:30' } })
+    // Svuotare il selettore non è un'ora: resta quella di prima.
+    fireEvent.change(ora, { target: { value: '' } })
+    expect(ora).toHaveValue('08:30')
+
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].ora).toBe('08:30')
+  })
+
+  it('se si esce dalla scheda mentre salva e il salvataggio fallisce, lo dice comunque', async () => {
+    let fallisci!: (e: unknown) => void
+    vi.mocked(salvaMisura).mockImplementationOnce(() => new Promise<void>((_r, rifiuta) => { fallisci = rifiuta }))
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    expect(posizione()).toBe('/esperimenti/E')
+
+    await act(async () => fallisci(new TypeError('Failed to fetch')))
+
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Pianta #35 non salvata.'))
+    expect(posizione()).toBe('/esperimenti/E')
+  })
+})
+
+describe('SchedaPianta: passaggio alla pianta successiva', () => {
+  it('Temp aria (ricorda tra piante) è già compilata sulla #36 e il cursore è sul primo campo vuoto', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(campo('Temp pianta')).toHaveValue('')
+    await waitFor(() => expect(campo('Temp pianta')).toHaveFocus())
+    expect(pulsante('Salva e vai alla #37')).toBeInTheDocument()
+  })
+
+  it('aprendo una scheda dalla griglia il cursore non si sposta da solo', async () => {
+    apri('35')
+    await pronta()
+    expect(campo('Temp aria')).not.toHaveFocus()
+  })
+
+  it('sull\'ultima pianta non c\'è "Salva e vai", solo "Salva"', async () => {
+    apri('56')
+    await pronta()
+    expect(screen.queryByRole('button', { name: /Salva e vai/ })).not.toBeInTheDocument()
+    expect(pulsante('Salva')).toBeInTheDocument()
+  })
+
+  it('cambiando pianta un "Annulla" rimasto in sospeso sparisce con la lista', async () => {
+    archivio = [misura({
+      passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-21',
+      valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }] },
+    })]
+    const utente = userEvent.setup()
+    apri('35', 'Fenologici')
+    await pronta()
+    await utente.click(within(screen.getByRole('group', { name: 'Palchi' })).getByRole('button', { name: 'Rimuovi ultimo' }))
+    expect(toast).toHaveBeenCalledWith('Palchi 1 rimosso.', expect.anything())
+    await utente.type(campo('Altezza'), '42')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    expect(toast.dismiss).toHaveBeenCalledWith('id-toast')
+  })
+})
+
+describe('SchedaPianta: valori precompilati', () => {
+  it('i parametri progressivi (Palchi) ripartono dai valori della volta precedente', async () => {
+    archivio = [
+      misura({
+        passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-14', ora: '09:00',
+        valori: { [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 4 } }], [par('N palchi totali').id]: [1] },
+      }),
+      misura({
+        passata_id: idPassata('Fenologici'), data_rilievo: '2026-10-21', ora: '09:00',
+        valori: {
+          [par('Palchi').id]: [{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }],
+          [par('N palchi totali').id]: [2],
+          [par('Altezza').id]: [38],
+        },
+      }),
+    ]
+    const utente = userEvent.setup()
+    apri('35', 'Fenologici')
+    await pronta()
+
+    expect(within(screen.getByRole('group', { name: 'Palchi 1' })).getByLabelText('N foglie')).toHaveValue('5')
+    expect(within(screen.getByRole('group', { name: 'Palchi 2' })).getByLabelText('N foglie')).toHaveValue('7')
+    expect(campo('N palchi totali')).toHaveValue('2')
+    // Altezza non è progressiva: si misura da capo.
+    expect(campo('Altezza')).toHaveValue('')
+
+    await utente.type(campo('Altezza'), '42')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    const valori = salvate()[0].valori
+    expect(valori[par('Palchi').id]).toEqual([{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }])
+    expect(valori[par('Altezza').id]).toEqual([42])
+    // Il modulo successivo riparte dalla misura appena salvata.
+    expect(await screen.findByRole('button', { name: /^10:00 · Altezza 42 cm/ })).toBeInTheDocument()
+    expect(campo('N palchi totali')).toHaveValue('2')
+  })
+})
+
+describe('SchedaPianta: più misure nello stesso giorno', () => {
+  function dueMisure() {
+    const ta = par('Temp aria').id
+    const tp = par('Temp pianta').id
+    const mattina = misura({ ora: '09:12', valori: { [ta]: [24.5], [tp]: [25.1], 'chiave-di-un-altra-passata': 'da tenere' } })
+    const pomeriggio = misura({ ora: '15:40', valori: { [ta]: [27], [tp]: [28.3] } })
+    // Una misura di un'altra passata e una di ieri non sono "di oggi per questa passata".
+    const spad = misura({ passata_id: idPassata('SPAD'), ora: '11:00', valori: { [par('SPAD').id]: [38.1] } })
+    const ieri = misura({ data_rilievo: IERI, ora: '09:00', valori: { [ta]: [20] } })
+    archivio = [pomeriggio, spad, ieri, mattina]
+    return { mattina, pomeriggio, ta, tp }
+  }
+
+  it('sopra il modulo elenca le misure di oggi della passata, in ordine di ora', async () => {
+    dueMisure()
+    apri('35')
+    const elenco = await screen.findByRole('list', { name: 'Misure già registrate' })
+    expect(within(elenco).getAllByRole('button')).toHaveLength(2)
+    const [prima, seconda] = within(elenco).getAllByRole('button')
+    expect(prima).toHaveAccessibleName('09:12 · Temp aria 24,5 °C · Temp pianta 25,1 °C')
+    expect(seconda).toHaveAccessibleName('15:40 · Temp aria 27 °C · Temp pianta 28,3 °C')
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+  })
+
+  it('toccando una misura la si corregge: il salvataggio usa il suo id e tiene le chiavi di altre passate', async () => {
+    const { mattina, ta, tp } = dueMisure()
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: '09:12 · Temp aria 24,5 °C · Temp pianta 25,1 °C' }))
+
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(campo('Temp pianta')).toHaveValue('25,1')
+    expect(pulsante('Ora: 09:12')).toBeInTheDocument()
+    expect(pulsante('+ Nuova misura')).toBeInTheDocument()
+
+    await utente.type(campo('Temp pianta'), '25,3')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvaMisura).toHaveBeenCalledWith('E', {
+      id: mattina.id, pianta_id: idPianta('35'), passata_id: idPassata('Termometro'), data_rilievo: OGGI, ora: '09:12',
+      valori: { [ta]: [24.5], [tp]: [25.3], 'chiave-di-un-altra-passata': 'da tenere' },
+    })
+    // Dopo la correzione si torna a una misura nuova.
+    expect(await screen.findByText('Nuova misura')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '09:12 · Temp aria 24,5 °C · Temp pianta 25,3 °C' })).toBeInTheDocument()
+  })
+
+  it('"+ Nuova misura" lascia la correzione e torna a un modulo nuovo, con un id nuovo', async () => {
+    const { mattina } = dueMisure()
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: /^09:12 · / }))
+    await utente.click(pulsante('+ Nuova misura'))
+
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Nuova misura' })).not.toBeInTheDocument()
+    expect(campo('Temp pianta')).toHaveValue('')
+    await utente.type(campo('Temp pianta'), '30')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].id).not.toBe(mattina.id)
+    expect(salvate()[0].ora).toBe('10:00')
+  })
+})
+
+describe('SchedaPianta: intestazione e storia', () => {
+  it('mostra l\'esperimento in alto, "Pianta #35" con il trattamento e il riquadro di oggi', async () => {
+    apri('35')
+    await pronta()
+    expect(screen.getByRole('heading', { level: 1, name: 'Hydrochar × Cuore di Bue' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E')
+    expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' })).toBeInTheDocument()
+    expect(screen.getByText('W1')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+    expect(campo('Temp aria')).toBeInTheDocument()
+    expect(campo('Temp pianta')).toBeInTheDocument()
+    expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
+  })
+
+  it('la storia elenca le misure per giorno (dal più recente), con l\'icona della passata e i parametri archiviati', async () => {
+    par('SPAD').archiviato = true
+    const oggi = misura({ ora: '09:12', valori: { [par('Temp aria').id]: [24.5], [par('Temp pianta').id]: [null] } })
+    const spad = misura({ passata_id: idPassata('SPAD'), data_rilievo: '2026-10-21', ora: '09:00', valori: { [par('SPAD').id]: [38.1] } })
+    const temp = misura({ data_rilievo: '2026-10-21', ora: '08:30', valori: { [par('Temp aria').id]: [22] } })
+    archivio = [oggi, spad, temp]
+    apri('35')
+    const storia = await screen.findByRole('region', { name: 'Storia' })
+
+    const giorni = within(storia).getAllByRole('heading', { level: 4 }).map(h => h.textContent)
+    expect(giorni).toEqual(['28/10/2026', '21/10/2026'])
+    const righe = within(storia).getAllByRole('link')
+    expect(righe.map(r => r.getAttribute('href'))).toEqual([oggi, temp, spad].map(m => `/esperimenti/E/misure/${m.id}`))
+    expect(righe[0]).toHaveAccessibleName('09:12 · Termometro · Temp aria 24,5 °C')
+    expect(righe[1]).toHaveAccessibleName('08:30 · Termometro · Temp aria 22 °C')
+    expect(righe[2]).toHaveAccessibleName('09:00 · SPAD · SPAD (archiviato) 38,1')
+    expect(righe[2]).toHaveTextContent('💚')
+  })
+
+  it('senza misure la storia lo dice', async () => {
+    apri('35')
+    const storia = await screen.findByRole('region', { name: 'Storia' })
+    expect(within(storia).getByText('Ancora nessuna misura per questa pianta.')).toBeInTheDocument()
+  })
+})
+
+describe('SchedaPianta: casi limite', () => {
+  it('senza una passata scelta torna alla schermata in campo', async () => {
+    apri('35', null)
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+  })
+
+  it('con una passata che non esiste più torna alla schermata in campo', async () => {
+    useCampoStore.getState().setPassata('E', 'passata-cancellata')
+    apri('35', null)
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E'))
+  })
+
+  it('una pianta che non c\'è lo dice', async () => {
+    apri('inesistente')
+    expect(await screen.findByText('Questa pianta non esiste in questo esperimento.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
+  })
+
+  it('se la configurazione non si carica spiega cosa è successo, con "Riprova"', async () => {
+    vi.mocked(caricaConfig).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    await utente.click(pulsante('Riprova'))
+    expect(await pronta()).toBeInTheDocument()
+  })
+
+  it('se le misure della pianta non si caricano non mostra il modulo (i progressivi sarebbero sbagliati) e "Riprova" ci riprova', async () => {
+    vi.mocked(misurePianta).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(screen.getByRole('heading', { name: 'Pianta #35' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Temp aria')).not.toBeInTheDocument()
+    await utente.click(pulsante('Riprova'))
+    expect(await pronta()).toBeInTheDocument()
+  })
+})

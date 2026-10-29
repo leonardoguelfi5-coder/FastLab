@@ -14,12 +14,10 @@ import { contaPerPianta } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Passata } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
+import { percorsoPianta } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
-
-const percorsoPianta = (espId: string, piantaId: string) =>
-  `/esperimenti/${encodeURIComponent(espId)}/piante/${encodeURIComponent(piantaId)}`
 
 /**
  * Le passate come scelte esclusive in una riga che scorre di lato (DESIGN.md, Chips). Sono vere scelte radio

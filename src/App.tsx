@@ -7,6 +7,7 @@ import { Campo } from '@/pages/Campo'
 import { Esperimenti } from '@/pages/Esperimenti'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
 import { Registrati } from '@/pages/Registrati'
+import { SchedaPianta } from '@/pages/SchedaPianta'
 
 /** Segnaposto delle pagine non ancora scritte: già dentro il guscio, così il menu funziona. */
 function InCostruzione({ titolo, indietro }: { titolo: string; indietro?: string }) {
@@ -27,7 +28,7 @@ export function AppRoutes() {
         <Route path="/" element={<Esperimenti />} />
         <Route path="/esperimenti/nuovo" element={<NuovoEsperimento />} />
         <Route path="/esperimenti/:espId" element={<Campo />} />
-        <Route path="/esperimenti/:espId/piante/:piantaId" element={<InCostruzione titolo="Scheda pianta" indietro="/" />} />
+        <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<InCostruzione titolo="Modifica misura" indietro="/" />} />
         <Route path="/esperimenti/:espId/impostazioni" element={<InCostruzione titolo="Impostazioni" indietro="/" />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
