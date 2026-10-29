@@ -81,3 +81,6 @@ Task 3: fix round 1/5 (4 addressed, 0 open; commits 2d41382..7e7bd47)
 Task 3: minor (deferred): intestazione `aggiornato_il` fuori posto in catalogo.test.sql; chiavi doppie nella stessa voce da impedire nell'editor (T8, già nel brief)
 Task 3: complete (commits 2d41382..7e7bd47, review clean)
 Task 5: dispatched implementer (sonnet) in parallelo al T4 (semi in src/domain/modelli/semi.ts, non tocca i file del catalogo), BASE 7e7bd47+docs
+Task 5: implementatore (sonnet) DONE_WITH_CONCERNS eb9b336 — 1011 Vitest (con il WIP del T4); SEMI_CATALOGO in src/domain/modelli/semi.ts confrontata con la migration (import ?raw); tolto anche "Aggiungi almeno un parametro."; la regola "parametro in più strumenti" conta anche gli archiviati (come l'indice del DB); hunk di errori.ts committati a parte dal WIP del T4
+Task 5: possibile test instabile: SchedaPianta "cambiando pianta un Annulla rimasto in sospeso sparisce con la lista" fallito una volta sotto carico
+Task 5: dispatched reviewer (sonnet) on 9eaa97a..eb9b336 (verifiche su copia esatta del commit)
