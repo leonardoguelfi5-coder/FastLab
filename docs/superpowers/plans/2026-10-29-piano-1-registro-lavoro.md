@@ -238,3 +238,7 @@ Final fix round: dispatched implementer (opus)
 Final fix round: implemented 8313b6e (campo), 0292a60 (db), 3395c67 (config) — 838 tests; verification review (opus) → Approved
 Final review: minor (deferred): test di NuovoEsperimento con il vecchio testo "non trovato"; retry inutile su ESPERIMENTO_NON_TROVATO (query.ts:25); finestra dopoSalvataggio attiva anche dopo Correggi/Nuova misura (innocua, commento da precisare); test del link "I miei esperimenti" solo via Campo
 Piano 1: COMPLETE nel cloud (commits 2fd1c23..3395c67 + docs). Restano solo le verifiche in locale elencate in 2026-10-29-piano-1-stato.md
+
+## Verifiche locali (29/10/2026, sessione locale)
+
+- `npm ci`, `npx supabase db reset` (tutte le migration, compresa 20261029000006_guardie_piante.sql, applicate da zero), `npm run test:db`: 4 file, 104 test pgTAP, Result: PASS (guardie, inviti, rls, rpc).
