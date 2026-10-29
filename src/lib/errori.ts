@@ -81,6 +81,8 @@ export function messaggioErrore(e: unknown): string {
   if (code === '23505' && messaggio.includes('strumento_parametri_un_solo_strumento')) {
     return 'Un parametro può stare in un solo strumento.'
   }
+  // Una sola tabella fenologica per esperimento, anche archiviata (indice unico parziale su strumenti).
+  if (code === '23505' && messaggio.includes('strumenti_un_fenologico')) return 'C\'è già una tabella fenologica in questo esperimento.'
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   // catalogo_id di uno strumento che punta a una voce che non c'è (crea_esperimento o salvaStrumento).
   if (code === '23503' && messaggio.includes('strumenti_catalogo_id_fkey')) {

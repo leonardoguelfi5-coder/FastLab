@@ -126,6 +126,8 @@ beforeEach(() => {
   })
   vi.mocked(eliminaOArchiviaParametro).mockImplementation(async (_e, p) => {
     config.parametri = config.parametri.filter(x => x.id !== p.id)
+    // Come il database: il collegamento ai parametri eliminati sparisce con loro (on delete cascade).
+    config.strumenti = config.strumenti.map(st => ({ ...st, parametri: st.parametri.filter(pp => pp.parametro_id !== p.id) }))
     return 'eliminato'
   })
   vi.mocked(salvaStrumento).mockImplementation(async (_e, p) => {
@@ -614,6 +616,103 @@ describe('Impostazioni: valori degli strumenti', () => {
     await waitFor(() => expect(salvaParametro).toHaveBeenCalledWith('E', { ...prima, archiviato: false }))
     await utente.click(rigaStrumento('Termometro'))
     expect(await aperta(rigaStrumento('Termometro')).findByRole('button', { name: /^Temp pianta/ })).toBeInTheDocument()
+  })
+})
+
+describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare', () => {
+  it('"Aggiungi «Ciras»" con un valore omonimo già presente non salva: la bozza resta, con l\'errore', async () => {
+    par('SPAD').nome = 'gs'
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Ciras»' }))
+
+    const riga = await screen.findByRole('button', { name: /^🍃 Ciras/ })
+    expect(riga).toHaveTextContent('Non salvato')
+    expect(aperta(riga).getByText('C\'è già un parametro che si chiama "gs".')).toBeInTheDocument()
+    expect(aperta(riga).getByRole('button', { name: 'Salva' })).toBeDisabled()
+    expect(salvaParametro).not.toHaveBeenCalled()
+    expect(salvaStrumento).not.toHaveBeenCalled()
+  })
+
+  it('"Aggiungi «Calibro»" con uno strumento omonimo non collegato non salva', async () => {
+    strum('Metro').nome = 'Calibro'
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
+    await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Calibro»' }))
+
+    const riga = await screen.findByRole('button', { name: /^📐 Calibro/ })
+    expect(aperta(riga).getByText('C\'è già uno strumento che si chiama "Calibro".')).toBeInTheDocument()
+    expect(salvaParametro).not.toHaveBeenCalled()
+    expect(salvaStrumento).not.toHaveBeenCalled()
+  })
+
+  it('eliminando un valore se ne toglie anche il collegamento dalla bozza: nessuna modifica fantasma', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Termometro'))
+    const termometro = aperta(rigaStrumento('Termometro'))
+    const nome = termometro.getByLabelText('Nome dello strumento')
+    await utente.type(nome, ' x')
+    await utente.type(nome, '{Backspace}{Backspace}')
+    expect(rigaStrumento('Termometro')).not.toHaveTextContent('Modifiche non salvate')
+    await utente.click(rigaValore(termometro, 'Temp pianta'))
+    await utente.click(termometro.getByRole('button', { name: 'Elimina il valore «Temp pianta»' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Valore eliminato.'))
+    await waitFor(() => expect(termometro.queryByRole('button', { name: /^Temp pianta/ })).not.toBeInTheDocument())
+    expect(rigaStrumento('Termometro')).not.toHaveTextContent('Modifiche non salvate')
+    expect(termometro.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('"Elimina strumento" non c\'è finché non si sa quali valori hanno dati, né se quella lettura fallisce', async () => {
+    vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    await sezione('Strumenti').findByRole('alert')
+
+    await utente.click(rigaStrumento('SPAD'))
+    const spad = aperta(rigaStrumento('SPAD'))
+    expect(spad.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(spad.getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
+  })
+
+  it('prima di eliminare uno strumento si ricontrollano i dati dei suoi valori: se ne hanno, non si elimina', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('SPAD'))
+    await utente.click(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' }))
+    // Nel frattempo il valore SPAD ha ricevuto una misura.
+    vi.mocked(parametriConDati).mockResolvedValue(new Set([par('SPAD').id]))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/«SPAD».*valori con dati.*Archivialo/)))
+    expect(eliminaStrumento).not.toHaveBeenCalled()
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
+    expect(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
+  })
+
+  it('la conferma di "Archivia strumento" avverte delle modifiche non salvate', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Metro'))
+    const metro = aperta(rigaStrumento('Metro'))
+    await utente.click(metro.getByRole('button', { name: 'Archivia strumento' }))
+    let dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Metro»?' })
+    expect(within(dialogo).queryByText(/modifiche non salvate/)).not.toBeInTheDocument()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Annulla' }))
+
+    await utente.type(metro.getByLabelText('Nome dello strumento'), ' lungo')
+    await utente.click(metro.getByRole('button', { name: 'Archivia strumento' }))
+    dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Metro lungo»?' })
+    expect(within(dialogo).getByText(/Le modifiche non salvate di questo strumento andranno perse\./)).toBeInTheDocument()
   })
 })
 

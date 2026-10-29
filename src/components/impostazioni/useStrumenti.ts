@@ -190,7 +190,11 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
     void ripulisci(voce.parametri)
   }
 
-  /** Uno strumento da aggiungere (dal catalogo o nuovo): i suoi valori vanno dopo il massimo dell'esperimento. Si salva subito. */
+  /**
+   * Uno strumento da aggiungere (dal catalogo o nuovo): i suoi valori vanno dopo il massimo dell'esperimento. Si salva
+   * subito, a meno che non ci siano problemi (un nome già usato da un altro valore o strumento: il database non lo
+   * impedisce): allora resta tra gli strumenti non salvati, aperto con gli errori, da correggere.
+   */
   async function aggiungi(strumento: Strumento, parametri: Parametro[]): Promise<boolean> {
     const base = Math.max(-1, ...config.parametri.map(p => p.ordine))
     const voce: BozzaStrumento = {
@@ -200,6 +204,7 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
     }
     setCreati(n => [...n, voce])
     setAperta(voce.id)
+    if (problemi(voce).tutti.length > 0) return false
     return salva(voce)
   }
 
@@ -235,6 +240,15 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
   async function elimina(s: Strumento): Promise<boolean> {
     const suoi = config.parametri.filter(p => s.parametri.some(pp => pp.parametro_id === p.id))
     const riuscito = await esegui(async () => {
+      // Come per un valore solo: se nel frattempo uno dei suoi valori ha avuto dei dati, lo strumento non si elimina.
+      const fresche = await queryClient.fetchQuery({
+        queryKey: chiavi.parametriConDati(espId), queryFn: () => parametriConDati(espId), staleTime: 0,
+      })
+      if (suoi.some(p => fresche.has(p.id))) {
+        throw new ErroreDaMostrare(s.tipo === 'fenologico'
+          ? 'Alcune voci della tabella fenologica hanno già dei dati: non si può eliminare. Le voci con dati si archiviano.'
+          : `Lo strumento «${s.nome}» ha valori con dati: non si può eliminare. Archivialo: sparisce dalla scelta in misura e i dati restano.`)
+      }
       try {
         await eliminaStrumento(espId, s.id)
       } catch (e) {
@@ -268,8 +282,15 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
   }
 
   /** Un valore uscito dal database (archiviato o eliminato) esce anche dalla bozza dello strumento, se ce n'è una. */
-  function senzaValore(strumentoId: string, parametroId: string) {
-    const togli = (b: BozzaStrumento) => ({ ...b, parametri: b.parametri.filter(p => p.id !== parametroId) })
+  function senzaValore(strumentoId: string, parametroId: string, eliminato: boolean) {
+    // Archiviato, il valore resta collegato allo strumento; eliminato, il collegamento sparisce con lui.
+    const togli = (b: BozzaStrumento): BozzaStrumento => ({
+      ...b,
+      strumento: eliminato
+        ? { ...b.strumento, parametri: b.strumento.parametri.filter(pp => pp.parametro_id !== parametroId) }
+        : b.strumento,
+      parametri: b.parametri.filter(p => p.id !== parametroId),
+    })
     bozze.modifica(strumentoId, togli)
     setCreati(n => n.map(b => (b.id === strumentoId ? togli(b) : b)))
   }
@@ -284,12 +305,17 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
       neutro: true,
       aggiorna: c => conArchiviato(c, p.id),
     })
-    if (riuscito && s) senzaValore(s.id, p.id)
+    if (riuscito && s) senzaValore(s.id, p.id, false)
   }
 
   /** Dopo la conferma di "Elimina il valore": se nel frattempo sono arrivati dati, il server archivia invece di eliminare. */
   async function eliminaValore(s: Strumento, p: Parametro) {
-    const riuscito = await esegui(() => eliminaOArchiviaParametro(espId, p), {
+    let eliminato = false
+    const riuscito = await esegui(async () => {
+      const esito = await eliminaOArchiviaParametro(espId, p)
+      eliminato = esito === 'eliminato'
+      return esito
+    }, {
       messaggio: esito => (esito === 'archiviato' ? 'Valore archiviato.' : 'Valore eliminato.'),
       neutro: true,
       aggiorna: (c, esito) => esito === 'archiviato'
@@ -300,7 +326,7 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
             strumenti: c.strumenti.map(st => ({ ...st, parametri: st.parametri.filter(pp => pp.parametro_id !== p.id) })),
           },
     })
-    if (riuscito) senzaValore(s.id, p.id)
+    if (riuscito) senzaValore(s.id, p.id, eliminato)
   }
 
   /** Un valore archiviato torna attivo, anche nella bozza del suo strumento se ce n'è una. */
@@ -320,6 +346,8 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
     modificato, conMisure, valoreSalvato, valoreConDati, bloccoTipo, problemiExtra, altriParametri, problemi,
     cambia, salva, scarta, aggiungi, preparaTabella, archivia, ripristina, elimina,
     archiviaValore, eliminaValore, ripristinaValore,
+    /** Si sa quali valori hanno dati? Senza, "Elimina strumento" non si offre. */
+    valoriNoti: datiParametri.data !== undefined,
     salvato: (id: string) => config.strumenti.find(s => s.id === id),
   }
 }

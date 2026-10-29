@@ -109,6 +109,12 @@ describe('messaggioErrore', () => {
     })).toBe('Un parametro può stare in un solo strumento.')
   })
 
+  it('seconda tabella fenologica (indice strumenti_un_fenologico)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "strumenti_un_fenologico"',
+    })).toBe('C\'è già una tabella fenologica in questo esperimento.')
+  })
+
   it('nome doppio nel catalogo (indice catalogo_strumenti_nome_unico)', () => {
     expect(messaggioErrore({
       code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"',

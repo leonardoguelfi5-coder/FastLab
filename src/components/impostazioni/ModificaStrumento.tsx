@@ -71,7 +71,10 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
         problemiExtra={g.problemiExtra}
         azioniValore={azioneValore}
       />
-      {dello.length > 0 && <div className="flex flex-col gap-1">{dello.map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>}
+      {/* Uno strumento non ancora salvato (es. aggiunto dal catalogo con un nome già usato) mostra tutti i problemi, anche dei valori. */}
+      {(salvato ? dello : tutti).length > 0 && (
+        <div className="flex flex-col gap-1">{(salvato ? dello : tutti).map(e => <TestoErrore key={e}>{e}</TestoErrore>)}</div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" disabled={!modificato || tutti.length > 0 || g.inCorso} onClick={() => void g.salva(voce)}>
@@ -91,7 +94,7 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
           {!tabella && (
             <Button variant="outline" size="sm" disabled={g.inCorso} onClick={() => setChiede('archivia')}>Archivia strumento</Button>
           )}
-          {conMisure === false && (
+          {conMisure === false && g.valoriNoti && (
             <Button variant="destructive" size="sm" disabled={g.inCorso} onClick={() => setChiede('elimina')}>
               {tabella ? 'Elimina la tabella fenologica' : 'Elimina strumento'}
             </Button>
@@ -102,7 +105,10 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
       <Conferma
         aperta={chiede === 'archivia'}
         titolo={`Archiviare lo strumento «${voce.strumento.nome}»?`}
-        testo="Non compare più tra gli strumenti da misurare; le sue misure restano nella storia e nell'export. Lo puoi ripristinare."
+        testo={
+          'Non compare più tra gli strumenti da misurare; le sue misure restano nella storia e nell\'export. Lo puoi ripristinare.'
+          + (modificato ? ' Le modifiche non salvate di questo strumento andranno perse.' : '')
+        }
         annulla="Annulla"
         conferma="Archivia"
         onAnnulla={() => setChiede(null)}
