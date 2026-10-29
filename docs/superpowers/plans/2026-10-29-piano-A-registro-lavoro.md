@@ -69,3 +69,6 @@ Task 3: dispatched implementer (opus) in parallelo alla ri-revisione del T2 (add
 Task 2: re-review fix round 1 → Approved (916 Vitest)
 Task 2: fix round 1/5 (5 addressed, 0 open; commits 20a5d09..cdaf525)
 Task 2: complete (commits 20a5d09..cdaf525, review clean)
+Task 3: implementatore (opus) DONE e5c5734 — 942 Vitest, 177 pgTAP (emulato); salvaVoceCatalogo senza controllaRighe (come gli altri upsert); lettura tollerante dei parametri JSON oltre il brief
+Task 3: minor (carry to T6/T8): le chiavi dei valori di una voce non sono validate nel DB (vuote o doppie possibili) → l'editor del catalogo deve garantirle uniche e non vuote prima di salvare
+Task 3: dispatched reviewer (opus) on 2d41382..e5c5734
