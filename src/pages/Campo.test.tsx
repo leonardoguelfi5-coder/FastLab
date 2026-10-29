@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -336,6 +336,8 @@ describe('Campo: griglia delle piante', () => {
     await screen.findByText('Fatte 3/56 · Termometro · 28/10/2026')
 
     expect(within(cella('Pianta 2, misurata 2 volte')).getByText('×2')).toBeInTheDocument()
+    // Leggibile al sole: la taglia Label di DESIGN.md (13px), non un valore arbitrario più piccolo.
+    expect(within(cella('Pianta 2, misurata 2 volte')).getByText('×2')).toHaveClass('text-label')
     expect(within(cella('Pianta 3, misurata 3 volte')).getByText('×3')).toBeInTheDocument()
     expect(within(cella('Pianta 1, misurata')).queryByText(/^×/)).not.toBeInTheDocument()
     expect(within(cella('Pianta 4, da misurare')).queryByText(/^×/)).not.toBeInTheDocument()
@@ -481,6 +483,34 @@ describe('Campo: data di rilievo', () => {
     fireEvent.change(screen.getByLabelText('Data di rilievo'), { target: { value: '' } })
     expect(screen.getByLabelText('Data di rilievo')).toHaveValue(OGGI)
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe(OGGI)
+  })
+
+  it('se la pagina resta aperta oltre la mezzanotte la data segue il nuovo giorno (finché non ne è stata scelta un\'altra)', async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59))
+    await paginaConPassata('Termometro')
+    await screen.findByText('Fatte 0/56 · Termometro · 28/10/2026')
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue(OGGI)
+
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 1)) // l'app riprende dallo sfondo
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue('2026-10-29')
+    expect(await screen.findByText('Fatte 0/56 · Termometro · 29/10/2026')).toBeInTheDocument()
+    expect(misureDelGiorno).toHaveBeenCalledWith('E', '2026-10-29')
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+  })
+
+  it('una data scelta resta anche dopo la mezzanotte e il banner continua a segnalarla', async () => {
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59))
+    useCampoStore.getState().setData('E', IERI)
+    await paginaConPassata('Termometro')
+    expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
+
+    vi.setSystemTime(new Date(2026, 9, 29, 0, 1))
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    expect(screen.getByLabelText('Data di rilievo')).toHaveValue(IERI)
+    expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
   })
 
   it('il banner c\'è anche senza una passata scelta', async () => {

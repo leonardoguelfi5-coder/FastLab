@@ -172,6 +172,8 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
+    /* Un campo che prende il focus non deve finire sotto la barra d'azione fissa (vedi BarraAzioni). */
+    scroll-padding-bottom: calc(var(--altezza-barra-azioni, 0px) + 1rem);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;

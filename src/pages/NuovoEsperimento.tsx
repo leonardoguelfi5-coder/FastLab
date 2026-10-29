@@ -8,9 +8,9 @@ import { useSessione } from '@/api/auth'
 import { useConfig } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BarraAzioni } from '@/components/BarraAzioni'
+import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
-import { messaggioErrore } from '@/lib/errori'
 import { cn } from '@/lib/utils'
 import {
   chiaveBozza, leggiBozza, modificato, nuovoLavoro, rimuoviBozza, salvaBozza, type Lavoro,
@@ -215,15 +215,6 @@ function Procedura({ chiave, crea }: ProceduraProps) {
         onConferma={ricomincia}
       />
     </AppShell>
-  )
-}
-
-function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-1">
-      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
-      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
-    </div>
   )
 }
 

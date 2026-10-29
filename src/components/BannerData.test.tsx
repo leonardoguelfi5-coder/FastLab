@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useCampoStore } from '@/store/campo'
 import { BannerData } from './BannerData'
@@ -58,5 +58,64 @@ describe('BannerData', () => {
     useCampoStore.getState().setData('E', '2026-10-29')
     render(<BannerData espId="E" />)
     expect(screen.getByText(/29\/10\/2026, non oggi/)).toBeInTheDocument()
+  })
+
+  it('ha un bordo pieno di attenzione (non una striscia laterale): al sole il solo fondo velato non si vede', () => {
+    useCampoStore.getState().setData('E', '2026-10-27')
+    render(<BannerData espId="E" />)
+    const banner = screen.getByRole('status')
+    expect(banner).toHaveClass('border', 'border-attenzione')
+    expect(banner.className).not.toMatch(/\bborder-[lrse]-/)
+  })
+})
+
+describe('BannerData: il giorno che cambia mentre la pagina è aperta', () => {
+  beforeEach(() => {
+    // Anche i timer: la mezzanotte si aspetta con setTimeout. 28 ottobre 2026, 23:59:30.
+    vi.useRealTimers()
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59, 30))
+  })
+
+  it('una data scelta che diventa oggi a mezzanotte fa sparire il banner da sola', () => {
+    useCampoStore.getState().setData('E', '2026-10-29')
+    render(<BannerData espId="E" />)
+    expect(screen.getByText(/29\/10\/2026, non oggi/)).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(31_000) })
+
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+  })
+
+  it('la stessa data, alla mezzanotte dopo, è passata: il banner torna', () => {
+    useCampoStore.getState().setData('E', '2026-10-29')
+    render(<BannerData espId="E" />)
+    act(() => { vi.advanceTimersByTime(31_000) })
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(24 * 60 * 60_000) })
+
+    expect(screen.getByText(/29\/10\/2026, non oggi/)).toBeInTheDocument()
+  })
+
+  it('riprendendo l\'app dallo sfondo (focus) guarda di nuovo il giorno', () => {
+    useCampoStore.getState().setData('E', '2026-10-29')
+    render(<BannerData espId="E" />)
+    expect(screen.getByText(/non oggi/)).toBeInTheDocument()
+
+    vi.setSystemTime(new Date(2026, 9, 29, 8, 0))
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+  })
+
+  it('"Usa oggi" usa il giorno vero, anche se il banner non si è ancora accorto del cambio', () => {
+    useCampoStore.getState().setData('E', '2026-10-27')
+    render(<BannerData espId="E" />)
+
+    vi.setSystemTime(new Date(2026, 9, 29, 8, 0)) // il giorno è cambiato, nessun evento è ancora arrivato
+    fireEvent.click(screen.getByRole('button', { name: 'Usa oggi' }))
+
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-29')
   })
 })

@@ -3,9 +3,11 @@ import { CheckIcon, InfoIcon, TriangleAlertIcon, CircleAlertIcon, Loader2Icon } 
 
 /**
  * Toast di DESIGN.md: fondo grafite, testo foglio, angoli 10px, ombra galleggiante (index.css).
- * Stanno in basso, sopra la barra d'azione se la pagina ne ha una (`--altezza-barra-azioni`, vedi BarraAzioni).
+ * Stanno in basso, sopra la barra d'azione se la pagina ne ha una (`--altezza-barra-azioni`, vedi BarraAzioni) e
+ * sopra la tastiera a schermo (`--tastiera-coperta`, pubblicata dalla stessa barra): l'esito di un salvataggio
+ * non deve restare nascosto.
  */
-const SOPRA_LA_BARRA = "calc(var(--altezza-barra-azioni, 0px) + 16px)"
+const SOPRA_LA_BARRA = "calc(var(--tastiera-coperta, 0px) + var(--altezza-barra-azioni, 0px) + 16px)"
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (

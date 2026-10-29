@@ -14,6 +14,7 @@ import { contaPerPianta } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Passata } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
+import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
 
@@ -68,7 +69,8 @@ function SceltaPassata({ passate, sceltaId, onScegli }: { passate: Passata[]; sc
 
 function DataRilievo({ espId }: { espId: string }) {
   const id = useId()
-  const dataRilievo = useCampoStore(s => s.dati(espId).dataRilievo)
+  const oggi = useOggi()
+  const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
   const setData = useCampoStore(s => s.setData)
 
   return (
@@ -202,7 +204,7 @@ function GrigliaPiante({ espId, config, passata, dataRilievo }: { espId: string;
               >
                 {p.etichetta}
                 {fatta && (
-                  <span className="flex items-center gap-0.5 text-[0.6875rem]">
+                  <span className="flex items-center gap-0.5 font-mono text-label leading-none">
                     <Check aria-hidden className="size-3" strokeWidth={3} />
                     {n > 1 && `×${n}`}
                   </span>
@@ -218,7 +220,8 @@ function GrigliaPiante({ espId, config, passata, dataRilievo }: { espId: string;
 
 /** Il contenuto della schermata, a configurazione caricata. */
 function CampoCaricato({ espId, config }: { espId: string; config: ConfigEsperimento }) {
-  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId))
+  const oggi = useOggi()
+  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
   const setPassata = useCampoStore(s => s.setPassata)
   const passate = useMemo(() => [...config.passate].sort((a, b) => a.ordine - b.ordine), [config.passate])
   // Una passata salvata e poi cancellata dalle impostazioni è come nessuna scelta.

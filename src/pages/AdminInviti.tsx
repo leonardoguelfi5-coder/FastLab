@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { creaInvito, revocaInvito, type Invito } from '@/api/inviti'
 import { chiavi, useInviti, useSonoAdmin } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,15 +26,6 @@ function messaggioDiInvito(invito: Invito): string {
 /** Data (locale, non UTC) in cui l'invito è stato usato, nel formato GG/MM/AAAA. */
 function dataUso(usatoIl: string): string {
   return formattaData(oggiLocale(new Date(usatoIl)))
-}
-
-function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-1">
-      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
-      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
-    </div>
-  )
 }
 
 /** Ripiego quando gli appunti non sono disponibili: il testo è già selezionato, basta copiarlo. */

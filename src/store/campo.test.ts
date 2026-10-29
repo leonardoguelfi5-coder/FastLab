@@ -160,6 +160,65 @@ describe('useCampoStore: uso nei componenti', () => {
     expect(result.current).toBe(primo)
     expect(useCampoStore.getState().dati('E')).toBe(primo)
   })
+
+  it('dati(id, oggi) usa il giorno che gli si dà, non l\'orologio', () => {
+    expect(useCampoStore.getState().dati('E', '2026-11-02').dataRilievo).toBe('2026-11-02')
+    useCampoStore.getState().setData('E', '2026-10-27')
+    expect(useCampoStore.getState().dati('E', '2026-11-02').dataRilievo).toBe('2026-10-27')
+  })
+
+  it('chi chiede con giorni diversi (un componente non ancora aggiornato) trova sempre il proprio oggetto', () => {
+    const { dati } = useCampoStore.getState()
+    const ieri = dati('E', '2026-10-28')
+    const oggi = dati('E', '2026-10-29')
+    expect(oggi).not.toBe(ieri)
+    expect(dati('E', '2026-10-28')).toBe(ieri)
+    expect(dati('E', '2026-10-29')).toBe(oggi)
+  })
+})
+
+describe('useCampoStore: salvataggio con valori non validi', () => {
+  const salvaCosi = (voce: unknown) => useCampoStore.setState({ stato: { E: voce as never } })
+
+  it.each([
+    ['vuota', ''],
+    ['in un altro formato', '27/10/2026'],
+    ['senza zeri', '2026-1-5'],
+    ['con del testo intorno', ' 2026-10-27'],
+    ['non scritta come testo', 20261027],
+    ['nulla', null],
+  ])('una data %s vale come nessuna data scelta: oggi', (_nome, data) => {
+    salvaCosi({ passataId: null, dataRilievo: data, ricordati: {} })
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-28')
+  })
+
+  it('una data nel formato AAAA-MM-GG si tiene', () => {
+    salvaCosi({ passataId: null, dataRilievo: '2026-10-27', ricordati: {} })
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-27')
+  })
+
+  it('anche passata e valori ricordati del tipo sbagliato si ignorano', () => {
+    salvaCosi({ passataId: 5, dataRilievo: '2026-10-27', ricordati: 'xyz' })
+    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: null, dataRilievo: '2026-10-27', ricordati: {} })
+  })
+
+  it('una voce che non è un oggetto vale come vuota', () => {
+    salvaCosi('boh')
+    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: null, dataRilievo: '2026-10-28', ricordati: {} })
+  })
+
+  it('le scelte nuove si scrivono sopra una voce rovinata senza trascinarsi i campi sbagliati', () => {
+    salvaCosi({ passataId: 5, dataRilievo: 'ieri', ricordati: 'xyz' })
+    useCampoStore.getState().setPassata('E', 'p1')
+    useCampoStore.getState().ricorda('E', [tempAria], { [tempAria.id]: [24.5] })
+    expect(useCampoStore.getState().stato.E).toEqual({ passataId: 'p1', ricordati: { [tempAria.id]: [24.5] } })
+  })
+
+  it('dopo il ricaricamento una data rovinata nel localStorage vale oggi', async () => {
+    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { passataId: 'p1', dataRilievo: 'ieri', ricordati: {} } } }, version: 1 }))
+    await useCampoStore.persist.rehydrate()
+    expect(useCampoStore.getState().dati('E')).toEqual({ passataId: 'p1', dataRilievo: '2026-10-28', ricordati: {} })
+  })
 })
 
 describe('useCampoStore: salvataggio che non funziona', () => {

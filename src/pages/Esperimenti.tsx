@@ -5,10 +5,9 @@ import type { RiepilogoEsperimento } from '@/api/esperimenti'
 import { useEsperimenti } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BarraAzioni } from '@/components/BarraAzioni'
-import { TestoErrore } from '@/components/TestoErrore'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { buttonVariants } from '@/components/ui/button'
 import { formattaData, oggiLocale } from '@/lib/date'
-import { messaggioErrore } from '@/lib/errori'
 import { cn } from '@/lib/utils'
 
 const VOCE_MENU = 'flex h-11 w-full items-center gap-2.5 rounded-sm px-3 text-left text-base text-grafite transition-colors hover:bg-carta-ombra active:bg-carta-ombra [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-grafite-tenue'
@@ -25,15 +24,6 @@ function riepilogo(e: RiepilogoEsperimento): string {
   const piante = e.n_piante === 1 ? '1 pianta' : `${e.n_piante} piante`
   const trattamenti = e.n_trattamenti === 1 ? '1 trattamento' : `${e.n_trattamenti} trattamenti`
   return `${piante} · ${trattamenti} · ${e.stato === 'concluso' ? 'concluso' : 'in corso'}`
-}
-
-function ErroreConRiprova({ errore, onRiprova }: { errore: unknown; onRiprova: () => void }) {
-  return (
-    <div role="alert" className="flex flex-col items-start gap-1">
-      <TestoErrore className="text-base">{messaggioErrore(errore)}</TestoErrore>
-      <Button variant="ghost" size="sm" onClick={onRiprova} className="-ml-3">Riprova</Button>
-    </div>
-  )
 }
 
 /** Menu ⋯ della scheda: un pulsante che apre l'elenco delle azioni; si chiude con Escape o toccando fuori. */

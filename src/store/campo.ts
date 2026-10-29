@@ -26,10 +26,11 @@ export interface DatiCampo {
 interface CampoStore {
   stato: Record<string, ScelteCampo>
   /**
-   * Le scelte di un esperimento. Il risultato è lo stesso oggetto finché lo stato (e il giorno) non cambiano:
-   * `useCampoStore(s => s.dati(espId))` si può usare così com'è nei componenti.
+   * Le scelte di un esperimento. `oggi` è il giorno con cui confrontare (di solito quello di `useOggi()`, così i
+   * componenti restano d'accordo tra loro); senza, si guarda l'orologio. Il risultato è lo stesso oggetto finché lo
+   * stato e il giorno non cambiano: `useCampoStore(s => s.dati(espId, oggi))` si può usare così com'è nei componenti.
    */
-  dati: (espId: string) => DatiCampo
+  dati: (espId: string, oggi?: string) => DatiCampo
   setPassata: (espId: string, passataId: string | null) => void
   /** Scegliere la data di oggi riporta a "oggi" (non la fissa): domani il rilievo sarà di domani. */
   setData: (espId: string, data: string) => void
@@ -60,43 +61,60 @@ const archivio: StateStorage = {
 }
 
 const senzaValori: ValoriMisura = Object.freeze({})
-const memo = new Map<string, { scelte: ScelteCampo | undefined; oggi: string; dati: DatiCampo }>()
+const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/
 
-function leggi(stato: Record<string, ScelteCampo>, espId: string): DatiCampo {
-  const scelte = stato[espId]
-  const oggi = oggiLocale()
-  const ricordato = memo.get(espId)
-  if (ricordato && ricordato.scelte === scelte && ricordato.oggi === oggi) return ricordato.dati
-  // Un salvataggio vecchio o rovinato può non avere tutti i campi: si riempie ciò che manca.
-  const dati: DatiCampo = {
-    passataId: scelte?.passataId ?? null,
-    dataRilievo: scelte?.dataRilievo || oggi,
-    ricordati: scelte?.ricordati ?? senzaValori,
+const eOggetto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/**
+ * Le scelte di un esperimento rimesse in forma: un salvataggio vecchio o rovinato può mancare di campi o averli
+ * del tipo sbagliato (una data che non è AAAA-MM-GG vale come nessuna data scelta, quindi oggi).
+ */
+function pulite(scelte: unknown): ScelteCampo {
+  const s = eOggetto(scelte) ? scelte : {}
+  const risultato: ScelteCampo = {
+    passataId: typeof s.passataId === 'string' ? s.passataId : null,
+    ricordati: eOggetto(s.ricordati) ? (s.ricordati as ValoriMisura) : senzaValori,
   }
-  memo.set(espId, { scelte, oggi, dati })
-  return dati
+  if (typeof s.dataRilievo === 'string' && DATA_ISO.test(s.dataRilievo)) risultato.dataRilievo = s.dataRilievo
+  return risultato
 }
 
-const nuove = (): ScelteCampo => ({ passataId: null, ricordati: senzaValori })
+// Il risultato dipende solo dalle scelte e dal giorno: si tiene per ogni coppia, così chi chiede con un giorno
+// diverso (un componente non ancora aggiornato) non fa perdere a un altro il suo oggetto.
+const SENZA_SCELTE = Object.freeze({ passataId: null, ricordati: senzaValori }) as ScelteCampo
+const memo = new WeakMap<ScelteCampo, Map<string, DatiCampo>>()
+
+function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string): DatiCampo {
+  const salvate = stato[espId]
+  const chiave = eOggetto(salvate) ? (salvate as ScelteCampo) : SENZA_SCELTE
+  let perGiorno = memo.get(chiave)
+  if (!perGiorno) memo.set(chiave, (perGiorno = new Map()))
+  let dati = perGiorno.get(oggi)
+  if (!dati) {
+    const { passataId, dataRilievo, ricordati } = pulite(salvate)
+    perGiorno.set(oggi, (dati = { passataId, dataRilievo: dataRilievo ?? oggi, ricordati }))
+  }
+  return dati
+}
 
 /** Le scelte di campo per esperimento, salvate sul dispositivo (comodità di chi rileva, non un dato dell'esperimento). */
 export const useCampoStore = create<CampoStore>()(
   persist(
     (set, get) => ({
       stato: {},
-      dati: espId => leggi(get().stato, espId),
+      dati: (espId, oggi = oggiLocale()) => leggi(get().stato, espId, oggi),
       setPassata: (espId, passataId) =>
-        set(s => ({ stato: { ...s.stato, [espId]: { ...(s.stato[espId] ?? nuove()), passataId } } })),
+        set(s => ({ stato: { ...s.stato, [espId]: { ...pulite(s.stato[espId]), passataId } } })),
       setData: (espId, data) =>
         set(s => {
-          const scelte: ScelteCampo = { ...(s.stato[espId] ?? nuove()) }
+          const scelte = pulite(s.stato[espId])
           if (data === oggiLocale()) delete scelte.dataRilievo
           else scelte.dataRilievo = data
           return { stato: { ...s.stato, [espId]: scelte } }
         }),
       ricorda: (espId, parametri, valori) =>
         set(s => {
-          const scelte = s.stato[espId] ?? nuove()
+          const scelte = pulite(s.stato[espId])
           const ricordati = { ...scelte.ricordati }
           for (const p of parametri) {
             if (!p.ricorda_tra_piante || !(p.id in valori)) continue
