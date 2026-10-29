@@ -22,9 +22,9 @@
   --riga: oklch(88.5% 0.011 80);
   --riga-forte: oklch(78% 0.014 75);
   /*
-   * Bordo a riposo di campi, caselle e interruttori: l'unico tono di linea che arriva a 3:1 sulla carta
-   * (3.8:1 su carta, 3.5:1 su carta ombra), come chiede WCAG per i controlli. Riga e riga forte restano
-   * per separatori e passaggio del puntatore.
+   * Bordo a riposo di campi, select, caselle, interruttori e pulsanti secondari: l'unico tono di linea che
+   * arriva a 3:1 (3.8:1 su carta, 3.9:1 su foglio, 3.5:1 su carta ombra), come chiede WCAG per i controlli.
+   * Al passaggio questi bordi scuriscono a grafite tenue; riga e riga forte restano per i separatori.
    */
   --riga-controllo: oklch(60% 0.012 75);
 
@@ -242,11 +242,20 @@
   font-family: var(--font-sans);
 }
 
-/* Entra ed esce dissolvendosi sul posto (senza scivolare sopra la barra d'azione), in 200 ms. */
+/*
+ * Entra ed esce dissolvendosi sul posto (senza scivolare sopra la barra d'azione), in 200 ms.
+ * Sonner aggiunge il suo foglio di stile in fondo a <head> durante l'esecuzione, quindi a parità di
+ * specificità vincerebbe lui: questi selettori sono più specifici delle regole di sonner per gli stessi stati
+ * (entrata: 0,4,0 contro 0,2,0 di [data-y-position]; uscita: 0,5,0 contro 0,4,0). La pila di più toast
+ * resta quella di sonner.
+ */
 [data-sonner-toaster] [data-sonner-toast] {
-  --y: translateY(0);
   transition-duration: 200ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-mounted="false"][data-front="true"] {
+  --y: translateY(0);
 }
 
 [data-sonner-toaster] [data-sonner-toast][data-removed="true"][data-front="true"][data-swipe-out="false"] {
@@ -276,7 +285,12 @@
   height: 20px;
 }
 
-[data-sonner-toaster] [data-sonner-toast][data-type="success"] [data-icon] {
+/*
+ * Verde negato: un toast di successo qualsiasi ("Messaggio copiato.") resta neutro, ✓ in foglio. Il ✓ in
+ * registrato velato è solo per l'esito "salvato" delle misure, con la classe data da toastSalvato()
+ * (src/lib/toastSalvato.ts).
+ */
+[data-sonner-toaster] [data-sonner-toast].toast-salvato [data-icon] {
   color: var(--registrato-velato);
 }
 

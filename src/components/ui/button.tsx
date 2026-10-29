@@ -16,9 +16,9 @@ const buttonVariants = cva(
         /** Principale, inchiostro pieno: uno solo per schermata. */
         default:
           "bg-inchiostro text-title font-semibold text-foglio hover:bg-inchiostro-scuro active:bg-inchiostro-scuro disabled:bg-carta-ombra disabled:text-grafite-tenue",
-        /** Secondario: foglio con bordo riga. */
+        /** Secondario: foglio con bordo riga controllo (3:1 sulla carta, visibile al sole). */
         outline:
-          "border-riga bg-foglio text-base font-medium text-grafite hover:border-riga-forte active:bg-carta-ombra aria-expanded:bg-carta-ombra disabled:border-transparent disabled:bg-carta-ombra disabled:text-grafite-tenue",
+          "border-riga-controllo bg-foglio text-base font-medium text-grafite hover:border-grafite-tenue active:bg-carta-ombra aria-expanded:bg-carta-ombra disabled:border-transparent disabled:bg-carta-ombra disabled:text-grafite-tenue",
         /** Tonale, su carta ombra. */
         secondary:
           "bg-carta-ombra text-base font-medium text-grafite hover:bg-riga/60 active:bg-riga aria-expanded:bg-riga/60 disabled:text-grafite-tenue",

@@ -4,6 +4,7 @@ import { Copy, Ellipsis } from 'lucide-react'
 import type { RiepilogoEsperimento } from '@/api/esperimenti'
 import { useEsperimenti } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { BarraAzioni } from '@/components/BarraAzioni'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { formattaData, oggiLocale } from '@/lib/date'
@@ -149,10 +150,13 @@ export function Esperimenti() {
         <NessunEsperimento />
       ) : (
         <>
-          <Link to="/esperimenti/nuovo" className={buttonVariants({ variant: 'outline' })}>+ Nuovo esperimento</Link>
-          <ul aria-label="Esperimenti" className="-mx-4 -mt-2 flex flex-col border-t border-riga">
+          <ul aria-label="Esperimenti" className="-mx-4 flex flex-col border-t border-riga">
             {elenco.map(e => <SchedaEsperimento key={e.id} esperimento={e} />)}
           </ul>
+          {/* L'azione principale della schermata, in basso dove arriva il pollice. */}
+          <BarraAzioni>
+            <Link to="/esperimenti/nuovo" className={cn(buttonVariants({ size: 'lg' }), 'w-full')}>+ Nuovo esperimento</Link>
+          </BarraAzioni>
         </>
       )}
     </AppShell>
