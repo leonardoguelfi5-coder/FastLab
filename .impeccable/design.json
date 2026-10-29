@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T02:00:00+01:00",
+  "title": "Design System: FastLab",
+  "extensions": {
+    "colorMeta": {
+      "carta": { "role": "neutral", "displayName": "Carta", "canonical": "oklch(98.4% 0.006 85)" },
+      "foglio": { "role": "neutral", "displayName": "Foglio", "canonical": "oklch(99.6% 0.003 85)" },
+      "carta-ombra": { "role": "neutral", "displayName": "Carta ombra", "canonical": "oklch(95.6% 0.009 85)" },
+      "riga": { "role": "neutral", "displayName": "Riga", "canonical": "oklch(88.5% 0.011 80)" },
+      "riga-forte": { "role": "neutral", "displayName": "Riga forte", "canonical": "oklch(78% 0.014 75)" },
+      "grafite": { "role": "neutral", "displayName": "Grafite", "canonical": "oklch(23% 0.014 262)" },
+      "grafite-tenue": { "role": "neutral", "displayName": "Grafite tenue", "canonical": "oklch(44% 0.016 262)" },
+      "inchiostro": { "role": "primary", "displayName": "Inchiostro blu notte", "canonical": "oklch(37% 0.105 262)", "tonalRamp": ["oklch(18% 0.06 262)", "oklch(26% 0.085 262)", "oklch(30% 0.095 262)", "oklch(37% 0.105 262)", "oklch(50% 0.1 262)", "oklch(65% 0.08 262)", "oklch(82% 0.05 262)", "oklch(94.5% 0.028 262)"] },
+      "registrato": { "role": "semantic", "displayName": "Registrato", "canonical": "oklch(45% 0.1 152)" },
+      "attenzione": { "role": "semantic", "displayName": "Attenzione", "canonical": "oklch(50% 0.11 68)" },
+      "errore": { "role": "semantic", "displayName": "Errore", "canonical": "oklch(49% 0.16 28)" }
+    },
+    "typographyMeta": {
+      "numero-pianta": { "displayName": "Numero pianta", "purpose": "Etichetta della pianta in testa alla scheda e nel campo N° pianta; unico testo grande in campo." },
+      "campo": { "displayName": "Campo", "purpose": "Testo digitato nei campi numerici e di etichetta." },
+      "dato": { "displayName": "Dato", "purpose": "Valori, date, ore, contatori, celle della griglia." }
+    },
+    "shadows": [
+      { "name": "galleggiante", "value": "0 1px 2px oklch(23% 0.014 262 / 0.06), 0 8px 24px oklch(23% 0.014 262 / 0.10)", "purpose": "Menu, popover, toast." },
+      { "name": "dialogo", "value": "0 2px 6px oklch(23% 0.014 262 / 0.08), 0 20px 48px oklch(23% 0.014 262 / 0.16)", "purpose": "Dialoghi di conferma." }
+    ],
+    "motion": [
+      { "name": "ease-out-quint", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Tutte le transizioni di stato, 150–200 ms." }
+    ],
+    "breakpoints": [
+      { "name": "telefono", "value": "0px" },
+      { "name": "tablet", "value": "640px" }
+    ]
+  },
+  "components": [
+    { "name": "Pulsante principale", "kind": "button", "refersTo": "button-primary", "description": "Unica azione principale della schermata, nella barra in basso.", "html": "<button class=\"ds-btn-primary\">Salva e vai alla #36</button>", "css": ".ds-btn-primary{background:oklch(37% 0.105 262);color:oklch(99.6% 0.003 85);font:600 1.125rem/1.3 'Geist Variable',system-ui,sans-serif;height:52px;padding:0 20px;border:0;border-radius:10px;transition:background .15s cubic-bezier(.22,1,.36,1)}.ds-btn-primary:active{background:oklch(30% 0.095 262)}.ds-btn-primary:focus-visible{outline:2px solid oklch(37% 0.105 262);outline-offset:2px}" },
+    { "name": "Pulsante secondario", "kind": "button", "refersTo": "button-secondary", "description": "Azioni alternative.", "html": "<button class=\"ds-btn-secondary\">Salva</button>", "css": ".ds-btn-secondary{background:oklch(99.6% 0.003 85);color:oklch(23% 0.014 262);font:500 1rem/1.3 'Geist Variable',system-ui,sans-serif;height:48px;padding:0 16px;border:1px solid oklch(88.5% 0.011 80);border-radius:10px;transition:border-color .15s}.ds-btn-secondary:hover{border-color:oklch(78% 0.014 75)}.ds-btn-secondary:focus-visible{outline:2px solid oklch(37% 0.105 262);outline-offset:2px}" },
+    { "name": "Campo numerico", "kind": "input", "refersTo": "input", "description": "Campo con label sopra e unità a destra.", "html": "<label class=\"ds-label\">Temp aria<span class=\"ds-field\"><input class=\"ds-input\" inputmode=\"decimal\" value=\"24,5\"><span class=\"ds-unit\">°C</span></span></label>", "css": ".ds-label{display:grid;gap:6px;font:550 .8125rem/1.3 'Geist Variable',system-ui,sans-serif;color:oklch(44% 0.016 262)}.ds-field{position:relative;display:block}.ds-input{width:100%;height:52px;padding:0 48px 0 14px;background:oklch(99.6% 0.003 85);color:oklch(23% 0.014 262);font:500 1.25rem/1.3 'Geist Mono Variable',ui-monospace,monospace;font-variant-numeric:tabular-nums;border:1px solid oklch(88.5% 0.011 80);border-radius:10px}.ds-input:focus{outline:none;border-color:oklch(37% 0.105 262);box-shadow:0 0 0 3px oklch(94.5% 0.028 262)}.ds-unit{position:absolute;right:14px;top:50%;transform:translateY(-50%);font:450 .9375rem 'Geist Mono Variable',monospace;color:oklch(44% 0.016 262)}" },
+    { "name": "Chip passata", "kind": "chip", "refersTo": "chip-passata", "description": "Scelta della passata.", "html": "<div><button class=\"ds-chip ds-chip-on\">🌡 Termometro ✓</button><button class=\"ds-chip\">💚 SPAD</button></div>", "css": ".ds-chip{height:44px;padding:0 14px;margin-right:8px;border-radius:14px;border:1px solid oklch(88.5% 0.011 80);background:oklch(99.6% 0.003 85);color:oklch(23% 0.014 262);font:500 1rem 'Geist Variable',system-ui,sans-serif}.ds-chip-on{background:oklch(37% 0.105 262);border-color:oklch(37% 0.105 262);color:oklch(99.6% 0.003 85)}.ds-chip:focus-visible{outline:2px solid oklch(37% 0.105 262);outline-offset:2px}" },
+    { "name": "Cella pianta", "kind": "custom", "refersTo": "cella-pianta", "description": "Cella della griglia piante, da misurare o misurata.", "html": "<div class=\"ds-grid\"><span class=\"ds-cell ds-cell-on\">34 ✓</span><span class=\"ds-cell\">35</span></div>", "css": ".ds-grid{display:flex;gap:6px}.ds-cell{display:grid;place-items:center;width:44px;height:44px;border-radius:6px;border:1px solid oklch(88.5% 0.011 80);background:oklch(99.6% 0.003 85);color:oklch(44% 0.016 262);font:450 .9375rem 'Geist Mono Variable',monospace;font-variant-numeric:tabular-nums}.ds-cell-on{background:oklch(94.5% 0.028 262);border-color:oklch(94.5% 0.028 262);color:oklch(37% 0.105 262);font-size:.8125rem}" },
+    { "name": "Riga di quaderno", "kind": "card", "refersTo": "riga", "description": "Riga di lista al posto delle card.", "html": "<div class=\"ds-row\"><div class=\"ds-row-t\">Hydrochar × Cuore di Bue 2027</div><div class=\"ds-row-m\">56 piante · 8 trattamenti · in corso</div></div>", "css": ".ds-row{padding:14px 0;border-bottom:1px solid oklch(88.5% 0.011 80);background:oklch(98.4% 0.006 85)}.ds-row-t{font:600 1.125rem/1.3 'Geist Variable',system-ui,sans-serif;color:oklch(23% 0.014 262)}.ds-row-m{font:400 .9375rem/1.4 'Geist Variable',system-ui,sans-serif;color:oklch(44% 0.016 262)}" }
+  ],
+  "narrative": {
+    "northStar": "Il quaderno di campo",
+    "overview": "FastLab è un quaderno di campo, non un'applicazione. Carta calda quasi bianca, inchiostro grafite per il testo, un solo inchiostro blu notte per ciò che si può toccare o che è stato scelto. Le informazioni stanno su righe come in un registro; il ritmo nasce dalla tipografia e dallo spazio bianco. Tema solo chiaro, contrasto deciso per la serra luminosa, bersagli pensati per il pollice.",
+    "keyCharacteristics": ["Carta calda, testo grafite, un solo inchiostro blu notte come accento.", "Dati, etichette delle piante e codici in Geist Mono con cifre tabellari.", "Liste come righe di quaderno, non card.", "Piatto: ombre solo per ciò che galleggia.", "Bersagli grandi, azione principale in basso.", "Movimento solo per segnalare uno stato, 150–200 ms."],
+    "rules": [
+      { "name": "La regola dell'unico inchiostro", "body": "Il blu notte copre al massimo il 10% di una schermata: pulsante principale, selezione, focus.", "section": "colors" },
+      { "name": "La regola del verde negato", "body": "Il verde esiste solo come esito salvato.", "section": "colors" },
+      { "name": "La regola del non solo colore", "body": "Ogni stato comunicato dal colore ha anche testo, icona o forma.", "section": "colors" },
+      { "name": "La regola del dato in colonna", "body": "Ogni numero confrontabile usa Geist Mono con cifre tabellari.", "section": "typography" },
+      { "name": "La regola del grande unico", "body": "In una schermata di campo c'è un solo testo grande: il numero della pianta.", "section": "typography" },
+      { "name": "La regola della pagina piatta", "body": "Niente ombre su card, righe, pulsanti o campi.", "section": "elevation" }
+    ],
+    "dos": [],
+    "donts": []
+  }
+}
