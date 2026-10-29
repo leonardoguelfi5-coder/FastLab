@@ -114,3 +114,6 @@ Task 6: re-review fix round 1 → Approved (1083 Vitest, build OK, su copia del 
 Task 6: fix round 1/5 (6 addressed, 0 open; commits e643c1c..390e515)
 Task 6: minor (deferred): dopo un errore di rete arrivato comunque al server, un nuovo "+ Nuovo strumento" con lo stesso nome prende un id nuovo → 23505 (raro, coerente col piano); messaggio d'errore del modulo resta mentre si rinomina
 Task 6: complete (commits e643c1c..390e515, review clean)
+Task 9: implementatore (sonnet) DONE 8464ad6 — 1129 Vitest, build OK; `percorsoCampo` eliminato → percorsoHome/percorsoNuovaMisura/percorsoPiante/percorsoSezione; `percorsoMisura` (modifica) rinominato `percorsoModificaMisura`; Impostazioni e creazione → home; SchedaPianta → /misura; freccia di Campo → home
+Task 9: dispatched reviewer (sonnet) on 232fbcd..8464ad6
+Task 7: dispatched implementer (sonnet), BASE 8464ad6 (unico implementatore; revisore T9 su copia)
