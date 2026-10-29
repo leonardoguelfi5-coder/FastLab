@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { applicaAggiornamento, archiviaVoceCatalogo, copieDiProprieta, salvaVoceCatalogo } from '@/api/catalogo'
 import { chiavi, useCatalogo } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -91,7 +92,9 @@ export function Catalogo() {
     setModifica(apriModifica(vecchia))
     setAggiorna(false)
     setErrore(null)
-    setEsito(null)
+    // I saltati sono di quella voce e si azzerano; l'errore della fase esperimenti no: con il suo "Riprova" è l'unico
+    // modo di finire l'aggiornamento, e resta finché non riesce o non lo si chiude.
+    setEsito(prima => (prima?.tipo === 'errore' ? prima : null))
   }
 
   /** Il lavoro di una sola operazione alla volta: ferma il doppio invio e tiene i pulsanti spenti fino alla fine. */
@@ -147,13 +150,16 @@ export function Catalogo() {
         setErrore(messaggioErrore(e))
         return
       }
-      void queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
+      // Si aspetta l'elenco riletto prima di tornarci: riaprendo subito la voce non si parte dalla versione vecchia,
+      // che salvata di nuovo annullerebbe la modifica appena fatta.
+      await queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
       const { vecchia } = modifica
       if (vecchia && aggiorna) {
-        setEsito(await aggiornaEsperimenti(vecchia, nuova))
+        const nuovo = await aggiornaEsperimenti(vecchia, nuova)
+        setEsito(prima => nuovo ?? (prima?.tipo === 'errore' ? prima : null))
       } else {
         toastSalvato(vecchia ? 'Catalogo aggiornato.' : 'Strumento aggiunto al catalogo.')
-        setEsito(null)
+        setEsito(prima => (prima?.tipo === 'errore' ? prima : null))
       }
       setModifica(null)
     })
@@ -174,9 +180,10 @@ export function Catalogo() {
         setErrore(messaggioErrore(e))
         return
       }
-      void queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
-      toastSalvato('Strumento archiviato.')
-      setEsito(null)
+      await queryClient.invalidateQueries({ queryKey: chiavi.catalogo })
+      // Un'archiviazione non è un salvataggio: toast neutro, il segno verde è dei salvataggi (DESIGN.md).
+      toast.success('Strumento archiviato.')
+      setEsito(prima => (prima?.tipo === 'errore' ? prima : null))
       setModifica(null)
     })
   }
@@ -286,7 +293,7 @@ export function Catalogo() {
                     className="flex min-h-14 w-full flex-col gap-0.5 px-4 py-3.5 text-left transition-colors -outline-offset-2 hover:bg-carta-ombra/70 active:bg-carta-ombra"
                   >
                     <span className="text-title break-words text-grafite">{[v.icona, v.nome].filter(Boolean).join(' ')}</span>
-                    <span className="text-dato break-words text-grafite-tenue">{v.parametri.map(valoreCatalogo).join(' · ')}</span>
+                    <span className="text-dato font-mono tabular-nums break-words text-grafite-tenue">{v.parametri.map(valoreCatalogo).join(' · ')}</span>
                     {v.descrizione !== '' && <span className="text-sm break-words text-grafite-tenue">{v.descrizione}</span>}
                   </button>
                 </li>

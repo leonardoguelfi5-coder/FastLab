@@ -24,6 +24,7 @@ vi.mock('@/lib/id', async importOriginal => {
   return { nuovoId: vi.fn(vero.nuovoId) }
 })
 
+import { toast } from 'sonner'
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { applicaAggiornamento, archiviaVoceCatalogo, copieDiProprieta, listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
@@ -106,6 +107,8 @@ describe('Catalogo: l\'elenco', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Catalogo strumenti' })).toBeInTheDocument()
     const riga = rigaVoce('Ciras')
     expect(riga).toHaveTextContent('🍃 Ciras')
+    // I valori sono dati: Geist Mono con cifre tabellari.
+    expect(within(riga).getByText(/^A µmol/)).toHaveClass('font-mono', 'tabular-nums')
     expect(riga).toHaveTextContent('A µmol m⁻² s⁻¹ · gs mol m⁻² s⁻¹ · E mmol m⁻² s⁻¹ · Ci µmol mol⁻¹')
     expect(riga).toHaveTextContent('Scambi gassosi della foglia.')
     expect(screen.getAllByRole('listitem')).toHaveLength(SEMI_CATALOGO.length)
@@ -428,6 +431,68 @@ describe('Catalogo: una voce nuova', () => {
   })
 })
 
+describe('Catalogo: dopo il salvataggio e l\'errore sugli esperimenti', () => {
+  it('torna all\'elenco con il catalogo già riletto: riaprendo subito la voce si parte dalla versione salvata', async () => {
+    // Il catalogo "nel database": la rilettura dopo il salvataggio restituisce la voce nuova.
+    let db = SEMI_CATALOGO
+    vi.mocked(listaCatalogo).mockImplementation(async () => db)
+    vi.mocked(salvaVoceCatalogo).mockImplementation(async v => { db = db.map(x => (x.id === v.id ? v : x)) })
+    const { utente } = apri()
+    await apriVoce(utente, 'SPAD')
+    await utente.clear(screen.getByLabelText('Nome dello strumento'))
+    await utente.type(screen.getByLabelText('Nome dello strumento'), 'SPAD 502')
+    await salva(utente)
+
+    // Subito, senza attese: la riga è già quella nuova.
+    await screen.findByRole('list', { name: 'Catalogo strumenti' })
+    await utente.click(rigaVoce('SPAD 502'))
+    expect(await screen.findByLabelText('Nome dello strumento')).toHaveValue('SPAD 502')
+  })
+
+  it('l\'errore sugli esperimenti resta aprendo un\'altra voce o una voce nuova', async () => {
+    vi.mocked(copieDiProprieta).mockResolvedValue([copiaCiras()])
+    vi.mocked(applicaAggiornamento).mockRejectedValueOnce({ message: 'Failed to fetch' })
+    const { utente } = apri()
+    await apriVoce(utente, 'Ciras')
+    await utente.click(casella())
+    await utente.type(screen.getByLabelText('Nome dello strumento'), ' 2')
+    await salva(utente)
+    await screen.findByRole('alert')
+
+    // L'editor non mostra l'avviso, ma tornando all'elenco c'è ancora, aprendo una voce come una voce nuova.
+    await utente.click(rigaVoce('SPAD'))
+    await screen.findByLabelText('Nome dello strumento')
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati')
+    await utente.click(screen.getByRole('button', { name: '+ Nuovo strumento' }))
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati')
+
+    // Il Riprova resta disponibile in elenco e lo risolve.
+    await utente.click(await screen.findByRole('button', { name: 'Riprova' }))
+    await waitFor(() => expect(applicaAggiornamento).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+
+  it('salvare un\'altra voce senza casella non cancella l\'errore ancora da riprovare', async () => {
+    vi.mocked(copieDiProprieta).mockResolvedValue([copiaCiras()])
+    vi.mocked(applicaAggiornamento).mockRejectedValueOnce({ message: 'Failed to fetch' })
+    const { utente } = apri()
+    await apriVoce(utente, 'Ciras')
+    await utente.click(casella())
+    await utente.type(screen.getByLabelText('Nome dello strumento'), ' 2')
+    await salva(utente)
+    await screen.findByRole('alert')
+
+    await utente.click(rigaVoce('SPAD'))
+    await utente.type(await screen.findByLabelText('Nome dello strumento'), ' 2')
+    await salva(utente)
+
+    expect(await pronta()).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati')
+  })
+})
+
 describe('Catalogo: archiviare', () => {
   it('chiede conferma con il testo del piano e poi archivia la voce', async () => {
     const { utente } = apri()
@@ -441,7 +506,9 @@ describe('Catalogo: archiviare', () => {
     await utente.click(within(dialogo).getByRole('button', { name: 'Archivia' }))
 
     await waitFor(() => expect(archiviaVoceCatalogo).toHaveBeenCalledWith(ciras.id))
-    expect(toastSalvato).toHaveBeenCalledWith('Strumento archiviato.')
+    // Neutro: il segno verde è dei salvataggi.
+    expect(toast.success).toHaveBeenCalledWith('Strumento archiviato.')
+    expect(toastSalvato).not.toHaveBeenCalled()
     expect(await pronta()).toBeInTheDocument()
     expect(listaCatalogo).toHaveBeenCalledTimes(2)
   })

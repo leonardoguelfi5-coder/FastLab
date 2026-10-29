@@ -36,7 +36,7 @@ export function SceltaDalCatalogo({ voci, gia, onAggiungi, onNuovo, errore, onRi
               <li key={v.id} className="flex items-center gap-3 border-b border-riga px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-title break-words text-grafite">{[v.icona, v.nome].filter(Boolean).join(' ')}</p>
-                  <p className="text-dato break-words text-grafite-tenue">{v.parametri.map(valoreCatalogo).join(' · ')}</p>
+                  <p className="text-dato font-mono tabular-nums break-words text-grafite-tenue">{v.parametri.map(valoreCatalogo).join(' · ')}</p>
                 </div>
                 <Button
                   variant="outline"
