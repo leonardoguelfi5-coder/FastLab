@@ -129,3 +129,6 @@ Se i crediti di utilizzo finiscono, il lavoro riprende **in questa stessa sessio
 2. Si riparte dalla prima riga di "Avanzamento" senza `complete`. Ordine restante: T7 → T8 → T11 → T12 → T13 → revisione finale (opus) → un giro di correzioni.
 3. I brief stanno nella scratchpad della sessione (`briefs/`); se non ci sono più, si riscrivono dal piano e dai Ruling di questo registro.
 4. DB senza Docker: `pg_ctlcluster 16 main start`, poi `scripts/db-senza-docker/test-db.sh` (servono `postgresql-16-pgtap` e `libtap-parser-sourcehandler-pgtap-perl`, e `trust` per postgres in pg_hba).
+Task 7: implementatore (sonnet) DONE_WITH_CONCERNS 3f7b7b2 — 1157 Vitest, build OK; `strumentiConDati` a pagine da 1000; logica in impostazioni/useStrumenti.ts; elenco "Valori senza strumento" (solo Archivia) per i parametri rimasti fuori da ogni strumento; tabella fenologica senza "Archivia" (l'indice unico conta anche le archiviate); "Parametri archiviati" → "Valori archiviati"; EditorInclusioneStrumento e SezioneParametri eliminati
+Task 7: dispatched reviewer (sonnet) on 7b87068..3f7b7b2
+Task 8: dispatched implementer (sonnet), BASE 3f7b7b2 (unico implementatore; revisore T7 su copia)
