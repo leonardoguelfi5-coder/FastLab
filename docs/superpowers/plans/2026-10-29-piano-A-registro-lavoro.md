@@ -57,3 +57,6 @@ Task 10: dispatched implementer (sonnet) in parallelo alla revisione del T2 (sol
 Task 10: implementatore (sonnet) DONE 45cc256 — 912 Vitest (29 nuovi); fenologica con obbligatorio vuoto ma altre voci scritte → `incompleta` (non `da_fare`)
 Ruling: accettata la scelta `incompleta` per una pianta toccata senza le voci obbligatorie: va ripresa, non saltata (focus n. 2) — cost if wrong: nessuno
 Task 10: dispatched reviewer (sonnet) on 4f24688..45cc256 (solo i due file nuovi)
+Task 2: review (sonnet) → Needs fixes: (I1) una bozza ripresa perde il segno `mantenuto` (il valore mantenuto sembra digitato su quella pianta, focus n. 1)
+Ruling: T2 fix round 1 = I1 + minor 2 (setStrumento/setData azzerano i mantenuti se strumento o data effettiva cambiano, salvo `tieniIlGiorno`), 3 (segno solo con la spunta attiva), 4 (il cursore non cade sulle caselle "Mantieni"), 5 (copiaProfonda al posto di structuredClone) — cost if wrong: small
+Task 2: minor (deferred): con più letture il segno è solo sulla prima e sparisce cambiando la seconda (accettabile); ✓ della casella posizionato senza `top` → guardarlo su Safari iOS
