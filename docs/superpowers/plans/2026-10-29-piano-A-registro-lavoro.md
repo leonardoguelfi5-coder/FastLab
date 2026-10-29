@@ -148,3 +148,7 @@ Task 7: minor (deferred): tabella fenologica archiviata nel DB resta invisibile 
 Task 7: complete (commits 7b87068..3b7d3a5, review clean)
 Task 8: fix round 1 implemented 9534878 (1210 Vitest, build OK); re-review (sonnet) dispatched su copia
 Task 11: dispatched implementer (sonnet), BASE 9534878 (unico implementatore)
+Task 8: re-review fix round 1 → Approved (1210 Vitest, build OK, su copia)
+Task 8: fix round 1/5 (4 addressed, 0 open; commits 411d79c..9534878)
+Task 8: minor (deferred): il test "catalogo già riletto" non discrimina (mock troppo veloce); l'errore della fase esperimenti non ha "Chiudi"; un nuovo esito sostituisce l'errore pendente
+Task 8: complete (commits 411d79c..9534878, review clean)
