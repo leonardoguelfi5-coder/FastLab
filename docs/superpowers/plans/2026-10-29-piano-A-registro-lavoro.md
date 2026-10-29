@@ -146,3 +146,5 @@ Task 7: re-review fix round 1 → Approved (1207 Vitest, build OK, su copia)
 Task 7: fix round 1/5 (5 addressed, 0 open; commits 7b87068..3b7d3a5)
 Task 7: minor (deferred): tabella fenologica archiviata nel DB resta invisibile (ora l'errore è chiaro)
 Task 7: complete (commits 7b87068..3b7d3a5, review clean)
+Task 8: fix round 1 implemented 9534878 (1210 Vitest, build OK); re-review (sonnet) dispatched su copia
+Task 11: dispatched implementer (sonnet), BASE 9534878 (unico implementatore)
