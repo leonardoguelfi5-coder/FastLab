@@ -1,0 +1,38 @@
+# Registro del Piano A: strumenti e catalogo, home, misura sequenziale
+
+Piano: `docs/superpowers/plans/2026-10-29-fastlab-v3-piano-A-strumenti-home-misura.md`
+Spec: `docs/superpowers/specs/2026-10-29-fastlab-v3-home-strumenti-design.md` (+ mockup `2026-10-29-fastlab-v3-home-mockup.html`)
+Branch: `claude/app-review-improvements-c26294` (base 93065bd, piano A committato). Nessun merge su `main`.
+Base nel cloud: 840 test Vitest verdi, `tsc -b` pulito, lint pulito.
+
+Metodo: le skill `superpowers:subagent-driven-development` e `impeccable` non sono installate nell'ambiente cloud. Il controller segue lo stesso metodo a mano: brief scritti, implementatore → revisore → giri di correzione, registro qui. I brief UI riportano le regole di `PRODUCT.md`, `DESIGN.md` e `.impeccable/design.json`.
+Modelli: Opus per i Task 1, 3, 4, 12 e la revisione finale; Sonnet per gli altri (implementazione e revisione).
+
+## Database nel cloud
+
+Docker non c'è, ma nel container ci sono PostgreSQL 16 e pgTAP (installato con apt). Il controller ha preparato uno **strato che imita Supabase** (ruoli `anon`/`authenticated`/`service_role`, `auth.users`, `auth.uid()` da `request.jwt.claims`, schema `extensions` con pgcrypto, privilegi di default di Supabase su `public`): lo script ricrea il DB, applica tutte le migration in ordine ed esegue `pg_prove` su `supabase/tests/*.sql`.
+Sulla base del Piano 1 dà lo stesso risultato della sessione locale: 4 file, 104 test, PASS.
+
+Ruling: le migration nuove (0007–0010) e i loro pgTAP si verificano nel cloud con lo strato emulato; restano comunque da confermare in locale con `npx supabase db reset` + `npm run test:db` (GoTrue, PostgREST e i privilegi reali di Supabase non sono emulati) — cost if wrong: un giro in locale.
+
+## Scansione preliminare
+
+| Coppia / task | Produce → usa | Esito |
+|---|---|---|
+| T1 → tutti | `Strumento`, `strumento_id`, `salvaStrumento` → T2–T12 | coerente |
+| T1 ↔ modello Hydrochar | il modello resta con 4 strumenti, ma "Altezza" è sia in "Altezza" sia in "Fenologici"; il nuovo indice `strumento_parametri_un_solo_strumento` farebbe fallire `crea_esperimento` dal modello fino al T5 | CONFLITTO |
+| T2 → T12 | `setMantieni`/`aggiornaMantenuti`/`valoriIniziali({mantenuti})` → MisuraPianta | coerente |
+| T3 → T4–T8 | `VoceCatalogo`, `listaCatalogo`, `salvaVoceCatalogo`, `strumentoDaCatalogo` | coerente |
+| T3 ↔ `rls.test.sql` | test "ogni tabella ha RLS" e "anon senza privilegi/funzioni" → valgono anche per `catalogo_strumenti` e per la RPC del T11 | coerente (va rispettato) |
+| T5 → T6 | `bozzaHydrochar(catalogo)` cambia firma: i chiamanti esistenti (`SceltaIniziale`) devono continuare a compilare | coerente (passano `[]` o il catalogo) |
+| T6/T7 ↔ T8 | `EditorStrumento`, `SceltaDalCatalogo` riusati | coerente |
+| T9 ↔ T11/T12 | la striscia della home porta a `/misura`, che esiste solo dal T11; `Campo.tsx` resta senza route dal T9 al T12 | LACUNA |
+| T10 → T9/T11/T12 | `statoPianta`, `prossimaDaMisurare`, `riepilogoGiro`, `progressoOggi` | coerente (T10 prima del T9) |
+| T12 ↔ Piano 1 | `RiquadroOggi`/`ModuloOggi` riusati: bozze, `nuovoId()`, finestra 500 ms, niente doppioni | coerente (da non rompere) |
+| T13 grep | `passat` resta nei soli commenti/nomi storici delle migration vecchie | coerente |
+
+Ruling: nel T1 il modello Hydrochar toglie "Altezza" dallo strumento "Fenologici" (anticipa la decisione del T5: niente Altezza nella tabella fenologica), così il modello resta valido con il nuovo indice unico — cost if wrong: nessuno, il T5 ristruttura comunque il modello.
+Ruling: nel T9 la route `/esperimenti/:espId/misura` monta provvisoriamente `Campo` (la vecchia schermata di campo), così la striscia "Nuova misura" porta già a una misura; il T11 la sostituisce con `SceltaStrumento` e il T12 elimina `Campo.tsx` — cost if wrong: nessuno.
+
+## Avanzamento
+Ruling: lo strato emulato è nel repository (`scripts/db-senza-docker/`, script `test-db.sh` + `stub-supabase.sql`), così lo usano gli agenti e le prossime sessioni cloud (Piani B–D) — cost if wrong: due file da togliere.
