@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Strumento, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
@@ -335,31 +335,6 @@ describe('validaMisura', () => {
       '«Note» è obbligatorio.',
     ])
   })
-})
-
-describe('contaPerPianta', () => {
-  it('conta solo lo strumento indicato', () => {
-    const misure = [
-      mis(D, '09:00', {}, { pianta_id: 'P1', strumento_id: 'Termometro' }),
-      mis(D, '10:00', {}, { pianta_id: 'P1', strumento_id: 'Termometro' }),
-      mis(D, '11:00', {}, { pianta_id: 'P1', strumento_id: 'SPAD' }),
-    ]
-    expect(contaPerPianta(misure, 'Termometro')).toEqual(new Map([['P1', 2]]))
-  })
-  it('una voce per ogni pianta che ha misure, nessuna per le altre', () => {
-    const misure = [
-      mis(D, '09:00', {}, { pianta_id: 'P1', strumento_id: 'T' }),
-      mis(D, '09:05', {}, { pianta_id: 'P2', strumento_id: 'T' }),
-      mis(D, '09:10', {}, { pianta_id: 'P2', strumento_id: 'T' }),
-      mis(D, '09:15', {}, { pianta_id: 'P3', strumento_id: 'ALTRA' }),
-    ]
-    const m = contaPerPianta(misure, 'T')
-    expect(m.get('P1')).toBe(1)
-    expect(m.get('P2')).toBe(2)
-    expect(m.has('P3')).toBe(false)
-    expect(m.size).toBe(2)
-  })
-  it('nessuna misura → mappa vuota', () => expect(contaPerPianta([], 'T').size).toBe(0))
 })
 
 describe('raggruppaStoria', () => {

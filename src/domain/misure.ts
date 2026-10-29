@@ -180,15 +180,6 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
   return { errori, avvisi }
 }
 
-/** Quante misure dello strumento indicato ha ogni pianta (le piante senza misure non compaiono). */
-export function contaPerPianta(misure: Misura[], strumentoId: string): Map<string, number> {
-  const conteggi = new Map<string, number>()
-  for (const m of misure) {
-    if (m.strumento_id === strumentoId) conteggi.set(m.pianta_id, (conteggi.get(m.pianta_id) ?? 0) + 1)
-  }
-  return conteggi
-}
-
 /** Misure raggruppate per giorno: giorni dal più recente, ore dalla più antica all'interno del giorno. */
 export function raggruppaStoria(misure: Misura[]): { data: string; misure: Misura[] }[] {
   const ordinate = [...misure].sort((a, b) => confronta(b.data_rilievo, a.data_rilievo) || confronta(a.ora, b.ora))

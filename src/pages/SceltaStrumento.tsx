@@ -116,7 +116,7 @@ function VoceStrumento({ strumento, testo, onScegli }: { strumento: Strumento; t
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-[550] text-grafite">{strumento.nome}</span>
         {/* Sempre presente, anche vuota: la riga non cambia altezza quando i dati arrivano. */}
-        <span id={idTesto} aria-hidden className="min-h-[1.3em] font-mono text-label tabular-nums text-grafite-tenue">{testo}</span>
+        <span id={idTesto} aria-hidden className="min-h-[1.3em] font-mono text-dato tabular-nums text-grafite-tenue">{testo}</span>
       </span>
       <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />
     </button>
@@ -173,7 +173,7 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
             />
             {riga === inCima && riga.prossima && (
               <div className="px-4 pb-3">
-                <Button size="lg" className="w-full" onClick={() => scegli(riga)}>
+                <Button size="lg" className="h-14 w-full" onClick={() => scegli(riga)}>
                   {`Riprendi dalla pianta ${riga.prossima.etichetta}`}
                 </Button>
               </div>

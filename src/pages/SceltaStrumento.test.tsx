@@ -283,7 +283,10 @@ describe('SceltaStrumento: lo strumento in corso', () => {
     expect(nomi[3]).toContain('Tabella fenologica')
     // L'azione sta nella riga dello strumento in corso, subito dopo di lui.
     const primo = screen.getAllByRole('listitem')[0]
-    expect(within(primo).getByRole('button', { name: 'Riprendi dalla pianta 35' })).toBeInTheDocument()
+    const riprendi = within(primo).getByRole('button', { name: 'Riprendi dalla pianta 35' })
+    expect(riprendi).toBeInTheDocument()
+    // Alto 56 px come le righe dell'elenco.
+    expect(riprendi).toHaveClass('h-14')
   })
 
   it('"Riprendi" porta alla prima pianta non fatta, saltando le fatte e riprendendo le incomplete', async () => {
