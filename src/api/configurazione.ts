@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Parametro, Passata, Pianta } from '@/domain/tipi'
+import { controllaRighe } from './righe'
 import { aRigaParametro, aRigaPassata, aRigaPassataParametro, aRigaPianta } from './mappers'
 
 /** Crea o aggiorna un parametro (upsert per id). Cambiare il tipo di un parametro con dati fallisce con PARAMETRO_CON_DATI. */
@@ -29,13 +30,16 @@ export async function pianteConDati(espId: string): Promise<Set<string>> {
 export async function eliminaOArchiviaParametro(espId: string, p: Parametro): Promise<'eliminato' | 'archiviato'> {
   const conDati = await parametriConDati(espId)
   if (conDati.has(p.id)) {
-    const { error } = await supabase.from('parametri').update({ archiviato: true }).eq('id', p.id).eq('esperimento_id', espId)
-    if (error) throw error
+    await archiviaParametro(espId, p.id)
     return 'archiviato'
   }
-  const { error } = await supabase.from('parametri').delete().eq('id', p.id).eq('esperimento_id', espId)
-  if (error) throw error
+  controllaRighe(await supabase.from('parametri').delete().eq('id', p.id).eq('esperimento_id', espId).select('id'))
   return 'eliminato'
+}
+
+/** Archivia un parametro (mai eliminato): sparisce dai moduli, i suoi dati restano. */
+export async function archiviaParametro(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('parametri').update({ archiviato: true }).eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
 /**
@@ -65,8 +69,7 @@ export async function salvaPassata(espId: string, p: Passata): Promise<void> {
 
 /** Elimina una passata dell'esperimento (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
 export async function eliminaPassata(espId: string, id: string): Promise<void> {
-  const { error } = await supabase.from('passate').delete().eq('id', id).eq('esperimento_id', espId)
-  if (error) throw error
+  controllaRighe(await supabase.from('passate').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
 export async function aggiungiPiante(espId: string, piante: Pianta[]): Promise<void> {
@@ -75,20 +78,18 @@ export async function aggiungiPiante(espId: string, piante: Pianta[]): Promise<v
   if (error) throw error
 }
 
+/** Aggiorna una pianta dell'esperimento. Cambiarne il trattamento con misure fallisce con PIANTA_CON_DATI. */
 export async function aggiornaPianta(espId: string, p: Pianta): Promise<void> {
   const { id, esperimento_id, ...campi } = aRigaPianta(espId, p)
-  const { error } = await supabase.from('piante').update(campi).eq('id', id).eq('esperimento_id', esperimento_id)
-  if (error) throw error
+  controllaRighe(await supabase.from('piante').update(campi).eq('id', id).eq('esperimento_id', esperimento_id).select('id'))
 }
 
 /** Elimina una pianta dell'esperimento. Fallisce con 23503 se ha già misure. */
 export async function eliminaPianta(espId: string, id: string): Promise<void> {
-  const { error } = await supabase.from('piante').delete().eq('id', id).eq('esperimento_id', espId)
-  if (error) throw error
+  controllaRighe(await supabase.from('piante').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
 }
 
 /** Rinomina un trattamento dell'esperimento. Fallisce con 23505 se l'etichetta c'è già. */
 export async function aggiornaTrattamento(espId: string, id: string, etichetta: string): Promise<void> {
-  const { error } = await supabase.from('trattamenti').update({ etichetta }).eq('id', id).eq('esperimento_id', espId)
-  if (error) throw error
+  controllaRighe(await supabase.from('trattamenti').update({ etichetta }).eq('id', id).eq('esperimento_id', espId).select('id'))
 }

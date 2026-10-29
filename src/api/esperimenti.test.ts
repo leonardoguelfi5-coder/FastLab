@@ -4,6 +4,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
+import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import { configDiEsempio } from '@/domain/test-helpers'
 import { clonaConfig } from '@/domain/bozza'
 import type { RigheConfig } from './mappers'
@@ -62,15 +63,23 @@ describe('creaEsperimento', () => {
 
 describe('aggiornaEsperimento', () => {
   it('aggiorna solo i campi modificabili dell\'esperimento indicato', async () => {
+    mock.risponde('esperimenti', { data: [{ id: 'E' }] })
     await aggiornaEsperimento('E', { nome: 'Nuovo', stato: 'concluso' })
 
     expect(mock.di('esperimenti').map(c => [c.metodo, ...c.args])).toEqual([
       ['update', { nome: 'Nuovo', stato: 'concluso' }],
       ['eq', 'id', 'E'],
+      ['select', 'id'],
     ])
   })
 
+  it('se nessuna riga è stata aggiornata (esperimento rimosso o non accessibile) lo dice', async () => {
+    mock.risponde('esperimenti', { data: [] })
+    await expect(aggiornaEsperimento('E', { nome: 'Nuovo' })).rejects.toThrow(ELEMENTO_NON_TROVATO)
+  })
+
   it('non manda campi estranei, né creato_da né id', async () => {
+    mock.risponde('esperimenti', { data: [{ id: 'E' }] })
     await aggiornaEsperimento('E', { note: 'x', creato_da: 'u1', id: 'altro' } as never)
 
     expect(mock.di('esperimenti')[0].args).toEqual([{ note: 'x' }])

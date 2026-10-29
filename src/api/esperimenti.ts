@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { BozzaEsperimento, ConfigEsperimento, Esperimento } from '@/domain/tipi'
+import { controllaRighe } from './righe'
 import { daRigheConfig, type RigheConfig } from './mappers'
 
 /** Una riga dell'elenco esperimenti (RPC riepilogo_esperimenti). */
@@ -74,6 +75,5 @@ export async function aggiornaEsperimento(espId: string, patch: Partial<Omit<Esp
   }
   if (Object.keys(campi).length === 0) return
 
-  const { error } = await supabase.from('esperimenti').update(campi).eq('id', espId)
-  if (error) throw error
+  controllaRighe(await supabase.from('esperimenti').update(campi).eq('id', espId).select('id'))
 }

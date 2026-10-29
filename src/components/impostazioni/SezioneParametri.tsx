@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { UseQueryResult } from '@tanstack/react-query'
-import { eliminaOArchiviaParametro, salvaParametro } from '@/api/configurazione'
+import { useQueryClient, type UseQueryResult } from '@tanstack/react-query'
+import { archiviaParametro, eliminaOArchiviaParametro, parametriConDati, salvaParametro } from '@/api/configurazione'
+import { chiavi } from '@/api/query'
 import { EditorParametro } from '@/components/config/EditorParametro'
 import { riassuntoParametro } from '@/components/config/riassunti'
 import { Conferma } from '@/components/Conferma'
@@ -10,7 +11,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { nuovoParametro, problemiParametro } from '@/domain/bozza'
 import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
-import { useAzione } from './azione'
+import { ErroreDaMostrare, useAzione } from './azione'
 import { useBozze, useSegnalaModifiche } from './modifiche'
 import { ParametriArchiviati } from './ParametriArchiviati'
 import { ControlloDati, Sezione, Spiegazione } from './Sezione'
@@ -46,14 +47,18 @@ interface SezioneParametriProps {
  * nuovo, che esiste solo dopo il suo "Salva". Con dati un parametro si archivia (i dati restano), senza si elimina.
  */
 export function SezioneParametri({ espId, config, conDati }: SezioneParametriProps) {
+  const queryClient = useQueryClient()
   const { inCorso, esegui } = useAzione(espId)
   const bozze = useBozze<Parametro>()
   // I parametri nuovi come sono stati creati: quel che si scrive sta nelle bozze, come per quelli salvati.
-  const [nuovi, setNuovi] = useState<Parametro[]>([])
+  const [creati, setCreati] = useState<Parametro[]>([])
   const [aperto, setAperto] = useState<string | null>(null)
   const [daEliminare, setDaEliminare] = useState<{ parametro: Parametro; aperto: boolean } | null>(null)
   const dati = conDati.data
 
+  // Un nuovo già arrivato in configurazione (salvato anche se la risposta si è persa) è ormai un parametro salvato.
+  const inConfig = new Set(config.parametri.map(p => p.id))
+  const nuovi = creati.filter(p => !inConfig.has(p.id))
   const salvati = config.parametri.filter(p => !p.archiviato)
   const archiviati = config.parametri.filter(p => p.archiviato)
   const modificati = salvati.filter(p => bozze.modificato(p))
@@ -62,7 +67,8 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
   function problemi(p: Parametro, salvato: Parametro | null): string[] {
     const altri = [...config.parametri, ...nuovi.map(bozze.valore)].filter(x => x.id !== p.id)
     const elenco = problemiParametro(p, altri)
-    if (salvato && dati?.has(salvato.id) && sottoCampiTolti(salvato, p)) {
+    // Finché non si sa (o se la lettura è fallita) si fa come se avesse dati.
+    if (salvato && dati?.has(salvato.id) !== false && sottoCampiTolti(salvato, p)) {
       elenco.push('Un sotto-campo con dati non si può togliere: i valori registrati sparirebbero. Puoi rinominarlo.')
     }
     return elenco
@@ -71,13 +77,25 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
   function aggiungi() {
     const ordine = Math.max(-1, ...config.parametri.map(p => p.ordine), ...nuovi.map(p => p.ordine)) + 1
     const p = nuovoParametro(ordine)
-    setNuovi(n => [...n, p])
+    setCreati(n => [...n, p])
     setAperto(p.id)
   }
 
-  async function salva(inviato: Parametro, nuovo: boolean) {
+  async function salva(inviato: Parametro, salvato: Parametro | null) {
+    const nuovo = salvato === null
     const daSalvare = pulito(inviato)
-    const riuscito = await esegui(() => salvaParametro(espId, daSalvare), {
+    const riuscito = await esegui(async () => {
+      // Togliere un sotto-campo è ammesso solo senza dati: una misura può essere arrivata dopo l'apertura.
+      if (salvato && sottoCampiTolti(salvato, daSalvare)) {
+        const fresche = await queryClient.fetchQuery({
+          queryKey: chiavi.parametriConDati(espId), queryFn: () => parametriConDati(espId), staleTime: 0,
+        })
+        if (fresche.has(salvato.id)) {
+          throw new ErroreDaMostrare(`Il parametro «${salvato.nome}» ha già dei dati: i suoi sotto-campi non si possono togliere.`)
+        }
+      }
+      await salvaParametro(espId, daSalvare)
+    }, {
       messaggio: nuovo
         ? `Parametro «${daSalvare.nome}» salvato. Per misurarlo, aggiungilo a una passata.`
         : `Parametro «${daSalvare.nome}» salvato.`,
@@ -85,11 +103,12 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
     })
     if (!riuscito) return
     // Un parametro nuovo ora esiste e lascia i nuovi. Se nel frattempo si è scritto ancora, la bozza resta.
-    if (nuovo) setNuovi(n => n.filter(x => x.id !== inviato.id))
+    if (nuovo) setCreati(n => n.filter(x => x.id !== inviato.id))
     bozze.salvata(inviato)
   }
 
-  async function eliminaOArchivia(p: Parametro) {
+  /** Dopo la conferma di "Elimina": se nel frattempo sono arrivati dati, il server archivia invece di eliminare. */
+  async function elimina(p: Parametro) {
     setDaEliminare({ parametro: p, aperto: false })
     const riuscito = await esegui(() => eliminaOArchiviaParametro(espId, p), {
       messaggio: esito => (esito === 'archiviato' ? 'Parametro archiviato.' : 'Parametro eliminato.'),
@@ -102,14 +121,28 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
             passate: c.passate.map(pa => ({ ...pa, parametri: pa.parametri.filter(pp => pp.parametro_id !== p.id) })),
           },
     })
-    if (riuscito) {
-      bozze.scarta(p.id)
-      setAperto(a => (a === p.id ? null : a))
-    }
+    if (riuscito) chiudi(p.id)
+  }
+
+  /** "Archivia" archivia e basta: non elimina mai, anche se nel frattempo i dati fossero spariti. */
+  async function archivia(p: Parametro) {
+    const riuscito = await esegui(() => archiviaParametro(espId, p.id), {
+      messaggio: 'Parametro archiviato.',
+      neutro: true,
+      aggiorna: c => ({ ...c, parametri: c.parametri.map(x => (x.id === p.id ? { ...x, archiviato: true } : x)) }),
+    })
+    if (riuscito) chiudi(p.id)
+  }
+
+  function chiudi(id: string) {
+    // Anche dai creati: un nuovo salvato senza risposta, poi eliminato, non deve ricomparire come "Non salvato".
+    setCreati(n => n.filter(x => x.id !== id))
+    bozze.scarta(id)
+    setAperto(a => (a === id ? null : a))
   }
 
   function scartaNuovo(id: string) {
-    setNuovi(n => n.filter(x => x.id !== id))
+    setCreati(n => n.filter(x => x.id !== id))
     bozze.scarta(id)
   }
 
@@ -165,7 +198,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
                 <Button
                   variant="outline"
                   disabled={!modificato || elenco.length > 0 || inCorso}
-                  onClick={() => void salva(valore, salvato === null)}
+                  onClick={() => void salva(valore, salvato)}
                 >
                   {inCorso ? 'Salvataggio…' : 'Salva'}
                 </Button>
@@ -178,7 +211,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
                   Scarta
                 </Button>
               ) : haDati ? (
-                <Button variant="outline" size="sm" className="self-start" disabled={inCorso} onClick={() => void eliminaOArchivia(salvato)}>
+                <Button variant="outline" size="sm" className="self-start" disabled={inCorso} onClick={() => void archivia(salvato)}>
                   Archivia
                 </Button>
               ) : (
@@ -207,7 +240,7 @@ export function SezioneParametri({ espId, config, conDati }: SezioneParametriPro
         annulla="Annulla"
         conferma="Elimina"
         onAnnulla={() => setDaEliminare(d => d && { ...d, aperto: false })}
-        onConferma={() => { if (daEliminare) void eliminaOArchivia(daEliminare.parametro) }}
+        onConferma={() => { if (daEliminare) void elimina(daEliminare.parametro) }}
       />
     </Sezione>
   )

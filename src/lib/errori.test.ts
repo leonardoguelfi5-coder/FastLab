@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { eMisuraNonTrovata, MISURA_NON_TROVATA, messaggioErrore } from './errori'
+import { ELEMENTO_NON_TROVATO, eMisuraNonTrovata, MISURA_NON_TROVATA, messaggioErrore } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -9,6 +9,21 @@ const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono an
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
 
 describe('messaggioErrore', () => {
+  it('pianta con dati che cambia trattamento (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'PIANTA_CON_DATI' }))
+      .toBe('Questa pianta ha già delle misure: il trattamento non si può cambiare. Etichetta e blocco sì.')
+  })
+
+  it('riga spostata in un altro esperimento (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'ESPERIMENTO_NON_MODIFICABILE' }))
+      .toBe('Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.')
+  })
+
+  it('elemento non trovato (nessuna riga aggiornata o eliminata): il messaggio è già per l\'utente', () => {
+    expect(messaggioErrore(new Error(ELEMENTO_NON_TROVATO))).toBe(ELEMENTO_NON_TROVATO)
+    expect(ELEMENTO_NON_TROVATO).toBe('Elemento non trovato: forse è stato rimosso. Ricarica la pagina.')
+  })
+
   it('senza rete (navigator.onLine === false)', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     expect(messaggioErrore(new Error('qualunque cosa'))).toBe(MSG_OFFLINE)

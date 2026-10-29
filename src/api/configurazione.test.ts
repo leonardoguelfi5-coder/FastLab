@@ -5,9 +5,10 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
 import type { Parametro, Passata, Pianta } from '@/domain/tipi'
+import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, eliminaOArchiviaParametro, eliminaPassata, eliminaPianta,
-  pianteConDati, parametriConDati, salvaParametro, salvaPassata,
+  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaPassata,
+  eliminaPianta, pianteConDati, parametriConDati, salvaParametro, salvaPassata,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -17,6 +18,8 @@ const parametro: Parametro = {
   ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
 }
 const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
+/** La risposta di un update o di una delete con `.select('id')`: le righe toccate. */
+const toccata = (id: string) => ({ data: [{ id }] })
 
 let mock: ReturnType<typeof simulaSupabase>
 beforeEach(() => {
@@ -74,20 +77,30 @@ describe('parametriConDati e pianteConDati', () => {
 describe('eliminaOArchiviaParametro', () => {
   it('senza dati elimina il parametro', async () => {
     mock.risponde('rpc:parametri_con_dati', { data: [] })
+    mock.risponde('parametri', toccata('par1'))
 
     expect(await eliminaOArchiviaParametro('E', parametro)).toBe('eliminato')
     expect(mock.di('parametri').map(c => [c.metodo, ...c.args])).toEqual([
-      ['delete'], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'],
+      ['delete'], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
   })
 
   it('con dati lo archivia e non lo elimina', async () => {
     mock.risponde('rpc:parametri_con_dati', { data: ['par1'] })
+    mock.risponde('parametri', toccata('par1'))
 
     expect(await eliminaOArchiviaParametro('E', parametro)).toBe('archiviato')
     expect(mock.di('parametri').map(c => [c.metodo, ...c.args])).toEqual([
-      ['update', { archiviato: true }], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'],
+      ['update', { archiviato: true }], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
+  })
+
+  it('se nessuna riga è stata toccata (parametro già rimosso) lo dice, in entrambi i casi', async () => {
+    mock.risponde('parametri', { data: [] })
+    mock.risponde('rpc:parametri_con_dati', { data: [] })
+    await expect(eliminaOArchiviaParametro('E', parametro)).rejects.toThrow(ELEMENTO_NON_TROVATO)
+    mock.risponde('rpc:parametri_con_dati', { data: ['par1'] })
+    await expect(eliminaOArchiviaParametro('E', parametro)).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('lancia l\'errore se il controllo dei dati fallisce, senza toccare il parametro', async () => {
@@ -101,6 +114,24 @@ describe('eliminaOArchiviaParametro', () => {
     mock.risponde('rpc:parametri_con_dati', { data: [] })
     mock.risponde('parametri', { error: e })
     await expect(eliminaOArchiviaParametro('E', parametro)).rejects.toBe(e)
+  })
+})
+
+describe('archiviaParametro', () => {
+  it('archivia il parametro dell\'esperimento, senza mai eliminarlo', async () => {
+    mock.risponde('parametri', toccata('par1'))
+    await archiviaParametro('E', 'par1')
+    expect(mock.di('parametri').map(c => [c.metodo, ...c.args])).toEqual([
+      ['update', { archiviato: true }], ['eq', 'id', 'par1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+    ])
+    expect(supabase.rpc).not.toHaveBeenCalled()
+  })
+
+  it('lancia l\'errore se nessuna riga è stata toccata, o quello di Supabase', async () => {
+    mock.risponde('parametri', { data: [] })
+    await expect(archiviaParametro('E', 'par1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
+    mock.risponde('parametri', { error: errore })
+    await expect(archiviaParametro('E', 'par1')).rejects.toBe(errore)
   })
 })
 
@@ -154,10 +185,16 @@ describe('salvaPassata', () => {
 
 describe('eliminaPassata', () => {
   it('elimina per id e esperimento', async () => {
+    mock.risponde('passate', toccata('pa1'))
     await eliminaPassata('E', 'pa1')
     expect(mock.di('passate').map(c => [c.metodo, ...c.args])).toEqual([
-      ['delete'], ['eq', 'id', 'pa1'], ['eq', 'esperimento_id', 'E'],
+      ['delete'], ['eq', 'id', 'pa1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
+  })
+
+  it('se non ha eliminato nulla lo dice', async () => {
+    mock.risponde('passate', { data: [] })
+    await expect(eliminaPassata('E', 'pa1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('lancia l\'errore (misure collegate: 23503)', async () => {
@@ -188,13 +225,20 @@ describe('piante', () => {
   })
 
   it('aggiornaPianta aggiorna i campi della pianta per id e esperimento', async () => {
+    mock.risponde('piante', toccata('p1'))
     await aggiornaPianta('E', { ...pianta, etichetta: '9', blocco: 'B' })
 
     expect(mock.di('piante').map(c => [c.metodo, ...c.args])).toEqual([
       ['update', { trattamento_id: 't1', etichetta: '9', blocco: 'B', ordine: 0 }],
       ['eq', 'id', 'p1'],
       ['eq', 'esperimento_id', 'E'],
+      ['select', 'id'],
     ])
+  })
+
+  it('aggiornaPianta senza righe toccate lo dice', async () => {
+    mock.risponde('piante', { data: [] })
+    await expect(aggiornaPianta('E', pianta)).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('aggiornaPianta lancia l\'errore di Supabase', async () => {
@@ -203,10 +247,16 @@ describe('piante', () => {
   })
 
   it('eliminaPianta elimina per id e esperimento', async () => {
+    mock.risponde('piante', toccata('p1'))
     await eliminaPianta('E', 'p1')
     expect(mock.di('piante').map(c => [c.metodo, ...c.args])).toEqual([
-      ['delete'], ['eq', 'id', 'p1'], ['eq', 'esperimento_id', 'E'],
+      ['delete'], ['eq', 'id', 'p1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
+  })
+
+  it('eliminaPianta senza righe toccate lo dice', async () => {
+    mock.risponde('piante', { data: null })
+    await expect(eliminaPianta('E', 'p1')).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('eliminaPianta lancia l\'errore (misure collegate: 23503)', async () => {
@@ -218,10 +268,16 @@ describe('piante', () => {
 
 describe('aggiornaTrattamento', () => {
   it('aggiorna l\'etichetta per id e esperimento', async () => {
+    mock.risponde('trattamenti', toccata('t1'))
     await aggiornaTrattamento('E', 't1', 'Nuova')
     expect(mock.di('trattamenti').map(c => [c.metodo, ...c.args])).toEqual([
-      ['update', { etichetta: 'Nuova' }], ['eq', 'id', 't1'], ['eq', 'esperimento_id', 'E'],
+      ['update', { etichetta: 'Nuova' }], ['eq', 'id', 't1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
     ])
+  })
+
+  it('senza righe toccate lo dice', async () => {
+    mock.risponde('trattamenti', { data: [] })
+    await expect(aggiornaTrattamento('E', 't1', 'x')).rejects.toThrow(ELEMENTO_NON_TROVATO)
   })
 
   it('lancia l\'errore di Supabase', async () => {

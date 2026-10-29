@@ -6,6 +6,9 @@ const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di 
 /** Il messaggio con cui `caricaMisura` dice che la misura non c'è (cancellata, o non di questo utente). */
 export const MISURA_NON_TROVATA = 'Misura non trovata.'
 
+/** Un aggiornamento o un'eliminazione che non ha toccato nessuna riga: l'elemento non c'è più (o non è accessibile). */
+export const ELEMENTO_NON_TROVATO = 'Elemento non trovato: forse è stato rimosso. Ricarica la pagina.'
+
 export function eMisuraNonTrovata(e: unknown): boolean {
   return e instanceof Error && e.message === MISURA_NON_TROVATA
 }
@@ -36,6 +39,13 @@ export function messaggioErrore(e: unknown): string {
   if (messaggio.includes('PARAMETRO_CON_DATI')) {
     return 'Questo parametro ha già dei dati: non si può eliminare né cambiarne il tipo. Puoi archiviarlo.'
   }
+  if (messaggio.includes('PIANTA_CON_DATI')) {
+    return 'Questa pianta ha già delle misure: il trattamento non si può cambiare. Etichetta e blocco sì.'
+  }
+  if (messaggio.includes('ESPERIMENTO_NON_MODIFICABILE')) {
+    return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
+  }
+  if (messaggio === ELEMENTO_NON_TROVATO) return ELEMENTO_NON_TROVATO
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
 

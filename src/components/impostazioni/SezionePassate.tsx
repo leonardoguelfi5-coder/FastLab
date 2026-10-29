@@ -22,33 +22,43 @@ export function SezionePassate({ espId, config }: { espId: string; config: Confi
   const { inCorso, esegui } = useAzione(espId)
   const bozze = useBozze<Passata>()
   // Le passate nuove come sono state create: quel che si scrive sta nelle bozze, come per quelle salvate.
-  const [nuove, setNuove] = useState<Passata[]>([])
+  const [create, setCreate] = useState<Passata[]>([])
   const [aperta, setAperta] = useState<string | null>(null)
   const [daEliminare, setDaEliminare] = useState<{ passata: Passata; aperto: boolean } | null>(null)
 
+  // Una nuova già arrivata in configurazione (salvata anche se la risposta si è persa) è ormai una passata salvata.
+  const inConfig = new Set(config.passate.map(p => p.id))
+  const nuove = create.filter(p => !inConfig.has(p.id))
   const attivi = new Set(config.parametri.filter(p => !p.archiviato).map(p => p.id))
   useSegnalaModifiche('passate', nuove.length > 0 || config.passate.some(p => bozze.modificato(p)))
 
   function aggiungi() {
     const ordine = Math.max(-1, ...config.passate.map(p => p.ordine), ...nuove.map(p => p.ordine)) + 1
     const p = nuovaPassata(ordine)
-    setNuove(n => [...n, p])
+    setCreate(n => [...n, p])
     setAperta(p.id)
   }
 
   function scartaNuova(id: string) {
-    setNuove(n => n.filter(x => x.id !== id))
+    setCreate(n => n.filter(x => x.id !== id))
     bozze.scarta(id)
   }
 
   async function salva(inviata: Passata, nuova: boolean) {
-    const daSalvare: Passata = { ...inviata, nome: inviata.nome.trim(), icona: inviata.icona?.trim() || null }
+    // Un parametro eliminato nel frattempo non si manda: il collegamento fallirebbe (23503).
+    const esistenti = new Set(config.parametri.map(p => p.id))
+    const daSalvare: Passata = {
+      ...inviata,
+      nome: inviata.nome.trim(),
+      icona: inviata.icona?.trim() || null,
+      parametri: inviata.parametri.filter(pp => esistenti.has(pp.parametro_id)),
+    }
     const riuscito = await esegui(() => salvaPassata(espId, daSalvare), {
       messaggio: `Passata «${daSalvare.nome}» salvata.`,
       aggiorna: c => ({ ...c, passate: sostituisci(c.passate, daSalvare) }),
     })
     if (!riuscito) return
-    if (nuova) setNuove(n => n.filter(x => x.id !== inviata.id))
+    if (nuova) setCreate(n => n.filter(x => x.id !== inviata.id))
     bozze.salvata(inviata)
   }
 
@@ -60,6 +70,7 @@ export function SezionePassate({ espId, config }: { espId: string; config: Confi
       aggiorna: c => ({ ...c, passate: c.passate.filter(x => x.id !== p.id) }),
     })
     if (riuscito) {
+      setCreate(n => n.filter(x => x.id !== p.id))
       bozze.scarta(p.id)
       setAperta(a => (a === p.id ? null : a))
     }

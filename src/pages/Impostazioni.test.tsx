@@ -18,6 +18,7 @@ vi.mock('@/api/esperimenti', () => ({
 }))
 vi.mock('@/api/configurazione', () => ({
   salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
+  archiviaParametro: vi.fn(),
   salvaPassata: vi.fn(), eliminaPassata: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
   aggiornaTrattamento: vi.fn(),
 }))
@@ -29,7 +30,7 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
 import {
-  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, eliminaOArchiviaParametro, eliminaPassata, eliminaPianta,
+  aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, eliminaOArchiviaParametro, eliminaPassata, eliminaPianta,
   parametriConDati, pianteConDati, salvaParametro, salvaPassata,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
@@ -333,17 +334,20 @@ describe('Impostazioni: parametri', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro eliminato.'))
   })
 
-  it('"Archivia" su un parametro con dati lo archivia e lo dice', async () => {
-    vi.mocked(eliminaOArchiviaParametro).mockImplementation(async (_e, p) => {
-      config.parametri = config.parametri.map(x => (x.id === p.id ? { ...x, archiviato: true } : x))
-      return 'archiviato'
+  it('"Archivia" su un parametro con dati lo archivia (mai elimina) e lo dice', async () => {
+    vi.mocked(archiviaParametro).mockImplementation(async (_e, id) => {
+      config.parametri = config.parametri.map(x => (x.id === id ? { ...x, archiviato: true } : x))
     })
+    const tempAria = par('Temp aria').id
     const { utente } = apri()
     await pronta()
 
     await utente.click(rigaParametro('Temp aria'))
     await utente.click(aperta(rigaParametro('Temp aria')).getByRole('button', { name: 'Archivia' }))
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro archiviato.'))
+    // Anche se nel frattempo i dati fossero spariti: "Archivia" non passa da eliminaOArchiviaParametro.
+    expect(archiviaParametro).toHaveBeenCalledWith('E', tempAria)
+    expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
     await waitFor(() => expect(sezione('Parametri').queryByRole('button', { name: /^Temp aria/ })).not.toBeInTheDocument())
     expect(sezione('Parametri').getByRole('button', { name: 'Parametri archiviati (1)' })).toBeInTheDocument()
   })
@@ -395,6 +399,70 @@ describe('Impostazioni: parametri', () => {
     await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
     expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
     expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('finché non si sa se un parametro lista ha dati, i sotto-campi non si tolgono', async () => {
+    vi.mocked(parametriConDati).mockReturnValue(new Promise(() => undefined))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+
+    await utente.click(rigaParametro('Palchi'))
+    const voce = aperta(rigaParametro('Palchi'))
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
+    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('anche con dati in errore i sotto-campi non si tolgono', async () => {
+    vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    await sezione('Parametri').findByRole('alert')
+
+    await utente.click(rigaParametro('Palchi'))
+    const voce = aperta(rigaParametro('Palchi'))
+    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
+    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    expect(voce.getByText(/Un sotto-campo con dati non si può togliere/)).toBeInTheDocument()
+    expect(voce.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+
+  it('togliendo un sotto-campo si ricontrolla sul server se nel frattempo sono arrivati dati', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaParametro('Palchi'))
+    const voce = aperta(rigaParametro('Palchi'))
+    // Un secondo sotto-campo, così la lista resta valida dopo aver tolto il primo.
+    await utente.click(voce.getByRole('button', { name: '+ Sotto-campo' }))
+    await utente.type(voce.getByLabelText('Nome del sotto-campo 2'), 'N gemme')
+    await utente.click(voce.getByRole('button', { name: 'Togli il sotto-campo 1' }))
+    vi.mocked(parametriConDati).mockResolvedValue(new Set([par('Palchi').id]))
+    await utente.click(voce.getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'Il parametro «Palchi» ha già dei dati: i suoi sotto-campi non si possono togliere.'))
+    expect(salvaParametro).not.toHaveBeenCalled()
+  })
+
+  it('un parametro nuovo arrivato in configurazione nonostante un errore non compare due volte', async () => {
+    // Il salvataggio arriva al database ma la risposta no.
+    vi.mocked(salvaParametro).mockImplementationOnce(async (_e, p) => {
+      config.parametri = [...config.parametri, p]
+      throw new TypeError('Failed to fetch')
+    })
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Parametri').getByRole('button', { name: '+ Parametro' }))
+    await utente.type(aperta(rigaParametro('Senza nome')).getByLabelText('Nome'), 'Diametro')
+    await utente.click(aperta(rigaParametro('Diametro')).getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(sezione('Parametri').getAllByRole('button', { name: /^Diametro/ })).toHaveLength(1))
+    expect(rigaParametro('Diametro')).not.toHaveTextContent('Non salvato')
   })
 
   it('un errore di rete lascia i valori scritti e lo dice', async () => {
@@ -483,6 +551,48 @@ describe('Impostazioni: passate', () => {
     const nuova = aperta(rigaPassata('Senza nome'))
     expect(nuova.getByText('Una passata non ha nome.')).toBeInTheDocument()
     expect(nuova.getByRole('button', { name: 'Salva' })).toBeDisabled()
+  })
+})
+
+describe('Impostazioni: passate, casi limite', () => {
+  it('una passata nuova arrivata in configurazione nonostante un errore non compare due volte', async () => {
+    vi.mocked(salvaPassata).mockImplementationOnce(async (_e, p) => {
+      config.passate = [...config.passate, p]
+      throw new TypeError('Failed to fetch')
+    })
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(sezione('Passate').getByRole('button', { name: '+ Passata' }))
+    const nuova = aperta(rigaPassata('Senza nome'))
+    await utente.type(nuova.getByLabelText('Nome della passata'), 'Diametro')
+    const riga = within(nuova.getByText('Altezza', { selector: '[data-testid="nome-parametro"]' }).closest('li') as HTMLElement)
+    await utente.click(riga.getByRole('switch', { name: /Incluso/ }))
+    await utente.click(nuova.getByRole('button', { name: 'Salva' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    await waitFor(() => expect(caricaConfig).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(sezione('Passate').getAllByRole('button', { name: /^(?!Sposta).*Diametro/ })).toHaveLength(1))
+  })
+
+  it('salvando una passata, i parametri eliminati nel frattempo non si mandano', async () => {
+    const tempAria = par('Temp aria').id
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaPassata('Termometro'))
+    await utente.type(aperta(rigaPassata('Termometro')).getByLabelText('Nome della passata'), ' mattino')
+    // Intanto "Temp pianta" (senza dati) viene eliminato.
+    await utente.click(rigaParametro('Temp pianta'))
+    await utente.click(aperta(rigaParametro('Temp pianta')).getByRole('button', { name: 'Elimina' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Parametro eliminato.'))
+
+    await utente.click(aperta(rigaPassata('Termometro')).getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(salvaPassata).toHaveBeenCalledTimes(1))
+    const [, salvata] = vi.mocked(salvaPassata).mock.calls[0]
+    expect(salvata.nome).toBe('Termometro mattino')
+    expect(salvata.parametri.map(pp => pp.parametro_id)).toEqual([tempAria])
   })
 })
 
