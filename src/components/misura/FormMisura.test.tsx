@@ -110,10 +110,18 @@ describe('FormMisura', () => {
     expect(campo).toHaveAccessibleDescription('cm')
   })
 
-  it('un parametro che ammette valori negativi apre la tastiera con il segno meno', () => {
-    const potenziale = parametro('Potenziale', { valore_min: -3, valore_max: 0 })
-    rendi([], { [potenziale.id]: valoreVuoto(potenziale) }, [potenziale])
-    expect(screen.getByLabelText('Potenziale')).toHaveAttribute('inputmode', 'text')
+  it.each([
+    ['con un minimo sotto zero', { valore_min: -3, valore_max: 0 }, 'text'],
+    ['con il solo minimo sotto zero', { valore_min: -3 }, 'text'],
+    ['senza minimo e con il massimo sotto zero', { valore_max: -1 }, 'text'],
+    ['senza minimo e con il massimo a zero', { valore_max: 0 }, 'text'],
+    ['senza minimo e con il massimo sopra zero', { valore_max: 10 }, 'decimal'],
+    ['con il minimo a zero', { valore_min: 0, valore_max: 100 }, 'decimal'],
+    ['senza limiti', {}, 'decimal'],
+  ] as const)('tastiera con un parametro %s: %s', (_nome, limiti, tastiera) => {
+    const p = parametro('Potenziale', limiti)
+    rendi([], { [p.id]: valoreVuoto(p) }, [p])
+    expect(screen.getByLabelText('Potenziale')).toHaveAttribute('inputmode', tastiera)
   })
 
   it('mostra i valori già presenti', () => {

@@ -78,6 +78,12 @@ export function valoriIniziali(a: {
   return valori
 }
 
+/** Vero se la lettura cade fuori dall'intervallo atteso del parametro (gli estremi sono ammessi). Un numero non finito non conta: è un errore. */
+export function fuoriIntervallo(p: Parametro, x: number): boolean {
+  if (!Number.isFinite(x)) return false
+  return (p.valore_min !== null && x < p.valore_min) || (p.valore_max !== null && x > p.valore_max)
+}
+
 /** L'intervallo atteso di un parametro a parole brevi, es. "0–100", "≥ 5" o "≤ 30". */
 export function descriviIntervallo(p: Parametro): string {
   const { valore_min: min, valore_max: max } = p
@@ -114,7 +120,7 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
       const soggetto = p.n_letture > 1 ? `«${p.nome}» lettura ${i + 1}` : `«${p.nome}»`
       if (!Number.isFinite(x)) {
         errori.push(`${soggetto}: numero non valido.`)
-      } else if ((p.valore_min !== null && x < p.valore_min) || (p.valore_max !== null && x > p.valore_max)) {
+      } else if (fuoriIntervallo(p, x)) {
         const misurato = p.unita ? `${formattaNumero(x)} ${p.unita}` : formattaNumero(x)
         avvisi.push(`${soggetto} = ${misurato} è fuori dall'intervallo atteso (${descriviIntervallo(p)}).`)
       }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, ultimoValore, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore,
+  valoreVuoto, eVuoto, ultimoValore, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
 import type { ElementoLista, Misura, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
@@ -385,5 +385,30 @@ describe('formattaValore', () => {
     expect(formattaValore(note, '  ')).toBe('—')
     expect(formattaValore(palchi, [])).toBe('—')
     expect(formattaValore(siNo, undefined)).toBe('—')
+  })
+})
+
+describe('fuoriIntervallo', () => {
+  it('con due estremi: dentro e sugli estremi no, fuori sì', () => {
+    expect(fuoriIntervallo(altezza, 50)).toBe(false)
+    expect(fuoriIntervallo(altezza, 0)).toBe(false)
+    expect(fuoriIntervallo(altezza, 120)).toBe(false)
+    expect(fuoriIntervallo(altezza, -0.1)).toBe(true)
+    expect(fuoriIntervallo(altezza, 120.1)).toBe(true)
+  })
+  it('con un solo estremo controlla solo quello', () => {
+    const soloMin = parametro('Peso', { valore_min: 10 })
+    const soloMax = parametro('Umidità', { valore_max: 100 })
+    expect(fuoriIntervallo(soloMin, 3)).toBe(true)
+    expect(fuoriIntervallo(soloMin, 1e9)).toBe(false)
+    expect(fuoriIntervallo(soloMax, 101)).toBe(true)
+    expect(fuoriIntervallo(soloMax, -1e9)).toBe(false)
+  })
+  it('senza limiti non è mai fuori', () => {
+    expect(fuoriIntervallo(spad3, 1e9)).toBe(false)
+  })
+  it('un numero non finito non è "fuori": è un errore, non un avviso', () => {
+    expect(fuoriIntervallo(altezza, NaN)).toBe(false)
+    expect(fuoriIntervallo(altezza, Infinity)).toBe(false)
   })
 })

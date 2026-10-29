@@ -1,5 +1,5 @@
 import type { Parametro } from '@/domain/tipi'
-import { descriviIntervallo } from '@/domain/misure'
+import { descriviIntervallo, fuoriIntervallo } from '@/domain/misure'
 import { NumericField } from '@/components/NumericField'
 
 interface CampoNumeroProps {
@@ -12,17 +12,20 @@ interface CampoNumeroProps {
 
 /** Il messaggio (non bloccante) per una lettura fuori dall'intervallo atteso del parametro. */
 function avvisoFuoriIntervallo(p: Parametro, x: number | null): string | undefined {
-  if (x === null || !Number.isFinite(x)) return undefined
-  const sotto = p.valore_min !== null && x < p.valore_min
-  const sopra = p.valore_max !== null && x > p.valore_max
-  return sotto || sopra ? `Fuori dall'intervallo atteso (${descriviIntervallo(p)}).` : undefined
+  return x !== null && fuoriIntervallo(p, x) ? `Fuori dall'intervallo atteso (${descriviIntervallo(p)}).` : undefined
+}
+
+/** I limiti lasciano posto a valori negativi: minimo sotto zero, o nessun minimo e massimo a zero o sotto. */
+function ammetteNegativi(p: Parametro): boolean {
+  if (p.valore_min !== null) return p.valore_min < 0
+  return p.valore_max !== null && p.valore_max <= 0
 }
 
 /** Un campo numerico per lettura: "SPAD · lettura 1", "SPAD · lettura 2"…, o solo il nome se la lettura è una. */
 export function CampoNumero({ parametro, valore, onChange, obbligatorio }: CampoNumeroProps) {
   const letture = Array.from({ length: parametro.n_letture }, (_, i) => valore[i] ?? null)
   // La tastiera decimale non ha il segno meno: se il parametro ammette negativi serve quella normale.
-  const negativo = parametro.valore_min !== null && parametro.valore_min < 0
+  const negativo = ammetteNegativi(parametro)
 
   return (
     <div className="flex flex-col gap-4">

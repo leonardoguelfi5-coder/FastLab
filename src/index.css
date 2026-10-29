@@ -286,6 +286,19 @@
 }
 
 /*
+ * Azione dentro il toast (es. "Annulla" dopo "Palchi 3 rimosso."): sonner la fa alta 24px con testo di 12px,
+ * qui diventa un bersaglio di almeno 44px. I colori restano quelli di sonner: foglio su grafite, a contrasto pieno.
+ */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+  height: auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/*
  * Verde negato: un toast di successo qualsiasi ("Messaggio copiato.") resta neutro, ✓ in foglio. Il ✓ in
  * registrato velato è solo per l'esito "salvato" delle misure, con la classe data da toastSalvato()
  * (src/lib/toastSalvato.ts).

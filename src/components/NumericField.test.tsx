@@ -72,7 +72,8 @@ describe('NumericField', () => {
 
   it('con uno stato vero, un testo non valido resta com\'è anche se lo stato diventa NaN', async () => {
     render(<ConStato iniziale={12} onChange={() => {}} />)
-    await userEvent.type(campo(), 'x')
+    // Il tocco seleziona tutto il testo precompilato: il tasto Fine porta il cursore in fondo, per accodare.
+    await userEvent.type(campo(), '{End}x')
     expect(campo()).toHaveValue('12x')
   })
 
@@ -155,5 +156,86 @@ describe('NumericField', () => {
   it('placeholder facoltativo', () => {
     render(<NumericField label="Altezza" value={null} onChange={() => {}} placeholder="es. 24,5" />)
     expect(campo()).toHaveAttribute('placeholder', 'es. 24,5')
+  })
+
+  it('toccando un campo precompilato ne seleziona tutto il testo, perché scrivere lo sostituisca', async () => {
+    render(<NumericField label="Altezza" value={24.5} onChange={() => {}} />)
+    await userEvent.click(campo())
+    expect(campo().selectionStart).toBe(0)
+    expect(campo().selectionEnd).toBe(4)
+  })
+
+  it('scrivere in un campo precompilato sostituisce il valore: 24,5 poi 31 dà 31, non 24,531', async () => {
+    const onChange = vi.fn()
+    render(<NumericField label="Altezza" value={24.5} onChange={onChange} />)
+    await userEvent.type(campo(), '31')
+    expect(onChange).toHaveBeenLastCalledWith(31)
+    expect(campo()).toHaveValue('31')
+  })
+
+  it('un secondo tocco sul campo già attivo mette il cursore dove serve, senza riselezionare', async () => {
+    const onChange = vi.fn()
+    render(<NumericField label="Altezza" value={24.5} onChange={onChange} />)
+    await userEvent.type(campo(), '31')
+    await userEvent.click(campo())
+    expect(campo().selectionStart).toBe(campo().selectionEnd)
+    await userEvent.keyboard('9')
+    expect(campo()).toHaveValue('319')
+    expect(onChange).toHaveBeenLastCalledWith(319)
+  })
+
+  it('uscendo dal campo un numero valido passa alla scrittura italiana, senza cambiarne il valore', async () => {
+    const onChange = vi.fn()
+    render(<NumericField label="Altezza" value={null} onChange={onChange} />)
+    await userEvent.type(campo(), '24.5')
+    await userEvent.tab()
+    expect(campo()).toHaveValue('24,5')
+    expect(onChange).toHaveBeenLastCalledWith(24.5)
+    expect(onChange).toHaveBeenCalledTimes(4)
+  })
+
+  it.each([
+    [',5', '0,5', 0.5],
+    ['24,', '24', 24],
+    ['-,5', '-0,5', -0.5],
+    ['007', '7', 7],
+  ])('uscendo dal campo "%s" diventa "%s"', async (digitato, mostrato, valore) => {
+    const onChange = vi.fn()
+    render(<NumericField label="Altezza" value={null} onChange={onChange} />)
+    await userEvent.type(campo(), digitato)
+    await userEvent.tab()
+    expect(campo()).toHaveValue(mostrato)
+    expect(onChange).toHaveBeenLastCalledWith(valore)
+  })
+
+  it('uscendo dal campo un testo non valido resta com\'è, e un numero che la scrittura italiana non sa rileggere non viene toccato', async () => {
+    const onChange = vi.fn()
+    render(<NumericField label="Altezza" value={null} onChange={onChange} />)
+    await userEvent.type(campo(), 'abc')
+    await userEvent.tab()
+    expect(campo()).toHaveValue('abc')
+    await userEvent.clear(campo())
+    await userEvent.type(campo(), '0,0000001')
+    await userEvent.tab()
+    // String(1e-7) è "1e-7", che non si rilegge: il testo digitato resta.
+    expect(campo()).toHaveValue('0,0000001')
+    expect(onChange).toHaveBeenLastCalledWith(1e-7)
+  })
+
+  it('un value NaN con il campo vuoto segnala l\'errore, non un campo vuoto qualunque', () => {
+    render(<NumericField label="Altezza" value={NaN} onChange={() => {}} />)
+    expect(campo()).toHaveValue('')
+    expect(campo()).toBeInvalid()
+    expect(campo()).toHaveAccessibleDescription('Scrivi un numero, es. 12,5.')
+  })
+
+  it('con un value NaN l\'errore resta anche con il campo attivo e passa quando si scrive un numero', async () => {
+    const onChange = vi.fn()
+    render(<ConStato iniziale={NaN} onChange={onChange} />)
+    await userEvent.click(campo())
+    expect(campo()).toBeInvalid()
+    await userEvent.type(campo(), '5')
+    expect(onChange).toHaveBeenLastCalledWith(5)
+    expect(campo()).toBeValid()
   })
 })

@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useState } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ElementoLista } from '@/domain/tipi'
 import { parametro } from '@/domain/test-helpers'
+
+vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { dismiss: vi.fn() }) }))
+
+import { toast } from 'sonner'
 import { CampoLista } from './CampoLista'
+
+beforeEach(() => vi.clearAllMocks())
 
 const palchi = parametro('Palchi', { tipo: 'lista', sotto_campi: [{ chiave: 'f', nome: 'Foglie', unita: null }] })
 
@@ -20,6 +26,12 @@ function rendi(iniziale: ElementoLista[] = [], p = palchi, obbligatorio?: boolea
 }
 
 const ultimo = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1)?.[0]
+
+/** L'azione "Annulla" dell'ultimo avviso mostrato. */
+function annulla() {
+  const [, opzioni] = vi.mocked(toast).mock.calls.at(-1) as unknown as [string, { action: { label: string; onClick: () => void } }]
+  return opzioni.action
+}
 
 describe('CampoLista', () => {
   it('senza elementi mostra solo il nome e "+ Palchi"; "Rimuovi ultimo" non si può usare', () => {
@@ -98,5 +110,87 @@ describe('CampoLista', () => {
     rendi([], palchi, true)
     expect(screen.getByText('*')).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Palchi' })).toHaveAccessibleDescription('Obbligatorio')
+  })
+
+  it('"+ Palchi" porta il cursore nel primo campo della nuova riga', async () => {
+    rendi()
+    await userEvent.click(screen.getByRole('button', { name: '+ Palchi' }))
+    expect(screen.getAllByRole('textbox')[0]).toHaveFocus()
+    await userEvent.keyboard('12')
+    await userEvent.click(screen.getByRole('button', { name: '+ Palchi' }))
+    expect(screen.getAllByRole('textbox')[1]).toHaveFocus()
+  })
+
+  it('con più sotto-campi il cursore va al primo della nuova riga, non a un altro', async () => {
+    const p = parametro('Palchi', {
+      tipo: 'lista',
+      sotto_campi: [
+        { chiave: 'foglie', nome: 'Foglie', unita: null },
+        { chiave: 'lungh', nome: 'Lunghezza', unita: 'cm' },
+      ],
+    })
+    rendi([{ n: 1, valori: { foglie: 3, lungh: 2 } }], p)
+    await userEvent.click(screen.getByRole('button', { name: '+ Palchi' }))
+    expect(within(screen.getByRole('group', { name: 'Palchi 2' })).getByLabelText('Foglie')).toHaveFocus()
+  })
+
+  it('una lista già compilata non porta il cursore in nessun campo', () => {
+    rendi([{ n: 1, valori: { f: 3 } }])
+    expect(screen.getByRole('textbox')).not.toHaveFocus()
+  })
+})
+
+describe('CampoLista: Rimuovi ultimo con valori', () => {
+  it('se l\'ultima riga ha dei valori la toglie e lo dice con un avviso "Annulla"', async () => {
+    const onChange = rendi([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: 4 } }, { n: 3, valori: { f: 12 } }])
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    expect(ultimo(onChange)).toEqual([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: 4 } }])
+    expect(toast).toHaveBeenCalledTimes(1)
+    expect(toast).toHaveBeenCalledWith('Palchi 3 rimosso.', expect.objectContaining({ action: expect.objectContaining({ label: 'Annulla' }) }))
+  })
+
+  it('"Annulla" rimette la riga con i suoi valori', async () => {
+    const onChange = rendi([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: 12 } }])
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    expect(screen.getAllByRole('textbox')).toHaveLength(1)
+    act(() => annulla().onClick())
+    expect(ultimo(onChange)).toEqual([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: 12 } }])
+    expect(screen.getAllByRole('textbox')).toHaveLength(2)
+    expect(screen.getAllByRole('textbox')[1]).toHaveValue('12')
+  })
+
+  it('"Annulla" dopo altre modifiche rimette la riga in fondo con il numero che le spetta, senza perdere il resto', async () => {
+    const onChange = rendi([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: 12 } }])
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    await userEvent.click(screen.getByRole('button', { name: '+ Palchi' }))
+    await userEvent.type(screen.getAllByRole('textbox')[1], '8')
+    act(() => annulla().onClick())
+    expect(ultimo(onChange)).toEqual([
+      { n: 1, valori: { f: 3 } },
+      { n: 2, valori: { f: 8 } },
+      { n: 3, valori: { f: 12 } },
+    ])
+  })
+
+  it('un testo non numerico (NaN) conta come valore: si avvisa', async () => {
+    rendi([{ n: 1, valori: { f: NaN } }])
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    expect(toast).toHaveBeenCalledWith('Palchi 1 rimosso.', expect.anything())
+  })
+
+  it('una riga vuota si toglie senza avvisi', async () => {
+    const onChange = rendi([{ n: 1, valori: { f: 3 } }, { n: 2, valori: { f: null } }])
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    expect(ultimo(onChange)).toEqual([{ n: 1, valori: { f: 3 } }])
+    expect(toast).not.toHaveBeenCalled()
+  })
+
+  it('uscendo dalla pagina l\'avviso con "Annulla" viene tolto', async () => {
+    const { unmount } = render(
+      <CampoLista parametro={palchi} valore={[{ n: 1, valori: { f: 5 } }]} onChange={() => {}} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Rimuovi ultimo' }))
+    unmount()
+    expect(toast.dismiss).toHaveBeenCalledWith('id-toast')
   })
 })

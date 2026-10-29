@@ -48,8 +48,10 @@ export function NumericField({ label, value, onChange, unita, avviso, placeholde
     if (!Object.is(parseNumero(testo), value)) setTesto(testoDa(value))
   }
 
-  const nonValido = Number.isNaN(parseNumero(testo))
-  const errore = nonValido && !(messoAFuoco && IN_CORSO.test(testo.trim()))
+  // Errore se il testo non è un numero (ma non per un inizio di numero mentre lo si scrive) o se da fuori
+  // arriva NaN con il campo vuoto (es. dopo un rimontaggio): il testo andato perso non diventa un campo vuoto qualunque.
+  const testoNonValido = Number.isNaN(parseNumero(testo)) && !(messoAFuoco && IN_CORSO.test(testo.trim()))
+  const errore = testoNonValido || (Number.isNaN(value) && testo.trim() === '')
   const descrizione = [unita && `${id}-unita`, avviso && `${id}-avviso`, errore && `${id}-errore`].filter(Boolean).join(' ')
 
   return (
@@ -78,8 +80,25 @@ export function NumericField({ label, value, onChange, unita, avviso, placeholde
             setTesto(e.target.value)
             onChange(parseNumero(e.target.value))
           }}
-          onFocus={() => setMessoAFuoco(true)}
-          onBlur={() => setMessoAFuoco(false)}
+          onFocus={(e) => {
+            setMessoAFuoco(true)
+            // Un valore precompilato (ricordato o progressivo) si sostituisce: scrivere non lo allunga ("24,5" + "31").
+            // Safari su iOS rimette il cursore dopo il tocco, quindi la selezione si ripete un attimo dopo.
+            const campo = e.currentTarget
+            campo.select()
+            setTimeout(() => {
+              if (document.activeElement === campo) campo.setSelectionRange(0, campo.value.length)
+            }, 0)
+          }}
+          onBlur={() => {
+            setMessoAFuoco(false)
+            // Un numero valido passa alla scrittura italiana ("24.5" → "24,5", ",5" → "0,5"); il valore non cambia.
+            // Se il testo normalizzato non si rilegge uguale (es. "1e-7") resta quello digitato.
+            const n = parseNumero(testo)
+            if (n === null || Number.isNaN(n)) return
+            const italiano = formattaNumero(n)
+            if (Object.is(parseNumero(italiano), n)) setTesto(italiano)
+          }}
         />
         {unita && (
           <span id={`${id}-unita`} className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center text-label text-grafite-tenue">
