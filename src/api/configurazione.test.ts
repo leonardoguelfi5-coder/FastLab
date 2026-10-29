@@ -15,7 +15,7 @@ const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' 
 
 const parametro: Parametro = {
   id: 'par1', nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false, progressivo: false,
-  ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+  n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
 }
 const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
 /** La risposta di un update o di una delete con `.select('id')`: le righe toccate. */

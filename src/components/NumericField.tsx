@@ -3,6 +3,7 @@ import { TriangleAlert } from 'lucide-react'
 import { Asterisco } from '@/components/Asterisco'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { SegnoMantenuto } from '@/components/SegnoMantenuto'
 import { TestoErrore } from '@/components/TestoErrore'
 import { formattaNumero, parseNumero } from '@/lib/numeri'
 
@@ -20,6 +21,8 @@ interface NumericFieldProps {
   obbligatorio?: boolean
   /** Ammette valori negativi: tastiera con il segno meno, che quella decimale di iOS non ha. */
   negativo?: boolean
+  /** Il valore di partenza è quello mantenuto dalla pianta di prima: accanto all'etichetta compare il segno "mantenuto". */
+  mantenuto?: boolean
 }
 
 const ERRORE = 'Scrivi un numero, es. 12,5.'
@@ -35,7 +38,7 @@ const testoDa = (v: number | null) => (v === null || Number.isNaN(v) ? '' : form
  * configurazione non riscrive mai quel che è stato digitato: il `NaN` arriva fino al salvataggio,
  * che si ferma. Il testo si riallinea a `value` solo se `value` cambia da fuori e non coincide già.
  */
-export function NumericField({ label, value, onChange, unita, avviso, placeholder, obbligatorio, negativo }: NumericFieldProps) {
+export function NumericField({ label, value, onChange, unita, avviso, placeholder, obbligatorio, negativo, mantenuto }: NumericFieldProps) {
   const id = useId()
   const [testo, setTesto] = useState(() => testoDa(value))
   const [valorePrecedente, setValorePrecedente] = useState(value)
@@ -50,14 +53,17 @@ export function NumericField({ label, value, onChange, unita, avviso, placeholde
   // arriva NaN con il campo vuoto (es. dopo un rimontaggio): il testo andato perso non diventa un campo vuoto qualunque.
   const testoNonValido = Number.isNaN(parseNumero(testo)) && !(messoAFuoco && IN_CORSO.test(testo.trim()))
   const errore = testoNonValido || (Number.isNaN(value) && testo.trim() === '')
-  const descrizione = [unita && `${id}-unita`, avviso && `${id}-avviso`, errore && `${id}-errore`].filter(Boolean).join(' ')
+  const descrizione = [mantenuto && `${id}-mantenuto`, unita && `${id}-unita`, avviso && `${id}-avviso`, errore && `${id}-errore`].filter(Boolean).join(' ')
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={id}>
-        {label}
-        {obbligatorio && <Asterisco />}
-      </Label>
+      <div className="flex items-center gap-2">
+        <Label htmlFor={id}>
+          {label}
+          {obbligatorio && <Asterisco />}
+        </Label>
+        {mantenuto && <SegnoMantenuto id={`${id}-mantenuto`} />}
+      </div>
       <div className="relative">
         <Input
           id={id}
@@ -79,7 +85,7 @@ export function NumericField({ label, value, onChange, unita, avviso, placeholde
           }}
           onFocus={(e) => {
             setMessoAFuoco(true)
-            // Un valore precompilato (ricordato o progressivo) si sostituisce: scrivere non lo allunga ("24,5" + "31").
+            // Un valore precompilato (mantenuto o progressivo) si sostituisce: scrivere non lo allunga ("24,5" + "31").
             // Safari su iOS rimette il cursore dopo il tocco, quindi la selezione si ripete un attimo dopo.
             const campo = e.currentTarget
             campo.select()

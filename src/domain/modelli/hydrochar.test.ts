@@ -14,7 +14,6 @@ describe('bozzaHydrochar', () => {
     expect(b.strumenti.map(p => p.nome)).toEqual(['Termometro', 'SPAD', 'Altezza', 'Fenologici'])
     const par = (n: string) => b.parametri.find(p => p.nome === n)!
     expect(par('Palchi').progressivo && par('Infiorescenze').progressivo && par('N palchi totali').progressivo).toBe(true)
-    expect(par('Temp aria').ricorda_tra_piante).toBe(true)
   })
 
   it('mappa piante → trattamenti come nella v2 (1–56)', () => {
@@ -53,7 +52,6 @@ describe('bozzaHydrochar', () => {
     expect(par('Palchi').sotto_campi.map(s => s.nome)).toEqual(['N foglie'])
     expect(par('Infiorescenze').sotto_campi.map(s => s.nome)).toEqual(['N fiori'])
     expect(par('N fiori fioriti').progressivo).toBe(false)
-    expect(par('Temp pianta').ricorda_tra_piante).toBe(false)
     const nomiParametri = (nome: string) => b.strumenti.find(p => p.nome === nome)!.parametri
       .map(pp => b.parametri.find(p => p.id === pp.parametro_id)!.nome)
     expect(nomiParametri('Termometro')).toEqual(['Temp aria', 'Temp pianta'])

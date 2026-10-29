@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, contaPerPianta, raggruppaStoria, formattaValore, fuoriIntervallo,
 } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Strumento, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
@@ -14,7 +14,7 @@ const listaDueCampi = parametro('Grappoli', {
   tipo: 'lista',
   sotto_campi: [{ chiave: 'a', nome: 'A', unita: null }, { chiave: 'b', nome: 'B', unita: null }],
 })
-const tempAria = parametro('Temp. aria', { unita: '°C', ricorda_tra_piante: true })
+const tempAria = parametro('Temp. aria', { unita: '°C' })
 const spad3 = parametro('SPAD', { n_letture: 3 })
 const altezza = parametro('Altezza', { unita: 'cm', valore_min: 0, valore_max: 120 })
 const note = parametro('Note', { tipo: 'testo' })
@@ -130,7 +130,7 @@ describe('valoriIniziali', () => {
     const misure = [mis('2026-10-14', '09:00', { [palchi.id]: [{ n: 1, valori: { f: 5 } }] }),
                     mis('2026-10-21', '10:00', { [palchi.id]: [{ n: 1, valori: { f: 6 } }, { n: 2, valori: { f: 3 } }] }),
                     mis('2026-10-28', '09:00', { [palchi.id]: [] })]           // vuoto: ignorato
-    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: '2026-10-27', ricordati: {} })
+    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: '2026-10-27', mantenuti: {} })
     expect(v[palchi.id]).toEqual([{ n: 1, valori: { f: 6 } }, { n: 2, valori: { f: 3 } }])
     ;(v[palchi.id] as ElementoLista[])[0].valori.f = 99
     expect((misure[1].valori[palchi.id] as ElementoLista[])[0].valori.f).toBe(6)   // copia profonda
@@ -138,58 +138,76 @@ describe('valoriIniziali', () => {
   it('progressivo: una misura vuota recente non nasconde l\'ultimo valore reale', () => {
     const misure = [mis('2026-10-14', '09:00', { [palchi.id]: [{ n: 1, valori: { f: 5 } }] }),
                     mis('2026-10-26', '09:00', { [palchi.id]: [] })]
-    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: D, ricordati: {} })
+    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: D, mantenuti: {} })
     expect(v[palchi.id]).toEqual([{ n: 1, valori: { f: 5 } }])
   })
   it('progressivo: una misura di un giorno successivo non viene ripresa', () => {
     const misure = [mis('2026-10-29', '09:00', { [palchi.id]: [{ n: 1, valori: { f: 8 } }] })]
-    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: D, ricordati: {} })
+    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: D, mantenuti: {} })
     expect(v[palchi.id]).toEqual([])
   })
-  it('ricorda tra piante e vuoti', () => {
-    const v = valoriIniziali({ parametri: [tempAria, spad3], misurePianta: [], dataRilievo: D, ricordati: { [tempAria.id]: [24.5] } })
+  it('mantenuti e vuoti', () => {
+    const v = valoriIniziali({ parametri: [tempAria, spad3], misurePianta: [], dataRilievo: D, mantenuti: { [tempAria.id]: [24.5] } })
     expect(v).toEqual({ [tempAria.id]: [24.5], [spad3.id]: [null, null, null] })
   })
-  it('ricorda tra piante: copia, non riferimento', () => {
-    const ricordato = [24.5]
-    const v = valoriIniziali({ parametri: [tempAria], misurePianta: [], dataRilievo: D, ricordati: { [tempAria.id]: ricordato } })
+  it('mantenuti: copia, non riferimento', () => {
+    const mantenuto = [24.5]
+    const v = valoriIniziali({ parametri: [tempAria], misurePianta: [], dataRilievo: D, mantenuti: { [tempAria.id]: mantenuto } })
     ;(v[tempAria.id] as number[])[0] = 0
-    expect(ricordato).toEqual([24.5])
+    expect(mantenuto).toEqual([24.5])
   })
-  it('un valore ricordato è ignorato se il parametro non è "ricorda tra piante"', () => {
-    const v = valoriIniziali({ parametri: [spad3], misurePianta: [], dataRilievo: D, ricordati: { [spad3.id]: [1, 2, 3] } })
-    expect(v[spad3.id]).toEqual([null, null, null])
+  it('un valore mantenuto vale per un parametro qualsiasi di tipo numero, testo o sì/no', () => {
+    const v = valoriIniziali({ parametri: [spad3, note, siNo], misurePianta: [], dataRilievo: D,
+      mantenuti: { [spad3.id]: [1, 2, 3], [note.id]: 'sereno', [siNo.id]: false } })
+    expect(v).toEqual({ [spad3.id]: [1, 2, 3], [note.id]: 'sereno', [siNo.id]: false })
   })
-  it('un valore ricordato vuoto lascia il valore vuoto del parametro', () => {
-    const v = valoriIniziali({ parametri: [tempAria], misurePianta: [], dataRilievo: D, ricordati: { [tempAria.id]: [null] } })
-    expect(v[tempAria.id]).toEqual([null])
+  it('un valore mantenuto di una lista si ignora', () => {
+    const v = valoriIniziali({ parametri: [listaDueCampi], misurePianta: [], dataRilievo: D,
+      mantenuti: { [listaDueCampi.id]: [{ n: 1, valori: { a: 1, b: 2 } }] } })
+    expect(v[listaDueCampi.id]).toEqual([])
   })
-  it('precedenza: il progressivo batte il ricordato, il ricordato batte il vuoto', () => {
-    const prog = parametro('Conteggio', { tipo: 'lista', progressivo: true, ricorda_tra_piante: true,
-      sotto_campi: [{ chiave: 'f', nome: 'F', unita: null }] })
-    const misure = [mis('2026-10-14', '09:00', { [prog.id]: [{ n: 1, valori: { f: 4 } }] })]
-    const conStoria = valoriIniziali({ parametri: [prog], misurePianta: misure, dataRilievo: D,
-      ricordati: { [prog.id]: [{ n: 1, valori: { f: 1 } }] } })
-    expect(conStoria[prog.id]).toEqual([{ n: 1, valori: { f: 4 } }])
-    const senzaStoria = valoriIniziali({ parametri: [prog], misurePianta: [], dataRilievo: D,
-      ricordati: { [prog.id]: [{ n: 1, valori: { f: 1 } }] } })
-    expect(senzaStoria[prog.id]).toEqual([{ n: 1, valori: { f: 1 } }])
+  it('un valore mantenuto vuoto lascia il valore vuoto del parametro', () => {
+    const v = valoriIniziali({ parametri: [tempAria, note, siNo], misurePianta: [], dataRilievo: D,
+      mantenuti: { [tempAria.id]: [null], [note.id]: '  ', [siNo.id]: null } })
+    expect(v).toEqual({ [tempAria.id]: [null], [note.id]: '', [siNo.id]: null })
+  })
+  it('un mantenuto vuoto non nasconde il progressivo', () => {
+    const prog = parametro('Diametro', { progressivo: true })
+    const misure = [mis('2026-10-14', '09:00', { [prog.id]: [7] })]
+    const v = valoriIniziali({ parametri: [prog], misurePianta: misure, dataRilievo: D, mantenuti: { [prog.id]: [null] } })
+    expect(v[prog.id]).toEqual([7])
+  })
+  it('precedenza: il mantenuto batte il progressivo, il progressivo batte il vuoto', () => {
+    const prog = parametro('Diametro', { progressivo: true })
+    const misure = [mis('2026-10-14', '09:00', { [prog.id]: [4] })]
+    const conMantenuto = valoriIniziali({ parametri: [prog], misurePianta: misure, dataRilievo: D, mantenuti: { [prog.id]: [9] } })
+    expect(conMantenuto[prog.id]).toEqual([9])
+    const soloStoria = valoriIniziali({ parametri: [prog], misurePianta: misure, dataRilievo: D, mantenuti: {} })
+    expect(soloStoria[prog.id]).toEqual([4])
+    const niente = valoriIniziali({ parametri: [prog], misurePianta: [], dataRilievo: D, mantenuti: {} })
+    expect(niente[prog.id]).toEqual([null])
+  })
+  it('la lista progressiva con un mantenuto di troppo usa il progressivo', () => {
+    const misure = [mis('2026-10-14', '09:00', { [palchi.id]: [{ n: 1, valori: { f: 4 } }] })]
+    const v = valoriIniziali({ parametri: [palchi], misurePianta: misure, dataRilievo: D,
+      mantenuti: { [palchi.id]: [{ n: 1, valori: { f: 1 } }] } })
+    expect(v[palchi.id]).toEqual([{ n: 1, valori: { f: 4 } }])
   })
   describe('letture adattate a n_letture attuale', () => {
-    const prog = parametro('Diametro', { progressivo: true, ricorda_tra_piante: true, n_letture: 3 })
+    const prog = parametro('Diametro', { progressivo: true, n_letture: 3 })
     const storia = (valori: (number | null)[]) => [mis('2026-10-14', '09:00', { [prog.id]: valori })]
-    const iniziali = (misurePianta: Misura[], ricordati: ValoriMisura = {}) =>
-      valoriIniziali({ parametri: [prog], misurePianta, dataRilievo: D, ricordati })[prog.id]
+    const iniziali = (misurePianta: Misura[], mantenuti: ValoriMisura = {}) =>
+      valoriIniziali({ parametri: [prog], misurePianta, dataRilievo: D, mantenuti })[prog.id]
     it('progressivo con meno letture di n_letture → completato con null', () => {
       expect(iniziali(storia([4]))).toEqual([4, null, null])
     })
     it('progressivo con più letture di n_letture → troncato', () => {
       expect(iniziali(storia([1, 2, 3, 4, 5]))).toEqual([1, 2, 3])
     })
-    it('ricordato con meno letture → completato con null', () => {
+    it('mantenuto con meno letture → completato con null', () => {
       expect(iniziali([], { [prog.id]: [7, 8] })).toEqual([7, 8, null])
     })
-    it('ricordato con più letture → troncato', () => {
+    it('mantenuto con più letture → troncato', () => {
       expect(iniziali([], { [prog.id]: [1, 2, 3, 4] })).toEqual([1, 2, 3])
     })
     it('lunghezza già corretta → invariata', () => {
@@ -198,8 +216,15 @@ describe('valoriIniziali', () => {
   })
   it('un parametro non progressivo non usa la storia', () => {
     const misure = [mis('2026-10-14', '09:00', { [altezza.id]: [10] })]
-    const v = valoriIniziali({ parametri: [altezza], misurePianta: misure, dataRilievo: D, ricordati: {} })
+    const v = valoriIniziali({ parametri: [altezza], misurePianta: misure, dataRilievo: D, mantenuti: {} })
     expect(v[altezza.id]).toEqual([null])
+  })
+})
+
+describe('mantenibile', () => {
+  it('vero per numero, testo e sì/no, falso per la lista', () => {
+    expect([altezza, note, siNo].map(mantenibile)).toEqual([true, true, true])
+    expect(mantenibile(palchi)).toBe(false)
   })
 })
 

@@ -176,7 +176,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
     }
 
     // La scheda della pianta potrebbe avere una bozza di questa correzione: sopra la modifica appena fatta
-    // riproporrebbe i valori vecchi. I valori ricordati per le piante dopo restano com'erano: correggere una misura
+    // riproporrebbe i valori vecchi. I valori mantenuti per le piante dopo restano com'erano: correggere una misura
     // vecchia non è l'ultima misura inserita.
     cancellaBozzaCorrezione(espId, misura)
     toastSalvato('Misura aggiornata ✓')

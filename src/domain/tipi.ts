@@ -10,7 +10,7 @@ export interface Fattore { id: string; nome: string; ordine: number; livelli: Li
 export interface Trattamento { id: string; etichetta: string; ordine: number; livello_ids: string[] }
 export interface Pianta { id: string; trattamento_id: string; etichetta: string; blocco: string | null; ordine: number }
 export interface Parametro { id: string; nome: string; unita: string | null; tipo: TipoParametro; ordine: number;
-  archiviato: boolean; progressivo: boolean; ricorda_tra_piante: boolean; n_letture: number;
+  archiviato: boolean; progressivo: boolean; n_letture: number;
   valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[] }
 export interface StrumentoParametro { parametro_id: string; obbligatorio: boolean; ordine: number }
 /** 'strumento': un gruppo di parametri misurati insieme in campo; 'fenologico': la tabella fenologica (al massimo una). */

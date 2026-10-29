@@ -156,3 +156,79 @@ describe('FormMisura', () => {
     expect(screen.getByLabelText('SPAD · lettura 3')).toHaveValue('')
   })
 })
+
+describe('FormMisura: Mantieni questo parametro uguale', () => {
+  const ETICHETTA = 'Mantieni questo parametro uguale anche nelle prossime misure'
+
+  /** Il modulo con le prop di "Mantieni"; `onMantieni` registra le spunte. */
+  function rendiMantieni(props: { mantenuti?: string[]; precompilati?: string[]; senzaOnMantieni?: boolean } = {}) {
+    const onMantieni = vi.fn<(parametroId: string, attivo: boolean) => void>()
+    render(
+      <FormMisura
+        parametri={tutti}
+        obbligatori={new Set()}
+        valori={vuoti()}
+        onChange={() => {}}
+        mantenuti={new Set(props.mantenuti ?? [])}
+        onMantieni={props.senzaOnMantieni ? undefined : onMantieni}
+        precompilatiDaMantenuti={new Set(props.precompilati ?? [])}
+      />,
+    )
+    return onMantieni
+  }
+
+  it('c\'è una casella per numero, numero a più letture, testo e sì/no, e non per la lista', () => {
+    rendiMantieni()
+    // Altezza, SPAD, Note, Fiori: la lista (Palchi) non ne ha.
+    expect(screen.getAllByRole('checkbox', { name: ETICHETTA })).toHaveLength(4)
+  })
+
+  it('l\'etichetta della casella è cliccabile, non solo la casella', async () => {
+    const onMantieni = rendiMantieni()
+    // Il testo dell'etichetta, non la casella: tocca anche quello. L'ordine segue i parametri: Altezza per prima.
+    await userEvent.click(screen.getAllByText(ETICHETTA)[0])
+    expect(onMantieni).toHaveBeenCalledTimes(1)
+    expect(onMantieni).toHaveBeenLastCalledWith(altezza.id, true)
+  })
+
+  it('toccare la casella chiama onMantieni(parametro, true)', async () => {
+    const onMantieni = rendiMantieni({ mantenuti: [] })
+    const caselle = screen.getAllByRole('checkbox', { name: ETICHETTA })
+    await userEvent.click(caselle[2])
+    expect(onMantieni).toHaveBeenLastCalledWith(note.id, true)
+  })
+
+  it('le caselle dei parametri spuntati sono selezionate; toccarne una selezionata la toglie', async () => {
+    const onMantieni = rendiMantieni({ mantenuti: [note.id] })
+    const caselle = screen.getAllByRole('checkbox', { name: ETICHETTA })
+    expect(caselle.map(c => (c as HTMLInputElement).checked)).toEqual([false, false, true, false])
+    await userEvent.click(caselle[2])
+    expect(onMantieni).toHaveBeenLastCalledWith(note.id, false)
+  })
+
+  it('senza onMantieni non ci sono caselle (correzione di una misura, modifica)', () => {
+    rendiMantieni({ senzaOnMantieni: true })
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('senza le prop di Mantieni il modulo è quello di sempre', () => {
+    rendi()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
+  })
+
+  it('un campo precompilato da mantenuti mostra il segno "mantenuto", gli altri no', () => {
+    rendiMantieni({ mantenuti: [altezza.id, note.id], precompilati: [altezza.id] })
+    expect(screen.getAllByText('mantenuto')).toHaveLength(1)
+    // Il segno è collegato al campo, e non entra nel suo nome.
+    const campo = screen.getByLabelText('Altezza')
+    expect(campo).toHaveAccessibleDescription(expect.stringContaining('mantenuto'))
+  })
+
+  it('il segno "mantenuto" c\'è anche su testo, sì/no e numero a più letture (una volta per parametro)', () => {
+    rendiMantieni({ mantenuti: [note.id, fiori.id, spad.id], precompilati: [note.id, fiori.id, spad.id] })
+    expect(screen.getAllByText('mantenuto')).toHaveLength(3)
+    expect(screen.getByLabelText('Note')).toHaveAccessibleDescription(expect.stringContaining('mantenuto'))
+    expect(screen.getByRole('group', { name: 'Fiori' })).toHaveAccessibleDescription(expect.stringContaining('mantenuto'))
+  })
+})

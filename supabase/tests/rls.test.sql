@@ -48,7 +48,7 @@ select is(
     "piante": [{"id": "ba000000-0000-0000-0000-000000000001", "trattamento_id": "7a000000-0000-0000-0000-000000000001",
                 "etichetta": "1", "blocco": null, "ordine": 0}],
     "parametri": [{"id": "ca000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
-                   "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
+                   "archiviato": false, "progressivo": false, "n_letture": 1,
                    "valore_min": null, "valore_max": null, "sotto_campi": []}],
     "strumenti": [{"id": "da000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                  "parametri": [{"parametro_id": "ca000000-0000-0000-0000-000000000001", "obbligatorio": false, "ordine": 0}]}]
@@ -196,7 +196,7 @@ select is(
     "piante": [{"id": "bb000000-0000-0000-0000-000000000001", "trattamento_id": "7b000000-0000-0000-0000-000000000001",
                 "etichetta": "1", "blocco": null, "ordine": 0}],
     "parametri": [{"id": "cb000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
-                   "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
+                   "archiviato": false, "progressivo": false, "n_letture": 1,
                    "valore_min": null, "valore_max": null, "sotto_campi": []}],
     "strumenti": [{"id": "db000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                  "parametri": [{"parametro_id": "cb000000-0000-0000-0000-000000000001", "obbligatorio": false, "ordine": 0}]}]

@@ -8,6 +8,8 @@ interface CampoNumeroProps {
   valore: (number | null)[]
   onChange: (valore: (number | null)[]) => void
   obbligatorio?: boolean
+  /** Parte dal valore mantenuto: il segno "mantenuto" compare una volta, sulla prima lettura. */
+  mantenuto?: boolean
 }
 
 /** Il messaggio (non bloccante) per una lettura fuori dall'intervallo atteso del parametro. */
@@ -31,7 +33,7 @@ function quanteLetture(p: Parametro, valore: (number | null)[]): number {
 }
 
 /** Un campo numerico per lettura: "SPAD · lettura 1", "SPAD · lettura 2"…, o solo il nome se la lettura è una. */
-export function CampoNumero({ parametro, valore, onChange, obbligatorio }: CampoNumeroProps) {
+export function CampoNumero({ parametro, valore, onChange, obbligatorio, mantenuto }: CampoNumeroProps) {
   const quante = quanteLetture(parametro, valore)
   const letture = Array.from({ length: quante }, (_, i) => valore[i] ?? null)
   // La tastiera decimale non ha il segno meno: se il parametro ammette negativi serve quella normale.
@@ -48,6 +50,7 @@ export function CampoNumero({ parametro, valore, onChange, obbligatorio }: Campo
           avviso={avvisoFuoriIntervallo(parametro, x)}
           obbligatorio={obbligatorio}
           negativo={negativo}
+          mantenuto={mantenuto && i === 0}
           onChange={(v) => onChange(letture.map((y, j) => (j === i ? v : y)))}
         />
       ))}

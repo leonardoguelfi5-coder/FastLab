@@ -48,6 +48,7 @@ let archivio: Misura[]
 const idStrumento = (nome: string) => config.strumenti.find(p => p.nome === nome)!.id
 const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
+const par2 = (id: string): Parametro => config.parametri.find(p => p.id === id)!
 
 /** Una misura della pianta 35 (di norma: Termometro, oggi alle 09:12). */
 function misura(extra: Partial<Misura> & { valori: ValoriMisura }): Misura {
@@ -100,6 +101,19 @@ function apri(etichetta = '35', strumento: string | null = 'Termometro') {
 
 const posizione = () => screen.getByTestId('posizione').textContent
 const campo = (nome: string) => screen.getByLabelText(nome) as HTMLInputElement
+/** La casella "Mantieni questo parametro uguale" sotto il campo del parametro. */
+const MANTIENI = 'Mantieni questo parametro uguale anche nelle prossime misure'
+const mantieni = (nome: string) => {
+  let el: HTMLElement | null = campo(nome)
+  while (el && !within(el).queryByRole('checkbox')) el = el.parentElement
+  return within(el!).getByRole('checkbox', { name: MANTIENI })
+}
+/** Come se alla pianta di prima si fosse spuntato "Mantieni" su Temp aria (Termometro, oggi) con quel valore. */
+function mantenutaTempAria(valore: number, data = OGGI) {
+  const ta = par('Temp aria').id
+  useCampoStore.getState().setMantieni('E', idStrumento('Termometro'), data, ta, true)
+  useCampoStore.getState().aggiornaMantenuti('E', { [ta]: [valore] })
+}
 const pulsante = (nome: string | RegExp) => screen.getByRole('button', { name: nome })
 /** Aspetta che la scheda sia pronta: il modulo compare solo con configurazione e misure arrivate. */
 const pronta = () => screen.findByRole('button', { name: /^Ora: / })
@@ -314,14 +328,17 @@ describe('SchedaPianta: salvataggio', () => {
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
     await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(mantieni('Temp aria'))
     await utente.click(pulsante('Salva'))
 
     expect(await screen.findByRole('button', { name: '10:00 · Temp aria 24,5 °C · Temp pianta 25,1 °C' })).toBeInTheDocument()
     expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓')
     expect(posizione()).toBe(`/esperimenti/E/piante/${idPianta('35')}`)
-    // Il modulo nuovo parte da valoriIniziali: Temp aria è ricordata, Temp pianta no.
+    // Il modulo nuovo parte da valoriIniziali: Temp aria è mantenuta (spuntata), Temp pianta no.
     expect(campo('Temp aria')).toHaveValue('24,5')
     expect(campo('Temp pianta')).toHaveValue('')
+    expect(mantieni('Temp aria')).toBeChecked()
+    expect(mantieni('Temp pianta')).not.toBeChecked()
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
 
     await utente.type(campo('Temp pianta'), '26')
@@ -339,11 +356,12 @@ describe('SchedaPianta: salvataggio', () => {
     apri('35')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
     await utente.click(pulsante('Salva'))
     await screen.findByRole('button', { name: '10:00 · Temp aria 24,5 °C' })
     expect(salvaMisura).toHaveBeenCalledTimes(1)
 
-    // Il modulo nuovo ha già Temp aria (ricordata): un tocco troppo vicino salverebbe una seconda misura uguale.
+    // Il modulo nuovo ha già Temp aria (mantenuta): un tocco troppo vicino salverebbe una seconda misura uguale.
     await utente.click(pulsante('Salva'))
     await act(async () => {})
     expect(salvaMisura).toHaveBeenCalledTimes(1)
@@ -358,6 +376,7 @@ describe('SchedaPianta: salvataggio', () => {
     apri('35')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
     await utente.click(pulsante('Salva e vai alla #36'))
     await screen.findByRole('heading', { name: 'Pianta #36' })
     await pronta()
@@ -449,14 +468,14 @@ describe('SchedaPianta: salvataggio', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('il messaggio dopo l\'uscita dice il vero: riaprendo la pianta i valori ci sono, anche quelli solo precompilati', async () => {
-    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+  it('il messaggio dopo l\'uscita dice il vero: riaprendo la pianta i valori ci sono, anche quelli solo precompilati (mantenuti)', async () => {
+    mantenutaTempAria(26)
     let fallisci!: (e: unknown) => void
     vi.mocked(salvaMisura).mockImplementationOnce(() => new Promise<void>((_r, rifiuta) => { fallisci = rifiuta }))
     const utente = userEvent.setup()
     const { unmount } = apri('35')
     await pronta()
-    // Temp aria è ricordata: si salva senza toccare nulla.
+    // Temp aria è mantenuta: si salva senza toccare nulla.
     await utente.click(pulsante('Salva e vai alla #36'))
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     await act(async () => fallisci(new Error('boom')))
@@ -466,7 +485,7 @@ describe('SchedaPianta: salvataggio', () => {
     )
     unmount()
 
-    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [30] })
+    mantenutaTempAria(30)
     apri('35')
     await pronta()
     expect(screen.getByText('Bozza ripristinata.')).toBeInTheDocument()
@@ -512,11 +531,11 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
   })
 
   it('un fallimento tardivo non sovrascrive la bozza di un modulo aperto dopo, rientrando, e non promette i suoi valori', async () => {
-    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+    mantenutaTempAria(26)
     const utente = userEvent.setup()
     const primo = apri('35')
     await pronta()
-    // Temp aria è ricordata: si salva senza toccare nulla, quindi senza bozza.
+    // Temp aria è mantenuta: si salva senza toccare nulla, quindi senza bozza.
     const fine = await salvaEdEsci(utente)
     primo.unmount()
 
@@ -537,7 +556,7 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
   })
 
   it('un salvataggio tardivo riuscito non cancella la bozza di un modulo aperto dopo, rientrando', async () => {
-    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+    mantenutaTempAria(26)
     const utente = userEvent.setup()
     const primo = apri('35')
     await pronta()
@@ -556,20 +575,136 @@ describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
 })
 
 describe('SchedaPianta: passaggio alla pianta successiva', () => {
-  it('Temp aria (ricorda tra piante) è già compilata sulla #36 e il cursore è sul primo campo vuoto', async () => {
+  it('Temp aria (mantenuta con la spunta) è già compilata sulla #36, con il segno "mantenuto", e il cursore è sul primo campo vuoto', async () => {
     const utente = userEvent.setup()
     apri('35')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
     await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(mantieni('Temp aria'))
     await utente.click(pulsante('Salva e vai alla #36'))
 
     await screen.findByRole('heading', { name: 'Pianta #36' })
     await pronta()
     expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(campo('Temp aria')).toHaveAccessibleDescription(expect.stringContaining('mantenuto'))
+    expect(screen.getAllByText('mantenuto')).toHaveLength(1)
     expect(campo('Temp pianta')).toHaveValue('')
+    expect(mantieni('Temp aria')).toBeChecked()
     await waitFor(() => expect(campo('Temp pianta')).toHaveFocus())
     expect(pulsante('Salva e vai alla #37')).toBeInTheDocument()
+  })
+
+  it('senza la spunta la #36 parte vuota: niente si ricorda da solo', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
+  })
+
+  it('scrivendo un altro valore sulla #36 il segno "mantenuto" sparisce, e il nuovo valore è quello che si mantiene', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    expect(screen.getByText('mantenuto')).toBeInTheDocument()
+
+    await utente.clear(campo('Temp aria'))
+    await utente.type(campo('Temp aria'), '26')
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
+    piuTardi()
+    await utente.click(pulsante('Salva e vai alla #37'))
+    await screen.findByRole('heading', { name: 'Pianta #37' })
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('26')
+  })
+
+  it('togliendo la spunta sulla #36 la #37 parte senza Temp aria', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+
+    await utente.click(mantieni('Temp aria'))
+    piuTardi()
+    await utente.click(pulsante('Salva e vai alla #37'))
+    await screen.findByRole('heading', { name: 'Pianta #37' })
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(mantieni('Temp aria')).not.toBeChecked()
+  })
+
+  it('cambiando data di rilievo la spunta si azzera: la pianta non è più precompilata', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(mantieni('Temp aria'))
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+
+    // Il rilievo passa a ieri (come dalla schermata in campo): il modulo ricomincia e i mantenuti di oggi non valgono.
+    act(() => useCampoStore.getState().setData('E', IERI))
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(mantieni('Temp aria')).not.toBeChecked()
+    expect(screen.queryByText('mantenuto')).not.toBeInTheDocument()
+  })
+
+  it('i mantenuti di un altro strumento non precompilano questo: seguono lo strumento con cui si misura', async () => {
+    mantenutaTempAria(26)
+    // Rifatti per un altro strumento: quelli del Termometro non valgono più.
+    useCampoStore.getState().setMantieni('E', idStrumento('SPAD'), OGGI, par('SPAD').id, true)
+    apri('35')
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(mantieni('Temp aria')).not.toBeChecked()
+  })
+
+  it('spuntare dal riquadro registra lo strumento e la data del riquadro', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(mantieni('Temp aria'))
+    expect(useCampoStore.getState().mantenutiPer('E', idStrumento('Termometro'), OGGI)?.parametri).toEqual([par('Temp aria').id])
+  })
+
+  it('la casella c\'è per numeri, testo e sì/no e non per le liste ripetute', async () => {
+    apri('35', 'Fenologici')
+    await pronta()
+    expect(screen.getByRole('group', { name: 'Palchi' })).toBeInTheDocument()
+    // Fenologici: N frutti, ecc. sono numeri, Note è testo; Palchi e Infiorescenze sono liste.
+    const numeroDiCaselle = screen.getAllByRole('checkbox', { name: MANTIENI }).length
+    const nonListe = config.strumenti.find(st => st.nome === 'Fenologici')!.parametri
+      .map(pp => par2(pp.parametro_id)).filter(p => p.tipo !== 'lista' && !p.archiviato).length
+    expect(numeroDiCaselle).toBe(nonListe)
+  })
+
+  it('correggendo una misura già salvata non c\'è la casella', async () => {
+    archivio = [misura({ valori: { [par('Temp aria').id]: [24.5] } })]
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    expect(screen.getAllByRole('checkbox', { name: MANTIENI })).toHaveLength(2)
+    await utente.click(pulsante(/^09:12 · /))
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
   it('aprendo una scheda dalla griglia il cursore non si sposta da solo', async () => {
@@ -1271,9 +1406,9 @@ describe('SchedaPianta: dettagli del passaggio tra piante', () => {
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
   })
 
-  it('correggere una misura vecchia non cambia i valori ricordati per la pianta dopo', async () => {
+  it('correggere una misura vecchia non cambia i valori mantenuti per la pianta dopo', async () => {
     const ta = par('Temp aria').id
-    useCampoStore.getState().ricorda('E', config.parametri, { [ta]: [26] })
+    mantenutaTempAria(26)
     const mattina = misura({ ora: '09:12', valori: { [ta]: [24.5] } })
     archivio = [mattina]
     const utente = userEvent.setup()
@@ -1287,7 +1422,7 @@ describe('SchedaPianta: dettagli del passaggio tra piante', () => {
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     expect(salvate()[0].id).toBe(mattina.id)
-    expect(useCampoStore.getState().dati('E').ricordati[ta]).toEqual([26])
+    expect(useCampoStore.getState().dati('E').mantenuti?.valori[ta]).toEqual([26])
     expect(await screen.findByText('Nuova misura')).toBeInTheDocument()
     expect(campo('Temp aria')).toHaveValue('26')
   })

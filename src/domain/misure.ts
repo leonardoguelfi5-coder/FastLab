@@ -25,7 +25,7 @@ export function eVuoto(p: Parametro, v: ValoreParametro | undefined): boolean {
 }
 
 /** Come `eVuoto`, ma deduce il tipo dalla forma del valore (serve dove non si conosce il parametro). */
-function vuotoPerForma(v: ValoreParametro | undefined): boolean {
+export function vuotoPerForma(v: ValoreParametro | undefined): boolean {
   if (v === undefined || v === null) return true
   if (typeof v === 'string') return v.trim() === ''
   if (typeof v === 'boolean') return false
@@ -60,19 +60,25 @@ export function ultimoValore(misure: Misura[], parametroId: string, finoA: strin
   return migliore ? copiaProfonda(migliore.valori[parametroId]) : undefined
 }
 
+/** Si può mantenere uguale tra una misura e l'altra un parametro numero, testo o sì/no; una lista (elementi numerati) no. */
+export function mantenibile(p: Parametro): boolean {
+  return p.tipo === 'numero' || p.tipo === 'testo' || p.tipo === 'sino'
+}
+
 /**
- * Valori di partenza per una nuova misura. Per ogni parametro, in ordine di precedenza:
- * l'ultimo valore della pianta (progressivo), il valore ricordato dalle piante precedenti, il valore vuoto.
+ * Valori di partenza per una nuova misura. Per ogni parametro, in ordine di precedenza: il valore mantenuto
+ * (la spunta "Mantieni questo parametro uguale"), l'ultimo valore della pianta (progressivo), il valore vuoto.
+ * I mantenuti valgono solo per i parametri `mantenibile`; un mantenuto vuoto non conta.
  */
 export function valoriIniziali(a: {
-  parametri: Parametro[]; misurePianta: Misura[]; dataRilievo: string; ricordati: ValoriMisura
+  parametri: Parametro[]; misurePianta: Misura[]; dataRilievo: string; mantenuti: ValoriMisura
 }): ValoriMisura {
   const valori: ValoriMisura = {}
   for (const p of a.parametri) {
+    const mantenuto = mantenibile(p) ? a.mantenuti[p.id] : undefined
     const storico = p.progressivo ? ultimoValore(a.misurePianta, p.id, a.dataRilievo) : undefined
-    const ricordato = p.ricorda_tra_piante ? a.ricordati[p.id] : undefined
-    if (storico !== undefined) valori[p.id] = adattaLetture(p, storico)
-    else if (ricordato !== undefined && !eVuoto(p, ricordato)) valori[p.id] = adattaLetture(p, copiaProfonda(ricordato))
+    if (mantenuto !== undefined && !eVuoto(p, mantenuto)) valori[p.id] = adattaLetture(p, copiaProfonda(mantenuto))
+    else if (storico !== undefined) valori[p.id] = adattaLetture(p, storico)
     else valori[p.id] = valoreVuoto(p)
   }
   return valori

@@ -3,12 +3,15 @@ import { Check } from 'lucide-react'
 import type { Parametro } from '@/domain/tipi'
 import { Asterisco } from '@/components/Asterisco'
 import { Button } from '@/components/ui/button'
+import { SegnoMantenuto } from '@/components/SegnoMantenuto'
 
 interface CampoSiNoProps {
   parametro: Parametro
   valore: boolean | null
   onChange: (valore: boolean | null) => void
   obbligatorio?: boolean
+  /** Parte dal valore mantenuto dalla pianta di prima: accanto al nome compare il segno "mantenuto". */
+  mantenuto?: boolean
 }
 
 interface SceltaProps {
@@ -35,19 +38,22 @@ function Scelta({ etichetta, attiva, onClick }: SceltaProps) {
 }
 
 /** Sì / No in due pulsanti grandi. Ritoccare quello scelto toglie la risposta (`null`). */
-export function CampoSiNo({ parametro, valore, onChange, obbligatorio }: CampoSiNoProps) {
+export function CampoSiNo({ parametro, valore, onChange, obbligatorio, mantenuto }: CampoSiNoProps) {
   const id = useId()
   return (
     <div
       role="group"
       aria-labelledby={`${id}-nome`}
-      aria-describedby={obbligatorio ? `${id}-obbligatorio` : undefined}
+      aria-describedby={[mantenuto && `${id}-mantenuto`, obbligatorio && `${id}-obbligatorio`].filter(Boolean).join(' ') || undefined}
       className="flex flex-col gap-1.5"
     >
-      <p id={`${id}-nome`} className="flex items-center gap-2 text-label text-grafite-tenue select-none">
-        {parametro.nome}
-        {obbligatorio && <Asterisco />}
-      </p>
+      <div className="flex items-center gap-2">
+        <p id={`${id}-nome`} className="flex items-center gap-2 text-label text-grafite-tenue select-none">
+          {parametro.nome}
+          {obbligatorio && <Asterisco />}
+        </p>
+        {mantenuto && <SegnoMantenuto id={`${id}-mantenuto`} />}
+      </div>
       {obbligatorio && <span id={`${id}-obbligatorio`} className="sr-only">Obbligatorio</span>}
       <div className="flex gap-3">
         <Scelta etichetta="Sì" attiva={valore === true} onClick={() => onChange(valore === true ? null : true)} />

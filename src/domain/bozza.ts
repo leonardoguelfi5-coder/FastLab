@@ -23,7 +23,6 @@ export function nuovoParametro(ordine: number): Parametro {
     ordine,
     archiviato: false,
     progressivo: false,
-    ricorda_tra_piante: false,
     n_letture: 1,
     valore_min: null,
     valore_max: null,

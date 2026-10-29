@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(29);
+select plan(32);
 
 -- ===== Rinomina completa: nel database non resta nulla che porti il vecchio nome =====
 -- Il vecchio nome e' scritto spezzato ('pas' || 'sat'), cosi' un grep sul repository trova
@@ -33,6 +33,10 @@ select is_empty(
       where p.pronamespace = 'public'::regnamespace
         and (p.proname ilike '%' || 'pas' || 'sat' || '%' or p.prosrc ilike '%' || 'pas' || 'sat' || '%') $$,
   'nessuna funzione di public cita il vecchio nome (crea_esperimento compresa)');
+
+-- "Ricorda tra piante" e' sparito: il valore mantenuto tra una pianta e l'altra e' una scelta di chi rileva
+-- (nel dispositivo), non una proprieta' del parametro.
+select hasnt_column('public', 'parametri', 'ricorda_tra_piante', 'parametri non ha piu'' ricorda_tra_piante');
 
 select policies_are('public', 'strumenti', array['strumenti_membro'],
   'strumenti ha la sola policy strumenti_membro');
@@ -75,10 +79,10 @@ select is(
                 "etichetta": "1", "blocco": null, "ordine": 0}],
     "parametri": [
       {"id": "c5000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
-       "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
+       "archiviato": false, "progressivo": false, "n_letture": 1,
        "valore_min": null, "valore_max": null, "sotto_campi": []},
       {"id": "c5000000-0000-0000-0000-000000000002", "nome": "Fioritura", "unita": null, "tipo": "sino", "ordine": 1,
-       "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
+       "archiviato": false, "progressivo": false, "n_letture": 1,
        "valore_min": null, "valore_max": null, "sotto_campi": []}],
     "strumenti": [
       {"id": "d5000000-0000-0000-0000-000000000001", "nome": "Righello", "icona": "ruler", "ordine": 0,
@@ -198,6 +202,22 @@ select throws_ok(
      }'::jsonb) $$,
   '23505', null,
   'crea_esperimento con due tabelle fenologiche fallisce');
+
+-- Una bozza senza il campo ricorda_tra_piante crea i parametri (le bozze di sopra), e una bozza di un client
+-- vecchio che lo porta ancora non rompe la creazione: la chiave in piu' si ignora.
+select lives_ok(
+  $$ select crea_esperimento('{
+       "esperimento": {"id": "e5000000-0000-0000-0000-000000000004", "nome": "Client vecchio", "data_inizio": null, "note": "", "stato": "in_corso"},
+       "parametri": [{"id": "c5000000-0000-0000-0000-000000000004", "nome": "Temp aria", "unita": "C", "tipo": "numero", "ordine": 0,
+                      "archiviato": false, "progressivo": false, "ricorda_tra_piante": true, "n_letture": 1,
+                      "valore_min": null, "valore_max": null, "sotto_campi": []}]
+     }'::jsonb) $$,
+  'crea_esperimento ignora il campo ricorda_tra_piante di una bozza vecchia');
+
+select is(
+  (select count(*)::int from parametri where esperimento_id = 'e5000000-0000-0000-0000-000000000004'),
+  1,
+  'il parametro della bozza vecchia e'' stato creato');
 
 reset role;
 select is(

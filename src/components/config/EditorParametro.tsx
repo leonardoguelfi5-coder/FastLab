@@ -39,7 +39,7 @@ const testoONull = (s: string) => (s.trim() === '' ? null : s)
 /** Il parametro con il tipo nuovo, senza le opzioni che per quel tipo non valgono (non restano nascoste). */
 function conTipo(p: Parametro, tipo: TipoParametro): Parametro {
   if (tipo === 'numero') return { ...p, tipo, sotto_campi: [] }
-  const base = { ...p, tipo, unita: null, ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null }
+  const base = { ...p, tipo, unita: null, n_letture: 1, valore_min: null, valore_max: null }
   if (tipo === 'lista') return base
   return { ...base, progressivo: false, sotto_campi: [] }
 }
@@ -186,14 +186,6 @@ export function EditorParametro({
           aiuto="Per le conte che crescono nel tempo: il campo parte dall'ultimo valore registrato per la stessa pianta."
           checked={p.progressivo}
           onCheckedChange={(v) => cambia({ progressivo: v })}
-        />
-      )}
-      {p.tipo === 'numero' && (
-        <Interruttore
-          etichetta="Ricorda tra piante"
-          aiuto="Con lo stesso strumento il valore resta da una pianta all'altra, es. la temperatura dell'aria."
-          checked={p.ricorda_tra_piante}
-          onCheckedChange={(v) => cambia({ ricorda_tra_piante: v })}
         />
       )}
     </div>

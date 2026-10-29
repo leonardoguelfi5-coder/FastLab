@@ -1,8 +1,22 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
-import { eVuoto } from '@/domain/misure'
-import type { Parametro, ValoriMisura } from '@/domain/tipi'
+import { vuotoPerForma } from '@/domain/misure'
+import type { ValoreParametro, ValoriMisura } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
+
+/**
+ * I parametri che chi rileva ha spuntato con "Mantieni questo parametro uguale anche nelle prossime misure", e i loro
+ * ultimi valori. Valgono per uno strumento e un giorno di rilievo: altrove non si vedono (vedi `dati` e `mantenutiPer`).
+ */
+export interface Mantenuti {
+  strumentoId: string
+  /** AAAA-MM-GG del rilievo a cui valgono, sempre esplicita (anche se la data scelta era "oggi"). */
+  data: string
+  /** Gli id dei parametri spuntati. */
+  parametri: string[]
+  /** L'ultimo valore salvato dei soli parametri spuntati; un parametro spuntato senza valore parte vuoto. */
+  valori: ValoriMisura
+}
 
 /** Le scelte fatte in campo per un esperimento, come stanno nel localStorage. */
 interface ScelteCampo {
@@ -12,15 +26,15 @@ interface ScelteCampo {
    * che cambia con il giorno (così scegliere lo strumento, o riaprire l'app domani, non fissa il rilievo a ieri).
    */
   dataRilievo?: string
-  /** Gli ultimi valori dei parametri "ricorda tra piante", per precompilare la pianta dopo. */
-  ricordati: ValoriMisura
+  mantenuti?: Mantenuti
 }
 
 /** Quello che serve a una schermata: sempre completo, con la data di oggi se non ne è stata scelta un'altra. */
 export interface DatiCampo {
   strumentoId: string | null
   dataRilievo: string
-  ricordati: ValoriMisura
+  /** I mantenuti, solo se sono quelli dello strumento e della data correnti; altrimenti `null`. */
+  mantenuti: Mantenuti | null
 }
 
 interface CampoStore {
@@ -35,10 +49,21 @@ interface CampoStore {
   /** Scegliere la data di oggi riporta a "oggi" (non la fissa): domani il rilievo sarà di domani. */
   setData: (espId: string, data: string) => void
   /**
-   * Dopo un salvataggio: ricorda i valori dei soli parametri con `ricorda_tra_piante`. Un parametro presente ma
-   * vuoto cancella il valore ricordato; uno assente dai `valori` (non è nello strumento) resta com'era.
+   * I mantenuti validi per uno strumento e una data, anche diversi da quelli scelti nello store (il riquadro misura
+   * con il proprio strumento): `null` se non ce ne sono per quella coppia. Lo stesso oggetto finché lo stato non cambia.
    */
-  ricorda: (espId: string, parametri: Parametro[], valori: ValoriMisura) => void
+  mantenutiPer: (espId: string, strumentoId: string, data: string) => Mantenuti | null
+  /**
+   * Spunta o toglie "Mantieni questo parametro uguale" per un parametro. Con uno strumento o una data diversi da
+   * quelli dei mantenuti salvati si riparte da zero: la spunta non passa a un altro strumento o a un altro giorno.
+   * Togliere la spunta toglie anche il valore mantenuto.
+   */
+  setMantieni: (espId: string, strumentoId: string, data: string, parametroId: string, attivo: boolean) => void
+  /**
+   * Dopo il salvataggio di una misura nuova: tiene una copia dei valori dei soli parametri spuntati presenti in `valori`.
+   * Un parametro spuntato lasciato vuoto cancella il suo valore mantenuto; uno assente dai `valori` resta com'era.
+   */
+  aggiornaMantenuti: (espId: string, valori: ValoriMisura) => void
 }
 
 const CHIAVE = 'fastlab-campo'
@@ -60,7 +85,6 @@ const archivio: StateStorage = {
   },
 }
 
-const senzaValori: ValoriMisura = Object.freeze({})
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/
 
 const eOggetto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -73,18 +97,39 @@ function pulite(scelte: unknown): ScelteCampo {
   const s = eOggetto(scelte) ? scelte : {}
   // Prima della rinomina lo strumento scelto si salvava come `passataId`: vale finché non si scrive la chiave nuova.
   const strumentoId = typeof s.strumentoId === 'string' ? s.strumentoId : typeof s.passataId === 'string' ? s.passataId : null
-  const risultato: ScelteCampo = {
-    strumentoId,
-    ricordati: eOggetto(s.ricordati) ? (s.ricordati as ValoriMisura) : senzaValori,
-  }
+  const risultato: ScelteCampo = { strumentoId }
   if (typeof s.dataRilievo === 'string' && DATA_ISO.test(s.dataRilievo)) risultato.dataRilievo = s.dataRilievo
+  const mantenuti = mantenutiPuliti(s.mantenuti)
+  if (mantenuti) risultato.mantenuti = mantenuti
+  // Un salvataggio di prima di "Mantieni" porta `ricordati`: non serve più e non si riscrive.
   return risultato
+}
+
+/** I mantenuti rimessi in forma, o `null` se mancano o sono rovinati. Una copia: lo stato salvato non si tocca. */
+function mantenutiPuliti(m: unknown): Mantenuti | null {
+  if (!eOggetto(m)) return null
+  if (typeof m.strumentoId !== 'string' || typeof m.data !== 'string' || !DATA_ISO.test(m.data)) return null
+  if (!Array.isArray(m.parametri) || !eOggetto(m.valori)) return null
+  const parametri = m.parametri.filter((id): id is string => typeof id === 'string')
+  // Un valore ha senso solo per un parametro spuntato.
+  const valori = Object.fromEntries(Object.entries(m.valori).filter(([id]) => parametri.includes(id))) as ValoriMisura
+  return { strumentoId: m.strumentoId, data: m.data, parametri, valori }
 }
 
 // Il risultato dipende solo dalle scelte e dal giorno: si tiene per ogni coppia, così chi chiede con un giorno
 // diverso (un componente non ancora aggiornato) non fa perdere a un altro il suo oggetto.
-const SENZA_SCELTE = Object.freeze({ strumentoId: null, ricordati: senzaValori }) as ScelteCampo
+const SENZA_SCELTE = Object.freeze({ strumentoId: null }) as ScelteCampo
 const memo = new WeakMap<ScelteCampo, Map<string, DatiCampo>>()
+// Anche i mantenuti rimessi in forma si tengono per ogni voce, così chi li legge riceve sempre lo stesso oggetto.
+const mantenutiMemo = new WeakMap<ScelteCampo, Mantenuti | null>()
+
+function mantenutiDi(stato: Record<string, ScelteCampo>, espId: string): Mantenuti | null {
+  const salvate = stato[espId]
+  if (!eOggetto(salvate)) return null
+  let m = mantenutiMemo.get(salvate as ScelteCampo)
+  if (m === undefined) mantenutiMemo.set(salvate as ScelteCampo, (m = mantenutiPuliti((salvate as ScelteCampo).mantenuti)))
+  return m
+}
 
 function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string): DatiCampo {
   const salvate = stato[espId]
@@ -93,8 +138,12 @@ function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string):
   if (!perGiorno) memo.set(chiave, (perGiorno = new Map()))
   let dati = perGiorno.get(oggi)
   if (!dati) {
-    const { strumentoId, dataRilievo, ricordati } = pulite(salvate)
-    perGiorno.set(oggi, (dati = { strumentoId, dataRilievo: dataRilievo ?? oggi, ricordati }))
+    const { strumentoId, dataRilievo } = pulite(salvate)
+    const data = dataRilievo ?? oggi
+    // I mantenuti valgono per lo strumento e la data di adesso: con la data implicita "oggi", fino a mezzanotte.
+    const mantenuti = mantenutiDi(stato, espId)
+    dati = { strumentoId, dataRilievo: data, mantenuti: mantenuti && mantenuti.strumentoId === strumentoId && mantenuti.data === data ? mantenuti : null }
+    perGiorno.set(oggi, dati)
   }
   return dati
 }
@@ -114,16 +163,41 @@ export const useCampoStore = create<CampoStore>()(
           else scelte.dataRilievo = data
           return { stato: { ...s.stato, [espId]: scelte } }
         }),
-      ricorda: (espId, parametri, valori) =>
+      mantenutiPer: (espId, strumentoId, data) => {
+        const m = mantenutiDi(get().stato, espId)
+        return m && m.strumentoId === strumentoId && m.data === data ? m : null
+      },
+      setMantieni: (espId, strumentoId, data, parametroId, attivo) =>
         set(s => {
           const scelte = pulite(s.stato[espId])
-          const ricordati = { ...scelte.ricordati }
-          for (const p of parametri) {
-            if (!p.ricorda_tra_piante || !(p.id in valori)) continue
-            if (eVuoto(p, valori[p.id])) delete ricordati[p.id]
-            else ricordati[p.id] = structuredClone(valori[p.id])
+          const salvati = scelte.mantenuti
+          const stessi = salvati !== undefined && salvati.strumentoId === strumentoId && salvati.data === data
+          const parametri = stessi ? [...salvati.parametri] : []
+          const valori: ValoriMisura = stessi ? { ...salvati.valori } : {}
+          if (attivo) {
+            if (!parametri.includes(parametroId)) parametri.push(parametroId)
+          } else {
+            const posto = parametri.indexOf(parametroId)
+            if (posto >= 0) parametri.splice(posto, 1)
+            delete valori[parametroId]
           }
-          return { stato: { ...s.stato, [espId]: { ...scelte, ricordati } } }
+          scelte.mantenuti = { strumentoId, data, parametri, valori }
+          return { stato: { ...s.stato, [espId]: scelte } }
+        }),
+      aggiornaMantenuti: (espId, valori) =>
+        set(s => {
+          const scelte = pulite(s.stato[espId])
+          const salvati = scelte.mantenuti
+          if (!salvati) return s
+          const nuovi: ValoriMisura = { ...salvati.valori }
+          for (const id of salvati.parametri) {
+            if (!(id in valori)) continue
+            const v: ValoreParametro = valori[id]
+            if (vuotoPerForma(v)) delete nuovi[id]
+            else nuovi[id] = structuredClone(v)
+          }
+          scelte.mantenuti = { ...salvati, valori: nuovi }
+          return { stato: { ...s.stato, [espId]: scelte } }
         }),
     }),
     {

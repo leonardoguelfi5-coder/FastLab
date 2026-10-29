@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -7,7 +7,7 @@ import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
-import { validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
+import { eVuoto, mantenibile, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
@@ -47,6 +47,9 @@ function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: s
   return `Pianta #${etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} ${cosaFare}`
 }
 
+/** Nessun campo parte dal valore mantenuto (misura che si corregge, bozza ripresa). */
+const nessuno: ReadonlyMap<string, ValoriMisura[string]> = new Map()
+
 interface ModuloOggiProps {
   espId: string
   config: ConfigEsperimento
@@ -66,7 +69,6 @@ interface ModuloOggiProps {
   misureOggi: Misura[]
   misurePianta: Misura[]
   dataRilievo: string
-  oggi: string
   successiva: Pianta | null
   /** Porta il cursore nel primo campo da compilare appena il modulo compare. */
   primoCampo: boolean
@@ -89,27 +91,39 @@ interface ModuloOggiProps {
  */
 export function ModuloOggi({
   espId, config, pianta, strumento, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
-  dataRilievo, oggi, successiva, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
+  dataRilievo, successiva, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const ricorda = useCampoStore(s => s.ricorda)
+  const setMantieni = useCampoStore(s => s.setMantieni)
+  const aggiornaMantenuti = useCampoStore(s => s.aggiornaMantenuti)
+  // Le spunte "Mantieni" valgono per lo strumento del riquadro e la data di rilievo di questo modulo, anche se lo store
+  // ha scelto altro: i mantenuti seguono lo strumento con cui si sta misurando.
+  const mantenutiOra = useCampoStore(s => s.mantenutiPer(espId, strumento.id, dataRilievo))
 
   // I valori di partenza si calcolano una volta, all'apertura: un ricaricamento in background non cancella quel che
   // si scrive. Prima la bozza lasciata da un'uscita senza salvare, poi la misura che si corregge, poi i precompilati.
   const [iniziale] = useState(() => {
     const bozza = leggiBozza(chiave)
-    if (bozza && bozza.id === id) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true }
-    // I valori ricordati si leggono dallo store adesso, non dall'ultimo disegno: dopo un salvataggio sono già aggiornati.
-    const ricordati = useCampoStore.getState().dati(espId, oggi).ricordati
-    return {
-      valori: misura ? valoriDeiParametri(parametri, misura.valori) : valoriIniziali({ parametri, misurePianta, dataRilievo, ricordati }),
-      ora: misura?.ora ?? null,
-      ripresa: false,
-    }
+    if (bozza && bozza.id === id) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true, daMantenuti: nessuno }
+    if (misura) return { valori: valoriDeiParametri(parametri, misura.valori), ora: misura.ora, ripresa: false, daMantenuti: nessuno }
+    // I mantenuti si leggono dallo store adesso, non dall'ultimo disegno: dopo un salvataggio sono già aggiornati.
+    const mantenuti = useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)?.valori ?? {}
+    const valori = valoriIniziali({ parametri, misurePianta, dataRilievo, mantenuti })
+    // Quali campi partono dal valore mantenuto (e non da quello progressivo o vuoto): portano il segno "mantenuto".
+    const daMantenuti = new Map(
+      parametri.filter(p => mantenibile(p) && mantenuti[p.id] !== undefined && !eVuoto(p, mantenuti[p.id])).map(p => [p.id, valori[p.id]]),
+    )
+    return { valori, ora: null, ripresa: false, daMantenuti }
   })
   const [valori, setValori] = useState<ValoriMisura>(iniziale.valori)
+  // Il segno "mantenuto" resta finché il campo ha il valore con cui è partito: scritto un altro, è un valore di questa pianta.
+  const precompilatiDaMantenuti = useMemo(
+    () => new Set([...iniziale.daMantenuti].filter(([pid, v]) => JSON.stringify(valori[pid]) === JSON.stringify(v)).map(([pid]) => pid)),
+    [iniziale.daMantenuti, valori],
+  )
+  const spuntati = useMemo(() => new Set(mantenutiOra?.parametri ?? []), [mantenutiOra])
   const [ora, setOra] = useState<string | null>(iniziale.ora)
   const [modificato, setModificato] = useState(iniziale.ripresa)
   const [controllo, setControllo] = useState<Controllo | null>(null)
@@ -171,7 +185,7 @@ export function ModuloOggi({
     scriviAperto(aperto, misuraId)
   }, [chiave, aperto, misuraId, id, valori, ora, modificato])
 
-  // Dopo "Salva e vai" si continua a scrivere: il cursore va nel primo campo vuoto (Temp aria ricordata è già
+  // Dopo "Salva e vai" si continua a scrivere: il cursore va nel primo campo vuoto (Temp aria mantenuta è già
   // compilata, si scrive Temp pianta). Se il browser non apre la tastiera da solo, pazienza.
   useEffect(() => {
     if (!primoCampo || !campi.current) return
@@ -269,7 +283,8 @@ export function ModuloOggi({
     cancellaTutto()
     toastSalvato(`Pianta #${pianta.etichetta} salvata ✓`)
     // Solo una misura nuova è "l'ultima inserita": correggere quella del mattino non cambia la Temp aria del pomeriggio.
-    if (!misura) ricorda(espId, parametri, valori)
+    // Se le spunte non sono più per questo strumento e questa data (la scheda è stata riaperta altrove), non si toccano.
+    if (!misura && useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)) aggiornaMantenuti(espId, valori)
     // La misura entra subito nella cache: l'elenco di oggi la mostra senza aspettare il ricaricamento.
     queryClient.setQueryData<Misura[]>(chiavi.misurePianta(pianta.id), prima => [m, ...(prima ?? []).filter(x => x.id !== m.id)])
     void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
@@ -331,7 +346,16 @@ export function ModuloOggi({
 
         <div ref={campi}>
           {parametri.length > 0 ? (
-            <FormMisura parametri={parametri} obbligatori={obbligatori} valori={valori} onChange={cambia} />
+            <FormMisura
+              parametri={parametri}
+              obbligatori={obbligatori}
+              valori={valori}
+              onChange={cambia}
+              // La casella c'è solo nelle misure nuove: correggerne una vecchia non decide i valori delle piante dopo.
+              mantenuti={misura ? undefined : spuntati}
+              onMantieni={misura ? undefined : (parametroId, attivo) => setMantieni(espId, strumento.id, dataRilievo, parametroId, attivo)}
+              precompilatiDaMantenuti={precompilatiDaMantenuti}
+            />
           ) : (
             <p className="text-grafite-tenue">Questo strumento non ha parametri da compilare: aggiungili dalle impostazioni.</p>
           )}

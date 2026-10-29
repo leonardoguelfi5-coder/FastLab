@@ -144,7 +144,7 @@ describe('bozza', () => {
     const p = nuovoParametro(3)
     expect(p).toEqual({
       id: expect.any(String), nome: '', unita: null, tipo: 'numero', ordine: 3, archiviato: false, progressivo: false,
-      ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+      n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
     })
     expect(nuovoParametro(0).id).not.toBe(p.id)
   })

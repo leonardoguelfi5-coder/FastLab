@@ -21,14 +21,15 @@ const ultimo = (onChange: ReturnType<typeof rendi>) => onChange.mock.calls.at(-1
 const CAMPI_NUMERO = ['Unità', 'Letture per misura', 'Minimo', 'Massimo']
 
 describe('EditorParametro: opzioni per tipo', () => {
-  it('con tipo numero mostra Unità, Letture per misura, Minimo, Massimo, Progressivo e Ricorda tra piante', () => {
+  it('con tipo numero mostra Unità, Letture per misura, Minimo, Massimo e Progressivo', () => {
     rendi(parametro('Altezza'))
     for (const campo of CAMPI_NUMERO) expect(screen.getByLabelText(campo)).toBeInTheDocument()
     expect(screen.getByRole('switch', { name: 'Progressivo' })).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Ricorda tra piante' })).toBeInTheDocument()
+    // "Ricorda tra piante" non c'è più: il valore uguale si mantiene al momento della misura.
+    expect(screen.queryByRole('switch', { name: 'Ricorda tra piante' })).not.toBeInTheDocument()
   })
 
-  it('con tipo lista mostra Sotto-campi (con "+ Sotto-campo") e Progressivo, ma non Minimo né Ricorda tra piante', () => {
+  it('con tipo lista mostra Sotto-campi (con "+ Sotto-campo") e Progressivo, ma non Minimo', () => {
     rendi(parametro('Palchi', { tipo: 'lista' }))
     const gruppo = screen.getByRole('group', { name: 'Sotto-campi' })
     expect(within(gruppo).getByRole('button', { name: '+ Sotto-campo' })).toBeInTheDocument()
@@ -65,12 +66,12 @@ describe('EditorParametro: opzioni per tipo', () => {
   it('cambiando tipo azzera le opzioni che non valgono più', async () => {
     const utente = userEvent.setup({ delay: null })
     const onChange = rendi(parametro('Conta', {
-      unita: 'n', progressivo: true, ricorda_tra_piante: true, n_letture: 3, valore_min: 0, valore_max: 10,
+      unita: 'n', progressivo: true, n_letture: 3, valore_min: 0, valore_max: 10,
     }))
 
     await utente.selectOptions(screen.getByLabelText('Tipo'), 'lista')
     expect(ultimo(onChange)).toMatchObject({
-      tipo: 'lista', unita: null, progressivo: true, ricorda_tra_piante: false, n_letture: 1,
+      tipo: 'lista', unita: null, progressivo: true, n_letture: 1,
       valore_min: null, valore_max: null, sotto_campi: [],
     })
 
@@ -201,8 +202,6 @@ describe('EditorParametro: campi numerici', () => {
     await utente.clear(screen.getByLabelText('Unità'))
     expect(ultimo(onChange).unita).toBeNull()
 
-    await utente.click(screen.getByRole('switch', { name: 'Ricorda tra piante' }))
-    expect(ultimo(onChange).ricorda_tra_piante).toBe(true)
     await utente.click(screen.getByRole('switch', { name: 'Progressivo' }))
     expect(ultimo(onChange).progressivo).toBe(true)
   })

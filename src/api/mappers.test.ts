@@ -44,12 +44,12 @@ function righe(): RigheConfig {
     parametri: [
       {
         id: 'par2', ...DB, nome: 'Palchi', unita: null, tipo: 'lista', ordine: 1, archiviato: false,
-        progressivo: true, ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null,
+        progressivo: true, n_letture: 1, valore_min: null, valore_max: null,
         sotto_campi: [{ chiave: 'n_foglie', nome: 'N foglie', unita: null }],
       },
       {
         id: 'par1', ...DB, nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false,
-        progressivo: false, ricorda_tra_piante: true, n_letture: 3, valore_min: 0, valore_max: 300,
+        progressivo: false, n_letture: 3, valore_min: 0, valore_max: 300,
         sotto_campi: [],
       },
     ],
@@ -178,7 +178,7 @@ describe('aRigaMisura', () => {
 describe('mapper di scrittura della configurazione', () => {
   const parametro: Parametro = {
     id: 'par1', nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false, progressivo: false,
-    ricorda_tra_piante: true, n_letture: 3, valore_min: 0, valore_max: 300, sotto_campi: [],
+    n_letture: 3, valore_min: 0, valore_max: 300, sotto_campi: [],
   }
   const pianta: Pianta = { id: 'p1', trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }
   const strumento: Strumento = {

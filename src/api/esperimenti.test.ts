@@ -109,7 +109,7 @@ describe('caricaConfig', () => {
     piante: [{ id: 'p1', esperimento_id: E, trattamento_id: 't1', etichetta: '1', blocco: null, ordine: 0 }],
     parametri: [{
       id: 'par1', esperimento_id: E, nome: 'Altezza', unita: 'cm', tipo: 'numero', ordine: 0, archiviato: false,
-      progressivo: false, ricorda_tra_piante: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
+      progressivo: false, n_letture: 1, valore_min: null, valore_max: null, sotto_campi: [],
     }],
     strumenti: [{ id: 'pa1', esperimento_id: E, nome: 'Altezza', icona: null, ordine: 0, tipo: 'strumento', archiviato: false }],
     strumento_parametri: [{ esperimento_id: E, strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: false, ordine: 0 }],

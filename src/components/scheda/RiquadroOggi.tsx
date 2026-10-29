@@ -136,7 +136,6 @@ export function RiquadroOggi({
       misureOggi={misureOggi}
       misurePianta={misurePerIniziali}
       dataRilievo={dataRilievo}
-      oggi={oggi}
       successiva={successiva}
       primoCampo={primoCampo}
       dopoSalvataggio={primoCampo || appenaSalvata !== null}

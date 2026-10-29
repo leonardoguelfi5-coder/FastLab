@@ -21,7 +21,7 @@ export interface RigaPianta {
 }
 export interface RigaParametro {
   id: string; esperimento_id: string; nome: string; unita: string | null; tipo: TipoParametro; ordine: number
-  archiviato: boolean; progressivo: boolean; ricorda_tra_piante: boolean; n_letture: number
+  archiviato: boolean; progressivo: boolean; n_letture: number
   valore_min: number | null; valore_max: number | null; sotto_campi: SottoCampo[]
 }
 export interface RigaStrumento {
@@ -108,7 +108,6 @@ export function daRigheConfig(r: RigheConfig): ConfigEsperimento {
     ordine: p.ordine,
     archiviato: p.archiviato,
     progressivo: p.progressivo,
-    ricorda_tra_piante: p.ricorda_tra_piante,
     n_letture: p.n_letture,
     valore_min: p.valore_min,
     valore_max: p.valore_max,
@@ -168,7 +167,6 @@ export function aRigaParametro(espId: string, p: Parametro): RigaParametro {
     ordine: p.ordine,
     archiviato: p.archiviato,
     progressivo: p.progressivo,
-    ricorda_tra_piante: p.ricorda_tra_piante,
     n_letture: p.n_letture,
     valore_min: p.valore_min,
     valore_max: p.valore_max,

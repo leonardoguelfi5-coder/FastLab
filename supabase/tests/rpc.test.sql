@@ -152,10 +152,10 @@ select is(
        "etichetta": "3", "blocco": null, "ordine": 2}],
     "parametri": [
       {"id": "c3000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero", "ordine": 0,
-       "archiviato": false, "progressivo": true, "ricorda_tra_piante": true, "n_letture": 3,
+       "archiviato": false, "progressivo": true, "n_letture": 3,
        "valore_min": 0, "valore_max": 300, "sotto_campi": []},
       {"id": "c3000000-0000-0000-0000-000000000002", "nome": "Foglie", "unita": null, "tipo": "lista", "ordine": 1,
-       "archiviato": false, "progressivo": false, "ricorda_tra_piante": false, "n_letture": 1,
+       "archiviato": false, "progressivo": false, "n_letture": 1,
        "valore_min": null, "valore_max": null, "sotto_campi": [{"chiave": "l", "nome": "Lunghezza", "unita": "cm"}]}],
     "strumenti": [{"id": "d3000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": "ruler", "ordine": 0,
       "parametri": [
@@ -186,11 +186,11 @@ select results_eq(
   'l''esperimento ha i campi della bozza e creato_da = utente');
 
 select results_eq(
-  $$ select nome, unita, tipo, ordine, archiviato, progressivo, ricorda_tra_piante, n_letture,
+  $$ select nome, unita, tipo, ordine, archiviato, progressivo, n_letture,
             valore_min, valore_max, sotto_campi
        from parametri where esperimento_id = 'e3000000-0000-0000-0000-000000000003' order by ordine $$,
-  $$ values ('Altezza'::text, 'cm'::text, 'numero'::text, 0, false, true, true, 3, 0::numeric, 300::numeric, '[]'::jsonb),
-            ('Foglie', null, 'lista', 1, false, false, false, 1, null, null,
+  $$ values ('Altezza'::text, 'cm'::text, 'numero'::text, 0, false, true, 3, 0::numeric, 300::numeric, '[]'::jsonb),
+            ('Foglie', null, 'lista', 1, false, false, 1, null, null,
              '[{"chiave": "l", "nome": "Lunghezza", "unita": "cm"}]') $$,
   'i parametri hanno tutti i campi della bozza');
 
@@ -238,7 +238,7 @@ select throws_ok(
          {"id": "b4000000-0000-0000-0000-000000000002", "trattamento_id": "74000000-0000-0000-0000-000000000001",
           "etichetta": " 1", "blocco": null, "ordine": 1}],
        "parametri": [{"id": "c4000000-0000-0000-0000-000000000001", "nome": "Altezza", "unita": "cm", "tipo": "numero",
-                      "ordine": 0, "archiviato": false, "progressivo": false, "ricorda_tra_piante": false,
+                      "ordine": 0, "archiviato": false, "progressivo": false,
                       "n_letture": 1, "valore_min": null, "valore_max": null, "sotto_campi": []}],
        "strumenti": [{"id": "d4000000-0000-0000-0000-000000000001", "nome": "Settimanale", "icona": null, "ordine": 0,
                     "parametri": [{"parametro_id": "c4000000-0000-0000-0000-000000000001", "obbligatorio": false,

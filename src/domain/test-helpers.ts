@@ -31,7 +31,6 @@ export function parametro(nome: string, extra: Partial<Parametro> = {}): Paramet
     ordine: 0,
     archiviato: false,
     progressivo: false,
-    ricorda_tra_piante: false,
     n_letture: 1,
     valore_min: null,
     valore_max: null,
@@ -70,7 +69,7 @@ export function configDiEsempio(): ConfigEsperimento {
     ordine: i,
     livello_ids: [a.id, bl.id],
   }))
-  const altezza = parametro('Altezza', { unita: 'cm', ordine: 0, valore_min: 0, valore_max: 300, ricorda_tra_piante: true })
+  const altezza = parametro('Altezza', { unita: 'cm', ordine: 0, valore_min: 0, valore_max: 300 })
   const palchi = parametro('Palchi', {
     tipo: 'lista', ordine: 1, progressivo: true,
     sotto_campi: [{ chiave: 'n_foglie', nome: 'N foglie', unita: null }],

@@ -475,7 +475,7 @@ describe('ModificaMisura: salvataggio', () => {
     await waitFor(() => expect(posizione()).toBe(SCHEDA()))
   })
 
-  it('non cambia i valori ricordati per le piante dopo: correggere una misura vecchia non è l\'ultima inserita', async () => {
+  it('non cambia i valori mantenuti per le piante dopo: correggere una misura vecchia non è l\'ultima inserita', async () => {
     const utente = userEvent.setup()
     apri()
     await pronta()
@@ -483,7 +483,7 @@ describe('ModificaMisura: salvataggio', () => {
     await utente.click(pulsante('Salva'))
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
 
-    expect(useCampoStore.getState().dati('E', OGGI).ricordati).toEqual({})
+    expect(useCampoStore.getState().dati('E', OGGI).mantenuti).toBeNull()
   })
 })
 

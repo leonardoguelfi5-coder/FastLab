@@ -22,7 +22,6 @@ function parametro(nome: string, ordine: number, extra: Partial<Parametro> = {})
     ordine,
     archiviato: false,
     progressivo: false,
-    ricorda_tra_piante: false,
     n_letture: 1,
     valore_min: null,
     valore_max: null,
@@ -66,7 +65,7 @@ export function bozzaHydrochar(): BozzaEsperimento {
   })
   bozza.piante = generaPiante(bozza.trattamenti.map((t, i) => ({ trattamento_id: t.id, n: i === 0 ? 14 : 6 })))
 
-  const tempAria = parametro('Temp aria', 0, { unita: '°C', ricorda_tra_piante: true })
+  const tempAria = parametro('Temp aria', 0, { unita: '°C' })
   const tempPianta = parametro('Temp pianta', 1, { unita: '°C' })
   const spad = parametro('SPAD', 2)
   const altezza = parametro('Altezza', 3, { unita: 'cm' })
