@@ -72,6 +72,10 @@ export function messaggioErrore(e: unknown): string {
     return messaggio
   }
   if (code === '23505' && messaggio.includes('catalogo_strumenti_nome_unico')) return MSG_NOME_NEL_CATALOGO
+  // Un parametro sta in un solo strumento (indice unico su strumento_parametri.parametro_id).
+  if (code === '23505' && messaggio.includes('strumento_parametri_un_solo_strumento')) {
+    return 'Un parametro può stare in un solo strumento.'
+  }
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   // catalogo_id di uno strumento che punta a una voce che non c'è (crea_esperimento o salvaStrumento).
   if (code === '23503' && messaggio.includes('strumenti_catalogo_id_fkey')) {

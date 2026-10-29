@@ -103,6 +103,12 @@ describe('messaggioErrore', () => {
     )
   })
 
+  it('parametro già in un altro strumento (indice strumento_parametri_un_solo_strumento)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "strumento_parametri_un_solo_strumento"',
+    })).toBe('Un parametro può stare in un solo strumento.')
+  })
+
   it('nome doppio nel catalogo (indice catalogo_strumenti_nome_unico)', () => {
     expect(messaggioErrore({
       code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"',
