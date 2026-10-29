@@ -56,7 +56,7 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
   }, [aperto])
 
   // Dopo l'uscita ci pensano gli altri pezzi, come per ogni altra fine di sessione:
-  // RequireAuth rimanda a /accedi e svuotaCacheAlCambioUtente (main.tsx) svuota la cache e le bozze.
+  // RequireAuth rimanda a /accedi e svuotaCacheAlCambioUtente (main.tsx) svuota la cache.
   async function uscire() {
     setAperto(false)
     try {

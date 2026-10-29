@@ -228,17 +228,28 @@ describe('svuotaCacheAlCambioUtente', () => {
       sessionStorage.setItem(aperto, 'm1')
       sessionStorage.setItem('altro', 'resta')
     }
+    const ciSono = () => sessionStorage.getItem(bozza) !== null && sessionStorage.getItem(aperto) === 'm1'
 
     beforeEach(() => sessionStorage.clear())
 
-    it('all\'uscita (A -> nessuno) si cancellano tutte, e solo loro', () => {
+    it('a sessione finita (scaduta, o uscita da un\'altra scheda) restano: la stessa persona rientra e le ritrova', () => {
       const { notifica } = avvia(utenteA)
       scrivi()
       notifica('SIGNED_OUT', null)
-      expect(Object.keys(sessionStorage)).toEqual(['altro'])
+      expect(ciSono()).toBe(true)
+      notifica('SIGNED_IN', utenteA)
+      expect(ciSono()).toBe(true)
     })
 
-    it('con l\'accesso di un altro utente (A -> B) si cancellano', () => {
+    it('A -> nessuno -> B: all\'accesso di B si cancellano tutte, e solo loro', () => {
+      const { notifica } = avvia(utenteA)
+      scrivi()
+      notifica('SIGNED_OUT', null)
+      notifica('SIGNED_IN', utenteB)
+      expect(Object.keys(sessionStorage).filter(k => k !== 'fastlab-bozza:utente')).toEqual(['altro'])
+    })
+
+    it('A -> B direttamente (accesso con un altro account, anche da un\'altra scheda) le cancella', () => {
       const { notifica } = avvia(utenteA)
       scrivi()
       notifica('SIGNED_IN', utenteB)
@@ -246,13 +257,27 @@ describe('svuotaCacheAlCambioUtente', () => {
       expect(sessionStorage.getItem(aperto)).toBeNull()
     })
 
-    it('lo stesso utente (rinnovo del token, ricarica della pagina) le ritrova', () => {
+    it('ricaricando la pagina con la sessione ancora da recuperare (INITIAL_SESSION vuota, poi A) A le ritrova', () => {
+      avvia(utenteA)
+      scrivi()
+      const { notifica } = avvia(null)
+      expect(ciSono()).toBe(true)
+      notifica('SIGNED_IN', utenteA)
+      expect(ciSono()).toBe(true)
+    })
+
+    it('lo stesso utente (rinnovo del token) le ritrova', () => {
       const { notifica } = avvia(utenteA)
       scrivi()
       notifica('TOKEN_REFRESHED', { ...utenteA, access_token: 'nuovo' })
       notifica('SIGNED_IN', { ...utenteA })
-      expect(sessionStorage.getItem(bozza)).not.toBeNull()
-      expect(sessionStorage.getItem(aperto)).toBe('m1')
+      expect(ciSono()).toBe(true)
+    })
+
+    it('bozze di cui non si sa il proprietario non passano al primo che accede', () => {
+      scrivi()
+      avvia(utenteA)
+      expect(sessionStorage.getItem(bozza)).toBeNull()
     })
   })
 

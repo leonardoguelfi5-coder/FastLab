@@ -9,7 +9,7 @@ import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
 import { validaMisura, valoreVuoto, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta, ValoriMisura } from '@/domain/tipi'
-import { oraLocale } from '@/lib/date'
+import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { percorsoPianta } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -43,6 +43,19 @@ const ATTESA_CONFERMA_MS = 500
 const istante = (): number => Date.now()
 
 /** I valori per i soli parametri del modulo (gli altri restano nella misura): quelli di una misura o di una bozza. */
+/**
+ * Il messaggio di un salvataggio fallito quando chi rileva è già uscito dalla scheda. Dice se i valori sono rimasti
+ * (in una bozza) e, se la misura non è di oggi, con quale data riaprire la pianta: riaprendola si vede il giorno scelto.
+ */
+function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: string, valoriRimasti: boolean): string {
+  const motivo = messaggioErrore(errore)
+  const conData = dataRilievo === oggiLocale() ? '' : ` con data ${formattaData(dataRilievo)}`
+  const cosaFare = valoriRimasti
+    ? `I valori sono rimasti: riapri la pianta${conData} per riprovare.`
+    : `Controlla i valori della pianta${conData} e salvali di nuovo.`
+  return `Pianta #${etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} ${cosaFare}`
+}
+
 function soloDelModulo(parametri: Parametro[], valori: ValoriMisura): ValoriMisura {
   return Object.fromEntries(parametri.map(p => [p.id, valori[p.id] ?? valoreVuoto(p)]))
 }
@@ -128,7 +141,13 @@ export function ModuloOggi({
 
   // La bozza e il ricordo di quale modulo era aperto vanno insieme: tornando, si riapre questo modulo con i suoi valori.
   const misuraId = misura?.id ?? null
+  /**
+   * Cancella la bozza di questo modulo. Una bozza con un altro id alla stessa chiave è di un modulo aperto dopo
+   * (si è rientrati nella scheda mentre questo salvava): resta com'è.
+   */
   function cancellaTutto() {
+    const bozza = leggiBozza(chiave)
+    if (bozza && bozza.id !== id) return
     cancellaBozza(chiave)
     scriviAperto(aperto, null)
   }
@@ -229,13 +248,14 @@ export function ModuloOggi({
       } else {
         // Chi è già uscito dalla scheda non vede più il modulo: l'esito non va perso in silenzio. I valori restano
         // nella bozza (scritta anche se non erano stati toccati, come i precompilati), così riaprendo la pianta tornano.
-        scriviBozza(chiave, { id, valori, ora: oraMisura })
-        scriviAperto(aperto, misuraId)
-        const motivo = messaggioErrore(e)
-        toast.error(
-          `Pianta #${pianta.etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} `
-          + 'I valori sono rimasti: riapri la pianta per riprovare.',
-        )
+        // Una bozza che c'è già non si tocca: con lo stesso id ha questi valori o quelli scritti dopo, rientrando;
+        // con un altro id è di un modulo aperto dopo, e questi valori non hanno più dove stare (il messaggio lo dice).
+        const presente = leggiBozza(chiave)
+        if (!presente) {
+          scriviBozza(chiave, { id, valori, ora: oraMisura })
+          scriviAperto(aperto, misuraId)
+        }
+        toast.error(nonSalvataDopoUscita(pianta.etichetta, e, daSalvare.data_rilievo, !presente || presente.id === id))
       }
       return
     }

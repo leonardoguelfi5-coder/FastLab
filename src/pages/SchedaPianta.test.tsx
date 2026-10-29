@@ -29,6 +29,7 @@ import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { misurePianta, salvaMisura } from '@/api/misure'
 import { chiavi } from '@/api/query'
+import { chiaveBozza, leggiBozza } from '@/components/scheda/bozza'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -398,6 +399,81 @@ describe('SchedaPianta: salvataggio', () => {
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
     const [primo, secondo] = salvate()
     expect(secondo.id).toBe(primo.id)
+  })
+})
+
+describe('SchedaPianta: salvataggio finito dopo l\'uscita dalla scheda', () => {
+  /** Salva (senza aspettare la risposta) ed esce dalla scheda con la freccia indietro. */
+  async function salvaEdEsci(utente: ReturnType<typeof userEvent.setup>) {
+    let fine!: { riesci: () => void; fallisci: (e: unknown) => void }
+    vi.mocked(salvaMisura).mockImplementationOnce(async (_esp, m) => new Promise<void>((riesci, fallisci) => {
+      fine = {
+        riesci: () => { archivio = [m, ...archivio]; riesci() },
+        fallisci,
+      }
+    }))
+    await utente.click(pulsante(/^Salva e vai/))
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    return fine
+  }
+  const bozzaNuova = (data = OGGI) =>
+    leggiBozza(chiaveBozza({ espId: 'E', piantaId: idPianta('35'), passataId: idPassata('Termometro'), dataRilievo: data, misuraId: null }))
+
+  it('con una data che non è oggi il messaggio dice con quale data riaprire la pianta', async () => {
+    useCampoStore.getState().setData('E', IERI)
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '21')
+    const fine = await salvaEdEsci(utente)
+    await act(async () => fine.fallisci(new Error('boom')))
+
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+      'Pianta #35 non salvata. Errore imprevisto: boom. I valori sono rimasti: riapri la pianta con data 27/10/2026 per riprovare.',
+    )
+    expect(bozzaNuova(IERI)?.valori[par('Temp aria').id]).toEqual([21])
+  })
+
+  it('un fallimento tardivo non sovrascrive la bozza di un modulo aperto dopo, rientrando, e non promette i suoi valori', async () => {
+    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+    const utente = userEvent.setup()
+    const primo = apri('35')
+    await pronta()
+    // Temp aria è ricordata: si salva senza toccare nulla, quindi senza bozza.
+    const fine = await salvaEdEsci(utente)
+    primo.unmount()
+
+    // Si rientra nella scheda mentre il primo tentativo è ancora in volo: un modulo nuovo, con un altro id.
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp pianta'), '25')
+    const nuova = bozzaNuova()!
+    await act(async () => fine.fallisci(new Error('boom')))
+
+    const [tentativo] = salvate()
+    expect(nuova.id).not.toBe(tentativo.id)
+    expect(bozzaNuova()).toEqual(nuova)
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+      'Pianta #35 non salvata. Errore imprevisto: boom. Controlla i valori della pianta e salvali di nuovo.',
+    )
+  })
+
+  it('un salvataggio tardivo riuscito non cancella la bozza di un modulo aperto dopo, rientrando', async () => {
+    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+    const utente = userEvent.setup()
+    const primo = apri('35')
+    await pronta()
+    const fine = await salvaEdEsci(utente)
+    primo.unmount()
+
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp pianta'), '25')
+    const nuova = bozzaNuova()!
+    await act(async () => fine.riesci())
+
+    expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓')
+    expect(bozzaNuova()).toEqual(nuova)
   })
 })
 

@@ -85,10 +85,24 @@ export function cancellaBozza(chiave: string): void {
   try { sessionStorage.removeItem(chiave) } catch { /* niente da togliere */ }
 }
 
+/** Di chi sono le bozze della scheda del browser: l'id dell'ultimo utente che vi ha avuto accesso. */
+const CHIAVE_UTENTE = `${PREFISSO_BOZZE}utente`
+
 /**
- * Cancella tutte le bozze della scheda del browser (e il ricordo dei moduli aperti). Si chiama quando la sessione
- * finisce o passa a un altro utente: chi accede dopo, sullo stesso telefono, non deve ritrovarsi i valori di un altro.
+ * Da chiamare quando si sa chi ha fatto l'accesso. Le bozze sono di chi le ha scritte: se accede un utente diverso
+ * (o non si sa di chi siano) si cancellano tutte, perché chi accede dopo sullo stesso telefono non deve ritrovarsi i
+ * valori di un altro né salvarli a suo nome. Con lo stesso utente restano: dopo una sessione scaduta o un'uscita la
+ * stessa persona rientra e le ritrova. All'uscita non si chiama: chi esce non ha ancora un successore.
  */
+export function assegnaBozze(utente: string): void {
+  try {
+    if (sessionStorage.getItem(CHIAVE_UTENTE) === utente) return
+    cancellaTutteLeBozze()
+    sessionStorage.setItem(CHIAVE_UTENTE, utente)
+  } catch { /* senza sessionStorage non ci sono bozze */ }
+}
+
+/** Cancella tutte le bozze della scheda del browser, il ricordo dei moduli aperti e il loro proprietario. */
 export function cancellaTutteLeBozze(): void {
   try {
     const chiavi: string[] = []
