@@ -60,3 +60,7 @@ Task 10: dispatched reviewer (sonnet) on 4f24688..45cc256 (solo i due file nuovi
 Task 2: review (sonnet) → Needs fixes: (I1) una bozza ripresa perde il segno `mantenuto` (il valore mantenuto sembra digitato su quella pianta, focus n. 1)
 Ruling: T2 fix round 1 = I1 + minor 2 (setStrumento/setData azzerano i mantenuti se strumento o data effettiva cambiano, salvo `tieniIlGiorno`), 3 (segno solo con la spunta attiva), 4 (il cursore non cade sulle caselle "Mantieni"), 5 (copiaProfonda al posto di structuredClone) — cost if wrong: small
 Task 2: minor (deferred): con più letture il segno è solo sulla prima e sparisce cambiando la seconda (accettabile); ✓ della casella posizionato senza `top` → guardarlo su Safari iOS
+Task 10: review (sonnet) → Approved (0 Critical/Important), 914 Vitest
+Task 10: minor (carry to T9/T11/T12): non calcolare gli stati prima che la configurazione sia caricata (con `parametri` vuoto uno strumento risulterebbe senza parametri attivi → piante "fatte")
+Task 10: minor (deferred): statiPiante O(piante × misure); id duplicati teorici; test di non mutazione solo per prossimaDaMisurare
+Task 10: complete (commits 4f24688..45cc256, review clean)
