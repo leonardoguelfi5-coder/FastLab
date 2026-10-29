@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
 import type { ConfigEsperimento, Misura, Parametro, Passata, Pianta } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
-import { chiaveBozza, leggiBozza } from './bozza'
+import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
 import { ModuloOggi, type ArrivoScheda, type StatoModulo } from './ModuloOggi'
 
 const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
@@ -37,8 +37,8 @@ interface RiquadroOggiProps {
 
 /**
  * Il riquadro "Oggi · 🌡 Termometro" della scheda: le misure già fatte con questa passata alla data di rilievo e il
- * modulo per una misura nuova o per correggerne una. Il modulo ha un id generato all'apertura (o quello della misura
- * che si corregge) e si rimonta quando cambia: così un "Annulla" in sospeso non finisce nella misura sbagliata.
+ * modulo per una misura nuova o per correggerne una. Il modulo ha un id (quello della misura nuova, o quello della
+ * misura che si corregge) e si rimonta quando cambia: così un "Annulla" in sospeso non finisce nella misura sbagliata.
  */
 export function RiquadroOggi({
   espId, config, pianta, passata, misure, dataRilievo, oggi, successiva, conferma, onModifiche,
@@ -47,14 +47,29 @@ export function RiquadroOggi({
   const queryClient = useQueryClient()
   const base = { espId, piantaId: pianta.id, passataId: passata.id, dataRilievo }
   const chiaveNuova = chiaveBozza({ ...base, misuraId: null })
+  const aperto = chiaveAperto(base)
 
-  // L'id di una misura nuova: cambia solo aprendo un modulo nuovo (dopo un salvataggio riuscito o con "+ Nuova
-  // misura"). Un nuovo tentativo dopo un errore lo riusa, e l'upsert per id non crea doppioni. Una bozza ripresa
-  // porta il suo: un tentativo arrivato al server prima dell'uscita viene aggiornato, non duplicato.
-  const idNuovo = () => leggiBozza(chiaveNuova)?.id ?? crypto.randomUUID()
-  const [formId, setFormId] = useState(idNuovo)
-  const [inCorrezione, setInCorrezione] = useState<Misura | null>(null)
-  // Dopo "Scarta" su una bozza ripresa si riparte dalla stessa misura: serve una chiave nuova per rimontare.
+  const misureOggi = useMemo(
+    () => misure
+      .filter(m => m.passata_id === passata.id && m.data_rilievo === dataRilievo)
+      .sort((a, b) => confronta(a.ora, b.ora)),
+    [misure, passata.id, dataRilievo],
+  )
+
+  // L'id di una misura nuova cambia solo dopo un salvataggio riuscito: un nuovo tentativo dopo un errore, "Scarta" sulla
+  // bozza ripresa o un giro in una correzione lo riusano, e l'upsert per id non crea doppioni anche se un tentativo
+  // dato per fallito (un timeout) era arrivato al server. Una bozza ripresa porta il suo. Se invece la misura con
+  // quell'id è già tra quelle della pianta (il server l'ha, e la si vede), il modulo nuovo non la riscrive: id nuovo.
+  const [formId, setFormId] = useState(() => leggiBozza(chiaveNuova)?.id ?? crypto.randomUUID())
+  const idLibero = (id: string) => (misure.some(m => m.id === id) ? crypto.randomUUID() : id)
+  // Tornando alla scheda si riapre il modulo che si era lasciato: la correzione di una misura del giorno, se ne
+  // resta la bozza; altrimenti la misura nuova.
+  const [inCorrezione, setInCorrezione] = useState<Misura | null>(() => {
+    const id = leggiAperto(aperto)
+    if (id === null || leggiBozza(chiaveBozza({ ...base, misuraId: id }))?.id !== id) return null
+    return misureOggi.find(m => m.id === id) ?? null
+  })
+  // Dopo "Scarta" su una bozza ripresa si riparte dallo stesso modulo (stesso id): serve una chiave nuova per rimontare.
   const [ripartenze, setRipartenze] = useState(0)
   const [appenaSalvata, setAppenaSalvata] = useState<Misura | null>(null)
   const [primoCampo, setPrimoCampo] = useState(() => (location.state as ArrivoScheda | null)?.primoCampo === true)
@@ -70,12 +85,6 @@ export function RiquadroOggi({
     () => new Set(passata.parametri.filter(pp => pp.obbligatorio).map(pp => pp.parametro_id)),
     [passata],
   )
-  const misureOggi = useMemo(
-    () => misure
-      .filter(m => m.passata_id === passata.id && m.data_rilievo === dataRilievo)
-      .sort((a, b) => confronta(a.ora, b.ora)),
-    [misure, passata.id, dataRilievo],
-  )
   // I precompilati del modulo dopo un salvataggio partono dalla misura appena salvata, anche prima che la cache la riporti.
   const misurePerIniziali = useMemo(
     () => (appenaSalvata ? [appenaSalvata, ...misure.filter(m => m.id !== appenaSalvata.id)] : misure),
@@ -84,7 +93,7 @@ export function RiquadroOggi({
 
   function apriNuova() {
     setInCorrezione(null)
-    setFormId(idNuovo())
+    setFormId(idLibero)
     setPrimoCampo(false)
   }
 
@@ -95,12 +104,15 @@ export function RiquadroOggi({
 
   function dopoSalvataggio(m: Misura) {
     setAppenaSalvata(m)
-    apriNuova()
+    setInCorrezione(null)
+    // L'unico punto in cui una misura nuova prende un id nuovo: quella di prima è salvata.
+    setFormId(crypto.randomUUID())
+    setPrimoCampo(false)
   }
 
   function daCapo() {
-    if (inCorrezione) setRipartenze(n => n + 1)
-    else setFormId(crypto.randomUUID())
+    if (!inCorrezione) setFormId(idLibero)
+    setRipartenze(n => n + 1)
     setPrimoCampo(false)
   }
 
@@ -108,7 +120,7 @@ export function RiquadroOggi({
 
   return (
     <ModuloOggi
-      key={`${pianta.id}:${inCorrezione ? `misura:${inCorrezione.id}:${ripartenze}` : `nuova:${formId}`}`}
+      key={`${pianta.id}:${inCorrezione ? `misura:${inCorrezione.id}` : `nuova:${formId}`}:${ripartenze}`}
       espId={espId}
       config={config}
       pianta={pianta}
@@ -118,6 +130,7 @@ export function RiquadroOggi({
       obbligatori={obbligatori}
       id={inCorrezione?.id ?? formId}
       chiave={chiaveBozza({ ...base, misuraId: inCorrezione?.id ?? null })}
+      aperto={aperto}
       misura={inCorrezione}
       misureOggi={misureOggi}
       misurePianta={misurePerIniziali}

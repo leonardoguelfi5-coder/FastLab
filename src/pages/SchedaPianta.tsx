@@ -99,12 +99,21 @@ export function SchedaPianta() {
   const config = useConfig(espId)
   // Si carica insieme alla configurazione, non dopo.
   const misure = useMisurePianta(piantaId)
-  const oggi = useOggi()
-  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
 
   // Il modulo aperto dice se ha valori non salvati; prima di chiuderlo (indietro, un'altra misura, "Usa oggi")
   // si chiede se scartarli. Si legge al momento del tocco: un ref basta e non fa ridisegnare la pagina a ogni tasto.
   const modulo = useRef<StatoModulo | null>(null)
+
+  // A mezzanotte (o riaprendo il telefono il mattino dopo) "oggi" cambia. Con valori scritti e nessuna data scelta,
+  // il rilievo resta sul giorno in cui li si è scritti: la data si fissa nello stesso evento, prima di ridisegnare,
+  // così il modulo non si ricrea vuoto; compare l'avviso "non oggi" e "Usa oggi" passa dalla conferma di scarto.
+  const tieniIlGiorno = useCallback((prima: string) => {
+    if (!modulo.current?.modificato) return
+    const campo = useCampoStore.getState()
+    if (campo.dati(espId, prima).dataRilievo === prima) campo.setData(espId, prima)
+  }, [espId])
+  const oggi = useOggi(tieniIlGiorno)
+  const { passataId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
   const [inAttesa, setInAttesa] = useState<{ esegui: () => void } | null>(null)
   const onModifiche = useCallback((stato: StatoModulo | null) => { modulo.current = stato }, [])
   const conferma = useCallback((esegui: () => void) => {

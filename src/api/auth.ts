@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
+import { cancellaTutteLeBozze } from '@/components/scheda/bozza'
 import { supabase } from '@/lib/supabase'
 
 export async function accedi(email: string, password: string): Promise<void> {
@@ -61,7 +62,9 @@ export function useSessione(): { sessione: Session | null; caricamento: boolean 
  * Svuota la cache delle query quando la sessione finisce o passa a un altro utente (scadenza del token,
  * uscita da un'altra scheda, accesso con un altro account): la cache non è legata all'utente e,
  * senza, il nuovo utente vedrebbe per un po' i dati del precedente. Un rinnovo del token dello stesso
- * utente non la tocca. Restituisce la funzione che toglie l'ascolto.
+ * utente non la tocca. Insieme alla cache si cancellano le bozze della scheda pianta (valori scritti e non salvati):
+ * sono di chi le ha scritte, e chi accede dopo sullo stesso telefono non deve ritrovarle né salvarle a suo nome.
+ * Restituisce la funzione che toglie l'ascolto.
  */
 export function svuotaCacheAlCambioUtente(queryClient: QueryClient): () => void {
   // undefined = ancora non si sa chi c'è: il primo evento (INITIAL_SESSION) fissa il punto di partenza.
@@ -69,7 +72,10 @@ export function svuotaCacheAlCambioUtente(queryClient: QueryClient): () => void 
 
   const { data } = supabase.auth.onAuthStateChange((_evento, sessione) => {
     const id = sessione?.user.id ?? null
-    if (idPrecedente !== undefined && id !== idPrecedente) queryClient.clear()
+    if (idPrecedente !== undefined && id !== idPrecedente) {
+      queryClient.clear()
+      cancellaTutteLeBozze()
+    }
     idPrecedente = id
   })
 

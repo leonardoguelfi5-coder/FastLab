@@ -21,8 +21,35 @@ export interface ChiaveBozza {
   misuraId: string | null
 }
 
+/**
+ * L'inizio di ogni chiave scritta qui (bozze e modulo aperto): le bozze sono di chi le ha scritte, e all'uscita o al
+ * cambio di utente si cancellano tutte insieme (vedi `cancellaTutteLeBozze`).
+ */
+export const PREFISSO_BOZZE = 'fastlab-bozza:'
+
 export function chiaveBozza(c: ChiaveBozza): string {
-  return ['fastlab-bozza', c.espId, c.piantaId, c.passataId, c.dataRilievo, c.misuraId ?? 'nuova'].join(':')
+  return PREFISSO_BOZZE + [c.espId, c.piantaId, c.passataId, c.dataRilievo, c.misuraId ?? 'nuova'].join(':')
+}
+
+/**
+ * Dove si ricorda quale modulo era aperto in un riquadro (esperimento, pianta, passata, data): la correzione di una
+ * misura, se ne aveva una bozza. Assente vale "la misura nuova". Si scrive e si cancella insieme alla bozza.
+ */
+export function chiaveAperto(c: Omit<ChiaveBozza, 'misuraId'>): string {
+  return PREFISSO_BOZZE + ['aperto', c.espId, c.piantaId, c.passataId, c.dataRilievo].join(':')
+}
+
+/** La misura che si stava correggendo, o `null` (la misura nuova, o il sessionStorage non si legge). */
+export function leggiAperto(chiave: string): string | null {
+  try { return sessionStorage.getItem(chiave) } catch { return null }
+}
+
+/** Ricorda la misura in correzione; `null` (la misura nuova) toglie il ricordo. */
+export function scriviAperto(chiave: string, misuraId: string | null): void {
+  try {
+    if (misuraId === null) sessionStorage.removeItem(chiave)
+    else sessionStorage.setItem(chiave, misuraId)
+  } catch { /* si riapre la misura nuova */ }
 }
 
 // Un numero non valido ("-" lasciato a metà è NaN) in JSON diventerebbe null, cioè un campo vuoto che si salva:
@@ -56,4 +83,19 @@ export function scriviBozza(chiave: string, b: Bozza): void {
 
 export function cancellaBozza(chiave: string): void {
   try { sessionStorage.removeItem(chiave) } catch { /* niente da togliere */ }
+}
+
+/**
+ * Cancella tutte le bozze della scheda del browser (e il ricordo dei moduli aperti). Si chiama quando la sessione
+ * finisce o passa a un altro utente: chi accede dopo, sullo stesso telefono, non deve ritrovarsi i valori di un altro.
+ */
+export function cancellaTutteLeBozze(): void {
+  try {
+    const chiavi: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const chiave = sessionStorage.key(i)
+      if (chiave?.startsWith(PREFISSO_BOZZE)) chiavi.push(chiave)
+    }
+    for (const chiave of chiavi) sessionStorage.removeItem(chiave)
+  } catch { /* niente da togliere */ }
 }

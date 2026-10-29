@@ -87,6 +87,15 @@ describe('useOggi', () => {
     expect(disegni).toBe(prima)
   })
 
+  it('al cambio di giorno chiama alCambio con il giorno di prima e quello nuovo, una volta sola', () => {
+    const alCambio = vi.fn()
+    const { result } = renderHook(() => useOggi(alCambio))
+    vi.setSystemTime(new Date(2026, 9, 29, 8, 0))
+    act(() => { window.dispatchEvent(new Event('focus')); tornaVisibile() })
+    expect(alCambio).toHaveBeenCalledExactlyOnceWith('2026-10-28', '2026-10-29')
+    expect(result.current).toBe('2026-10-29')
+  })
+
   it('smontando toglie timer e ascoltatori', () => {
     const { result, unmount } = renderHook(() => useOggi())
     unmount()

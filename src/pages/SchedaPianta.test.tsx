@@ -365,10 +365,39 @@ describe('SchedaPianta: salvataggio', () => {
 
     await act(async () => fallisci(new TypeError('Failed to fetch')))
 
-    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Pianta #35 non salvata.'))
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(
+      /^Pianta #35 non salvata\. Il server non risponde\. .*\(vedi README\)\. I valori sono rimasti: riapri la pianta per riprovare\.$/,
+    ))
     expect(posizione()).toBe('/esperimenti/E')
     // Durante il salvataggio l'uscita non chiede di scartare: i valori erano già partiti.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('il messaggio dopo l\'uscita dice il vero: riaprendo la pianta i valori ci sono, anche quelli solo precompilati', async () => {
+    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [26] })
+    let fallisci!: (e: unknown) => void
+    vi.mocked(salvaMisura).mockImplementationOnce(() => new Promise<void>((_r, rifiuta) => { fallisci = rifiuta }))
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    // Temp aria è ricordata: si salva senza toccare nulla.
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    await act(async () => fallisci(new Error('boom')))
+    expect(toast.error).toHaveBeenCalledExactlyOnceWith(
+      'Pianta #35 non salvata. Errore imprevisto: boom. I valori sono rimasti: riapri la pianta per riprovare.',
+    )
+    unmount()
+
+    useCampoStore.getState().ricorda('E', config.parametri, { [par('Temp aria').id]: [30] })
+    apri('35')
+    await pronta()
+    expect(screen.getByText('Bozza ripristinata.')).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('26')
+    await utente.click(pulsante('Salva'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [primo, secondo] = salvate()
+    expect(secondo.id).toBe(primo.id)
   })
 })
 
@@ -516,7 +545,7 @@ describe('SchedaPianta: più misure nello stesso giorno', () => {
     expect(await screen.findByRole('button', { name: '09:12 · Temp aria 24,5 °C · Temp pianta 25,3 °C' })).toBeInTheDocument()
   })
 
-  it('"+ Nuova misura" lascia la correzione e torna a un modulo nuovo, con un id nuovo', async () => {
+  it('"+ Nuova misura" lascia la correzione e torna al modulo della misura nuova (non con l\'id della corretta)', async () => {
     const { mattina } = dueMisure()
     const utente = userEvent.setup()
     apri('35')
@@ -532,6 +561,83 @@ describe('SchedaPianta: più misure nello stesso giorno', () => {
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     expect(salvate()[0].id).not.toBe(mattina.id)
     expect(salvate()[0].ora).toBe('10:00')
+  })
+})
+
+describe('SchedaPianta: niente misure doppie', () => {
+  it('"Scarta" sulla bozza ripresa tiene l\'id: un tentativo dato per fallito ma arrivato al server non si duplica', async () => {
+    // Il primo tentativo scade (per l'app è fallito), ma potrebbe essere arrivato al server.
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('alert')
+    unmount()
+
+    apri('35')
+    await pronta()
+    await utente.click(within(screen.getByText('Bozza ripristinata.').parentElement!).getByRole('button', { name: 'Scarta' }))
+    expect(campo('Temp aria')).toHaveValue('')
+    await utente.type(campo('Temp aria'), '25')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [primo, secondo] = salvate()
+    expect(secondo.id).toBe(primo.id)
+    expect(secondo.valori[par('Temp aria').id]).toEqual([25])
+  })
+
+  it('un giro in una correzione e "+ Nuova misura" tengono l\'id della misura nuova', async () => {
+    const mattina = misura({ ora: '09:12', valori: { [par('Temp aria').id]: [24.5] } })
+    archivio = [mattina]
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp pianta'), '25')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('alert')
+
+    await utente.click(pulsante(/^09:12 · /))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await chiudiDialogo()
+    await utente.click(pulsante('+ Nuova misura'))
+    await utente.type(campo('Temp pianta'), '26')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [primo, secondo] = salvate()
+    expect(secondo.id).toBe(primo.id)
+    expect(secondo.id).not.toBe(mattina.id)
+  })
+
+  it('se la misura con quell\'id è già tra quelle di oggi (il tentativo era arrivato), "Scarta" non la riscrive', async () => {
+    // Il primo tentativo arriva al server, ma la risposta no.
+    vi.mocked(salvaMisura).mockImplementationOnce(async (_esp, m) => {
+      archivio = [m, ...archivio]
+      throw new TypeError('Failed to fetch')
+    })
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+    await screen.findByRole('alert')
+    unmount()
+
+    apri('35')
+    await pronta()
+    expect(pulsante('10:00 · Temp aria 24,5 °C')).toBeInTheDocument()
+    await utente.click(within(screen.getByText('Bozza ripristinata.').parentElement!).getByRole('button', { name: 'Scarta' }))
+    await utente.type(campo('Temp pianta'), '26')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [primo, secondo] = salvate()
+    expect(secondo.id).not.toBe(primo.id)
+    expect(archivio.find(m => m.id === primo.id)?.valori[par('Temp aria').id]).toEqual([24.5])
   })
 })
 
@@ -673,6 +779,86 @@ describe('SchedaPianta: data di rilievo cambiata mentre si corregge', () => {
   })
 })
 
+describe('SchedaPianta: mezzanotte con la data non scelta', () => {
+  const DOMANI = '2026-10-29'
+
+  /** Il telefono riaperto il mattino dopo: la pagina torna visibile e "oggi" è un altro giorno. */
+  function riapertoIlMattinoDopo() {
+    vi.setSystemTime(new Date(2026, 9, 29, 7, 30))
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+  }
+
+  beforeEach(() => vi.setSystemTime(new Date(2026, 9, 28, 23, 50)))
+  afterEach(() => { Reflect.deleteProperty(document, 'visibilityState') })
+
+  it('con valori scritti il modulo resta, sul giorno in cui li si è scritti, con l\'avviso "non oggi"', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    const prima = campo('Temp aria')
+
+    riapertoIlMattinoDopo()
+
+    // Lo stesso modulo, non uno ricreato dalla bozza.
+    expect(campo('Temp aria')).toBe(prima)
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '28/10/2026 · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.getByText('Stai registrando con data 28/10/2026, non oggi.')).toBeInTheDocument()
+
+    await utente.click(pulsante('Salva'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].data_rilievo).toBe(OGGI)
+  })
+
+  it('"Usa oggi" chiede prima se scartare i valori; scartati, si riparte dal giorno nuovo', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    riapertoIlMattinoDopo()
+
+    await utente.click(pulsante('Usa oggi'))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Continua a modificare' }))
+    await chiudiDialogo()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+
+    await utente.click(pulsante('Usa oggi'))
+    await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
+    await chiudiDialogo()
+    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(campo('Temp aria')).toHaveValue('')
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe(DOMANI)
+    expect(bozzeSalvate()).toEqual([])
+  })
+
+  it('senza valori scritti si passa al giorno nuovo, senza fissare la data', async () => {
+    apri('35')
+    await pronta()
+    riapertoIlMattinoDopo()
+
+    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
+    expect(useCampoStore.getState().stato.E.dataRilievo).toBeUndefined()
+  })
+
+  it('con una data scelta a mano non cambia nulla: resta quella', async () => {
+    useCampoStore.getState().setData('E', '2026-10-20')
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    riapertoIlMattinoDopo()
+
+    expect(campo('Temp aria')).toHaveValue('24,5')
+    expect(screen.getByText('Stai registrando con data 20/10/2026, non oggi.')).toBeInTheDocument()
+    expect(useCampoStore.getState().dati('E').dataRilievo).toBe('2026-10-20')
+  })
+})
+
 describe('SchedaPianta: valori non salvati', () => {
   function unaMisuraDiOggi() {
     const m = misura({ ora: '09:12', valori: { [par('Temp aria').id]: [24.5], [par('Temp pianta').id]: [25.1] } })
@@ -787,6 +973,68 @@ describe('SchedaPianta: valori non salvati', () => {
     expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
     expect(campo('Temp aria')).toHaveValue('')
     expect(bozzeSalvate()).toEqual([])
+  })
+
+  it('la bozza di una correzione si riapre tornando alla scheda, sulla stessa misura', async () => {
+    const m = unaMisuraDiOggi()
+    const tp = par('Temp pianta').id
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await utente.click(await screen.findByRole('button', { name: /^09:12 · / }))
+    await utente.type(campo('Temp pianta'), '26')
+    await utente.click(pulsante('Indietro di sistema'))
+    unmount()
+
+    apri('35')
+    await pronta()
+    expect(screen.getByText('Bozza ripristinata.')).toBeInTheDocument()
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(campo('Temp pianta')).toHaveValue('26')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0]).toMatchObject({ id: m.id, ora: '09:12' })
+    expect(salvate()[0].valori[tp]).toEqual([26])
+    await waitFor(() => expect(bozzeSalvate()).toEqual([]))
+  })
+
+  it('"Scarta" sulla bozza di una correzione cancella anche il ricordo: la volta dopo si apre la misura nuova', async () => {
+    unaMisuraDiOggi()
+    const utente = userEvent.setup()
+    const primo = apri('35')
+    await utente.click(await screen.findByRole('button', { name: /^09:12 · / }))
+    await utente.type(campo('Temp pianta'), '26')
+    primo.unmount()
+
+    const secondo = apri('35')
+    await pronta()
+    await utente.click(within(screen.getByText('Bozza ripristinata.').parentElement!).getByRole('button', { name: 'Scarta' }))
+    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(campo('Temp pianta')).toHaveValue('25,1')
+    expect(bozzeSalvate()).toEqual([])
+    secondo.unmount()
+
+    apri('35')
+    await pronta()
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+    expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
+  })
+
+  it('se la misura in correzione non è più tra quelle del giorno si apre la misura nuova', async () => {
+    const m = unaMisuraDiOggi()
+    const utente = userEvent.setup()
+    const { unmount } = apri('35')
+    await utente.click(await screen.findByRole('button', { name: /^09:12 · / }))
+    await utente.type(campo('Temp pianta'), '26')
+    unmount()
+
+    // Eliminata (o spostata a un altro giorno) da un'altra schermata.
+    archivio = [{ ...m, data_rilievo: IERI }]
+    apri('35')
+    await pronta()
+    expect(screen.queryByText(/Modifica della misura/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
+    expect(campo('Temp pianta')).toHaveValue('')
   })
 
   it('una bozza ripresa salva con lo stesso id e la stessa ora del tentativo fallito: niente doppioni', async () => {

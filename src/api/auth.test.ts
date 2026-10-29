@@ -15,6 +15,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
+import { chiaveAperto, chiaveBozza } from '@/components/scheda/bozza'
 import { supabase } from '@/lib/supabase'
 import { accedi, esci, registrati, svuotaCacheAlCambioUtente, useSessione } from './auth'
 
@@ -216,6 +217,43 @@ describe('svuotaCacheAlCambioUtente', () => {
     riempi()
     notifica('SIGNED_IN', utenteA)
     expect(vuota()).toBe(true)
+  })
+
+  describe('le bozze della scheda pianta', () => {
+    const riquadro = { espId: 'E', piantaId: 'p35', passataId: 'termo', dataRilievo: '2026-10-28' }
+    const bozza = chiaveBozza({ ...riquadro, misuraId: null })
+    const aperto = chiaveAperto(riquadro)
+    const scrivi = () => {
+      sessionStorage.setItem(bozza, '{"id":"m1","valori":{},"ora":null}')
+      sessionStorage.setItem(aperto, 'm1')
+      sessionStorage.setItem('altro', 'resta')
+    }
+
+    beforeEach(() => sessionStorage.clear())
+
+    it('all\'uscita (A -> nessuno) si cancellano tutte, e solo loro', () => {
+      const { notifica } = avvia(utenteA)
+      scrivi()
+      notifica('SIGNED_OUT', null)
+      expect(Object.keys(sessionStorage)).toEqual(['altro'])
+    })
+
+    it('con l\'accesso di un altro utente (A -> B) si cancellano', () => {
+      const { notifica } = avvia(utenteA)
+      scrivi()
+      notifica('SIGNED_IN', utenteB)
+      expect(sessionStorage.getItem(bozza)).toBeNull()
+      expect(sessionStorage.getItem(aperto)).toBeNull()
+    })
+
+    it('lo stesso utente (rinnovo del token, ricarica della pagina) le ritrova', () => {
+      const { notifica } = avvia(utenteA)
+      scrivi()
+      notifica('TOKEN_REFRESHED', { ...utenteA, access_token: 'nuovo' })
+      notifica('SIGNED_IN', { ...utenteA })
+      expect(sessionStorage.getItem(bozza)).not.toBeNull()
+      expect(sessionStorage.getItem(aperto)).toBe('m1')
+    })
   })
 
   it('restituisce la funzione che toglie l\'ascolto', () => {

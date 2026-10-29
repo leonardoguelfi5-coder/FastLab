@@ -14,7 +14,7 @@ import { messaggioErrore } from '@/lib/errori'
 import { percorsoPianta } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
-import { cancellaBozza, leggiBozza, scriviBozza } from './bozza'
+import { cancellaBozza, leggiBozza, scriviAperto, scriviBozza } from './bozza'
 import { CampoOra } from './CampoOra'
 import { ElencoOggi } from './ElencoOggi'
 import { ErroreSalvataggio, EsitoControllo, type Controllo } from './MessaggiSalvataggio'
@@ -59,6 +59,8 @@ interface ModuloOggiProps {
   id: string
   /** Dove sta la bozza di questo modulo nel sessionStorage. */
   chiave: string
+  /** Dove il riquadro ricorda quale modulo era aperto (vedi `chiaveAperto`): si scrive e si cancella con la bozza. */
+  aperto: string
   /** La misura che si sta correggendo; `null` per una misura nuova. */
   misura: Misura | null
   misureOggi: Misura[]
@@ -81,7 +83,7 @@ interface ModuloOggiProps {
  * (id diverso), quindi lo stato qui dentro vale per un solo modulo.
  */
 export function ModuloOggi({
-  espId, config, pianta, passata, titolo, parametri, obbligatori, id, chiave, misura, misureOggi, misurePianta,
+  espId, config, pianta, passata, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
   dataRilievo, oggi, successiva, primoCampo, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
@@ -124,18 +126,33 @@ export function ModuloOggi({
     return () => { montato.current = false }
   }, [])
 
+  // La bozza e il ricordo di quale modulo era aperto vanno insieme: tornando, si riapre questo modulo con i suoi valori.
+  const misuraId = misura?.id ?? null
+  function cancellaTutto() {
+    cancellaBozza(chiave)
+    scriviAperto(aperto, null)
+  }
+
   // La pagina chiede conferma prima di azioni che chiudono il modulo (indietro, un'altra misura, un'altra data).
   // Durante il salvataggio no: i valori sono già partiti, e se il salvataggio fallisce la bozza resta e lo si dice.
   const salvando = stato.tipo === 'salvando'
   useEffect(() => {
-    onModifiche({ modificato: modificato && !salvando, scarta: () => cancellaBozza(chiave) })
-  }, [onModifiche, modificato, salvando, chiave])
+    onModifiche({
+      modificato: modificato && !salvando,
+      scarta: () => {
+        cancellaBozza(chiave)
+        scriviAperto(aperto, null)
+      },
+    })
+  }, [onModifiche, modificato, salvando, chiave, aperto])
   useEffect(() => () => onModifiche(null), [onModifiche])
 
   // Per le uscite che l'app non può fermare (gesto indietro del telefono, menu, ricarica) i valori restano in una bozza.
   useEffect(() => {
-    if (modificato && !chiuso.current) scriviBozza(chiave, { id, valori, ora })
-  }, [chiave, id, valori, ora, modificato])
+    if (!modificato || chiuso.current) return
+    scriviBozza(chiave, { id, valori, ora })
+    scriviAperto(aperto, misuraId)
+  }, [chiave, aperto, misuraId, id, valori, ora, modificato])
 
   // Dopo "Salva e vai" si continua a scrivere: il cursore va nel primo campo vuoto (Temp aria ricordata è già
   // compilata, si scrive Temp pianta). Se il browser non apre la tastiera da solo, pazienza.
@@ -210,8 +227,15 @@ export function ModuloOggi({
         setStato({ tipo: 'errore', azione, errore: e })
         setFermate(n => n + 1)
       } else {
-        // Chi è già uscito dalla scheda non vede più il modulo: l'esito non va perso in silenzio (la bozza resta).
-        toast.error(`Pianta #${pianta.etichetta} non salvata. ${messaggioErrore(e)}`)
+        // Chi è già uscito dalla scheda non vede più il modulo: l'esito non va perso in silenzio. I valori restano
+        // nella bozza (scritta anche se non erano stati toccati, come i precompilati), così riaprendo la pianta tornano.
+        scriviBozza(chiave, { id, valori, ora: oraMisura })
+        scriviAperto(aperto, misuraId)
+        const motivo = messaggioErrore(e)
+        toast.error(
+          `Pianta #${pianta.etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} `
+          + 'I valori sono rimasti: riapri la pianta per riprovare.',
+        )
       }
       return
     }
@@ -221,7 +245,7 @@ export function ModuloOggi({
 
   function salvata(m: Misura, azione: Azione) {
     chiuso.current = true
-    cancellaBozza(chiave)
+    cancellaTutto()
     toastSalvato(`Pianta #${pianta.etichetta} salvata ✓`)
     // Solo una misura nuova è "l'ultima inserita": correggere quella del mattino non cambia la Temp aria del pomeriggio.
     if (!misura) ricorda(espId, parametri, valori)
@@ -263,7 +287,7 @@ export function ModuloOggi({
               variant="ghost"
               size="sm"
               onClick={() => {
-                cancellaBozza(chiave)
+                cancellaTutto()
                 onDaCapo()
               }}
             >
