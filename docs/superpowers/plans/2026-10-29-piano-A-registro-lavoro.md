@@ -140,3 +140,5 @@ Task 8: dispatched reviewer (sonnet) su copia; Task 7 fix round 1 dispatched (im
 Task 8: review (sonnet) → Needs fixes: (I1) archiviazione con toast verde (`toastSalvato`), contro la regola "verde solo per salvato"; (I2) valori delle righe non in Geist Mono (`text-dato` non imposta la famiglia; stesso difetto in SceltaDalCatalogo del T6)
 Ruling: T8 fix round 1 (dopo la correzione del T7) = I1 + I2 (anche in SceltaDalCatalogo) + m3 (attendere l'invalidazione del catalogo prima di tornare all'elenco, o `setQueryData`, così riaprendo subito non si parte dalla voce vecchia) + m4 (l'errore della fase esperimenti con "Riprova" resta finché non si riprova o si chiude) — cost if wrong: small
 Task 8: minor (deferred): ramo `problemiVoce` in `salva()` difensivo e irraggiungibile (coperto dai test di dominio)
+Task 7: fix round 1 implemented 3b7d3a5 (1207 Vitest, build OK); re-review (sonnet) dispatched su copia
+Task 8: fix round 1 dispatched (implementatore T8)
