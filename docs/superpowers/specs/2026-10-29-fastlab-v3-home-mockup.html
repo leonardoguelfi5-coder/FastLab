@@ -1,0 +1,37 @@
+<style>
+  .wrap { display:flex; gap:28px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+  .phone { width:280px; border:2px solid oklch(78% 0.014 75); border-radius:24px; background:oklch(98.4% 0.006 85); color:oklch(23% 0.014 262); font:14px/1.4 system-ui, sans-serif; overflow:hidden; }
+  .bar { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid oklch(88.5% 0.011 80); font-weight:650; font-size:15px; }
+  .body { padding:14px; }
+  .sub { font:12px ui-monospace, monospace; color:oklch(44% 0.016 262); margin-bottom:10px; }
+  .strip { display:flex; align-items:center; justify-content:space-between; gap:10px; background:oklch(37% 0.105 262); color:oklch(99.6% 0.003 85); border-radius:12px; padding:12px 14px; margin-bottom:14px; }
+  .strip b { font-size:15px; }
+  .strip span { font:12px ui-monospace, monospace; opacity:.85; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  .ico { border:1px solid oklch(60% 0.012 75); background:oklch(99.6% 0.003 85); border-radius:14px; display:flex; align-items:center; gap:10px; padding:14px 12px; font-size:14px; font-weight:550; position:relative; min-height:56px; }
+  .ico .ic { font-size:22px; }
+  .badge { position:absolute; top:6px; right:8px; background:oklch(95.5% 0.04 80); color:oklch(50% 0.11 68); border:1px solid oklch(50% 0.11 68); border-radius:8px; font:600 10.5px ui-monospace, monospace; padding:1px 5px; }
+</style>
+
+<h2>Home v2: "Nuova misura" come striscia</h2>
+<p class="subtitle">Striscia in alto sempre a portata, sotto otto icone in due colonne.</p>
+
+<div class="wrap">
+  <div class="phone">
+    <div class="bar"><span>← Hydrochar 2027</span><span>☰</span></div>
+    <div class="body">
+      <div class="sub">56 piante · 8 trattamenti · in corso</div>
+      <div class="strip"><div><b>➕ Nuova misura</b><br><span>SPAD in corso · 34/56</span></div><span style="font-size:18px">›</span></div>
+      <div class="grid">
+        <div class="ico"><span class="badge">2</span><span class="ic">📅</span>Oggi</div>
+        <div class="ico"><span class="ic">🌿</span>Piante</div>
+        <div class="ico"><span class="ic">📊</span>Dataset</div>
+        <div class="ico"><span class="ic">⬇️</span>Esporta Excel</div>
+        <div class="ico"><span class="ic">📒</span>Diario</div>
+        <div class="ico"><span class="ic">🗺️</span>Mappa</div>
+        <div class="ico"><span class="ic">📷</span>Foto</div>
+        <div class="ico"><span class="ic">⚙️</span>Impostazioni</div>
+      </div>
+    </div>
+  </div>
+</div>
