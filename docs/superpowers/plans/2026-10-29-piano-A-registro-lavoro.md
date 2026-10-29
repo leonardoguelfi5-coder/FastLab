@@ -48,3 +48,6 @@ Task 1: minor (carry to T11): strumenti archiviati ancora nella scelta di `Campo
 Task 1: minor (deferred, primo deploy v3): bozza del wizard v1 scartata in silenzio; un client vecchio che manda `passate` crea un esperimento senza strumenti
 Task 1: complete (commits a6fcec1..f801124, review clean)
 Task 2: dispatched implementer (sonnet), BASE f801124
+Ruling (T10): per la tabella fenologica non contano tutte le voci (una `Note` facoltativa vuota renderebbe ogni pianta "incompleta" per sempre e il giro non finirebbe mai): contano le voci obbligatorie; senza obbligatorie la pianta è `fatta` con almeno un valore. Per gli strumenti semplici (Ciras) contano tutti i valori attivi, come da piano. Strumento senza parametri attivi: `fatta` con almeno una misura — cost if wrong: una tabella fenologica senza obbligatori non segnala le voci dimenticate.
+Ruling (T11): con una data di rilievo diversa da oggi la riga dice `<fatte>/<totale> il GG/MM` invece di `… oggi` — cost if wrong: copy tweak.
+Ruling (T7): l'"Elimina" di uno strumento richiede di sapere se ha misure: nuova lettura `strumentiConDati(espId)` (hook con `staleTime: 0` come `useParametriConDati`); finché non si sa, niente Elimina. Gli strumenti archiviati si possono ripristinare — cost if wrong: una query in più nelle impostazioni.
