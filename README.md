@@ -124,6 +124,8 @@ Su Supabase l'estensione pgcrypto sta nello schema `extensions`, per questo le f
 
 ## Messa online su un nuovo progetto Supabase
 
+La via più breve, senza riga di comando, è in [`docs/GUIDA-TELEFONO.md`](docs/GUIDA-TELEFONO.md): un solo file SQL da incollare nell'editor del Dashboard (`supabase/online/schema-completo.sql`, generato da `scripts/sql-unico.sh` unendo le migration; da rigenerare a ogni migration nuova), il sito su Vercel e l'installazione sul telefono. Qui sotto la via con la CLI.
+
 1. Crea un progetto su https://supabase.com (il piano Free basta). Annota la password del database e il riferimento del progetto (`<ref>`, nell'indirizzo del progetto).
 2. Dal repository, collega il progetto e porta lo schema online:
 
