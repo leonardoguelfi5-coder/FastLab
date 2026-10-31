@@ -27,3 +27,6 @@ Task B3: review (sonnet) → Approved (0 Critical/Important), 1380 Vitest, build
 Task B3: minor M1–M3 corretti dal controller: la ricerca mostra anche la pianta che Invio aprirebbe ("035" → 35, prima diceva "Nessuna pianta trovata."); hover delle righe nel blocco aperto come ElencoOggi (`bg-riga/40`, `active:bg-riga/60`); etichette lunghe troncate (`min-w-14 max-w-24 truncate`)
 Task B3: minor (deferred): `ultime_misure_piante` senza paginazione (limite 1000 righe di PostgREST: con ~100 piante × 10 strumenti la risposta si tronca; n/N l'unico indizio)
 Task B3: complete (commits f870e0a..1c944aa + correzioni del controller, review clean)
+Task B4: implementatore (sonnet) DONE_WITH_CONCERNS bc0b974 (63 test del modulo spostati in MisuraPianta.test.tsx: 45 → 108) + 330de15 (scheda nuova: UltimiValori, AvvisiMancanti, DatiPianta, MisuraQuestaPianta) — 1422 Vitest, build OK; `RiquadroOggi.avanti` obbligatorio; `daQuanto` e `formattaConUnita` in lib
+Ruling: accettate le deviazioni B4: con un solo strumento attivo "Misura questa pianta" parte subito; senza strumenti attivi c'è il link alle Impostazioni; liste senza confronto; errori di confronto e avvisi silenziosi (aiuti secondari); niente BannerData nella scheda — cost if wrong: small
+Task B4: dispatched reviewer (sonnet) su copia eca6a12..330de15; Task B5 dispatched implementer (sonnet), BASE 330de15
