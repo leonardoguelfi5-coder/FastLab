@@ -34,3 +34,12 @@ const dataUtc = (iso: string): number => {
 export function giorniTra(da: string, a: string): number {
   return Math.round((dataUtc(a) - dataUtc(da)) / 86_400_000)
 }
+
+/** Da quanto è una data, a parole: "oggi", "ieri", "3 giorni fa"; una data futura (rilievo in anticipo) è "il 30/10". */
+export function daQuanto(data: string, oggi: string): string {
+  const giorni = giorniTra(data, oggi)
+  if (giorni < 0) return `il ${formattaGiornoMese(data)}`
+  if (giorni === 0) return 'oggi'
+  if (giorni === 1) return 'ieri'
+  return `${giorni} giorni fa`
+}

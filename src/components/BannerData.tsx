@@ -12,7 +12,7 @@ import { useCampoStore } from '@/store/campo'
  * oltre la mezzanotte l'avviso compare o sparisce da solo.
  *
  * `conferma` riceve il cambio di data invece di eseguirlo: una pagina con valori non salvati che dipendono dalla
- * data (la scheda pianta) può chiedere prima se scartarli.
+ * data (la misura di una pianta) può chiedere prima se scartarli.
  */
 export function BannerData({ espId, conferma }: { espId: string; conferma?: (cambiaData: () => void) => void }) {
   const oggi = useOggi()

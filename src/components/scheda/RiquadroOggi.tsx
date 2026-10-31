@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
 import { misureStrumentoNelGiorno } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
-import { percorsoPianta } from '@/lib/percorsi'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
 import { ModuloOggi, type ArrivoScheda, type Avanti, type StatoModulo } from './ModuloOggi'
 import { titoloRiquadro } from './titolo'
@@ -29,16 +28,13 @@ interface RiquadroOggiProps {
   strumento: Strumento
   /** Tutte le misure della pianta, già caricate. */
   misure: Misura[]
-  /** Fissa per tutta la vita del riquadro: la pagina lo rimonta quando cambia (vedi SchedaPianta). */
+  /** Fissa per tutta la vita del riquadro: la pagina lo rimonta quando cambia (vedi MisuraPianta). */
   dataRilievo: string
   oggi: string
-  /** La pianta che segue (nell'ordine dell'esperimento, o nel giro); `null` sull'ultima. Le sue misure si leggono già. */
+  /** La pianta che segue nel giro; `null` se non ce n'è. Le sue misure si leggono già, così "Salva e vai" non aspetta. */
   successiva: Pianta | null
-  /**
-   * Il pulsante "Salva e …". Senza, "Salva e vai alla #N" verso la scheda della pianta successiva, e sull'ultima
-   * solo "Salva". La misura nel giro lo usa per restare nel giro e, alla fine, per "Salva e termina".
-   */
-  avanti?: Avanti | null
+  /** Il pulsante "Salva e …": "e vai alla #N" per restare nel giro, "e termina" alla fine; `null` per il solo "Salva". */
+  avanti: Avanti | null
   /**
    * Il modulo da aprire, scelto con un tocco (vale l'attesa contro il doppio tocco). Senza, quello lasciato l'ultima
    * volta (se ne resta la bozza), altrimenti una misura nuova. Con `nuova` l'id non è mai quello di una misura già
@@ -51,12 +47,12 @@ interface RiquadroOggiProps {
 }
 
 /**
- * Il riquadro "Oggi · 🌡 Termometro" della scheda: le misure già fatte con questo strumento alla data di rilievo e il
+ * Il riquadro "Oggi · 🌡 Termometro" della misura: le misure già fatte con questo strumento alla data di rilievo e il
  * modulo per una misura nuova o per correggerne una. Il modulo ha un id (quello della misura nuova, o quello della
  * misura che si corregge) e si rimonta quando cambia: così un "Annulla" in sospeso non finisce nella misura sbagliata.
  */
 export function RiquadroOggi({
-  espId, config, pianta, strumento, misure, dataRilievo, oggi, successiva, avanti: avantiScelto, iniziale, conferma, onModifiche,
+  espId, config, pianta, strumento, misure, dataRilievo, oggi, successiva, avanti, iniziale, conferma, onModifiche,
 }: RiquadroOggiProps) {
   const location = useLocation()
   const queryClient = useQueryClient()
@@ -132,10 +128,6 @@ export function RiquadroOggi({
     setRipartenze(n => n + 1)
     setPrimoCampo(false)
   }
-
-  const avanti = avantiScelto !== undefined
-    ? avantiScelto
-    : successiva && { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoPianta(espId, successiva.id) }
 
   const titolo = titoloRiquadro(strumento, dataRilievo, oggi)
 

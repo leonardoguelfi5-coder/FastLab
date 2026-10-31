@@ -28,6 +28,11 @@ export function formattaMedia(n: number): string {
   return formattaNumero(Object.is(arrotondato, -0) ? 0 : arrotondato)
 }
 
+/** Un valore calcolato con la sua unità di misura, se ce l'ha: "24,5 °C", "41,2". */
+export function formattaConUnita(n: number, unita: string | null): string {
+  return `${formattaMedia(n)}${unita ? ` ${unita}` : ''}`
+}
+
 const SOLO_CIFRE = /^\d+$/
 
 /**

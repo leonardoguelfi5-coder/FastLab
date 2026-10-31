@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra } from './date'
+import { oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra, daQuanto } from './date'
 
 describe('date', () => {
   it('oggiLocale usa la data locale anche dopo mezzanotte', () => {
@@ -18,4 +18,10 @@ describe('date', () => {
     expect(giorniTra('2026-10-31', '2026-10-31')).toBe(0)
     expect(giorniTra('2026-10-31', '2026-10-30')).toBe(-1)
   })
+  it.each([
+    ['2026-10-28', 'oggi'], ['2026-10-27', 'ieri'], ['2026-10-25', '3 giorni fa'], ['2026-09-28', '30 giorni fa'],
+    ['2026-10-29', 'il 29/10'],
+  ])('daQuanto(%s) con oggi 28/10 = %s', (data, atteso) => expect(daQuanto(data, '2026-10-28')).toBe(atteso))
+  it('daQuanto conta i giorni di calendario anche a cavallo dell\'ora legale', () =>
+    expect(daQuanto('2026-10-24', '2026-10-27')).toBe('3 giorni fa'))
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseNumero, formattaNumero, formattaMedia, leggiIntero } from './numeri'
+import { parseNumero, formattaNumero, formattaMedia, formattaConUnita, leggiIntero } from './numeri'
 
 describe('numeri', () => {
   it.each([
@@ -36,4 +36,7 @@ describe('numeri', () => {
     [41.2, '41,2'], [41.234, '41,23'], [41.2351, '41,24'], [40, '40'], [0.1 + 0.2, '0,3'], [-3.456, '-3,46'], [0, '0'],
   ])('formattaMedia(%s) = %s', (n, testo) => expect(formattaMedia(n)).toBe(testo))
   it('formattaMedia non scrive "-0"', () => expect(formattaMedia(-0.001)).toBe('0'))
+  it.each([
+    [24.5, '°C', '24,5 °C'], [41.234, null, '41,23'], [80, 'cm', '80 cm'], [3, '', '3'],
+  ])('formattaConUnita(%s, %s) = %s', (n, unita, testo) => expect(formattaConUnita(n, unita)).toBe(testo))
 })

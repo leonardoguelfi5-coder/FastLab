@@ -6,7 +6,7 @@ import { useCampoStore } from '@/store/campo'
 import type { StatoModulo } from './ModuloOggi'
 
 /**
- * Le protezioni di una pagina che contiene il modulo di una misura (la scheda della pianta, la misura nel giro):
+ * Le protezioni di una pagina che contiene il modulo di una misura (la misura nel giro):
  * prima di chiudere un modulo con valori non salvati si chiede se scartarli, il browser chiede conferma prima di
  * chiudere o ricaricare, e a mezzanotte il rilievo resta sul giorno in cui si è scritto.
  *

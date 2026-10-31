@@ -175,7 +175,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
       return
     }
 
-    // La scheda della pianta potrebbe avere una bozza di questa correzione: sopra la modifica appena fatta
+    // La misura della pianta potrebbe avere una bozza di questa correzione: sopra la modifica appena fatta
     // riproporrebbe i valori vecchi. I valori mantenuti per le piante dopo restano com'erano: correggere una misura
     // vecchia non è l'ultima misura inserita.
     cancellaBozzaCorrezione(espId, misura)
@@ -323,7 +323,7 @@ export function ModificaMisura() {
   const idValido = eUuid(misuraId)
   const misura = useMisura(idValido ? misuraId : undefined)
 
-  // Il modulo aperto dice se ha modifiche non salvate; si legge al momento del tocco (come in SchedaPianta).
+  // Il modulo aperto dice se ha modifiche non salvate; si legge al momento del tocco (come in MisuraPianta).
   const modulo = useRef<StatoModulo | null>(null)
   const onModifiche = useCallback((stato: StatoModulo | null) => { modulo.current = stato }, [])
   const [inAttesa, setInAttesa] = useState<{ esegui: () => void } | null>(null)

@@ -237,7 +237,7 @@ function MisuraCaricata({
 /**
  * Misura sequenziale: una pianta alla volta con lo strumento scelto, alla data di rilievo. "Salva e vai" porta alla
  * prossima pianta da misurare (le fatte si saltano), sull'ultima "Salva e termina" porta alla fine del giro. Valgono
- * tutte le protezioni della scheda della pianta: bozze, conferma prima di scartare, niente doppioni.
+ * tutte le protezioni del modulo di misura: bozze, conferma prima di scartare, niente doppioni.
  */
 export function MisuraPianta() {
   const { espId = '', strumentoId = '', piantaId = '' } = useParams()
