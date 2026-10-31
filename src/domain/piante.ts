@@ -38,13 +38,6 @@ export function trovaPianta(piante: Pianta[], input: string): Pianta | null {
   return piante.find(p => SOLO_CIFRE.test(p.etichetta.trim()) && Number(p.etichetta.trim()) === valore) ?? null
 }
 
-/** La pianta che segue `piantaId` secondo `ordine`, oppure null se è l'ultima (o non esiste). */
-export function piantaSuccessiva(piante: Pianta[], piantaId: string): Pianta | null {
-  const ordinate = [...piante].sort((a, b) => a.ordine - b.ordine)
-  const i = ordinate.findIndex(p => p.id === piantaId)
-  return i === -1 ? null : (ordinate[i + 1] ?? null)
-}
-
 /** Vero se tutte le etichette sono numeri interi senza segno (gli spazi attorno non contano, come cercando). */
 export function etichetteNumeriche(piante: Pianta[]): boolean {
   return piante.every(p => SOLO_CIFRE.test(p.etichetta.trim()))

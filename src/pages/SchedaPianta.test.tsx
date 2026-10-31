@@ -25,11 +25,12 @@ vi.mock('@/api/misure', () => ({
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
-import { misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from '@/api/misure'
+import { misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento } from '@/api/misure'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
 import { useCampoStore } from '@/store/campo'
+import { MisuraPianta } from './MisuraPianta'
 import { SchedaPianta } from './SchedaPianta'
 
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
@@ -76,6 +77,7 @@ function apri(etichetta: string | number = '35') {
         <Routes>
           <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
           <Route path="/esperimenti/:espId/misure/:misuraId" element={<StatoArrivo />} />
+          <Route path="/esperimenti/:espId/misura/:strumentoId/:piantaId" element={<MisuraPianta />} />
           <Route path="*" element={null} />
         </Routes>
         <Posizione />
@@ -114,6 +116,7 @@ beforeEach(() => {
   vi.mocked(caricaConfig).mockImplementation(async () => config)
   vi.mocked(misurePianta).mockImplementation(async id => archivio.filter(m => m.pianta_id === id))
   vi.mocked(misureDelGiorno).mockImplementation(async (_esp, data) => archivio.filter(m => m.data_rilievo === data))
+  vi.mocked(salvaMisura).mockImplementation(async (_esp, m) => { archivio = [m, ...archivio.filter(x => x.id !== m.id)] })
   // L'ultima data di ogni strumento nell'esperimento, come la dà il database.
   vi.mocked(ultimaMisuraPerStrumento).mockImplementation(async () => {
     const ultime = new Map<string, string>()
@@ -571,6 +574,52 @@ describe('SchedaPianta: misura questa pianta', () => {
     expect(screen.queryByText('Con quale strumento?')).not.toBeInTheDocument()
     expect(pulsante('Misura questa pianta')).toBeInTheDocument()
     expect(posizione()).toBe(`/esperimenti/E/piante/${pianta(35).id}`)
+  })
+
+  /** Come se alla pianta di prima si fosse spuntato "Mantieni" su Temp aria: il modulo si apre già con un valore valido. */
+  function mantenutaTempAria(valore: number) {
+    const ta = par('Temp aria').id
+    useCampoStore.getState().setMantieni('E', strumento('Termometro').id, OGGI, ta, true)
+    useCampoStore.getState().aggiornaMantenuti('E', { [ta]: [valore] })
+  }
+  const salva = () => screen.findByRole('button', { name: 'Salva' })
+
+  it('dopo la scelta dello strumento un tocco immediato sul modulo non salva: è il secondo di un doppio tocco', async () => {
+    mantenutaTempAria(26)
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(pulsante('Misura questa pianta'))
+    piuTardi()
+    await utente.click(pulsante('Termometro'))
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${strumento('Termometro').id}/${pianta(35).id}`))
+
+    // Il modulo è già lì (le misure della pianta sono in cache) e "Salva" sta dove c'era la scelta.
+    await utente.click(await salva())
+    await act(async () => {})
+    expect(salvaMisura).not.toHaveBeenCalled()
+
+    piuTardi()
+    await utente.click(await salva())
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+  })
+
+  it('con un solo strumento attivo un tocco immediato sul modulo non salva', async () => {
+    for (const s of config.strumenti) s.archiviato = s.nome !== 'Termometro'
+    mantenutaTempAria(26)
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(pulsante('Misura questa pianta'))
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${strumento('Termometro').id}/${pianta(35).id}`))
+
+    await utente.click(await salva())
+    await act(async () => {})
+    expect(salvaMisura).not.toHaveBeenCalled()
+
+    piuTardi()
+    await utente.click(await salva())
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
   })
 
   it('con un solo strumento attivo non chiede: va diretto alla misura', async () => {

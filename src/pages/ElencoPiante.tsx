@@ -15,15 +15,11 @@ import { trovaPianta } from '@/domain/piante'
 import { mediaPerTrattamento } from '@/domain/statistiche'
 import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
-import { formattaMedia } from '@/lib/numeri'
+import { formattaConUnita } from '@/lib/numeri'
 import { percorsoHome, percorsoPianta } from '@/lib/percorsi'
 import { useCampoStore } from '@/store/campo'
 
 const NUMERI = 'font-mono tabular-nums'
-
-/** Un valore con la sua unità di misura, se ce l'ha: "24,5 °C". */
-const conUnita = (valore: number, parametro: Parametro) =>
-  `${formattaMedia(valore)}${parametro.unita ? ` ${parametro.unita}` : ''}`
 
 /**
  * Lo stato degli ultimi valori per le righe: `caricano` finché non sono arrivati (mai un numero finto), `mancano`
@@ -163,7 +159,7 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
                               : ultimi.stato === 'caricano'
                                 ? '…'
                                 : ultimo
-                                  ? conUnita(ultimo.valore, parametro)
+                                  ? formattaConUnita(ultimo.valore, parametro.unita)
                                   : <span className="font-sans text-grafite-tenue">senza valore</span>}
                           </span>
                           {ultimo && <span className={`shrink-0 text-dato text-grafite-tenue ${NUMERI}`}>{formattaGiornoMese(ultimo.data)}</span>}
@@ -188,7 +184,7 @@ function riepilogo(parametro: Parametro, ultimi: Ultimi, trattamentoId: string, 
   if (ultimi.stato === 'mancano') return parametro.nome
   const m = ultimi.medie.get(trattamentoId)
   if (!m || m.media === null) return `${parametro.nome} senza valori`
-  return `${parametro.nome} ${conUnita(m.media, parametro)} · ${m.n}/${quante}`
+  return `${parametro.nome} ${formattaConUnita(m.media, parametro.unita)} · ${m.n}/${quante}`
 }
 
 /** Le piante di un esperimento per trattamento: la media dell'ultimo valore scelto, e la ricerca di una pianta. */

@@ -1,12 +1,13 @@
 import { useId } from 'react'
+import { cn } from '@/lib/utils'
 import type { ConfigEsperimento, Pianta } from '@/domain/tipi'
 
-/** Una riga del registro: la voce a sinistra in grafite tenue, il valore a destra. */
-function Voce({ nome, children }: { nome: string; children: string }) {
+/** Una riga del registro: la voce a sinistra in grafite tenue, il valore a destra (`mono`: in Geist Mono, per le etichette). */
+function Voce({ nome, children, mono }: { nome: string; children: string; mono?: boolean }) {
   return (
     <div className="flex min-h-11 items-center justify-between gap-4 border-b border-riga py-2">
       <dt className="shrink-0 text-grafite-tenue">{nome}</dt>
-      <dd className="min-w-0 text-right text-grafite">{children}</dd>
+      <dd className={cn('min-w-0 text-right text-grafite', mono && 'font-mono tabular-nums')}>{children}</dd>
     </div>
   )
 }
@@ -28,7 +29,7 @@ export function DatiPianta({ config, pianta }: { config: ConfigEsperimento; pian
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <h3 id={id} className="text-label text-grafite-tenue uppercase">Dati della pianta</h3>
       <dl className="border-t border-riga">
-        <Voce nome="Etichetta">{pianta.etichetta}</Voce>
+        <Voce nome="Etichetta" mono>{pianta.etichetta}</Voce>
         {trattamento && <Voce nome="Trattamento">{trattamento.etichetta}</Voce>}
         {fattori.map(f => <Voce key={f.id} nome={f.nome}>{f.livello}</Voce>)}
         {blocco && <Voce nome="Blocco">{blocco}</Voce>}

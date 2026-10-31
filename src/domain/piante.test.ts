@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generaPiante, trovaPianta, piantaSuccessiva, etichetteNumeriche, prossimaEtichetta } from './piante'
+import { generaPiante, trovaPianta, etichetteNumeriche, prossimaEtichetta } from './piante'
 import { piante } from './test-helpers'
 
 describe('piante', () => {
@@ -20,20 +20,6 @@ describe('piante', () => {
     expect(trovaPianta(piante(['035', '35']), '035')?.etichetta).toBe('035'))
   it('trovaPianta inesistente → null', () => expect(trovaPianta(piante(['35']), '99')).toBeNull())
   it('trovaPianta con input vuoto → null', () => expect(trovaPianta(piante(['35']), '  ')).toBeNull())
-
-  it('piantaSuccessiva', () => {
-    const p = piante(['1', '2', '3'])
-    expect(piantaSuccessiva(p, p[0].id)?.etichetta).toBe('2')
-    expect(piantaSuccessiva(p, p[1].id)?.etichetta).toBe('3')
-    expect(piantaSuccessiva(p, p[2].id)).toBeNull()
-    expect(piantaSuccessiva(p, 'inesistente')).toBeNull()
-  })
-  it('piantaSuccessiva segue `ordine`, non la posizione nell\'array', () => {
-    const p = piante(['1', '2', '3'])
-    const mescolate = [p[2], p[0], p[1]]
-    expect(piantaSuccessiva(mescolate, p[0].id)?.etichetta).toBe('2')
-    expect(piantaSuccessiva(mescolate, p[2].id)).toBeNull()
-  })
 
   it('etichetteNumeriche', () => {
     expect(etichetteNumeriche(piante(['1', '22', '035']))).toBe(true)

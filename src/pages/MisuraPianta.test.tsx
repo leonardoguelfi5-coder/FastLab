@@ -217,6 +217,19 @@ describe('MisuraPianta: intestazione', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Caricamento…')
   })
 
+  it('se le misure della pianta non si leggono non c\'è il modulo (i progressivi sarebbero sbagliati) e "Riprova" ci riprova', async () => {
+    vi.mocked(misurePianta).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('1')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(screen.getByRole('heading', { name: 'Pianta #1' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
+    await utente.click(pulsante('Riprova'))
+    expect(await pronta()).toBeInTheDocument()
+    expect(campo('SPAD')).toBeInTheDocument()
+  })
+
   it('se le misure del giorno non si leggono lo dice, con "Riprova"', async () => {
     vi.mocked(misureDelGiorno).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()

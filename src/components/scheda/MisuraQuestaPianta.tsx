@@ -4,6 +4,7 @@ import { BarraAzioni } from '@/components/BarraAzioni'
 import { Button } from '@/components/ui/button'
 import type { Strumento } from '@/domain/tipi'
 import { percorsoMisuraPianta } from '@/lib/percorsi'
+import type { ArrivoScheda } from './ModuloOggi'
 import { useAttesaArrivo } from './useAttesaArrivo'
 
 /**
@@ -45,7 +46,13 @@ interface MisuraQuestaPiantaProps {
 export function MisuraQuestaPianta({ espId, piantaId, strumenti }: MisuraQuestaPiantaProps) {
   const navigate = useNavigate()
   const [sceglie, setSceglie] = useState(false)
-  const vai = (s: Strumento) => navigate(percorsoMisuraPianta(espId, s.id, piantaId))
+  // Le misure della pianta sono già in cache: il modulo compare subito, e il suo "Salva" sta dove c'era il tocco
+  // appena fatto. Con `primoCampo` il modulo sa di essere appena arrivato: un tocco immediato è il secondo di un
+  // doppio tocco e non salva (con valori mantenuti salverebbe una misura che chi rileva non ha guardato).
+  const vai = (s: Strumento) => {
+    const arrivo: ArrivoScheda = { primoCampo: true }
+    navigate(percorsoMisuraPianta(espId, s.id, piantaId), { state: arrivo })
+  }
 
   return (
     <BarraAzioni>
