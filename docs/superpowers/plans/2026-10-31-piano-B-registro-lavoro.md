@@ -17,3 +17,7 @@ Task B1+B2: dispatched implementer (sonnet), BASE 89cb4ff
 Task B1+B2: implementatore (sonnet) DONE e9eb16e (RPC `ultime_misure_piante`, 196 pgTAP emulato) + 47d43b0 (statistiche, 1342 Vitest); ds campionaria (n−1) sulle altre piante; `giorniTra` in lib/date.ts (giorni di calendario, ora legale ok)
 Ruling: accettata la deviazione: `daSistemare` considera solo i parametri `numero`, non le liste (contare i palchi come valore sospetto sarebbe un falso allarme) — cost if wrong: togliere un filtro
 Task B1+B2: dispatched reviewer (sonnet) su copia 80871ab..47d43b0; Task B3 dispatched implementer (sonnet), BASE 47d43b0
+Task B1+B2: review (sonnet) → Approved (0 Critical/Important), 1342 Vitest, 196 pgTAP su copia; numeri ricalcolati a mano; 6 mutazioni → tutte intercettate dai test
+Task B1+B2: minor 1 corretto dal controller (ds sotto una tolleranza relativa vale 0: valori uguali a meno degli arrotondamenti delle medie davano un falso "fuori dal gruppo"), con test; refuso nel test
+Task B1+B2: minor (deferred): `mediaPerTrattamento` usa solo l'ultima data per coppia pianta/strumento (se quel giorno il parametro è vuoto la pianta non conta; visibile dal conteggio n/N); `piantaId` inutilizzato in `valoriDelTrattamento`
+Task B1+B2: complete (commits 80871ab..47d43b0 + correzione del controller, review clean)

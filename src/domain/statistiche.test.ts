@@ -139,6 +139,12 @@ describe('fuoriDalGruppo', () => {
     const r = fuoriDalGruppo(100, [5, 5, 5])
     expect(r).toEqual({ media: 5, ds: 0, fuori: false })
   })
+  it('valori uguali a meno degli arrotondamenti delle medie: ds 0, nessun falso allarme', () => {
+    // 0,15 letto una volta e 0,15 come media delle letture 0,1 e 0,2 (0,15000000000000002)
+    const r = fuoriDalGruppo(0.16, [0.15, 0.15, (0.1 + 0.2) / 2])
+    expect(r?.ds).toBe(0)
+    expect(r?.fuori).toBe(false)
+  })
   it('con 6 piante scatta (senza leave-one-out la soglia non scatterebbe mai: massimo 2,04 ds)', () => {
     // le altre cinque: 10, 10, 10, 10, 11 (media 10,2, ds 0,4472); la sesta vale 12: scarto 1,8 > 3 ds = 1,3416
     const r = fuoriDalGruppo(12, [10, 10, 10, 10, 11])
@@ -318,7 +324,7 @@ describe('daSistemare', () => {
     const dopo = spadMis('p6', D, 90, '15:00')
     const senzaValore = spadMis('p6', D, null, '18:00')
     const r = daSistemare(config, [...base, dopo, prima, senzaValore], D)
-    // media giornaliera 80: fuori; la misura da correggere è quella delle 15:00 (la delle 18:00 è vuota)
+    // media giornaliera 80: fuori; la misura da correggere è quella delle 15:00 (quella delle 18:00 è vuota)
     expect(r).toEqual([{ misuraId: dopo.id, piantaId: 'p6', parametroId: spad.id, valore: 80, media: 40 }])
   })
   it('conta solo la data richiesta, i parametri numerici attivi, non testo, sì/no, liste o archiviati', () => {

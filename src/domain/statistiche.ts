@@ -15,10 +15,14 @@ const SOGLIA_DS = 3
 
 const media = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length
 
-/** Deviazione standard campionaria (n-1) di almeno due valori; 0 se sono tutti uguali (così senza errori di arrotondamento). */
+/**
+ * Deviazione standard campionaria (n-1) di almeno due valori. Sotto una tolleranza relativa vale 0: valori uguali che
+ * escono da medie diverse (0,15 e (0,1 + 0,2) / 2) differiscono per un errore di arrotondamento, non per la misura, e una
+ * ds di 1e-17 farebbe sembrare "molto lontano" qualunque altro valore.
+ */
 function deviazioneStandard(xs: number[], m: number): number {
-  if (xs.every(x => x === xs[0])) return 0
-  return Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1))
+  const ds = Math.sqrt(xs.reduce((a, x) => a + (x - m) ** 2, 0) / (xs.length - 1))
+  return ds <= 1e-9 * Math.max(1, Math.abs(m)) ? 0 : ds
 }
 
 /**
