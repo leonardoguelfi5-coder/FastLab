@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { oggiLocale, oraLocale, formattaData, formattaGiornoMese } from './date'
+import { oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra } from './date'
 
 describe('date', () => {
   it('oggiLocale usa la data locale anche dopo mezzanotte', () => {
@@ -11,4 +11,11 @@ describe('date', () => {
   it('oraLocale', () => expect(oraLocale(new Date(2026, 9, 28, 9, 5))).toBe('09:05'))
   it('formattaData', () => expect(formattaData('2026-10-28')).toBe('28/10/2026'))
   it('formattaGiornoMese', () => expect(formattaGiornoMese('2026-10-08')).toBe('08/10'))
+  it('giorniTra conta i giorni di calendario, anche a cavallo del cambio di ora e di mese', () => {
+    expect(giorniTra('2026-10-20', '2026-10-31')).toBe(11)
+    expect(giorniTra('2026-10-24', '2026-10-26')).toBe(2)   // il 25/10 in Europa torna l'ora solare: 25 ore, un giorno solo
+    expect(giorniTra('2026-10-28', '2026-11-02')).toBe(5)
+    expect(giorniTra('2026-10-31', '2026-10-31')).toBe(0)
+    expect(giorniTra('2026-10-31', '2026-10-30')).toBe(-1)
+  })
 })

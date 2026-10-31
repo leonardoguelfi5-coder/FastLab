@@ -21,3 +21,16 @@ export function formattaGiornoMese(iso: string): string {
   const [, mese, giorno] = iso.slice(0, 10).split('-')
   return `${giorno}/${mese}`
 }
+
+const dataUtc = (iso: string): number => {
+  const [anno, mese, giorno] = iso.slice(0, 10).split('-').map(Number)
+  return Date.UTC(anno, mese - 1, giorno)
+}
+
+/**
+ * Giorni di calendario da `da` a `a` (AAAA-MM-GG); negativo se `a` precede `da`. Si contano i giorni sulla data,
+ * non le ore: il cambio dell'ora legale (giorni da 23 o 25 ore) non sposta il risultato.
+ */
+export function giorniTra(da: string, a: string): number {
+  return Math.round((dataUtc(a) - dataUtc(da)) / 86_400_000)
+}
