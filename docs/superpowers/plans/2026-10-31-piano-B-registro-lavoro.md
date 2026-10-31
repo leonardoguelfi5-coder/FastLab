@@ -23,3 +23,7 @@ Task B1+B2: minor (deferred): `mediaPerTrattamento` usa solo l'ultima data per c
 Task B1+B2: complete (commits 80871ab..47d43b0 + correzione del controller, review clean)
 Task B3: implementatore (sonnet) DONE 1c944aa — 1380 Vitest, build OK; `src/domain/elencoPiante.ts` (parametriMostrabili, parametroDiBase, ultimoValorePerPianta, filtraPiante); `formattaMedia` in lib/numeri.ts; `Espandibile.riassunto` ora ReactNode; selettore solo su parametri `numero`; con la ricerca i blocchi vuoti spariscono e quelli trovati si aprono
 Task B3: dispatched reviewer (sonnet) su copia f870e0a..1c944aa; Task B4 dispatched implementer (sonnet), BASE 1c944aa
+Task B3: review (sonnet) → Approved (0 Critical/Important), 1380 Vitest, build OK su copia; mutazione della ricerca intercettata
+Task B3: minor M1–M3 corretti dal controller: la ricerca mostra anche la pianta che Invio aprirebbe ("035" → 35, prima diceva "Nessuna pianta trovata."); hover delle righe nel blocco aperto come ElencoOggi (`bg-riga/40`, `active:bg-riga/60`); etichette lunghe troncate (`min-w-14 max-w-24 truncate`)
+Task B3: minor (deferred): `ultime_misure_piante` senza paginazione (limite 1000 righe di PostgREST: con ~100 piante × 10 strumenti la risposta si tronca; n/N l'unico indizio)
+Task B3: complete (commits f870e0a..1c944aa + correzioni del controller, review clean)

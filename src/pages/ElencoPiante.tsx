@@ -154,9 +154,9 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
                       <li key={p.id} className="border-b border-riga">
                         <Link
                           to={percorsoPianta(espId, p.id)}
-                          className="flex min-h-11 items-center gap-3 px-4 py-2 transition-colors -outline-offset-2 hover:bg-carta/70 active:bg-carta"
+                          className="flex min-h-11 items-center gap-3 px-4 py-2 transition-colors -outline-offset-2 hover:bg-riga/40 active:bg-riga/60"
                         >
-                          <span className={`w-14 shrink-0 text-dato text-grafite ${NUMERI}`}>{p.etichetta}</span>
+                          <span className={`min-w-14 max-w-24 shrink-0 truncate text-dato text-grafite ${NUMERI}`}>{p.etichetta}</span>
                           <span className={`min-w-0 flex-1 truncate text-dato text-grafite ${NUMERI}`}>
                             {!parametro || ultimi.stato === 'mancano'
                               ? ''

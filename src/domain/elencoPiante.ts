@@ -1,3 +1,4 @@
+import { trovaPianta } from './piante'
 import { valoriGiornalieri } from './statistiche'
 import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento } from './tipi'
 
@@ -55,8 +56,14 @@ export function ultimoValorePerPianta(parametro: Parametro, ultimeMisure: Misura
 
 const normalizza = (s: string) => s.trim().toLowerCase()
 
-/** Le piante la cui etichetta contiene il testo cercato (senza badare a maiuscole né a spazi ai bordi); senza testo, tutte. */
+/**
+ * Le piante la cui etichetta contiene il testo cercato (senza badare a maiuscole né a spazi ai bordi); senza testo,
+ * tutte. Vale anche la pianta che Invio aprirebbe (`trovaPianta`, es. "035" per la 35): l'elenco non dice "nessuna"
+ * mentre Invio la trova.
+ */
 export function filtraPiante(piante: Pianta[], cercato: string): Pianta[] {
   const q = normalizza(cercato)
-  return q === '' ? piante : piante.filter(p => normalizza(p.etichetta).includes(q))
+  if (q === '') return piante
+  const esatta = trovaPianta(piante, cercato)
+  return piante.filter(p => p === esatta || normalizza(p.etichetta).includes(q))
 }

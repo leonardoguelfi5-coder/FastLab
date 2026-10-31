@@ -92,6 +92,9 @@ describe('filtraPiante', () => {
     expect(etichette('a-')).toEqual(['A-3'])
     expect(etichette('5')).toEqual([' 5 '])
   })
+  it('lo zero iniziale trova la pianta che Invio aprirebbe', () => {
+    expect(etichette('012')).toEqual(['12'])
+  })
   it('nessuna corrispondenza: vuoto', () => {
     expect(etichette('99')).toEqual([])
   })
