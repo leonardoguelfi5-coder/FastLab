@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
 import type { Misura } from '@/domain/tipi'
 import { aRigaMisura } from './mappers'
-import { caricaMisura, eliminaMisura, misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento } from './misure'
+import { caricaMisura, eliminaMisura, misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 
 const misura: Misura = {
   id: 'm1', pianta_id: 'p1', strumento_id: 'pa1', data_rilievo: '2026-10-28', ora: '09:12',
@@ -133,5 +133,24 @@ describe('ultimaMisuraPerStrumento', () => {
   it('lancia l\'errore di Supabase', async () => {
     mock.risponde('rpc:ultime_misure_per_strumento', { error: errore })
     await expect(ultimaMisuraPerStrumento('E')).rejects.toBe(errore)
+  })
+})
+
+describe('ultimeMisurePiante', () => {
+  it('chiama la RPC e restituisce le misure convertite (ora senza secondi)', async () => {
+    mock.risponde('rpc:ultime_misure_piante', { data: [riga] })
+
+    expect(await ultimeMisurePiante('E')).toEqual([misura])
+    expect(supabase.rpc).toHaveBeenCalledWith('ultime_misure_piante', { p_esperimento: 'E' })
+  })
+
+  it('senza misure restituisce una lista vuota', async () => {
+    mock.risponde('rpc:ultime_misure_piante', { data: null })
+    expect(await ultimeMisurePiante('E')).toEqual([])
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('rpc:ultime_misure_piante', { error: errore })
+    await expect(ultimeMisurePiante('E')).rejects.toBe(errore)
   })
 })

@@ -4,7 +4,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn() }))
+vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
@@ -13,10 +13,10 @@ import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure,
+  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
 } from './query'
 
 function wrapper() {
@@ -42,6 +42,9 @@ describe('chiavi', () => {
     expect(chiavi.misura('m1')[0]).toBe('misure')
     expect(chiavi.ultimeMisure('E')[0]).toBe('misure')
     expect(chiavi.ultimeMisure('E')).not.toEqual(chiavi.ultimeMisure('F'))
+    expect(chiavi.ultimeMisurePiante('E')[0]).toBe('misure')
+    expect(chiavi.ultimeMisurePiante('E')).not.toEqual(chiavi.ultimeMisure('E'))
+    expect(chiavi.ultimeMisurePiante('E')).not.toEqual(chiavi.ultimeMisurePiante('F'))
     expect(chiavi.misura('m1')).not.toEqual(chiavi.misura('m2'))
     expect(chiavi.misure).toEqual(['misure'])
   })
@@ -109,6 +112,21 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useUltimeMisure(undefined), { wrapper: wrapper() })
     expect(result.current.fetchStatus).toBe('idle')
     expect(ultimaMisuraPerStrumento).not.toHaveBeenCalled()
+  })
+
+  it('useUltimeMisurePiante legge le ultime misure per pianta e strumento', async () => {
+    const misure = [{ id: 'm1', pianta_id: 'p1', strumento_id: 's1', data_rilievo: '2026-10-21', ora: '09:00', valori: {} }]
+    vi.mocked(ultimeMisurePiante).mockResolvedValue(misure)
+    const { result } = renderHook(() => useUltimeMisurePiante('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(ultimeMisurePiante).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe(misure)
+  })
+
+  it('useUltimeMisurePiante senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useUltimeMisurePiante(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(ultimeMisurePiante).not.toHaveBeenCalled()
   })
 
   it('useMisurePianta legge la storia della pianta', async () => {

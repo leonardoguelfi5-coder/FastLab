@@ -3,7 +3,7 @@ import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
-import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from './misure'
+import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 
 /** Chiavi di cache delle query. Quelle delle misure iniziano tutte con 'misure': si invalidano insieme. */
 export const chiavi = {
@@ -19,6 +19,7 @@ export const chiavi = {
   misureGiorno: (espId: string, data: string) => ['misure', 'giorno', espId, data] as const,
   misurePianta: (piantaId: string) => ['misure', 'pianta', piantaId] as const,
   ultimeMisure: (espId: string) => ['misure', 'ultime', espId] as const,
+  ultimeMisurePiante: (espId: string) => ['misure', 'ultimePiante', espId] as const,
   inviti: ['inviti'] as const,
   /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
   catalogo: ['catalogo'] as const,
@@ -92,6 +93,18 @@ export function useUltimeMisure(espId: string | undefined) {
   return useQuery({
     queryKey: chiavi.ultimeMisure(espId ?? ''),
     queryFn: () => ultimaMisuraPerStrumento(espId as string),
+    enabled: !!espId,
+  })
+}
+
+/**
+ * Le misure più recenti di ogni pianta per strumento. Sotto il prefisso `misure`: ogni salvataggio, modifica o
+ * eliminazione di una misura le rilegge, così i valori mostrati non restano indietro.
+ */
+export function useUltimeMisurePiante(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.ultimeMisurePiante(espId ?? ''),
+    queryFn: () => ultimeMisurePiante(espId as string),
     enabled: !!espId,
   })
 }

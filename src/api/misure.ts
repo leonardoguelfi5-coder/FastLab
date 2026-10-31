@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { Misura } from '@/domain/tipi'
 import { MISURA_NON_TROVATA } from '@/lib/errori'
-import { aRigaMisura, daRigaMisura } from './mappers'
+import { aRigaMisura, daRigaMisura, type RigaMisura } from './mappers'
 
 /** Misure di un esperimento in una data (AAAA-MM-GG), dalla più vecchia alla più recente. */
 export async function misureDelGiorno(espId: string, data: string): Promise<Misura[]> {
@@ -58,4 +58,15 @@ export async function ultimaMisuraPerStrumento(espId: string): Promise<Map<strin
   const { data, error } = await supabase.rpc('ultime_misure_per_strumento', { p_esperimento: espId })
   if (error) throw error
   return new Map(((data ?? []) as { strumento_id: string; ultima: string }[]).map(r => [r.strumento_id, r.ultima]))
+}
+
+/**
+ * Le misure più recenti di ogni pianta per ogni strumento: per ogni coppia (pianta, strumento) tutte le misure della
+ * data più recente (più misure nello stesso giorno tornano tutte, per la media giornaliera). Calcolata dal database,
+ * così la scheda, l'elenco per trattamento e "Oggi" non scaricano le misure di tutta la stagione.
+ */
+export async function ultimeMisurePiante(espId: string): Promise<Misura[]> {
+  const { data, error } = await supabase.rpc('ultime_misure_piante', { p_esperimento: espId })
+  if (error) throw error
+  return ((data ?? []) as RigaMisura[]).map(daRigaMisura)
 }
