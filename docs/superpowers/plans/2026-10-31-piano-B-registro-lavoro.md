@@ -14,3 +14,6 @@ Ruling: B1 (RPC) e B2 (dominio) affidati allo stesso implementatore in sequenza 
 
 ## Avanzamento
 Task B1+B2: dispatched implementer (sonnet), BASE 89cb4ff
+Task B1+B2: implementatore (sonnet) DONE e9eb16e (RPC `ultime_misure_piante`, 196 pgTAP emulato) + 47d43b0 (statistiche, 1342 Vitest); ds campionaria (n−1) sulle altre piante; `giorniTra` in lib/date.ts (giorni di calendario, ora legale ok)
+Ruling: accettata la deviazione: `daSistemare` considera solo i parametri `numero`, non le liste (contare i palchi come valore sospetto sarebbe un falso allarme) — cost if wrong: togliere un filtro
+Task B1+B2: dispatched reviewer (sonnet) su copia 80871ab..47d43b0; Task B3 dispatched implementer (sonnet), BASE 47d43b0
