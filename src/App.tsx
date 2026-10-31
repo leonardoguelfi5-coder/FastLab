@@ -12,6 +12,7 @@ import { InArrivo } from '@/pages/InArrivo'
 import { MisuraPianta } from '@/pages/MisuraPianta'
 import { ModificaMisura } from '@/pages/ModificaMisura'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
+import { Oggi } from '@/pages/Oggi'
 import { Registrati } from '@/pages/Registrati'
 import { SceltaStrumento } from '@/pages/SceltaStrumento'
 import { SchedaPianta } from '@/pages/SchedaPianta'
@@ -35,7 +36,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<ModificaMisura />} />
         <Route path="/esperimenti/:espId/impostazioni" element={<Impostazioni />} />
-        <Route path="/esperimenti/:espId/oggi" element={<InArrivo titolo="Oggi" />} />
+        <Route path="/esperimenti/:espId/oggi" element={<Oggi />} />
         <Route path="/esperimenti/:espId/dataset" element={<InArrivo titolo="Dataset" />} />
         <Route path="/esperimenti/:espId/esporta" element={<InArrivo titolo="Esporta Excel" />} />
         <Route path="/esperimenti/:espId/diario" element={<InArrivo titolo="Diario" />} />

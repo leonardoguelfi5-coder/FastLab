@@ -181,9 +181,10 @@ describe('HomeEsperimento: le sezioni', () => {
     expect(screen.getByRole('link', { name: 'Impostazioni' }).className).toContain('col-span-2')
   })
 
-  it('non ha il numerino su Oggi, né la Mappa', async () => {
+  it('senza valori da controllare non ha il numerino su Oggi, né la Mappa', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
+    await misureLette()
     expect(screen.getByRole('link', { name: 'Oggi' })).toHaveTextContent(/^📅Oggi$/)
     expect(screen.queryByRole('link', { name: /Mappa/ })).not.toBeInTheDocument()
   })
@@ -245,11 +246,13 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     expect(striscia()).toHaveTextContent('SPAD in corso · 34/56')
   })
 
-  it('senza uno strumento nello store non legge nemmeno le misure del giorno', async () => {
+  it('senza uno strumento nello store la striscia non legge le misure della data di rilievo: resta solo la lettura di oggi per il numerino', async () => {
+    useCampoStore.getState().setData('E', IERI)
     vaiAllaPagina()
     await aspettaLaHome()
-    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
-    expect(misureDelGiorno).not.toHaveBeenCalled()
+    await misureLette()
+    expect(misureDelGiorno).toHaveBeenCalledTimes(1)
+    expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
     expect(striscia()).toHaveAccessibleName('Nuova misura')
   })
 
@@ -324,6 +327,105 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     await misureLette()
     expect(striscia()).toHaveAccessibleName('Nuova misura')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('HomeEsperimento: il numerino su Oggi', () => {
+  const oggi = () => screen.getByRole('link', { name: /^Oggi/ })
+
+  /**
+   * Gli SPAD di oggi per due trattamenti. Controllo (piante 1 a 7 misurate): 40, 41, 39, 40, 42, 38 e la pianta 7 con
+   * 40, o con 80 se richiesta. Controllo + HC (piante 15 a 20): 20, 21, 19, 20, 22 e la pianta 20 con 20, o con 80 se
+   * richiesta. Con l'80 la pianta è oltre 3 deviazioni standard dalle altre; le altre non lo sono mai.
+   */
+  const conStonate = (...piante: number[]): Misura[] => {
+    const id = config.parametri.find(p => p.catalogo_chiave === 'spad')!.id
+    const s = strumento('SPAD').id
+    const valori: [number, number][] = [
+      [1, 40], [2, 41], [3, 39], [4, 40], [5, 42], [6, 38], [7, piante.includes(7) ? 80 : 40],
+      [15, 20], [16, 21], [17, 19], [18, 20], [19, 22], [20, piante.includes(20) ? 80 : 20],
+    ]
+    return valori.map(([n, v]): Misura => ({
+      id: `s${n}`, pianta_id: idPianta(n), strumento_id: s, data_rilievo: OGGI, ora: '09:00', valori: { [id]: [v] },
+    }))
+  }
+
+  it('conta i valori di oggi da controllare e li dice a parole a chi non vede il numero', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7, 20))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 2 valori da controllare'))
+    // Il numero si vede, la frase solo a chi legge lo schermo.
+    expect(within(oggi()).getByText('2')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(oggi()).getByText('2 valori da controllare')).toHaveClass('sr-only')
+  })
+
+  it('con un solo valore dice "1 valore da controllare"', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 1 valore da controllare'))
+  })
+
+  it('è un segno in attenzione velato, con il numero: mai solo colore', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    const numero = await within(oggi()).findByText('1')
+    expect(numero).toHaveClass('bg-attenzione-velato')
+    expect(numero).toHaveClass('text-attenzione')
+    expect(numero).toHaveClass('font-mono')
+  })
+
+  it('il link porta ancora a Oggi', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await within(oggi()).findByText('1')
+    expect(oggi()).toHaveAttribute('href', '/esperimenti/E/oggi')
+  })
+
+  it('legge le misure di oggi, non della data di rilievo', async () => {
+    useCampoStore.getState().setData('E', IERI)
+    vi.mocked(misureDelGiorno).mockImplementation(async (_e, data) => (data === OGGI ? conStonate(7) : []))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await within(oggi()).findByText('1')
+    expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
+  })
+
+  it('con le misure di un altro giorno non conta nulla', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7).map(m => ({ ...m, data_rilievo: IERI })))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await misureLette()
+    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+  })
+
+  it('mentre le misure caricano non mostra il numerino', async () => {
+    vi.mocked(misureDelGiorno).mockReturnValue(new Promise(() => {}))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalled())
+    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+  })
+
+  it('se la lettura fallisce non mostra il numerino e la home non allarma', async () => {
+    vi.mocked(misureDelGiorno).mockRejectedValue(new TypeError('Failed to fetch'))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await misureLette()
+    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('con uno strumento a metà giro oggi la striscia e il numerino usano la stessa lettura', async () => {
+    useCampoStore.getState().setStrumento('E', strumento('SPAD').id)
+    vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await within(oggi()).findByText('1')
+    expect(misureDelGiorno).toHaveBeenCalledTimes(1)
   })
 })
 

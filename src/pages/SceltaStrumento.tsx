@@ -1,54 +1,20 @@
 import { useId, useMemo } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
 import { useConfig, useMisureGiorno, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { VoceStrumento } from '@/components/VoceStrumento'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { prossimaDaMisurare, riepilogoGiro, statiPiante, type StatoPianta } from '@/domain/giro'
-import type { ConfigEsperimento, Pianta, Strumento } from '@/domain/tipi'
+import { righeStrumenti, type Giro } from '@/domain/giro'
+import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
-import { percorsoFineGiro, percorsoHome, percorsoImpostazioni, percorsoMisuraPianta } from '@/lib/percorsi'
+import { percorsoHome, percorsoImpostazioni } from '@/lib/percorsi'
+import { useAvviaMisura } from '@/lib/useAvviaMisura'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
-
-/** Il giro di uno strumento alla data di rilievo: quante piante fatte, se è cominciato e da dove si riprende. */
-interface Giro {
-  fatte: number
-  totale: number
-  /** Almeno una pianta già toccata (anche a metà): da qui in poi la riga parla di oggi, non dell'ultima volta. */
-  cominciato: boolean
-}
-
-interface RigaStrumento {
-  strumento: Strumento
-  /** `null` finché le misure del giorno non sono arrivate (o se non arrivano): nessun progresso inventato. */
-  giro: Giro | null
-  /** La prima pianta da misurare; `null` se non ce ne sono (si va alla fine del giro). */
-  prossima: Pianta | null
-}
-
-/**
- * Gli strumenti non archiviati, nell'ordine dello strumento. Gli stati delle piante si calcolano solo a misure del
- * giorno arrivate: senza, con i parametri e le misure ancora vuoti, ogni strumento risulterebbe "senza parametri
- * attivi" e le sue piante "fatte". Se le misure non arrivano (o non sono ancora arrivate) la prossima pianta è la
- * prima del giro: il modulo di misura chiederà lui cosa fare se ha già misure.
- */
-function righeStrumenti(config: ConfigEsperimento, misure: Parameters<typeof statiPiante>[2] | undefined): RigaStrumento[] {
-  return config.strumenti
-    .filter(s => !s.archiviato)
-    .sort((a, b) => a.ordine - b.ordine)
-    .map(strumento => {
-      if (!misure) return { strumento, giro: null, prossima: prossimaDaMisurare(config.piante, new Map<string, StatoPianta>(), null) }
-      const stati = statiPiante(strumento, config.parametri, misure, config.piante)
-      const { fatte, totale } = riepilogoGiro(config.piante, stati)
-      const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
-      return { strumento, giro: { fatte, totale, cominciato }, prossima: prossimaDaMisurare(config.piante, stati, null) }
-    })
-}
 
 /** Giro cominciato e non finito: lo strumento che si può riprendere. */
 const inCorso = (g: Giro | null): g is Giro => g !== null && g.cominciato && g.fatte < g.totale
@@ -102,34 +68,11 @@ function DataRilievo({ espId }: { espId: string }) {
   )
 }
 
-/** La riga di uno strumento: icona, nome e il progresso. Un tocco lo sceglie (`onScegli`). */
-function VoceStrumento({ strumento, testo, onScegli }: { strumento: Strumento; testo: string; onScegli: () => void }) {
-  const idTesto = useId()
-  return (
-    <button
-      type="button"
-      onClick={onScegli}
-      // Il nome del pulsante è quello dello strumento; il progresso (nascosto al nome) ne è la descrizione.
-      aria-describedby={idTesto}
-      className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors -outline-offset-2 hover:bg-carta-ombra/70 active:bg-carta-ombra"
-    >
-      <span aria-hidden className="w-7 shrink-0 text-center text-[22px] leading-none">{strumento.icona}</span>
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-[550] text-grafite">{strumento.nome}</span>
-        {/* Sempre presente, anche vuota: la riga non cambia altezza quando i dati arrivano. */}
-        <span id={idTesto} aria-hidden className="min-h-[1.3em] font-mono text-dato tabular-nums text-grafite-tenue">{testo}</span>
-      </span>
-      <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />
-    </button>
-  )
-}
-
 /** Il contenuto a configurazione caricata: data di rilievo, banner e l'elenco degli strumenti. */
 function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperimento }) {
-  const navigate = useNavigate()
   const oggi = useOggi()
   const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
-  const setStrumento = useCampoStore(s => s.setStrumento)
+  const scegli = useAvviaMisura(espId)
   const misure = useMisureGiorno(espId, dataRilievo)
   const ultime = useUltimeMisure(espId)
   // I dati restano anche se una rilettura in background fallisce: il progresso e "Riprendi" non spariscono per questo.
@@ -140,11 +83,6 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
   // Lo strumento dello store sta in cima solo se il suo giro è cominciato e non finito alla data di rilievo.
   const inCima = righe.find(r => r.strumento.id === strumentoId && inCorso(r.giro))
   const ordinate = inCima ? [inCima, ...righe.filter(r => r !== inCima)] : righe
-
-  function scegli({ strumento, prossima }: RigaStrumento) {
-    setStrumento(espId, strumento.id)
-    navigate(prossima ? percorsoMisuraPianta(espId, strumento.id, prossima.id) : percorsoFineGiro(espId, strumento.id))
-  }
 
   if (righe.length === 0) {
     return (

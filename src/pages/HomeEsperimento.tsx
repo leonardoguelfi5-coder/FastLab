@@ -1,12 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useConfig, useMisureGiorno } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { riepilogoGiro, statiPiante } from '@/domain/giro'
+import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
-import { percorsoImpostazioni, percorsoNuovaMisura, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
+import { percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -74,23 +75,55 @@ function StrisciaNuovaMisura({ espId, config }: { espId: string; config: ConfigE
 const VOCE = 'flex min-h-14 items-center gap-2.5 rounded-lg border border-riga-controllo bg-foglio px-3 py-3 font-[550] text-grafite transition-colors hover:border-grafite-tenue active:bg-carta-ombra'
 
 /** Una sezione: l'emoji è l'icona scelta nella spec, solo decorativa (il nome la dice già). */
-function Voce({ to, icona, nome, className }: { to: string; icona: string; nome: string; className?: string }) {
+function Voce({ to, icona, nome, className, children }: { to: string; icona: string; nome: string; className?: string; children?: ReactNode }) {
   return (
     <Link to={to} className={cn(VOCE, className)}>
       <span aria-hidden className="text-[22px] leading-none">{icona}</span>
-      {nome}
+      <span className="flex-1">{nome}</span>
+      {children}
     </Link>
+  )
+}
+
+/**
+ * Quanti valori di oggi sono da controllare (`daSistemare`), per il numerino su Oggi. "Oggi" è il giorno di calendario
+ * (`useOggi()`), come nella pagina Oggi: non la data di rilievo scelta. Senza le misure (in arrivo, o non arrivate) non
+ * si dice nulla: la home non mostra un numero finto né allarma per un errore di lettura. Con la data di rilievo di oggi
+ * è la stessa query della striscia: una sola lettura.
+ */
+function useDaControllare(espId: string, config: ConfigEsperimento): number {
+  const oggi = useOggi()
+  const dati = useMisureGiorno(espId, oggi).data
+  return useMemo(() => (dati ? daSistemare(config, dati, oggi).length : 0), [dati, config, oggi])
+}
+
+/**
+ * Il numerino su Oggi: un segno in attenzione velato con il numero, e a chi non lo vede (lettori di schermo) la frase
+ * intera. Mai solo colore: c'è il numero.
+ */
+function NumerinoDaControllare({ n }: { n: number }) {
+  return (
+    <>
+      <span aria-hidden className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-attenzione-velato px-1.5 font-mono text-label tabular-nums text-attenzione">{n}</span>
+      {/* Lo spazio tiene staccata la frase da "Oggi" nel nome del link. */}
+      {' '}
+      <span className="sr-only">{`${n === 1 ? '1 valore' : `${n} valori`} da controllare`}</span>
+    </>
   )
 }
 
 /** La home dell'esperimento a configurazione caricata: riepilogo, "Nuova misura" e le icone delle sezioni. */
 function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperimento }) {
+  const daControllare = useDaControllare(espId, config)
+
   return (
     <>
       <p className="font-mono text-dato tabular-nums text-grafite-tenue">{riepilogo(config)}</p>
       <StrisciaNuovaMisura espId={espId} config={config} />
       <nav aria-label="Sezioni" className="grid grid-cols-2 gap-2.5">
-        <Voce to={percorsoSezione(espId, 'oggi')} icona="📅" nome="Oggi" />
+        <Voce to={percorsoOggi(espId)} icona="📅" nome="Oggi">
+          {daControllare > 0 && <NumerinoDaControllare n={daControllare} />}
+        </Voce>
         <Voce to={percorsoPiante(espId)} icona="🌿" nome="Piante" />
         <Voce to={percorsoSezione(espId, 'dataset')} icona="📊" nome="Dataset" />
         <Voce to={percorsoSezione(espId, 'esporta')} icona="⬇️" nome="Esporta Excel" />

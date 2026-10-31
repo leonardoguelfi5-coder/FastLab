@@ -1,5 +1,5 @@
 import { eVuoto } from './misure'
-import type { Misura, Parametro, Pianta, Strumento } from './tipi'
+import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento } from './tipi'
 
 /** Stato di una pianta in un giro di misura: mai misurata, misurata a metà, completa. */
 export type StatoPianta = 'da_fare' | 'incompleta' | 'fatta'
@@ -87,4 +87,39 @@ export function progressoOggi(
       return [s.id, { fatte, totale: piante.length }]
     }),
   )
+}
+
+/** Il giro di uno strumento a una data: quante piante fatte, se è cominciato e da dove si riprende. */
+export interface Giro {
+  fatte: number
+  totale: number
+  /** Almeno una pianta già toccata (anche a metà): da qui in poi la riga parla di quel giorno, non dell'ultima volta. */
+  cominciato: boolean
+}
+
+export interface RigaStrumento {
+  strumento: Strumento
+  /** `null` finché le misure del giorno non sono arrivate (o se non arrivano): nessun progresso inventato. */
+  giro: Giro | null
+  /** La prima pianta da misurare; `null` se non ce ne sono (si va alla fine del giro). */
+  prossima: Pianta | null
+}
+
+/**
+ * Gli strumenti non archiviati, nell'ordine dello strumento, ciascuno con il suo giro. Gli stati delle piante si
+ * calcolano solo a misure del giorno arrivate: senza, con i parametri e le misure ancora vuoti, ogni strumento
+ * risulterebbe "senza parametri attivi" e le sue piante "fatte". Se le misure non arrivano (o non sono ancora
+ * arrivate) la prossima pianta è la prima del giro: il modulo di misura chiederà lui cosa fare se ha già misure.
+ */
+export function righeStrumenti(config: ConfigEsperimento, misure: Misura[] | undefined): RigaStrumento[] {
+  return config.strumenti
+    .filter(s => !s.archiviato)
+    .sort((a, b) => a.ordine - b.ordine)
+    .map(strumento => {
+      if (!misure) return { strumento, giro: null, prossima: prossimaDaMisurare(config.piante, new Map<string, StatoPianta>(), null) }
+      const stati = statiPiante(strumento, config.parametri, misure, config.piante)
+      const { fatte, totale } = riepilogoGiro(config.piante, stati)
+      const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
+      return { strumento, giro: { fatte, totale, cominciato }, prossima: prossimaDaMisurare(config.piante, stati, null) }
+    })
 }

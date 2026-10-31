@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, type StatoPianta } from './giro'
-import type { Misura, Parametro, Pianta, Strumento, ValoriMisura } from './tipi'
+import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, righeStrumenti, type StatoPianta } from './giro'
+import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, ValoriMisura } from './tipi'
 import { parametro, piante as creaPiante } from './test-helpers'
 
 const D = '2026-10-29'
@@ -230,5 +230,37 @@ describe('progressoOggi', () => {
   it('senza misure: zero fatte', () => {
     const ps = creaPiante(['1', '2'])
     expect(progressoOggi([ciras], tutti, [], ps).get(ciras.id)).toEqual({ fatte: 0, totale: 2 })
+  })
+})
+
+describe('righeStrumenti', () => {
+  const ps = creaPiante(['1', '2', '3'])
+  const archiviato = strumento('Vecchio', [[A, false]], { archiviato: true })
+  const config = {
+    strumenti: [{ ...spad, ordine: 2 }, archiviato, { ...ciras, ordine: 1 }],
+    parametri: tutti,
+    piante: ps,
+  } as unknown as ConfigEsperimento
+
+  it('senza misure arrivate: gli strumenti non archiviati in ordine, senza giro, con la prima pianta', () => {
+    const righe = righeStrumenti(config, undefined)
+    expect(righe.map(r => r.strumento.nome)).toEqual(['Ciras', 'SPAD'])
+    expect(righe.map(r => r.giro)).toEqual([null, null])
+    expect(righe.map(r => r.prossima?.etichetta)).toEqual(['1', '1'])
+  })
+
+  it('con le misure: fatte su totale, giro cominciato e prossima pianta', () => {
+    const completa = { [A.id]: [1], [gs.id]: [1], [E.id]: [1], [Ci.id]: [1] }
+    const righe = righeStrumenti(config, [mis(ps[0].id, ciras, completa), mis(ps[1].id, ciras, { [A.id]: [1] })])
+    expect(righe[0].giro).toEqual({ fatte: 1, totale: 3, cominciato: true })
+    expect(righe[0].prossima?.etichetta).toBe('2')
+    expect(righe[1].giro).toEqual({ fatte: 0, totale: 3, cominciato: false })
+    expect(righe[1].prossima?.etichetta).toBe('1')
+  })
+
+  it('giro finito: nessuna prossima pianta', () => {
+    const righe = righeStrumenti(config, ps.map(p => mis(p.id, spad, { [stadio.id]: [2] })))
+    expect(righe[1].giro).toEqual({ fatte: 3, totale: 3, cominciato: true })
+    expect(righe[1].prossima).toBeNull()
   })
 })

@@ -22,8 +22,11 @@ export const percorsoMisuraPianta = (espId: string, strumentoId: string, piantaI
 export const percorsoFineGiro = (espId: string, strumentoId: string) =>
   `${percorsoNuovaMisura(espId)}/${parte(strumentoId)}/fine`
 
+/** Oggi: gli strumenti con il progresso del giorno e i valori da sistemare. */
+export const percorsoOggi = (espId: string) => `${percorsoHome(espId)}/oggi`
+
 /** Le sezioni della home che per ora sono segnaposto "In arrivo". */
-export type SezioneInArrivo = 'oggi' | 'dataset' | 'esporta' | 'diario' | 'foto'
+export type SezioneInArrivo = 'dataset' | 'esporta' | 'diario' | 'foto'
 
 /** Una sezione della home dell'esperimento ancora segnaposto. */
 export const percorsoSezione = (espId: string, sezione: SezioneInArrivo) => `${percorsoHome(espId)}/${sezione}`
@@ -40,7 +43,11 @@ export const percorsoImpostazioni = (espId: string) => `${percorsoHome(espId)}/i
 /** Modifica di una misura già registrata. */
 export const percorsoModificaMisura = (espId: string, misuraId: string) => `${percorsoHome(espId)}/misure/${parte(misuraId)}`
 
-/** Lo stato di navigazione con cui la storia della pianta apre una misura: la modifica sa di poter tornare indietro. */
+/**
+ * Lo stato di navigazione con cui una pagina apre una misura (la storia della pianta, i valori da sistemare di Oggi):
+ * la modifica sa di poter tornare indietro, alla pagina da cui si arriva. `daScheda` ha il nome della prima che lo
+ * usa; vale per ogni pagina di provenienza.
+ */
 export interface ArrivoMisura { daScheda?: boolean }
 
 /** Il catalogo degli strumenti, condiviso tra tutti gli esperimenti. */
