@@ -82,13 +82,13 @@ function Strumenti({ espId, config, oggi }: { espId: string; config: ConfigEsper
 
   return (
     <ul aria-label="Strumenti" className="-mx-4 flex flex-col">
-      {righe.map((riga, i) => (
+      {righe.map(riga => (
         <li key={riga.strumento.id} className="border-b border-riga first:border-t">
           <VoceStrumento
             strumento={riga.strumento}
             testo={testoStrumento(riga.giro, misureOggi.isPending, ultime, riga.strumento.id, oggi)}
-            // Stesso ordine delle righe di oggi: si parte dalla pianta giusta per la data su cui si registra.
-            onScegli={() => avvia(righeRilievo[i])}
+            // Si parte dalla pianta giusta per la data su cui si registra (la riga dello stesso strumento a quella data).
+            onScegli={() => avvia(righeRilievo.find(r => r.strumento.id === riga.strumento.id) ?? riga)}
           />
         </li>
       ))}

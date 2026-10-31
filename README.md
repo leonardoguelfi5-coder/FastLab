@@ -42,7 +42,8 @@ Comandi utili:
 - `guardie.test.sql`: le guardie sulle piante (una pianta con misure non cambia trattamento) e sul cambio di esperimento delle righe, aggiunte con la migration `20261029000006_guardie_piante.sql`;
 - `strumenti.test.sql`: gli strumenti (tipo, archiviazione, vincoli) e la funzione che crea un esperimento;
 - `catalogo.test.sql`: il catalogo condiviso, le sue policy e il collegamento delle copie;
-- `ultime_misure.test.sql`: la data dell'ultima misura di ogni strumento ("ultima volta"), letta rispettando le policy.
+- `ultime_misure.test.sql`: la data dell'ultima misura di ogni strumento ("ultima volta"), letta rispettando le policy;
+- `ultime_misure_piante.test.sql`: le misure dell'ultima data di ogni pianta per ogni strumento (elenco delle piante), lette rispettando le policy.
 
 Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
 
@@ -58,9 +59,20 @@ Servono i pacchetti apt `postgresql-16`, `postgresql-16-pgtap` e `libtap-parser-
 
 Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piante, trattamenti, in corso o concluso). Sotto c'è la striscia "Nuova misura", l'unico elemento a inchiostro pieno: se un giro è a metà, dice a che punto è (per esempio "SPAD in corso · 34/56"). Poi ci sono sette icone:
 
-- Oggi, Dataset, Esporta Excel, Diario e Foto sono "In arrivo": aprono una pagina che dice che la sezione arriva con il prossimo aggiornamento;
-- Piante apre l'elenco delle piante e, da lì, la scheda di ogni pianta con la sua storia;
+- Oggi: gli strumenti con il progresso del giorno e i valori da controllare (vedi sotto); il numerino sull'icona dice quanti sono;
+- Piante: l'elenco delle piante per trattamento e la scheda di ogni pianta (vedi sotto);
+- Dataset, Esporta Excel, Diario e Foto sono "In arrivo": aprono una pagina che dice che la sezione arriva con un prossimo aggiornamento;
 - Impostazioni è a tutta larghezza in fondo: fattori, trattamenti, piante, strumenti e tabella fenologica.
+
+### Oggi
+
+- **Strumenti:** per ognuno il progresso di oggi (per esempio "34/56" o "fatto ✓") oppure da quanto non si misura ("ultima 20/10 (14 giorni fa)", "mai misurato"). Toccandolo parte la misura, come da "Nuova misura".
+- **Da sistemare:** i valori di oggi molto lontani dalla media delle altre piante dello stesso trattamento, forse errori di battitura. "Molto lontano" vuol dire oltre 3 deviazioni standard dalla media delle altre piante, con almeno 3 altre piante misurate. Toccando un valore si apre la misura da correggere.
+
+### Piante
+
+- **Elenco:** un blocco per trattamento, con il numero di piante e la media degli ultimi valori del parametro scelto in "Valore mostrato" (ogni pianta conta una volta, con la media del suo ultimo giorno). In cima c'è la ricerca per numero o etichetta; scrivendo un numero e premendo Invio si apre quella pianta.
+- **Scheda della pianta:** gli ultimi valori di ogni strumento con la freccia rispetto alla volta prima, un confronto discreto con la media del trattamento (e il segno "fuori dal gruppo" solo quando la pianta è molto lontana), gli avvisi tipo "SPAD non misurato da 9 giorni", la storia completa (toccando una misura la si corregge) e i dati della pianta. "Misura questa pianta" fa scegliere lo strumento e apre la misura di quella pianta.
 
 ### Nuova misura
 
@@ -163,9 +175,9 @@ Per un esperimento da qualche decina di piante il database resta molto sotto il 
 
 ## Struttura del codice
 
-- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, `giro.ts` per lo stato delle piante e il giro di misura di uno strumento, `catalogo.ts` per le copie dal catalogo, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
+- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, bozze, `giro.ts` per lo stato delle piante e il giro di misura di uno strumento, `statistiche.ts` per medie, confronti e valori da sistemare, `catalogo.ts` per le copie dal catalogo, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
 - `src/api`: le chiamate a Supabase e la conversione tra righe del database e tipi del dominio.
-- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, home dell'esperimento, scelta dello strumento, misura di una pianta, fine giro, catalogo, elenco e scheda delle piante, impostazioni, inviti, sezioni "In arrivo").
+- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, home dell'esperimento, scelta dello strumento, misura di una pianta, fine giro, Oggi, catalogo, elenco e scheda delle piante, impostazioni, inviti, sezioni "In arrivo").
 - `src/components`: i pezzi riusati dalle pagine; `ui/` contiene i componenti di base, le altre cartelle sono raggruppate per schermata.
 - `src/lib` e `src/store`: utilità (date, numeri, errori, client Supabase) e lo stato della misura in campo (strumento scelto, data di rilievo, valori mantenuti).
 - `supabase/`: `migrations/` (schema, sicurezza per riga, inviti, funzioni), `tests/` (pgTAP) e `config.toml`.

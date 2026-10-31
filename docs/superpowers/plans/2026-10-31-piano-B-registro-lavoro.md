@@ -37,3 +37,8 @@ Task B5: dispatched reviewer (sonnet) su copia; Task B4 fix round 1 dispatched (
 Task B4: fix round 1 implemented f2fc283 (1467 Vitest, build OK): stato di arrivo `primoCampo` su "Misura questa pianta" (2 test, rossi prima della correzione), test "misure della pianta non lette → niente modulo, Riprova" portato in MisuraPianta, etichetta in Geist Mono, via `piantaSuccessiva`, `formattaConUnita` in ElencoPiante
 Ruling: la correzione del B4 è verificata dal controller sul diff (piccola e mirata, test rossi prima e verdi dopo) invece di un'altra ri-revisione, per contenere i costi chiesti dall'utente; la vede comunque la revisione finale — cost if wrong: un difetto scoperto più tardi
 Task B4: fix round 1/5 (5 addressed, 0 open); complete (commits eca6a12..f2fc283)
+Task B5: review (sonnet) → Approved (0 Critical/Important), 1466 Vitest, build OK su copia; scelta 2 (il tocco riprende il giro della data di rilievo) da tenere: portare la data a oggi in silenzio salverebbe sul giorno sbagliato, e il banner la mostra
+Task B5: minor 2 corretto dal controller (la riga della data di rilievo si cerca per strumento, non per indice)
+Task B5: minor (deferred): con data di rilievo diversa da oggi la riga mostra il progresso di oggi ma il tocco riprende il giro dell'altra data (spiegato dal banner); due valori anomali nello stesso trattamento e giorno si coprono a vicenda; con più misure in un giorno il tocco apre l'ultima, il valore mostrato è la media del giorno
+Task B5: complete (commits 1e1ed8b..564d4be + correzione del controller)
+Task B6: README (Oggi, Piante, scheda, test del DB, struttura) aggiornato dal controller; verifica: 197 pgTAP PASS (emulato), 1467 Vitest, tsc 0, lint 0, build OK
