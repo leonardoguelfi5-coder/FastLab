@@ -18,6 +18,16 @@ export function formattaNumero(n: number | null): string {
   return String(n).replace('.', ',')
 }
 
+/**
+ * Una media o un valore calcolato da mostrare: virgola decimale e al massimo due decimali (senza zeri inutili),
+ * perché una media di letture può avere tante cifre ("41,2333333") che sul telefono non dicono nulla in più.
+ */
+export function formattaMedia(n: number): string {
+  const arrotondato = Math.round(n * 100) / 100
+  // -0 (da un valore minuscolo negativo) si scriverebbe "-0"
+  return formattaNumero(Object.is(arrotondato, -0) ? 0 : arrotondato)
+}
+
 const SOLO_CIFRE = /^\d+$/
 
 /**
