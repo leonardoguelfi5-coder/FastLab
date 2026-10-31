@@ -259,3 +259,9 @@ Decisioni dell'utente rispettate:
    - bersagli della home e della domanda Correggi/Nuova col pollice;
    - toast sopra la barra;
    - il primo tocco su "Salva e vai" alla prima pianta della sessione (osservazione del Piano 1).
+
+## Messa online della v3 (31/10/2026, su richiesta dell'utente)
+- Supabase: progetto "FastLab" (eu-west-3), già creato vuoto dall'utente. Il controller vi ha applicato le 10 migration con il connettore Supabase. L'impronta del database (funzioni, colonne, policy, vincoli, indici, trigger, catalogo) coincide con quella del DB emulato su cui passano i 189 pgTAP. Nessun privilegio per anon, RLS su tutte le tabelle, trigger dell'invito su auth.users.
+- Vercel: progetto nuovo "fastlab-v3", separato da "fast-lab" (v2, non toccato), collegato al repository e con le due variabili del progetto Supabase nuovo. Deploy di produzione dal ramo `claude/app-review-improvements-c26294` → https://fastlab-v3.vercel.app (protezione Vercel disattivata, perché la pagina deve aprirsi dal telefono). La pagina e il manifest rispondono 200.
+- Primo amministratore: invito creato per l'email dell'utente. Dopo la registrazione il controller conferma l'account via SQL (conferma email di Supabase attiva di default) e imposta `admin = true`.
+- Da fare: la produzione si aggiorna solo con un deploy di produzione esplicito (il ramo di produzione del progetto Vercel resta `main`). Un push sul ramo crea solo un'anteprima, protetta. Per i colleghi va spenta "Confirm email" nel Dashboard (il connettore non la gestisce).
