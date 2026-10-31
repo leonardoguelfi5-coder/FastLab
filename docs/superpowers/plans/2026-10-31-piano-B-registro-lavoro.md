@@ -21,3 +21,5 @@ Task B1+B2: review (sonnet) → Approved (0 Critical/Important), 1342 Vitest, 19
 Task B1+B2: minor 1 corretto dal controller (ds sotto una tolleranza relativa vale 0: valori uguali a meno degli arrotondamenti delle medie davano un falso "fuori dal gruppo"), con test; refuso nel test
 Task B1+B2: minor (deferred): `mediaPerTrattamento` usa solo l'ultima data per coppia pianta/strumento (se quel giorno il parametro è vuoto la pianta non conta; visibile dal conteggio n/N); `piantaId` inutilizzato in `valoriDelTrattamento`
 Task B1+B2: complete (commits 80871ab..47d43b0 + correzione del controller, review clean)
+Task B3: implementatore (sonnet) DONE 1c944aa — 1380 Vitest, build OK; `src/domain/elencoPiante.ts` (parametriMostrabili, parametroDiBase, ultimoValorePerPianta, filtraPiante); `formattaMedia` in lib/numeri.ts; `Espandibile.riassunto` ora ReactNode; selettore solo su parametri `numero`; con la ricerca i blocchi vuoti spariscono e quelli trovati si aprono
+Task B3: dispatched reviewer (sonnet) su copia f870e0a..1c944aa; Task B4 dispatched implementer (sonnet), BASE 1c944aa
