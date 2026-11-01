@@ -47,3 +47,9 @@ Final review (opus): "Pronto dopo correzioni", 0 Critical; 196 pgTAP, 1467 Vites
 Ruling (cambia il Ruling della soglia): "molto fuori dal gruppo" = scarto > max(5 ds, 20% della media delle altre piante), con le stesse condizioni (≥ 3 altre piante, ds > 0). Simulato dal revisore: falsi allarmi SPAD 5,2% → 0,25%, temperature 0%, errori ×10/÷10 sempre presi. Va detto all'utente: soglia da ritoccare dopo l'uso in campo — cost if wrong: qualche errore di battitura piccolo non segnalato
 Ruling: giro unico di correzione finale B = I1, I2 (costanti, commento, README, 4 test sul confine riscritti), M1 (nessun avviso "da 0 giorni" con date future), `valoriDelTrattamento` → number[]; restano rimandati: freccia indietro di MisuraPianta sempre a "Nuova misura" (M2), media per trattamento sull'ultima data per pianta, RPC senza paginazione, le scelte B5 — cost if wrong: small
 Final fix round B: dispatched implementer (sonnet)
+Final fix round B: implemented 4cd2f10 (1475 Vitest, tsc/lint/build puliti; test nuovi rossi prima della correzione): invalidazione di `ultimeMisurePiante` dopo il salvataggio, soglia max(5 ds, 20%) con i test sul confine riscritti, niente avvisi "da 0/-1 giorni", `valoriDelTrattamento` → number[]
+Piano B: COMPLETE (commits 80871ab..4cd2f10 + registro). Online: migration 0011 applicata al progetto Supabase "FastLab", deploy di produzione di fastlab-v3 dopo il giro finale.
+
+## Verifiche da fare (Piano B)
+- In locale (riferimento): `npx supabase db reset` + `npm run test:db` → atteso 8 file, 196 test, PASS (nuovo: `ultime_misure_piante.test.sql`).
+- Sul telefono: elenco Piante (ricerca, selettore, medie), scheda della pianta (ultimi valori, frecce, confronto discreto, avvisi, "Misura questa pianta"), Oggi (strumenti, da sistemare) e il numerino sulla home; soglia dei valori da sistemare da valutare dopo qualche giornata di uso reale.
