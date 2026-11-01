@@ -93,8 +93,10 @@ export function notaDaStato(id: string, s: StatoNota, esistente: Nota | null, og
 
 /**
  * Un promemoria già fatto la cui data viene spostata in avanti torna da fare: la spunta di ieri non vale per un
- * giorno che deve ancora arrivare (ruling del Task C2). Prima si toglie la spunta, poi si salva la nota.
+ * giorno che deve ancora arrivare (ruling del Task C2). Prima si toglie la spunta, poi si salva la nota. Solo se la
+ * data è stata davvero spostata: ritoccare il testo di un promemoria fatto con data futura non lo riapre.
  */
 export function daRiaprire(esistente: Nota | null, nuova: Nota, oggi: string): boolean {
-  return esistente !== null && esistente.fatto_il !== null && nuova.promemoria && ePromemoriaAlSalvataggio(nuova.data, oggi)
+  return esistente !== null && esistente.fatto_il !== null && nuova.promemoria
+    && nuova.data !== esistente.data && ePromemoriaAlSalvataggio(nuova.data, oggi)
 }

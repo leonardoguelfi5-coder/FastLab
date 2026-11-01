@@ -32,6 +32,8 @@ import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Nota } from '@/domain/tipi'
 import { ATTESA_ANNULLA_MS } from '@/lib/eliminaConAnnulla'
 import { oggiLocale } from '@/lib/date'
+import { scriviBozzaNota } from '@/components/note/bozzaNota'
+import { statoVuoto } from '@/components/note/statoNota'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { Diario } from './Diario'
 
@@ -415,7 +417,7 @@ describe('Diario: la spunta', () => {
     vi.mocked(segnaFatto).mockRejectedValueOnce(new Error('rete'))
     const { utente } = apri()
     await utente.click(await screen.findByRole('button', { name: /^Segna fatto/ }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ duration: Infinity })))
     expect(riga('Concimare')).not.toHaveTextContent('fatto il')
     expect(within(riga('Concimare')).getByRole('button', { name: /^Segna fatto/ })).toBeInTheDocument()
   })
@@ -594,6 +596,98 @@ describe('Diario: errori e bozza', () => {
     await userEvent.click(salva())
     await waitFor(() => expect(salvaNota).toHaveBeenCalled())
     expect(vi.mocked(salvaNota).mock.calls[0][1].pianta_ids).toEqual([idPianta('3')])
+  })
+})
+
+describe('Diario: uscire mentre si salva', () => {
+  it('con il salvataggio in viaggio la freccia indietro non esce e non chiede di scartare; la bozza resta', async () => {
+    let finisci!: () => void
+    vi.mocked(salvaNota).mockImplementationOnce(() => new Promise<void>(ok => { finisci = ok }))
+    const { utente } = apri()
+    await utente.click(await nuovaNota())
+    await utente.type(screen.getByLabelText('Nota'), 'Non perdere');
+    fireEvent.click(salva())
+    await screen.findByRole('button', { name: 'Salvataggio…' })
+
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/diario')
+    expect(Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))).toHaveLength(1)
+    await act(async () => finisci())
+  })
+
+  it('se il salvataggio fallisce dopo che la pagina non c\'è più, la bozza torna e un toast che resta lo dice', async () => {
+    let fallisci!: (e: Error) => void
+    vi.mocked(salvaNota).mockImplementationOnce(() => new Promise<void>((_ok, ko) => { fallisci = ko }))
+    const { utente, resa } = apri()
+    await utente.click(await nuovaNota())
+    await utente.type(screen.getByLabelText('Nota'), 'Non perdere')
+    fireEvent.click(salva())
+    await screen.findByRole('button', { name: 'Salvataggio…' })
+    // l'uscita senza passare dall'app toglie la bozza? No: qui si simula il caso peggiore, bozza già tolta
+    sessionStorage.clear()
+    resa.unmount()
+
+    await act(async () => fallisci(new Error('Failed to fetch')))
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Riapri il Diario'), expect.objectContaining({ duration: Infinity }),
+    )
+    const chiave = Object.keys(sessionStorage).find(k => /^fastlab-bozza:nota:E:/.test(k))
+    expect(chiave).toBeDefined()
+    expect(JSON.parse(sessionStorage.getItem(chiave!)!).stato.testo).toBe('Non perdere')
+
+    // riaprendo il Diario la nota è lì
+    apri()
+    expect(await screen.findByLabelText('Nota')).toHaveValue('Non perdere')
+  })
+})
+
+describe('Diario: la mezzanotte', () => {
+  const MEZZANOTTE = () => new Date(2026, 10, 1, 23, 59, 0)
+
+  it('la casella spuntata da sola per "domani" si toglie quando arriva domani, e si salva ciò che mostra', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: MEZZANOTTE() })
+    const { utente } = apri()
+    await utente.click(await nuovaNota())
+    await utente.type(screen.getByLabelText('Nota'), 'Concimare')
+    const casella = screen.getByRole('checkbox', { name: 'Ricordamelo quel giorno' })
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-11-02' } })
+    expect(casella).toBeChecked()
+
+    await act(() => vi.advanceTimersByTimeAsync(2 * 60_000))
+    expect(oggiLocale()).toBe('2026-11-02')
+    await waitFor(() => expect(casella).not.toBeChecked())
+    await utente.click(salva())
+    await waitFor(() => expect(salvaNota).toHaveBeenCalled())
+    expect(vi.mocked(salvaNota).mock.calls[0][1]).toMatchObject({ data: '2026-11-02', promemoria: false })
+  })
+
+  it('la casella toccata a mano resta com\'è a mezzanotte', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: MEZZANOTTE() })
+    const { utente } = apri()
+    await utente.click(await nuovaNota())
+    await utente.type(screen.getByLabelText('Nota'), 'Concimare')
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: '2026-11-02' } })
+    const casella = screen.getByRole('checkbox', { name: 'Ricordamelo quel giorno' })
+    await utente.click(casella)
+    await utente.click(casella)
+    expect(casella).toBeChecked()
+    await act(() => vi.advanceTimersByTimeAsync(2 * 60_000))
+    expect(casella).toBeChecked()
+  })
+
+  it('riprendendo il giorno dopo una bozza di ieri, la casella mostra ciò che si salva oggi', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date(2026, 10, 2, 8, 0, 0) })
+    scriviBozzaNota('E', {
+      id: 'n1', esistente: false,
+      stato: { ...statoVuoto('2026-11-01'), testo: 'Di ieri', data: '2026-11-02', promemoria: true },
+    })
+    apri()
+    expect(await screen.findByLabelText('Nota')).toHaveValue('Di ieri')
+    expect(screen.getByRole('checkbox', { name: 'Ricordamelo quel giorno' })).not.toBeChecked()
+    await userEvent.click(salva())
+    await waitFor(() => expect(salvaNota).toHaveBeenCalled())
+    expect(vi.mocked(salvaNota).mock.calls[0][1]).toMatchObject({ data: '2026-11-02', promemoria: false })
   })
 })
 

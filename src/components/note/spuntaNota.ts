@@ -4,6 +4,7 @@ import { segnaFatto } from '@/api/note'
 import { chiavi } from '@/api/query'
 import type { Nota } from '@/domain/tipi'
 import { messaggioErrore } from '@/lib/errori'
+import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 
 /** Le note con una spunta in corso: un secondo tocco mentre la prima è in viaggio non deve ripartire. */
 const inCorso = new Set<string>()
@@ -26,7 +27,7 @@ export async function spuntaNota(queryClient: QueryClient, espId: string, nota: 
     await segnaFatto(espId, nota.id, fatto)
   } catch (e) {
     imposta(nota.fatto_il)
-    toast.error(messaggioErrore(e))
+    toast.error(messaggioErrore(e), OPZIONI_ERRORE_TARDIVO)
   } finally {
     inCorso.delete(nota.id)
     void queryClient.invalidateQueries({ queryKey: chiave })

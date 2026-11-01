@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { salvaNota, segnaFatto } from '@/api/note'
 import { chiavi, useConfig, useNote } from '@/api/query'
@@ -15,7 +16,7 @@ import { chiaveEliminazioneNota, eliminaNotaConAnnulla } from '@/components/note
 import { RigaNota } from '@/components/note/RigaNota'
 import { spuntaNota } from '@/components/note/spuntaNota'
 import {
-  daRiaprire, firma, notaDaStato, problemiNota, statoDaNota, statoVuoto, type StatoNota,
+  conData, daRiaprire, firma, notaDaStato, problemiNota, statoDaNota, statoVuoto, type StatoNota,
 } from '@/components/note/statoNota'
 import type { ConfigEsperimento, Nota } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
@@ -23,6 +24,7 @@ import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
 import { percorsoHome } from '@/lib/percorsi'
+import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useOggi } from '@/lib/useOggi'
 
@@ -50,6 +52,14 @@ function senzaIdSconosciuti(stato: StatoNota, config: ConfigEsperimento): StatoN
 }
 
 /**
+ * Lo stato con la casella "Ricordamelo quel giorno" coerente con il giorno di oggi: una data scelta ieri come
+ * "domani" oggi non è più futura, e la casella (se non toccata a mano) deve mostrare ciò che si salverebbe.
+ */
+function coerenteConOggi(stato: StatoNota, esistente: Nota | null, oggi: string): StatoNota {
+  return conData(stato, stato.data, oggi, esistente?.promemoria ?? false)
+}
+
+/**
  * Se l'ultima volta si è usciti dal Diario senza passare dall'app (gesto indietro, ricarica) con una nota a metà,
  * riparte da lì. Una nota che nel frattempo non c'è più (eliminata altrove) si riprende come nuova, con lo stesso id:
  * il testo scritto non va perso.
@@ -64,7 +74,7 @@ function riprendi(espId: string, config: ConfigEsperimento, note: Nota[], oggi: 
     id,
     esistente,
     base: esistente ? statoDaNota(esistente) : statoVuoto(oggi),
-    stato: senzaIdSconosciuti(bozza.stato, config),
+    stato: coerenteConOggi(senzaIdSconosciuti(bozza.stato, config), esistente, oggi),
     ripresa: true,
   }
 }
@@ -86,13 +96,18 @@ export function Diario() {
       </AppShell>
     )
   }
-  return <DiarioCaricato espId={espId} config={config.data} note={note.data} />
+  return <DiarioCaricato key={espId} espId={espId} config={config.data} note={note.data} />
 }
 
 function DiarioCaricato({ espId, config, note }: { espId: string; config: ConfigEsperimento; note: Nota[] }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const oggi = useOggi()
+  // A mezzanotte la nota aperta riapplica la regola del promemoria con il giorno nuovo: la casella mostra ciò che si salva.
+  const oggi = useOggi((_prima, dopo) => {
+    if (!modifica) return
+    const stato = coerenteConOggi(modifica.stato, modifica.esistente, dopo)
+    if (stato.promemoria !== modifica.stato.promemoria) cambia(stato)
+  })
 
   const [modifica, setModifica] = useState<Modifica | null>(() => riprendi(espId, config, note, oggi))
   const [apertaId, setApertaId] = useState<string | null>(null)
@@ -101,6 +116,14 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
   const [conferma, setConferma] = useState<'esci' | 'chiudi' | null>(null)
   // Il doppio tocco si ferma subito, prima che il pulsante risulti disabilitato.
   const inCorso = useRef(false)
+  // Quale nota è aperta e se la pagina c'è ancora: un salvataggio che finisce male dopo l'uscita lo deve sapere.
+  const idAperto = useRef<string | null>(null)
+  const montata = useRef(false)
+  useEffect(() => { idAperto.current = modifica?.id ?? null }, [modifica?.id])
+  useEffect(() => {
+    montata.current = true
+    return () => { montata.current = false }
+  }, [])
 
   const modificato = modifica !== null && firma(modifica.stato) !== firma(modifica.base)
   const problemi = modifica === null ? [] : problemiNota(modifica.stato)
@@ -128,7 +151,10 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     const base = statoDaNota(nota)
     // Una bozza lasciata a metà su questa nota (uscita senza passare dall'app) ha la precedenza.
     const bozza = leggiBozzaNota(espId, nota.id)
-    setModifica({ id: nota.id, esistente: nota, base, stato: bozza ? senzaIdSconosciuti(bozza.stato, config) : base, ripresa: bozza !== null })
+    setModifica({
+      id: nota.id, esistente: nota, base, ripresa: bozza !== null,
+      stato: bozza ? coerenteConOggi(senzaIdSconosciuti(bozza.stato, config), nota, oggi) : base,
+    })
     setApertaId(null)
     setErrore(null)
   }
@@ -163,7 +189,14 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
       if (daRiaprire(esistente, nuova, adesso)) await segnaFatto(espId, id, false)
       await salvaNota(espId, nuova)
     } catch (e) {
-      setErrore(messaggioErrore(e))
+      if (!montata.current || idAperto.current !== id) {
+        // Si è usciti (o si è passati ad altro) mentre il salvataggio era in viaggio: nessun editor dove mostrare
+        // l'errore. La bozza si riscrive (l'uscita l'aveva tolta) e il toast resta finché non lo si chiude.
+        scriviBozzaNota(espId, { id, esistente: esistente !== null, stato: modifica.stato })
+        toast.error(`La nota non è stata salvata: ${messaggioErrore(e)} Riapri il Diario: la trovi come bozza.`, OPZIONI_ERRORE_TARDIVO)
+      } else {
+        setErrore(messaggioErrore(e))
+      }
       // La bozza e l'editor restano come sono: si riprova con lo stesso id. L'elenco si rilegge comunque, la nota
       // potrebbe essere arrivata a metà.
       void queryClient.invalidateQueries({ queryKey: chiavi.note(espId) })
@@ -188,6 +221,12 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
       titolo={modifica ? (modifica.esistente ? 'Modifica nota' : 'Nuova nota') : 'Diario'}
       indietro={percorsoHome(espId)}
       onIndietro={evento => {
+        // Salvataggio in viaggio: né uscita né scarto, come per il pulsante Annulla. Scartare ora cancellerebbe la
+        // bozza proprio mentre il salvataggio potrebbe fallire.
+        if (inCorso.current) {
+          evento.preventDefault()
+          return
+        }
         if (!modificato) return
         evento.preventDefault()
         setConferma('esci')

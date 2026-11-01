@@ -40,7 +40,7 @@ export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, 
           <span className={cn('break-words whitespace-pre-line text-base', fatto ? 'text-grafite-tenue line-through' : 'text-grafite', !aperta && 'line-clamp-3')}>
             {nota.testo}
           </span>
-          <span className="break-words text-sm text-grafite-tenue">{descriviCollegamento(nota, config)}</span>
+          <span className="break-words font-mono text-sm tabular-nums text-grafite-tenue">{descriviCollegamento(nota, config)}</span>
         </button>
         {nota.promemoria && (
           <button
@@ -50,7 +50,7 @@ export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, 
             className={cn(
               'mt-1.5 mr-3 flex size-11 shrink-0 items-center justify-center rounded-sm border transition-colors',
               fatto
-                ? 'border-inchiostro bg-inchiostro text-foglio active:bg-inchiostro-scuro'
+                ? 'border-inchiostro bg-inchiostro-velato text-inchiostro active:bg-riga/60'
                 : 'border-riga-controllo bg-foglio text-transparent hover:border-grafite-tenue active:bg-carta-ombra',
             )}
           >

@@ -116,6 +116,12 @@ describe('daRiaprire', () => {
     expect(daRiaprire(fatta, { ...fatta, data: '2026-11-09' }, OGGI)).toBe(true)
   })
 
+  it('non va riaperto se la data non è stata spostata, nemmeno se è futura', () => {
+    const futura = nota({ promemoria: true, data: '2026-11-09', fatto_il: '2026-10-31T10:00:00.000Z' })
+    expect(daRiaprire(futura, { ...futura, testo: 'ritoccata' }, OGGI)).toBe(false)
+    expect(daRiaprire(futura, { ...futura, data: '2026-11-10' }, OGGI)).toBe(true)
+  })
+
   it('non va riaperto se la data resta passata o di oggi, se non era fatto o se è una nota nuova', () => {
     expect(daRiaprire(fatta, { ...fatta, data: OGGI }, OGGI)).toBe(false)
     expect(daRiaprire(fatta, { ...fatta, data: '2026-10-01' }, OGGI)).toBe(false)

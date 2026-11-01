@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { OPZIONI_ERRORE_TARDIVO } from '@/components/scheda/salvataggio'
+import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 import { messaggioErrore } from '@/lib/errori'
 
 /** Per quanto tempo "Annulla" resta possibile prima che l'eliminazione parta davvero (spec §4). */
