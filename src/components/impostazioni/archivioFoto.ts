@@ -1,7 +1,7 @@
-import { archiviaFileFoto, listaFoto, urlFoto } from '@/api/foto'
+import { archiviaFileFoto, fileFotoPresenti, listaFoto, urlFoto } from '@/api/foto'
 import { listaNote } from '@/api/note'
 import { creaCsvFoto, nomeFileZip, nomiFileZip } from '@/domain/archivioFoto'
-import type { ConfigEsperimento } from '@/domain/tipi'
+import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData, oggiLocale } from '@/lib/date'
 import { ErroreApp } from '@/lib/errori'
 import { useArchivioSessione } from './archivioSessione'
@@ -76,13 +76,28 @@ export async function scaricaArchivio(
   { espId, config, onProgresso }: { espId: string; config: ConfigEsperimento; onProgresso: (fatte: number, totale: number) => void },
 ): Promise<EsitoArchivio> {
   // Elenchi freschi, non quelli in cache: lo zip e «Libera» devono parlare delle foto che ci sono adesso.
-  const [elenco, note] = await Promise.all([listaFoto(espId), listaNote(espId)])
+  const [elenco, note, presenti] = await Promise.all([listaFoto(espId), listaNote(espId), fileFotoPresenti(espId)])
   // `listaFoto` è dalla più recente: nel CSV e nello zip si va in ordine di tempo.
   const tutte = [...elenco].reverse()
-  const conFile = tutte.filter(f => !f.archiviata)
-  if (conFile.length === 0) throw new ErroreApp('Non ci sono foto con il file da scaricare.')
+  const nonArchiviate = tutte.filter(f => !f.archiviata)
+  if (nonArchiviate.length === 0) throw new ErroreApp('Non ci sono foto da scaricare.')
+  // Una foto non archiviata il cui file non c'è più (un giro di «Libera lo spazio» interrotto tra la rimozione e
+  // l'update, poi una ricarica) non si può scaricare: bloccherebbe lo zip per sempre. Va nel CSV come «file assente» e
+  // fra le foto di «Libera», che la segna archiviata senza toccare lo Storage (vedi `archiviaFileFoto`).
+  const nomeDi = (f: Foto) => f.percorso.split('/').pop() as string
+  const conFile = nonArchiviate.filter(f => presenti.has(nomeDi(f)))
+  const senzaFile = nonArchiviate.filter(f => !presenti.has(nomeDi(f)))
 
-  const { zipSync, strToU8 } = await import('fflate')
+  // Un import dinamico che non riesce (rete assente, versione dell'app cambiata sotto i piedi) non deve sembrare un guasto qualsiasi.
+  // Si prendono per nome le sole due funzioni: tenere tutto lo spazio dei nomi in una variabile impedirebbe al bundler di scartare il resto della libreria.
+  let libreria: Pick<typeof import('fflate'), 'zipSync' | 'strToU8'>
+  try {
+    const { zipSync, strToU8 } = await import('fflate')
+    libreria = { zipSync, strToU8 }
+  } catch {
+    throw new ErroreApp('Non riesco a preparare lo .zip: ricarica la pagina e riprova.')
+  }
+  const { zipSync, strToU8 } = libreria
 
   const nomi = nomiFileZip(conFile, config.piante)
   const contenuto: Record<string, [Uint8Array, { level: 0 | 6 }]> = {}
@@ -102,7 +117,7 @@ export async function scaricaArchivio(
 
   const nomeFile = nomeFileZip(config.esperimento.nome, oggiLocale())
   consegna(new Blob([zipSync(contenuto) as Uint8Array<ArrayBuffer>], { type: 'application/zip' }), nomeFile)
-  useArchivioSessione.getState().segna(espId, conFile.map(f => f.id))
+  useArchivioSessione.getState().segna(espId, { ids: [...conFile, ...senzaFile].map(f => f.id), foto: conFile.length, nomeFile })
   return { foto: conFile.length, nomeFile }
 }
 
@@ -114,9 +129,9 @@ export async function scaricaArchivio(
  * giro porta a termine il resto. Dice quante foto ha archiviato.
  */
 export async function liberaSpazio(espId: string): Promise<number> {
-  const ids = useArchivioSessione.getState().scaricati[espId]
-  if (ids === undefined) throw new ErroreApp('Prima scarica le foto in un .zip: lo spazio si libera solo dopo un download riuscito.')
-  const nelloZip = new Set(ids)
+  const scaricato = useArchivioSessione.getState().scaricati[espId]
+  if (scaricato === undefined) throw new ErroreApp('Prima scarica le foto in un .zip: lo spazio si libera solo dopo un download riuscito.')
+  const nelloZip = new Set(scaricato.ids)
   const daArchiviare = (await listaFoto(espId)).filter(f => nelloZip.has(f.id) && !f.archiviata)
   const n = daArchiviare.length === 0 ? 0 : await archiviaFileFoto(espId, daArchiviare)
   useArchivioSessione.getState().dimentica(espId)

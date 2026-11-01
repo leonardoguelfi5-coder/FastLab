@@ -78,4 +78,23 @@ describe('spuntaPromemoriaConAnnulla', () => {
     expect(segnaFatto).not.toHaveBeenCalled()
     expect(note().find(n => n.id === 'a')!.fatto_il).not.toBeNull()
   })
+
+  it('quel tocco che non fa nulla non è muto: un messaggio dice che per riaprirlo serve «Annulla»', async () => {
+    spuntaPromemoriaConAnnulla(client, 'E', nota('a'))
+    vi.mocked(toast).mockClear()
+    await spuntaNota(client, 'E', note().find(n => n.id === 'a')!)
+    expect(toast).toHaveBeenCalledExactlyOnceWith('Il promemoria è appena stato segnato fatto: per riaprirlo tocca «Annulla».')
+  })
+
+  it('una rilettura che riscrive la cache durante l\'attesa non riapre il promemoria: dopo il salvataggio torna fatto', async () => {
+    spuntaPromemoriaConAnnulla(client, 'E', nota('a'))
+    // Una lettura partita prima della spunta, finita durante i 5 secondi: il server non sa ancora nulla.
+    client.setQueryData(chiavi.note('E'), [nota('a'), nota('b')])
+    expect(note().find(n => n.id === 'a')!.fatto_il).toBeNull()
+
+    await vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS)
+
+    expect(segnaFatto).toHaveBeenCalledExactlyOnceWith('E', 'a', true)
+    expect(note().find(n => n.id === 'a')!.fatto_il).not.toBeNull()
+  })
 })

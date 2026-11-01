@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { unzipSync, strFromU8 } from 'fflate'
 
-vi.mock('@/api/foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn() }))
+vi.mock('@/api/foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn() }))
 vi.mock('@/api/note', () => ({ listaNote: vi.fn() }))
 // L'import dinamico di fflate è moccabile: la vera libreria, con `zipSync` spiata per vedere come viene chiamata.
 vi.mock('fflate', async importOriginale => {
@@ -10,7 +10,7 @@ vi.mock('fflate', async importOriginale => {
 })
 
 import { zipSync } from 'fflate'
-import { archiviaFileFoto, listaFoto, urlFoto } from '@/api/foto'
+import { archiviaFileFoto, fileFotoPresenti, listaFoto, urlFoto } from '@/api/foto'
 import { listaNote } from '@/api/note'
 import { oggiLocale } from '@/lib/date'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
@@ -40,6 +40,8 @@ beforeEach(() => {
   vi.mocked(listaFoto).mockReset()
   vi.mocked(urlFoto).mockReset()
   vi.mocked(archiviaFileFoto).mockReset()
+  // Di norma tutti i file ci sono; i test sul file assente lo cambiano.
+  vi.mocked(fileFotoPresenti).mockReset().mockResolvedValue({ has: () => true } as unknown as Set<string>)
   vi.mocked(listaNote).mockReset().mockResolvedValue([])
   vi.mocked(zipSync).mockClear()
   vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}?token=1`])))
@@ -94,7 +96,7 @@ describe('scaricaArchivio', () => {
     expect(Object.keys(zip).sort()).toEqual(['2026-10-28_esperimento_aaaaaaaa.jpg', 'foto.csv'])
     expect(strFromU8(zip['foto.csv'])).toContain('2026-10-28;;;;;sì')
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(useArchivioSessione.getState().scaricati[E]).toEqual([idDi('a')])
+    expect(useArchivioSessione.getState().scaricati[E].ids).toEqual([idDi('a')])
   })
 
   it('i file nello zip hanno tutti nomi diversi, anche con gli stessi primi 8 caratteri dell\'id', async () => {
@@ -191,10 +193,45 @@ describe('scaricaArchivio', () => {
     expect(click).not.toHaveBeenCalled()
   })
 
+  it('una foto non archiviata il cui file non c\'è più non blocca lo zip: va nel CSV come «file assente», non si scarica e Libera la archivia', async () => {
+    vi.mocked(listaFoto).mockResolvedValue([foto('b'), foto('a')])
+    vi.mocked(fileFotoPresenti).mockResolvedValue(new Set([`${idDi('a')}.jpg`]))
+
+    const esito = await scaricaArchivio({ espId: E, config, onProgresso: () => {} })
+
+    expect(esito.foto).toBe(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const zip = await zipScaricato()
+    expect(Object.keys(zip).sort()).toEqual(['2026-10-28_esperimento_aaaaaaaa.jpg', 'foto.csv'])
+    expect(strFromU8(zip['foto.csv']).split('\r\n')).toEqual([
+      'data;pianta;trattamento;nota;nome del file;archiviata',
+      '2026-10-28;;;;2026-10-28_esperimento_aaaaaaaa.jpg;',
+      '2026-10-28;;;;;file assente',
+    ])
+    // «Libera» le prende entrambe: all'API tocca archiviare quella senza file senza fare `remove`.
+    expect([...useArchivioSessione.getState().scaricati[E].ids].sort()).toEqual([idDi('a'), idDi('b')])
+    vi.mocked(archiviaFileFoto).mockResolvedValue(2)
+    await liberaSpazio(E)
+    expect(vi.mocked(archiviaFileFoto).mock.calls[0][1].map(f => f.id).sort()).toEqual([idDi('a'), idDi('b')])
+  })
+
+  it('se tutte le foto non archiviate sono senza file lo zip contiene solo il CSV: l\'errore resta solo senza nessuna foto non archiviata', async () => {
+    vi.mocked(listaFoto).mockResolvedValue([foto('a')])
+    vi.mocked(fileFotoPresenti).mockResolvedValue(new Set())
+    expect((await scaricaArchivio({ espId: E, config, onProgresso: () => {} })).foto).toBe(0)
+    expect(Object.keys(await zipScaricato())).toEqual(['foto.csv'])
+  })
+
+  it('ricorda il nome del file consegnato, per far controllare a chi libera lo spazio', async () => {
+    vi.mocked(listaFoto).mockResolvedValue([foto('a')])
+    await scaricaArchivio({ espId: E, config, onProgresso: () => {} })
+    expect(useArchivioSessione.getState().scaricati[E]).toMatchObject({ foto: 1, nomeFile: `FastLab_Hydrochar-lotto-2_foto_${oggiLocale()}.zip` })
+  })
+
   it('segna il download riuscito con gli id delle foto che sono nello zip', async () => {
     vi.mocked(listaFoto).mockResolvedValue([foto('a'), foto('b')])
     await scaricaArchivio({ espId: E, config, onProgresso: () => {} })
-    expect([...useArchivioSessione.getState().scaricati[E]].sort()).toEqual([idDi('a'), idDi('b')])
+    expect([...useArchivioSessione.getState().scaricati[E].ids].sort()).toEqual([idDi('a'), idDi('b')])
   })
 
   it('libera l\'indirizzo del Blob dopo il download, non subito (alcuni browser lo leggono dopo il click)', async () => {
@@ -214,7 +251,7 @@ describe('liberaSpazio', () => {
   })
 
   it('archivia solo le foto che erano nello zip: quelle aggiunte dopo il download non si toccano', async () => {
-    useArchivioSessione.getState().segna(E, [idDi('a'), idDi('b')])
+    useArchivioSessione.getState().segna(E, { ids: [idDi('a'), idDi('b')], foto: 1, nomeFile: 'x.zip' })
     vi.mocked(listaFoto).mockResolvedValue([foto('c'), foto('b'), foto('a')])
     vi.mocked(archiviaFileFoto).mockResolvedValue(2)
 
@@ -224,7 +261,7 @@ describe('liberaSpazio', () => {
   })
 
   it('una foto dello zip già archiviata o eliminata nel frattempo non si ripropone', async () => {
-    useArchivioSessione.getState().segna(E, [idDi('a'), idDi('b'), idDi('d')])
+    useArchivioSessione.getState().segna(E, { ids: [idDi('a'), idDi('b'), idDi('d')], foto: 1, nomeFile: 'x.zip' })
     vi.mocked(listaFoto).mockResolvedValue([foto('a', { archiviata: true, archiviata_il: '2026-11-02T10:00:00Z' }), foto('b')])
     vi.mocked(archiviaFileFoto).mockResolvedValue(1)
 
@@ -234,7 +271,7 @@ describe('liberaSpazio', () => {
   })
 
   it('a buon fine dimentica il download: «Libera» non si offre più', async () => {
-    useArchivioSessione.getState().segna(E, [idDi('a')])
+    useArchivioSessione.getState().segna(E, { ids: [idDi('a')], foto: 1, nomeFile: 'x.zip' })
     vi.mocked(listaFoto).mockResolvedValue([foto('a')])
     vi.mocked(archiviaFileFoto).mockResolvedValue(1)
     await liberaSpazio(E)
@@ -243,19 +280,19 @@ describe('liberaSpazio', () => {
   })
 
   it('se si ferma a metà il download resta valido e un nuovo giro completa', async () => {
-    useArchivioSessione.getState().segna(E, [idDi('a'), idDi('b')])
+    useArchivioSessione.getState().segna(E, { ids: [idDi('a'), idDi('b')], foto: 1, nomeFile: 'x.zip' })
     vi.mocked(listaFoto).mockResolvedValue([foto('a'), foto('b')])
     vi.mocked(archiviaFileFoto).mockRejectedValueOnce(new Error('rete')).mockResolvedValueOnce(2)
 
     await expect(liberaSpazio(E)).rejects.toThrow('rete')
-    expect(useArchivioSessione.getState().scaricati[E]).toEqual([idDi('a'), idDi('b')])
+    expect(useArchivioSessione.getState().scaricati[E].ids).toEqual([idDi('a'), idDi('b')])
 
     expect(await liberaSpazio(E)).toBe(2)
     expect(useArchivioSessione.getState().scaricati[E]).toBeUndefined()
   })
 
   it('con tutte le foto dello zip già archiviate dimentica il download e dice 0', async () => {
-    useArchivioSessione.getState().segna(E, [idDi('a')])
+    useArchivioSessione.getState().segna(E, { ids: [idDi('a')], foto: 1, nomeFile: 'x.zip' })
     vi.mocked(listaFoto).mockResolvedValue([foto('a', { archiviata: true, archiviata_il: '2026-11-02T10:00:00Z' })])
     expect(await liberaSpazio(E)).toBe(0)
     expect(archiviaFileFoto).not.toHaveBeenCalled()

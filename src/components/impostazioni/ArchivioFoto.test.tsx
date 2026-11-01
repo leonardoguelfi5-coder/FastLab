@@ -6,12 +6,12 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
 vi.mock('@/api/foto', () => ({
-  listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600,
+  listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/api/note', () => ({ listaNote: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 
-import { archiviaFileFoto, listaFoto, spazioFoto, urlFoto } from '@/api/foto'
+import { archiviaFileFoto, fileFotoPresenti, listaFoto, spazioFoto, urlFoto } from '@/api/foto'
 import { listaNote } from '@/api/note'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -55,6 +55,7 @@ beforeEach(() => {
   db = [foto('b'), foto('a')]
   vi.mocked(listaFoto).mockImplementation(async () => structuredClone(db))
   vi.mocked(listaNote).mockResolvedValue([])
+  vi.mocked(fileFotoPresenti).mockResolvedValue({ has: () => true } as unknown as Set<string>)
   vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 6, progetto: 6 })
   vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}`])))
   vi.mocked(archiviaFileFoto).mockImplementation(async (_e, daArchiviare) => {
@@ -137,6 +138,15 @@ describe('archivio .zip: scarica', () => {
     expect(sezione().queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('se l\'elenco delle foto non si legge lo dice con «Riprova», e il download resta spento', async () => {
+    vi.mocked(listaFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    expect(await sezione().findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(scarica()).toBeDisabled()
+    await utente.click(sezione().getByRole('button', { name: 'Riprova' }))
+    await waitFor(() => expect(scarica()).toBeEnabled())
+  })
+
   it('senza foto da scaricare lo dice e non offre il download', async () => {
     db = [foto('a', { archiviata: true, archiviata_il: '2026-11-03T12:00:00Z' })]
     apri()
@@ -168,6 +178,13 @@ describe('archivio .zip: libera lo spazio', () => {
     await utente.type(campo, `  ${NOME}  `)
     expect(confermaLibera()).toBeEnabled()
     expect(archiviaFileFoto).not.toHaveBeenCalled()
+  })
+
+  it('il testo nomina il file .zip da controllare', async () => {
+    const { utente } = apri()
+    await scaricaTutto(utente)
+    await utente.click(libera()!)
+    expect(dialogo().getByText(/FastLab_Hydrochar-2026_foto_\d{4}-\d{2}-\d{2}\.zip/)).toBeInTheDocument()
   })
 
   it('annullando non si tocca niente e «Libera» resta disponibile', async () => {

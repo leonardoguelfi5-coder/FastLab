@@ -9,7 +9,7 @@ import { simulaSupabase } from '@/test/supabase-mock'
 import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import type { Foto } from '@/domain/tipi'
 import {
-  aggiornaFoto, archiviaFileFoto, caricaFoto, eliminaFileEsperimento, eliminaFoto, listaFoto, spazioFoto, urlFoto,
+  aggiornaFoto, archiviaFileFoto, caricaFoto, eliminaFileEsperimento, fileFotoPresenti, eliminaFoto, listaFoto, spazioFoto, urlFoto,
 } from './foto'
 
 const E = 'e0000000-0000-4000-8000-000000000001'
@@ -580,6 +580,16 @@ describe('archiviaFileFoto', () => {
     expect(aggiornamenti().flatMap(u => u.ids as string[])).not.toContain(idDi(9))
   })
 
+  it('segna anche le righe senza file a gruppi da 100: i filtri `in` vanno nell\'URL e non possono crescere senza limite', async () => {
+    mock.storage.risponde('list', { data: [] })
+    aggiornaRiuscito()
+
+    expect(await archiviaFileFoto(E, elenco(250))).toBe(250)
+
+    expect(mock.storage.di('remove')).toEqual([])
+    expect(aggiornamenti().map(u => (u.ids as string[]).length)).toEqual([100, 100, 50])
+  })
+
   it('senza foto non fa niente', async () => {
     expect(await archiviaFileFoto(E, [])).toBe(0)
     expect(mock.chiamate).toEqual([])
@@ -597,5 +607,27 @@ describe('archiviaFileFoto', () => {
     await expect(archiviaFileFoto(E, [{ ...fotoN(1), percorso: 'altro/x.jpg' }])).rejects.toThrow()
     expect(mock.chiamate).toEqual([])
     await expect(archiviaFileFoto('../altro', elenco(1))).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+  })
+})
+
+describe('fileFotoPresenti', () => {
+  it('dà i nomi dei file delle foto nella cartella dell\'esperimento (in minuscolo), senza segnaposto né altri file', async () => {
+    mock.storage.risponde('list', { data: [
+      { name: 'f0000000-0000-4000-8000-000000000001.jpg', id: 'o1' }, { name: '.emptyFolderPlaceholder', id: 'p' },
+      { name: 'nota.txt', id: 'n' }, { name: 'f0000000-0000-4000-8000-000000000002.jpg', id: null },
+    ] })
+
+    const nomi = await fileFotoPresenti(E.toUpperCase())
+
+    expect([...nomi]).toEqual(['f0000000-0000-4000-8000-000000000001.jpg'])
+    expect(mock.storage.di('list').map(c => c.args[0])).toEqual([E])
+  })
+
+  it('un id che non è un uuid non elenca niente, e un errore dell\'elenco si propaga', async () => {
+    await expect(fileFotoPresenti('../altro')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+    expect(mock.storage.di('list')).toEqual([])
+    const e = { message: 'rete' }
+    mock.storage.risponde('list', { error: e })
+    await expect(fileFotoPresenti(E)).rejects.toBe(e)
   })
 })

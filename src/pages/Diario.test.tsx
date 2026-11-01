@@ -40,6 +40,7 @@ import type { ConfigEsperimento, Foto, Nota } from '@/domain/tipi'
 import { ATTESA_ANNULLA_MS } from '@/lib/eliminaConAnnulla'
 import { formattaData, oggiLocale } from '@/lib/date'
 import { scriviBozzaNota } from '@/components/note/bozzaNota'
+import { spuntaPromemoriaConAnnulla } from '@/components/note/spuntaPromemoriaConAnnulla'
 import { statoVuoto } from '@/components/note/statoNota'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { Diario } from './Diario'
@@ -408,6 +409,28 @@ describe('Diario: modificare una nota', () => {
     await waitFor(() => expect(salvaNota).toHaveBeenCalled())
     expect(segnaFatto).toHaveBeenCalledWith('E', 'a', false)
     expect(vi.mocked(segnaFatto).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(salvaNota).mock.invocationCallOrder[0])
+  })
+
+  it('con la spunta da Oggi ancora in attesa, spostare la data non riapre niente: errore chiaro, bozza e nota restano', async () => {
+    db = [nota('a', { testo: 'Pesare', promemoria: true, data: '2026-10-25', fatto_il: null })]
+    const { utente, client } = apri()
+    await screen.findByRole('button', { name: /Pesare/ })
+    // La spunta di Oggi: la nota risulta fatta in cache, il salvataggio vero parte tra 5 secondi.
+    act(() => spuntaPromemoriaConAnnulla(client, 'E', db[0]))
+    await utente.click(await screen.findByRole('button', { name: /Pesare/ }))
+    await utente.click(within(riga('Pesare')).getByRole('button', { name: 'Modifica' }))
+    fireEvent.change(screen.getByLabelText('Data'), { target: { value: FUTURO } })
+    await utente.click(salva())
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Il promemoria è appena stato segnato fatto')
+    expect(segnaFatto).not.toHaveBeenCalled()
+    expect(salvaNota).not.toHaveBeenCalled()
+    // L'editor e la data scritta restano: si riprova dopo l'Annulla o quando il salvataggio è finito.
+    expect(screen.getByLabelText('Data')).toHaveValue(FUTURO)
+
+    // Annulla il toast: niente salvataggio in ritardo che sporchi gli altri test.
+    const [, opzioni] = vi.mocked(toast).mock.calls.at(-1) as unknown as [string, { action: { onClick: () => void } }]
+    act(() => opzioni.action.onClick())
   })
 
   it('cambiare il testo di un promemoria fatto, senza toccare la data, non toglie la spunta', async () => {

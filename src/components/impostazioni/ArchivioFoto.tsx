@@ -33,6 +33,7 @@ export function ArchivioFoto({ espId, config }: { espId: string; config: ConfigE
   }
 
   const conFile = foto.data?.filter(f => !f.archiviata).length
+  const nomeFile = scaricate?.nomeFile
   const inCorso = stato.tipo === 'in_corso'
 
   const scarica = async () => {
@@ -53,6 +54,8 @@ export function ArchivioFoto({ espId, config }: { espId: string; config: ConfigE
         di ognuna. Dopo il download puoi liberare lo spazio: i file escono dall&apos;app e le foto restano come segnaposto.
       </Spiegazione>
 
+      {foto.isError && foto.data === undefined && <ErroreConRiprova errore={foto.error} onRiprova={() => void foto.refetch()} />}
+
       <Button variant="outline" disabled={inCorso || !conFile} onClick={() => void scarica()}>Scarica le foto (.zip)</Button>
 
       {conFile === 0 && <p role="status" className="text-sm text-grafite-tenue">Non ci sono foto da scaricare.</p>}
@@ -66,9 +69,9 @@ export function ArchivioFoto({ espId, config }: { espId: string; config: ConfigE
       {scaricate !== undefined && !inCorso && (
         <>
           <p role="status" className="text-sm text-grafite">
-            {`Download completato: ${scaricate.length === 1 ? '1 foto' : `${scaricate.length} foto`} nel .zip.`}
+            {`Download completato: ${scaricate.foto === 1 ? '1 foto' : `${scaricate.foto} foto`} nel .zip (${nomeFile}).`}
           </p>
-          <LiberaSpazio espId={espId} nomeEsperimento={config.esperimento.nome} quante={scaricate.length} />
+          <LiberaSpazio espId={espId} nomeEsperimento={config.esperimento.nome} quante={scaricate.ids.length} nomeFile={scaricate.nomeFile} />
         </>
       )}
     </div>

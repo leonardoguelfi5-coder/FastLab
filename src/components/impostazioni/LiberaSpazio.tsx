@@ -18,7 +18,7 @@ import { liberaSpazio } from './archivioFoto'
  * Se si ferma a metà il dialogo resta aperto con l'errore e «Riprova»: il nome è già scritto e un nuovo giro porta a
  * termine il resto (vedi `archiviaFileFoto`).
  */
-export function LiberaSpazio({ espId, nomeEsperimento, quante }: { espId: string; nomeEsperimento: string; quante: number }) {
+export function LiberaSpazio({ espId, nomeEsperimento, quante, nomeFile }: { espId: string; nomeEsperimento: string; quante: number; nomeFile: string }) {
   const queryClient = useQueryClient()
   const [aperta, setAperta] = useState(false)
   const [scritto, setScritto] = useState('')
@@ -56,7 +56,7 @@ export function LiberaSpazio({ espId, nomeEsperimento, quante }: { espId: string
             <DialogHeader>
               <DialogTitle>Liberare lo spazio?</DialogTitle>
               <DialogDescription>
-                {`Toglie dall'app i file di ${quante === 1 ? '1 foto' : `${quante} foto`}, quelle del .zip appena scaricato: nella galleria restano come segnaposto «Archiviata nel .zip». Le foto aggiunte dopo il download non si toccano. Non si può annullare: controlla di avere salvato il .zip.`}
+                {`Toglie dall'app i file di ${quante === 1 ? '1 foto' : `${quante} foto`}, quelle del .zip appena scaricato: nella galleria restano come segnaposto «Archiviata nel .zip». Le foto aggiunte dopo il download non si toccano. Non si può annullare: controlla di avere salvato il file ${nomeFile}.`}
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-1.5">

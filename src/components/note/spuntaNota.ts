@@ -19,8 +19,12 @@ const inCorso = new Set<string>()
 export async function spuntaNota(queryClient: QueryClient, espId: string, nota: Nota): Promise<void> {
   if (inCorso.has(nota.id)) return
   // Un promemoria già spuntato da Oggi, con il suo "Annulla" ancora aperto: il salvataggio vero parte allo scadere, e
-  // una seconda spunta da qui (che lo riaprirebbe) verrebbe scavalcata. Si decide con l'"Annulla" di quel toast.
-  if (inEliminazione(chiaveSpuntaPromemoria(nota.id))) return
+  // una seconda spunta da qui (che lo riaprirebbe) verrebbe scavalcata. Si decide con l'"Annulla" di quel toast, e un
+  // tocco che non fa nulla in silenzio sembrerebbe rotto: si dice perché.
+  if (inEliminazione(chiaveSpuntaPromemoria(nota.id))) {
+    toast('Il promemoria è appena stato segnato fatto: per riaprirlo tocca «Annulla».')
+    return
+  }
   inCorso.add(nota.id)
   const chiave = chiavi.note(espId)
   const fatto = nota.fatto_il === null

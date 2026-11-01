@@ -15,11 +15,13 @@ import { EditorNota } from '@/components/note/EditorNota'
 import { eliminaNotaConAnnulla, senzaNoteInEliminazione } from '@/components/note/eliminaNotaConAnnulla'
 import { RigaNota } from '@/components/note/RigaNota'
 import { spuntaNota } from '@/components/note/spuntaNota'
+import { chiaveSpuntaPromemoria } from '@/components/note/spuntaPromemoriaConAnnulla'
 import {
   conData, daRiaprire, firma, notaDaStato, problemiNota, statoDaNota, statoVuoto, type StatoNota,
 } from '@/components/note/statoNota'
 import type { ConfigEsperimento, Nota } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
+import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
 import { leggiArrivoDiario, percorsoHome, type ArrivoDiario } from '@/lib/percorsi'
@@ -225,6 +227,14 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     // Il giorno di adesso, non quello di quando si è aperto l'editor: a mezzanotte "futura" può non esserlo più.
     const adesso = oggiLocale()
     const nuova = notaDaStato(id, modifica.stato, esistente, adesso)
+    // Il promemoria è stato segnato fatto da Oggi e il suo "Annulla" è ancora aperto: il salvataggio vero partirebbe
+    // dopo e scavalcherebbe la riapertura, perdendola. Si ferma qui, con la bozza com'è.
+    if (daRiaprire(esistente, nuova, adesso) && inEliminazione(chiaveSpuntaPromemoria(id))) {
+      setErrore('Il promemoria è appena stato segnato fatto: tocca «Annulla» nel messaggio o riprova tra qualche secondo.')
+      inCorso.current = false
+      setOccupato(false)
+      return
+    }
     try {
       // Un promemoria già fatto, spostato in avanti, torna da fare: prima la spunta, poi la nota.
       if (daRiaprire(esistente, nuova, adesso)) await segnaFatto(espId, id, false)

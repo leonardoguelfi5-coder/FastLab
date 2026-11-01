@@ -24,7 +24,7 @@ vi.mock('@/api/configurazione', () => ({
 }))
 vi.mock('@/api/foto', () => ({
   listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
-  archiviaFileFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600,
+  archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/api/catalogo', () => ({
   listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),

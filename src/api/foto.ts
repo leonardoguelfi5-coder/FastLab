@@ -195,6 +195,9 @@ export async function spazioFoto(espId: string): Promise<{ esperimento: number; 
  * I nomi dei file delle foto nella cartella di un esperimento (`<uuid>.jpg`), letti a pagine. Contano solo i nomi
  * `<uuid>.jpg` (le foto): le sottocartelle (voci senza id) e altri file, come il segnaposto che il servizio può creare in
  * una cartella vuota, non sono nostri e non si toccano. Lancia se l'elenco fallisce.
+ * L'elenco è a pagine e non è un'istantanea: una cancellazione concorrente durante la lettura può spostare i nomi tra
+ * una pagina e l'altra e far saltare un file, che resterebbe nello Storage senza che nessuno lo sappia (spazio
+ * occupato, nessun dato perso: la foto è nello zip e la sua riga la segna il giro dopo).
  */
 async function nomiFileFoto(cartella: string): Promise<Set<string>> {
   const nomi = new Set<string>()
@@ -206,6 +209,16 @@ async function nomiFileFoto(cartella: string): Promise<Set<string>> {
     if (pagina.length < PERCORSI_PER_RICHIESTA) break
   }
   return nomi
+}
+
+/**
+ * I nomi (`<uuid>.jpg`) dei file delle foto che ci sono ora nello Storage per un esperimento. Serve all'archivio: una
+ * foto non archiviata senza file (un giro di «Libera lo spazio» interrotto tra la rimozione e l'update) non si può
+ * scaricare e non deve bloccare lo zip. Lancia se l'id non è un uuid o se l'elenco fallisce.
+ */
+export async function fileFotoPresenti(espId: string): Promise<Set<string>> {
+  if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
+  return nomiFileFoto(espId.toLowerCase())
 }
 
 /**
@@ -235,17 +248,23 @@ export async function eliminaFileEsperimento(espId: string): Promise<number> {
   return tolti
 }
 
-/** Segna archiviate (con la data di adesso) le righe date: `archiviata` e `archiviata_il` insieme, come impone il database. Dice quante ne ha toccate. */
+/**
+ * Segna archiviate (con la data di adesso) le righe date: `archiviata` e `archiviata_il` insieme, come impone il
+ * database. A gruppi da 100: il filtro `in` va nell'URL e non può crescere senza limite. Dice quante ne ha toccate.
+ */
 async function segnaArchiviate(espId: string, ids: string[], adesso: string): Promise<number> {
-  if (ids.length === 0) return 0
-  const { data, error } = await supabase
-    .from('foto')
-    .update({ archiviata: true, archiviata_il: adesso })
-    .eq('esperimento_id', espId)
-    .in('id', ids)
-    .select('id')
-  controllaRighe({ data, error })
-  return data?.length ?? 0
+  let toccate = 0
+  for (let i = 0; i < ids.length; i += PERCORSI_PER_RICHIESTA) {
+    const { data, error } = await supabase
+      .from('foto')
+      .update({ archiviata: true, archiviata_il: adesso })
+      .eq('esperimento_id', espId)
+      .in('id', ids.slice(i, i + PERCORSI_PER_RICHIESTA))
+      .select('id')
+    controllaRighe({ data, error })
+    toccate += data?.length ?? 0
+  }
+  return toccate
 }
 
 /**
@@ -254,7 +273,7 @@ async function segnaArchiviate(espId: string, ids: string[], adesso: string): Pr
  * un'altra che ha il file nella stessa cartella, non si tocca. Dice quante righe ha segnato.
  *
  * Coerenza tra file e righe, a gruppi da 100:
- * 1. Prima si elenca la cartella. Una foto il cui file non c'è già (un giro precedente l'aveva tolto ma la riga non si
+ * 1. Prima si elenca la cartella (l'elenco non è un'istantanea: vedi `nomiFileFoto`). Una foto il cui file non c'è già (un giro precedente l'aveva tolto ma la riga non si
  *    era aggiornata: errore di rete tra la rimozione e l'update) si segna subito archiviata. Per le foto date il file
  *    c'è stato di sicuro (è nello zip), quindi la sua assenza non può che essere una rimozione nostra.
  * 2. Poi per ogni gruppo si tolgono i file e SOLO per i nomi che `remove` restituisce, cioè i file davvero rimossi, si

@@ -2263,7 +2263,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     await utente.click(pulsante('Salva e vai alla #36'))
     await pianta('36')
 
-    expect(toast.error).toHaveBeenCalledWith('1 foto non è stata caricata: aggiungila di nuovo.', PERSISTENTE)
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('1 foto non è stata caricata: aggiungila di nuovo.', PERSISTENTE))
   })
 
   it('con il giro che continua il pulsante c\'è anche sulla pianta dopo', async () => {

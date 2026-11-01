@@ -117,6 +117,13 @@ describe('creaCsvFoto', () => {
     expect(righe[2]).toBe('2026-10-28;;;;;sì')
   })
 
+  it('una foto non archiviata il cui file non c\'è più è segnata «file assente», senza nome del file', () => {
+    const csv = creaCsvFoto([foto('a'), foto('b')], new Map([['a', 'x.jpg']]), contesto)
+    const righe = csv.slice(1).split('\r\n')
+    expect(righe[1]).toBe('2026-10-28;;;;x.jpg;')
+    expect(righe[2]).toBe('2026-10-28;;;;;file assente')
+  })
+
   it('nel CSV ci sono tutte le foto date, nell\'ordine in cui arrivano', () => {
     const csv = creaCsvFoto([foto('a', { data: '2026-10-01' }), foto('b', { data: '2026-10-05' })], new Map(), contesto)
     expect(csv.slice(1).split('\r\n').slice(1).map(r => r.slice(0, 10))).toEqual(['2026-10-01', '2026-10-05'])

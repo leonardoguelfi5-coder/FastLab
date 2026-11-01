@@ -75,8 +75,9 @@ export interface ContestoCsvFoto {
 
 /**
  * Il `foto.csv` dello zip: una riga per foto, nell'ordine dato, con data, pianta, trattamento, nota (accorciata), nome del
- * file nello zip e `sì` se la foto era già archiviata (il suo file non c'è e quindi non è nello zip: `nomi` non la
- * contiene). Per Excel italiano: separatore `;`, BOM UTF-8 davanti (senza, gli accenti si rovinano) e righe chiuse da CRLF.
+ * file nello zip e, se manca, il perché: `sì` se la foto era già archiviata, `file assente` se non lo è ma il suo file
+ * non c'è più nello Storage (un giro di «Libera lo spazio» interrotto). Quelle foto non sono nello zip: `nomi` non le
+ * contiene. Per Excel italiano: separatore `;`, BOM UTF-8 davanti (senza, gli accenti si rovinano) e righe chiuse da CRLF.
  */
 export function creaCsvFoto(foto: Foto[], nomi: Map<string, string>, contesto: ContestoCsvFoto): string {
   const pianta = new Map(contesto.piante.map(p => [p.id, p]))
@@ -92,7 +93,7 @@ export function creaCsvFoto(foto: Foto[], nomi: Map<string, string>, contesto: C
       (p && trattamento.get(p.trattamento_id)) ?? '',
       testoNota === undefined ? '' : riassuntoNota(testoNota),
       nomi.get(f.id) ?? '',
-      f.archiviata ? 'sì' : '',
+      f.archiviata ? 'sì' : nomi.has(f.id) ? '' : 'file assente',
     ])
   }
   return `${BOM}${righe.map(r => r.map(campoCsv).join(';')).join('\r\n')}`

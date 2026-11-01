@@ -31,7 +31,9 @@ export function spuntaPromemoriaConAnnulla(queryClient: QueryClient, espId: stri
       imposta(nota.fatto_il)
       void queryClient.invalidateQueries({ queryKey: chiave })
     },
-    elimina: () => segnaFatto(espId, nota.id, true),
+    // Dopo il salvataggio la cache si riscrive come "fatta": una rilettura arrivata durante i 5 secondi (prima del
+    // salvataggio) l'avrebbe riportata da fare, e il promemoria ricomparirebbe in Oggi finché non si rilegge di nuovo.
+    elimina: async () => { await segnaFatto(espId, nota.id, true); imposta(new Date().toISOString()) },
     dopo: () => void queryClient.invalidateQueries({ queryKey: chiave }),
   })
 }
