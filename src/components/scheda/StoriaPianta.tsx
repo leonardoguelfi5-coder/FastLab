@@ -85,7 +85,6 @@ export function StoriaPianta({ espId, config, pianta, misure }: StoriaPiantaProp
   const fotoDella = foto.data
     ? fotoDellaPianta(foto.data.filter(f => !inEliminazione(chiaveEliminazioneFoto(f.id))), pianta.id)
     : []
-  // Gli stessi percorsi della sezione «Foto» della scheda: una sola richiesta di URL firmati.
   const urls = useUrlFoto(fotoDella.filter(f => !f.archiviata).map(f => f.percorso)).data
   const giorni = storiaPianta(misure, dellaPianta, fotoDella)
   const strumenti = useMemo(() => new Map(config.strumenti.map(p => [p.id, p])), [config.strumenti])
@@ -95,6 +94,9 @@ export function StoriaPianta({ espId, config, pianta, misure }: StoriaPiantaProp
       <h3 id={id} className="text-label text-grafite-tenue uppercase">Storia</h3>
       {note.isError && note.data === undefined && (
         <ErroreConRiprova errore={note.error} onRiprova={() => void note.refetch()} />
+      )}
+      {foto.isError && foto.data === undefined && (
+        <ErroreConRiprova errore={foto.error} onRiprova={() => void foto.refetch()} />
       )}
       {giorni.length === 0 ? (
         <p className="text-grafite-tenue">Ancora nessuna misura per questa pianta.</p>

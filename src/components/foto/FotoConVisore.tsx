@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { descriviFoto, raggruppaPerData } from '@/domain/foto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
@@ -18,7 +18,9 @@ interface MiniaturaProps {
  * non ha il file: segnaposto, e l'URL non si chiede. L'etichetta della pianta, se c'è, è in Geist Mono in un angolo.
  */
 function Miniatura({ foto, config, url, onApri }: MiniaturaProps) {
-  const [rotta, setRotta] = useState(false)
+  // L'URL che non si è caricato: un URL rinnovato riparte da capo (un file che prima non c'era può esserci ora).
+  const [urlRotto, setUrlRotto] = useState<string | null>(null)
+  const rotta = url !== undefined && urlRotto === url
   const pianta = foto.pianta_id === null ? undefined : config.piante.find(p => p.id === foto.pianta_id)
   return (
     <li>
@@ -31,7 +33,7 @@ function Miniatura({ foto, config, url, onApri }: MiniaturaProps) {
         {foto.archiviata ? (
           <span className="flex size-full items-center justify-center p-1 text-center text-sm text-grafite-tenue">Archiviata nel .zip</span>
         ) : url && !rotta ? (
-          <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setRotta(true)} className="size-full object-cover" />
+          <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setUrlRotto(url)} className="size-full object-cover" />
         ) : (
           <span aria-hidden className="flex size-full items-center justify-center p-1 text-center text-sm text-grafite-tenue">{rotta ? 'Non disponibile' : ''}</span>
         )}
@@ -64,6 +66,7 @@ interface FotoConVisoreProps {
 export function FotoConVisore({ espId, config, foto, urls, perGiorno = false, nome }: FotoConVisoreProps) {
   const queryClient = useQueryClient()
   const [apertaId, setApertaId] = useState<string | null>(null)
+  const ultimaEliminata = useRef(false)
 
   const gruppi = useMemo(() => (perGiorno ? raggruppaPerData(foto) : null), [foto, perGiorno])
   // La fila su cui scorre il visore è quella che si vede, giorno dopo giorno.
@@ -73,6 +76,7 @@ export function FotoConVisore({ espId, config, foto, urls, perGiorno = false, no
 
   function elimina(f: Foto) {
     const vicina = fila[indice + 1] ?? fila[indice - 1] ?? null
+    ultimaEliminata.current = vicina === null
     setApertaId(vicina?.id ?? null)
     eliminaFotoConAnnulla(queryClient, espId, f)
   }
@@ -80,10 +84,16 @@ export function FotoConVisore({ espId, config, foto, urls, perGiorno = false, no
   const griglia = (dentro: Foto[], etichetta: string) => (
     <ul aria-label={etichetta} className="grid grid-cols-3 gap-1">
       {dentro.map(f => (
-        <Miniatura key={f.id} foto={f} config={config} url={urls?.get(f.percorso)} onApri={() => setApertaId(f.id)} />
+        <Miniatura key={f.id} foto={f} config={config} url={urls?.get(f.percorso)} onApri={() => { ultimaEliminata.current = false; setApertaId(f.id) }} />
       ))}
     </ul>
   )
+
+  // Eliminata l'ultima foto il visore si chiude e la miniatura da cui si era partiti sparisce: il fuoco va al pulsante
+  // «Aggiungi foto» della pagina, che c'è sempre, e non sul body.
+  function fuocoDopoVisore(): HTMLElement | null {
+    return ultimaEliminata.current ? document.querySelector<HTMLElement>('[data-aggiungi-foto]') : null
+  }
 
   return (
     <>
@@ -111,6 +121,7 @@ export function FotoConVisore({ espId, config, foto, urls, perGiorno = false, no
           onSuccessiva={indice < fila.length - 1 ? () => setApertaId(fila[indice + 1].id) : null}
           onChiudi={() => setApertaId(null)}
           onElimina={() => elimina(aperta)}
+          fuocoDopo={fuocoDopoVisore}
         />
       )}
     </>

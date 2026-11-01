@@ -213,7 +213,6 @@ function MisuraCaricata({
             <PulsanteAggiungiFoto carica={carica} variante="icona" nome="Aggiungi foto a questa pianta" />
           </div>
         </div>
-        <StatoCaricamentoFoto carica={carica} />
         <VaiAllaPianta espId={espId} config={config} strumentoId={strumento.id} piantaId={pianta.id} conferma={conferma} />
         <BannerData espId={espId} conferma={conferma} />
       </div>
@@ -238,6 +237,10 @@ function MisuraCaricata({
           onModifiche={onModifiche}
         />
       )}
+
+      {/* Sotto il modulo, non nell'intestazione: una riga che compare mentre si scrivono i valori sposterebbe i campi sotto il
+          dito. Un errore si nota dal segno sul 📷 e dal toast se si lascia la pagina; qui c'è il dettaglio con «Riprova». */}
+      <StatoCaricamentoFoto carica={carica} />
     </>
   )
 }

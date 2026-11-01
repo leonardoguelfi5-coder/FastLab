@@ -716,37 +716,28 @@ describe('SchedaPianta: misura questa pianta', () => {
 })
 
 describe('SchedaPianta: le foto', () => {
-  it('ha la sezione «Foto» con le miniature della pianta, e solo le sue', async () => {
-    fotoDb = [
-      fotoDi('a', { pianta_id: pianta(35).id }), fotoDi('b', { pianta_id: pianta(35).id, data: '2026-10-20' }),
-      fotoDi('c', { pianta_id: pianta(1).id }), fotoDi('d'),
-    ]
+  const sezioneFoto = () => screen.findByRole('region', { name: 'Foto' })
+
+  it('la sezione «Foto» ha solo «Aggiungi foto»: le miniature stanno nella Storia, non due volte', async () => {
+    fotoDb = [fotoDi('a', { pianta_id: pianta(35).id }), fotoDi('b', { pianta_id: pianta(35).id, data: '2026-10-20' })]
     apri('35')
-    const sezione = await screen.findByRole('region', { name: 'Foto' })
-    const miniature = await within(sezione).findAllByRole('button', { name: /^Foto del / })
-    expect(miniature.map(m => m.getAttribute('aria-label'))).toEqual(['Foto del 27/10/2026, pianta 35', 'Foto del 20/10/2026, pianta 35'])
-    await waitFor(() => expect(urlFoto).toHaveBeenCalledWith(['E/a.jpg', 'E/b.jpg']))
+    const sezione = await sezioneFoto()
+    expect(within(sezione).getByRole('button', { name: 'Aggiungi foto' })).toBeInTheDocument()
+    // Le miniature ci sono nella Storia...
+    const storia = within(await screen.findByRole('region', { name: 'Storia' }))
+    expect(await storia.findAllByRole('button', { name: /^Foto del / })).toHaveLength(2)
+    // ...e nella sezione «Foto» no, né l\'elenco né il testo di una galleria vuota.
+    expect(within(sezione).queryByRole('button', { name: /^Foto del / })).not.toBeInTheDocument()
+    expect(within(sezione).queryByRole('list')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^Foto del / })).toHaveLength(2)
+    // Non c\'è un filtro per una pianta precisa nella galleria: niente collegamento che porterebbe alle foto di altre piante.
+    expect(within(sezione).queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('senza foto lo dice', async () => {
-    apri('35')
-    const sezione = await screen.findByRole('region', { name: 'Foto' })
-    expect(await within(sezione).findByText('Ancora nessuna foto per questa pianta.')).toBeInTheDocument()
-  })
-
-  it('toccando una miniatura si apre il visore', async () => {
-    fotoDb = [fotoDi('a', { pianta_id: pianta(35).id })]
+  it('«Aggiungi foto» carica le foto collegate a questa pianta e compaiono nella Storia', async () => {
     const utente = userEvent.setup()
     apri('35')
-    const sezione = await screen.findByRole('region', { name: 'Foto' })
-    await utente.click(await within(sezione).findByRole('button', { name: 'Foto del 27/10/2026, pianta 35' }))
-    expect(screen.getByRole('dialog')).toHaveAccessibleName('Foto 1 di 1')
-  })
-
-  it('«Aggiungi foto» carica le foto collegate a questa pianta e le mostra', async () => {
-    const utente = userEvent.setup()
-    apri('35')
-    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    const sezione = await sezioneFoto()
     await utente.click(within(sezione).getByRole('button', { name: 'Aggiungi foto' }))
     expect(screen.getByRole('button', { name: 'Scatta' })).toBeInTheDocument()
     fireEvent.change(document.querySelector('input[type="file"][capture]')!, { target: { files: [new File(['x'], 'a.jpg', { type: 'image/jpeg' })] } })
@@ -754,18 +745,27 @@ describe('SchedaPianta: le foto', () => {
     await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
     expect(vi.mocked(caricaFoto).mock.calls[0][0]).toBe('E')
     expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ piantaId: pianta(35).id, notaId: null })
-    expect(await within(sezione).findByRole('button', { name: 'Foto del 28/10/2026, pianta 35' })).toBeInTheDocument()
+    const storia = within(await screen.findByRole('region', { name: 'Storia' }))
+    expect(await storia.findByRole('button', { name: 'Foto del 28/10/2026, pianta 35' })).toBeInTheDocument()
   })
 
-  it('se le foto non si leggono lo dice con «Riprova», senza toccare il resto della scheda', async () => {
-    vi.mocked(listaFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+  it('lo stato del caricamento sta nella sezione, con l\'errore e «Riprova»', async () => {
+    vi.mocked(caricaFoto).mockRejectedValueOnce(new Error('Il server non risponde.'))
     const utente = userEvent.setup()
     apri('35')
-    const sezione = await screen.findByRole('region', { name: 'Foto' })
-    expect(await within(sezione).findByRole('alert')).toHaveTextContent('Il server non risponde')
-    expect(await pronta()).toBeInTheDocument()
-    await utente.click(within(sezione).getByRole('button', { name: 'Riprova' }))
-    expect(await within(sezione).findByText('Ancora nessuna foto per questa pianta.')).toBeInTheDocument()
+    const sezione = await sezioneFoto()
+    fireEvent.change(document.querySelector('input[type="file"][capture]')!, { target: { files: [new File(['x'], 'rotta.jpg', { type: 'image/jpeg' })] } })
+    expect(await within(sezione).findByRole('alert')).toHaveTextContent('Il server non risponde.')
+    await utente.click(within(sezione).getByRole('button', { name: 'Riprova rotta.jpg' }))
+    await waitFor(() => expect(within(sezione).queryByRole('alert')).not.toBeInTheDocument())
+    expect(caricaFoto).toHaveBeenCalledTimes(2)
+  })
+
+  it('c\'è anche se le foto non si leggono', async () => {
+    vi.mocked(listaFoto).mockRejectedValue(new TypeError('Failed to fetch'))
+    apri('35')
+    const sezione = await sezioneFoto()
+    expect(within(sezione).getByRole('button', { name: 'Aggiungi foto' })).toBeInTheDocument()
   })
 })
 
@@ -859,8 +859,10 @@ describe('SchedaPianta: note e foto nella storia', () => {
     apri('35')
     await pronta()
     await waitFor(() => expect(listaFoto).toHaveBeenCalled())
-    await within(await screen.findByRole('region', { name: 'Foto' })).findByText('Ancora nessuna foto per questa pianta.')
+    await waitFor(() => expect(vi.mocked(listaFoto).mock.results.length).toBeGreaterThan(0))
+    await act(async () => { await Promise.all(vi.mocked(listaFoto).mock.results.map(r => r.value)) })
     expect(within(await storia()).queryByRole('button', { name: /^Foto del / })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Foto del / })).not.toBeInTheDocument()
   })
 
   it('le note e le foto in attesa di eliminazione non compaiono, nemmeno se gli elenchi vengono riletti', async () => {
@@ -897,6 +899,20 @@ describe('SchedaPianta: note e foto nella storia', () => {
     expect(dentro.getByRole('link', { name: /SPAD/ })).toBeInTheDocument()
     await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
     expect(await dentro.findByText('Arrivata dopo')).toBeInTheDocument()
+    expect(dentro.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('se le foto non si leggono lo dice con «Riprova» e le misure restano; poi compaiono', async () => {
+    archivio = [misura(35, 'SPAD', { SPAD: [38.1] }, '2026-10-21', '09:00')]
+    vi.mocked(listaFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    fotoDb = [fotoDi('f1', { data: '2026-10-21', pianta_id: pianta(35).id })]
+    const utente = userEvent.setup()
+    apri('35')
+    const dentro = within(await storia())
+    expect(await dentro.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(dentro.getByRole('link', { name: /SPAD/ })).toBeInTheDocument()
+    await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
+    expect(await dentro.findByRole('button', { name: 'Foto del 21/10/2026, pianta 35' })).toBeInTheDocument()
     expect(dentro.queryByRole('alert')).not.toBeInTheDocument()
   })
 

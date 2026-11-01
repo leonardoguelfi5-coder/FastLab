@@ -66,15 +66,19 @@ export function PulsanteAggiungiFoto({ carica, variante = 'secondario', nome = '
   return (
     <div ref={radice} className={cn('relative', variante === 'principale' && 'w-full')}>
       {variante === 'icona' ? (
-        <Button type="button" variant="quiet" size="icon" aria-label={nome} aria-expanded={aperto} onClick={() => setAperto(v => !v)}>
+        <Button type="button" variant="quiet" size="icon" className="relative" aria-label={nome} aria-expanded={aperto} data-aggiungi-foto="" onClick={() => setAperto(v => !v)}>
           <span aria-hidden className="text-[22px] leading-none">📷</span>
+          {/* Lo stato dei caricamenti sta altrove (sotto il modulo): una foto da riprovare si nota anche da qui, con un segno e non solo con il colore. */}
+          {carica.elementi.some(e => e.stato === 'errore') && (
+            <span aria-hidden className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-errore font-mono text-[11px] leading-none text-foglio">!</span>
+          )}
         </Button>
       ) : variante === 'principale' ? (
-        <Button type="button" size="lg" className="w-full" aria-expanded={aperto} onClick={() => setAperto(v => !v)}>
+        <Button type="button" size="lg" className="w-full" aria-expanded={aperto} data-aggiungi-foto="" onClick={() => setAperto(v => !v)}>
           + {nome}
         </Button>
       ) : (
-        <Button type="button" variant="outline" aria-expanded={aperto} onClick={() => setAperto(v => !v)}>
+        <Button type="button" variant="outline" aria-expanded={aperto} data-aggiungi-foto="" onClick={() => setAperto(v => !v)}>
           {nome}
         </Button>
       )}

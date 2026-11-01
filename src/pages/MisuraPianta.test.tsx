@@ -2214,11 +2214,17 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
 
     expect(await screen.findByText('rotta.jpg')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('Il server non risponde.')
+    // Lo stato sta sotto il modulo (niente campi che si spostano) e una foto da riprovare si nota dal segno sul 📷.
+    const elenco = screen.getByRole('list', { name: 'Foto da caricare' })
+    expect(campo('Temp aria').compareDocumentPosition(elenco) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(elenco.closest('[data-slot="barra-azioni"]')).toBeNull()
+    expect(foto()).toHaveTextContent('!')
     expect(campo('Temp aria').value).toBe('24,5')
     expect(pulsante('Salva')).toBeEnabled()
     await utente.click(screen.getByRole('button', { name: 'Riprova rotta.jpg' }))
     await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(foto()).not.toHaveTextContent('!')
   })
 
   it('non consuma la finestra di 500 ms del «Salva comunque»: un tocco troppo vicino all\'avviso resta ignorato', async () => {
@@ -2242,6 +2248,22 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     await utente.click(pulsante('Salva comunque'))
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     expect(salvate()[0].valori[par('Temp aria').id]).toEqual([45])
+  })
+
+  it('passando alla pianta dopo con una foto fallita, un toast che resta dice che va aggiunta di nuovo', async () => {
+    vi.mocked(caricaFoto).mockRejectedValueOnce(new Error('Il server non risponde.'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    scegliFile('rotta.jpg')
+    await screen.findByRole('button', { name: 'Riprova rotta.jpg' })
+
+    piuTardi()
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await pianta('36')
+
+    expect(toast.error).toHaveBeenCalledWith('1 foto non è stata caricata: aggiungila di nuovo.', PERSISTENTE)
   })
 
   it('con il giro che continua il pulsante c\'è anche sulla pianta dopo', async () => {

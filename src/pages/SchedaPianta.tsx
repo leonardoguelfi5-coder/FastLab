@@ -74,8 +74,8 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
         Aggiungi nota
       </Link>
 
-      {/* Le foto hanno la loro lettura: non aspettano le misure e un loro errore non nasconde la scheda. */}
-      <FotoPianta espId={espId} config={config} piantaId={pianta.id} />
+      {/* Solo l'aggiunta: le foto della pianta stanno nella Storia. Non aspetta le misure. */}
+      <FotoPianta espId={espId} piantaId={pianta.id} />
 
       <DatiPianta config={config} pianta={pianta} />
 

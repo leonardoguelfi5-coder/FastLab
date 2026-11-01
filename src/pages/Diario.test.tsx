@@ -833,6 +833,31 @@ describe('Diario: le foto della nota', () => {
     expect(Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))).toEqual(bozza)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  describe('una foto in eliminazione', () => {
+    beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+    afterEach(async () => { await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS * 2)) })
+
+    it('non riappare nella nota se l\'elenco viene riletto dal server nei 5 secondi', async () => {
+      db = [nota('a', { testo: 'Da correggere' })]
+      fotoDb = [fotoDi('nota-f1', { nota_id: 'a' }), fotoDi('nota-f2', { nota_id: 'a', data: '2026-10-20' })]
+      const { utente, client } = await apriModifica()
+      const miniature = await within(sezione()).findAllByRole('button', { name: /^Foto del / })
+      expect(miniature).toHaveLength(2)
+
+      await utente.click(miniature[0])
+      await utente.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Elimina foto' }))
+      await utente.keyboard('{Escape}')
+      expect(within(sezione()).getAllByRole('button', { name: /^Foto del / })).toHaveLength(1)
+
+      // Il server ha ancora le due foto. Si aspetta che la rilettura sia nella cache e che la pagina si sia ridisegnata.
+      await act(async () => { await client.invalidateQueries({ queryKey: ['foto', 'E'] }) })
+      await waitFor(() => expect(client.getQueryData<unknown[]>(['foto', 'E'])).toHaveLength(2))
+      await act(() => vi.advanceTimersByTimeAsync(100))
+      expect(within(sezione()).getAllByRole('button', { name: /^Foto del / })).toHaveLength(1)
+      expect(within(sezione()).queryByRole('button', { name: 'Foto del 27/10/2026' })).not.toBeInTheDocument()
+    })
+  })
 })
 
 describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {

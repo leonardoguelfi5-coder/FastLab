@@ -72,7 +72,19 @@ export function useCaricaFoto(espId: string, collegamento: { piantaId?: string |
   const conteggio = useRef({ totale: 0, fatte: 0, salvate: 0 })
   useEffect(() => {
     montata.current = true
-    return () => { montata.current = false }
+    return () => {
+      montata.current = false
+      // Le foto già fallite (la riga con «Riprova») spariscono con la pagina, ad esempio con «Salva e vai alla #36»: nessuno
+      // le vedrebbe più. Un toast che resta dice quante sono e che vanno aggiunte di nuovo. Quelle ancora in coda o in
+      // corso si portano a termine, e se falliscono avvisa il toast della singola foto.
+      const perse = elenco.current.filter(e => e.stato === 'errore').length
+      if (perse > 0) {
+        toast.error(
+          perse === 1 ? '1 foto non è stata caricata: aggiungila di nuovo.' : `${perse} foto non sono state caricate: aggiungile di nuovo.`,
+          OPZIONI_ERRORE_TARDIVO,
+        )
+      }
+    }
   }, [])
 
   const scrivi = useCallback((fai: (prima: ElementoFoto[]) => ElementoFoto[]) => {

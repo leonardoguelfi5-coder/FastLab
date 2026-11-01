@@ -367,6 +367,37 @@ describe('Foto: il visore', () => {
     expect(document.body.style.overflow).toBe('')
   })
 
+  it('un URL rinnovato dopo un errore di caricamento riprova a mostrare l\'immagine', async () => {
+    vi.mocked(urlFoto).mockImplementationOnce(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}?firma=scaduta`])))
+    const { utente, client } = await apriVisore()
+    const immagine = await waitFor(() => {
+      const i = nelVisore().getByRole('img')
+      expect(i).toHaveAttribute('src', 'https://storage/E/b.jpg?firma=scaduta')
+      return i
+    })
+    fireEvent.error(immagine)
+    expect(await nelVisore().findByText('Foto non disponibile.')).toBeInTheDocument()
+    expect(nelVisore().queryByRole('img')).not.toBeInTheDocument()
+
+    // Gli URL si rinnovano: la stessa foto, con la firma nuova, si mostra di nuovo.
+    await act(async () => { await client.invalidateQueries({ queryKey: ['urlFoto'] }) })
+    await waitFor(() => expect(nelVisore().getByRole('img')).toHaveAttribute('src', 'https://storage/E/b.jpg?firma=1'))
+    expect(utente).toBeTruthy()
+  })
+
+  it('anche una miniatura rotta si rimostra con l\'URL rinnovato', async () => {
+    vi.mocked(urlFoto).mockImplementationOnce(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}?firma=scaduta`])))
+    const { client } = apri()
+    await attesa()
+    await waitFor(() => expect(document.querySelectorAll('img')).toHaveLength(3))
+    fireEvent.error(document.querySelectorAll('img')[0])
+    expect(await screen.findByText('Non disponibile')).toBeInTheDocument()
+
+    await act(async () => { await client.invalidateQueries({ queryKey: ['urlFoto'] }) })
+    await waitFor(() => expect(document.querySelectorAll('img')).toHaveLength(3))
+    expect(screen.queryByText('Non disponibile')).not.toBeInTheDocument()
+  })
+
   it('una foto archiviata mostra il segnaposto e non ha immagine', async () => {
     db = [foto('z', { archiviata: true })]
     const r = apri()
@@ -377,34 +408,103 @@ describe('Foto: il visore', () => {
   })
 
   describe('la data', () => {
-    it('è modificabile e si salva con «Salva data»', async () => {
-      const { utente, invalida } = await apriVisore()
-      const campo = nelVisore().getByLabelText('Data') as HTMLInputElement
-      expect(campo.value).toBe('2026-10-28')
-      expect(nelVisore().queryByRole('button', { name: 'Salva data' })).not.toBeInTheDocument()
+    // Il salvataggio parte da solo dopo una pausa: servono i timer finti (che avanzano anche da soli, per le promesse).
+    beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+    afterEach(async () => { await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS)) })
+    const pausa = () => act(() => vi.advanceTimersByTimeAsync(1000))
+    const scrivi = (valore: string) => fireEvent.change(nelVisore().getByLabelText('Data'), { target: { value: valore } })
 
-      fireEvent.change(campo, { target: { value: '2026-10-25' } })
-      await utente.click(nelVisore().getByRole('button', { name: 'Salva data' }))
+    it('si salva da sola dopo una pausa, senza pulsante, e la foto mostra la data nuova', async () => {
+      const { invalida } = await apriVisore()
+      expect((nelVisore().getByLabelText('Data') as HTMLInputElement).value).toBe('2026-10-28')
+      expect(nelVisore().queryByRole('button', { name: /Salva data/ })).not.toBeInTheDocument()
+
+      scrivi('2026-10-25')
+      expect(aggiornaFoto).not.toHaveBeenCalled()
+      await pausa()
 
       await waitFor(() => expect(aggiornaFoto).toHaveBeenCalledWith('E', 'b', { data: '2026-10-25' }))
+      expect(aggiornaFoto).toHaveBeenCalledTimes(1)
       expect(invalida).toHaveBeenCalledWith({ queryKey: ['foto', 'E'] })
-      await waitFor(() => expect(nelVisore().queryByRole('button', { name: 'Salva data' })).not.toBeInTheDocument())
-      expect(nelVisore().getByText('25/10/2026')).toBeInTheDocument()
+      await waitFor(() => expect(nelVisore().getByText('25/10/2026')).toBeInTheDocument())
     })
 
-    it('una data vuota non si salva', async () => {
+    it('più modifiche ravvicinate salvano solo l\'ultima', async () => {
       await apriVisore()
-      fireEvent.change(nelVisore().getByLabelText('Data'), { target: { value: '' } })
-      expect(nelVisore().getByRole('button', { name: 'Salva data' })).toBeDisabled()
+      scrivi('2026-10-24')
+      await act(() => vi.advanceTimersByTimeAsync(300))
+      scrivi('2026-10-25')
+      await pausa()
+      await waitFor(() => expect(aggiornaFoto).toHaveBeenCalledTimes(1))
+      expect(aggiornaFoto).toHaveBeenCalledWith('E', 'b', { data: '2026-10-25' })
     })
 
-    it('un errore resta in vista e la data scritta non si perde', async () => {
+    it('chiudendo il visore prima della pausa la data scritta si salva subito: non si perde', async () => {
+      const { utente } = await apriVisore()
+      scrivi('2026-10-25')
+      await utente.click(nelVisore().getByRole('button', { name: 'Chiudi' }))
+
+      await waitFor(() => expect(aggiornaFoto).toHaveBeenCalledWith('E', 'b', { data: '2026-10-25' }))
+      expect(aggiornaFoto).toHaveBeenCalledTimes(1)
+    })
+
+    it('scorrendo a un\'altra foto prima della pausa la data scritta si salva sulla foto giusta', async () => {
+      const { utente } = await apriVisore()
+      scrivi('2026-10-25')
+      await utente.click(nelVisore().getByRole('button', { name: 'Foto successiva' }))
+
+      await waitFor(() => expect(aggiornaFoto).toHaveBeenCalledWith('E', 'b', { data: '2026-10-25' }))
+      expect((nelVisore().getByLabelText('Data') as HTMLInputElement).value).toBe('2026-10-20')
+      await pausa()
+      expect(aggiornaFoto).toHaveBeenCalledTimes(1)
+    })
+
+    it('una data vuota o incompleta non si salva, né da sola né uscendo', async () => {
+      const { utente } = await apriVisore()
+      scrivi('')
+      await pausa()
+      scrivi('0002-10-28')
+      await pausa()
+      await utente.click(nelVisore().getByRole('button', { name: 'Chiudi' }))
+      await pausa()
+      expect(aggiornaFoto).not.toHaveBeenCalled()
+    })
+
+    it('una data tornata uguale a quella salvata non scrive niente', async () => {
+      const { utente } = await apriVisore()
+      scrivi('2026-10-25')
+      scrivi('2026-10-28')
+      await pausa()
+      await utente.click(nelVisore().getByRole('button', { name: 'Chiudi' }))
+      expect(aggiornaFoto).not.toHaveBeenCalled()
+    })
+
+    it('un errore resta in vista con la data scritta e «Riprova»; non si ripete da solo', async () => {
       vi.mocked(aggiornaFoto).mockRejectedValueOnce(new Error('Il server non risponde.'))
       const { utente } = await apriVisore()
-      fireEvent.change(nelVisore().getByLabelText('Data'), { target: { value: '2026-10-25' } })
-      await utente.click(nelVisore().getByRole('button', { name: 'Salva data' }))
+      scrivi('2026-10-25')
+      await pausa()
+
       expect(await nelVisore().findByRole('alert')).toHaveTextContent('Il server non risponde.')
       expect((nelVisore().getByLabelText('Data') as HTMLInputElement).value).toBe('2026-10-25')
+      await act(() => vi.advanceTimersByTimeAsync(5000))
+      expect(aggiornaFoto).toHaveBeenCalledTimes(1)
+
+      await utente.click(nelVisore().getByRole('button', { name: 'Riprova' }))
+      await waitFor(() => expect(aggiornaFoto).toHaveBeenCalledTimes(2))
+      await waitFor(() => expect(nelVisore().queryByRole('alert')).not.toBeInTheDocument())
+    })
+
+    it('se uscendo il salvataggio fallisce, un toast che resta lo dice', async () => {
+      vi.mocked(aggiornaFoto).mockRejectedValueOnce(new Error('Il server non risponde.'))
+      const { utente } = await apriVisore()
+      scrivi('2026-10-25')
+      await utente.click(nelVisore().getByRole('button', { name: 'Chiudi' }))
+
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1))
+      const [testo, opzioni] = vi.mocked(toast.error).mock.calls[0]
+      expect(testo).toContain('La data della foto non è stata salvata')
+      expect(opzioni).toMatchObject({ duration: Infinity })
     })
   })
 
@@ -509,11 +609,42 @@ describe('Foto: il visore', () => {
       await utente.keyboard('{Escape}')
       expect(miniature()).toHaveLength(2)
 
-      // Il server ha ancora la foto: ha risposto prima dell'eliminazione vera.
+      // Il server ha ancora la foto: ha risposto prima dell'eliminazione vera. Si aspetta che la rilettura sia arrivata nella
+      // cache (con 3 foto) e che la pagina si sia ridisegnata: senza, "non riappare" sarebbe vero per forza.
       await act(async () => { await client.invalidateQueries({ queryKey: ['foto', 'E'] }) })
+      await waitFor(() => expect(client.getQueryData<unknown[]>(['foto', 'E'])).toHaveLength(3))
+      await act(() => vi.advanceTimersByTimeAsync(100))
       expect(listaFoto).toHaveBeenCalledTimes(2)
+      expect(eliminaFoto).not.toHaveBeenCalled()
       expect(miniature()).toHaveLength(2)
       expect(screen.queryByRole('button', { name: 'Foto del 28/10/2026, pianta 35' })).not.toBeInTheDocument()
+    })
+
+    it('eliminando dal visore il fuoco resta nella finestra, sulla foto che segue', async () => {
+      const { utente } = await apriVisore()
+      await utente.click(nelVisore().getByRole('button', { name: 'Elimina foto' }))
+      expect(visore().contains(document.activeElement)).toBe(true)
+      expect(document.activeElement).not.toBe(document.body)
+    })
+
+    it('eliminando l\'ultima foto il fuoco va al pulsante «+ Aggiungi foto», non sul body', async () => {
+      db = [foto('solo')]
+      const r = apri()
+      await attesa()
+      await r.utente.click(miniature()[0])
+      await r.utente.click(nelVisore().getByRole('button', { name: 'Elimina foto' }))
+      await screen.findByText('Nessuna foto.')
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: '+ Aggiungi foto' })))
+    })
+
+    it('eliminando l\'ultima foto di un filtro il fuoco non finisce sul body', async () => {
+      const r = apri()
+      await attesa()
+      await r.utente.type(screen.getByLabelText('Cerca pianta'), '35')
+      await r.utente.click(miniature()[0])
+      await r.utente.click(nelVisore().getByRole('button', { name: 'Elimina foto' }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await waitFor(() => expect(document.activeElement).not.toBe(document.body))
     })
 
     it('se il file non si è tolto avvisa con un messaggio non verde', async () => {

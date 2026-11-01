@@ -331,6 +331,39 @@ describe('AggiungiFoto: uscire mentre carica', () => {
     expect(toastSalvato).not.toHaveBeenCalled()
   })
 
+  it('una foto già fallita non sparisce in silenzio allo smontaggio: un toast che resta dice quante vanno aggiunte di nuovo', async () => {
+    vi.mocked(caricaFoto).mockRejectedValue(new Error('Il server non risponde.'))
+    const { resa } = apri()
+    scegli(inputGalleria(), jpg('a.jpg'), jpg('b.jpg'))
+    await waitFor(() => expect(screen.getAllByRole('alert')).toHaveLength(2))
+    expect(toast.error).not.toHaveBeenCalled()
+
+    resa.unmount()
+
+    expect(toast.error).toHaveBeenCalledTimes(1)
+    expect(toast.error).toHaveBeenCalledWith('2 foto non sono state caricate: aggiungile di nuovo.', OPZIONI_ERRORE_TARDIVO)
+  })
+
+  it('con una sola foto fallita il toast è al singolare', async () => {
+    vi.mocked(caricaFoto).mockRejectedValue(new Error('Il server non risponde.'))
+    const { resa } = apri()
+    scegli(inputScatto(), jpg('a.jpg'))
+    await screen.findByRole('alert')
+    resa.unmount()
+    expect(toast.error).toHaveBeenCalledWith('1 foto non è stata caricata: aggiungila di nuovo.', OPZIONI_ERRORE_TARDIVO)
+  })
+
+  it('smontando senza foto fallite, o dopo «Togli» e dopo un nuovo tentativo riuscito, non c\'è nessun toast', async () => {
+    vi.mocked(caricaFoto).mockRejectedValueOnce(new Error('x')).mockRejectedValueOnce(new Error('y'))
+    const { resa, utente } = apri()
+    scegli(inputGalleria(), jpg('a.jpg'), jpg('b.jpg'))
+    await utente.click(await screen.findByRole('button', { name: 'Togli a.jpg' }))
+    await utente.click(await screen.findByRole('button', { name: 'Riprova b.jpg' }))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalled())
+    resa.unmount()
+    expect(toast.error).not.toHaveBeenCalled()
+  })
+
   it('smontare la pagina non lascia la protezione della chiusura della scheda una volta finito', async () => {
     const attesa = differita<Foto>()
     vi.mocked(caricaFoto).mockImplementationOnce(() => attesa.promessa)

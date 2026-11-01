@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type TouchEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { aggiornaFoto } from '@/api/foto'
 import { chiavi } from '@/api/query'
 import { TestoErrore } from '@/components/TestoErrore'
@@ -11,6 +12,7 @@ import { descriviFoto } from '@/domain/foto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
+import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 
 /** Quanto deve scorrere il dito (in pixel) perché sia una strisciata e non un tocco, e quanto più in orizzontale che in verticale. */
 const STRISCIATA_MIN = 50
@@ -35,6 +37,8 @@ interface VisoreFotoProps {
   onSuccessiva: (() => void) | null
   onChiudi: () => void
   onElimina: () => void
+  /** Dove portare il fuoco chiudendo, se non sulla miniatura che ha aperto il visore (che con l'ultima foto eliminata sparisce). */
+  fuocoDopo?: () => HTMLElement | null
 }
 
 /**
@@ -44,13 +48,14 @@ interface VisoreFotoProps {
  * un dialogo modale blocca il tocco su tutto ciò che sta fuori, e il toast con «Annulla» dell'eliminazione deve restare
  * toccabile con il visore aperto.
  */
-export function VisoreFoto({ espId, config, foto, posizione, totale, url, urlLetti, onPrecedente, onSuccessiva, onChiudi, onElimina }: VisoreFotoProps) {
+export function VisoreFoto({ espId, config, foto, posizione, totale, url, urlLetti, onPrecedente, onSuccessiva, onChiudi, onElimina, fuocoDopo }: VisoreFotoProps) {
   const radice = useRef<HTMLDivElement>(null)
   const inizioDito = useRef<{ x: number; y: number } | null>(null)
-  const idTitolo = useId()
 
   // All'apertura il fuoco entra nella finestra; alla chiusura torna dov'era (la miniatura), se c'è ancora. La pagina sotto
   // non scorre.
+  const fuocoDopoRef = useRef(fuocoDopo)
+  useEffect(() => { fuocoDopoRef.current = fuocoDopo })
   useEffect(() => {
     const prima = document.activeElement instanceof HTMLElement ? document.activeElement : null
     radice.current?.focus()
@@ -58,16 +63,20 @@ export function VisoreFoto({ espId, config, foto, posizione, totale, url, urlLet
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = overflow
-      if (prima?.isConnected) prima.focus()
+      // Il fuoco torna alla miniatura da cui si è partiti, salvo che chi ha aperto il visore dica altrimenti (eliminata
+      // l'ultima foto quella miniatura sta per sparire): mai sul body.
+      const dopo = fuocoDopoRef.current?.() ?? (prima?.isConnected ? prima : null)
+      dopo?.focus()
     }
   }, [])
 
-  // Scorrendo, il pulsante che si era toccato può diventare disabilitato (la prima o l'ultima foto) e il fuoco andrebbe
-  // perso: le frecce della tastiera smetterebbero di funzionare. Il fuoco torna alla finestra.
+  // Scorrendo, il pulsante che si era toccato può diventare disabilitato (la prima o l'ultima foto), e eliminando una foto
+  // il pannello si ricrea con quella successiva: il fuoco andrebbe perso e le frecce della tastiera smetterebbero di
+  // funzionare. Il fuoco torna alla finestra a ogni foto nuova.
   useEffect(() => {
     const attivo = document.activeElement
     if (!radice.current?.contains(attivo) || (attivo instanceof HTMLButtonElement && attivo.disabled)) radice.current?.focus()
-  }, [posizione])
+  }, [foto.id])
 
   function tasto(evento: KeyboardEvent<HTMLDivElement>) {
     if (evento.key === 'Escape') {
@@ -129,7 +138,7 @@ export function VisoreFoto({ espId, config, foto, posizione, totale, url, urlLet
       className="fixed inset-0 z-40 flex flex-col bg-carta outline-none"
     >
       <div className="flex h-14 shrink-0 items-center gap-3 border-b border-riga pt-[env(safe-area-inset-top)] pr-2 pl-4">
-        <h2 id={idTitolo} className="min-w-0 flex-1 truncate font-mono text-dato font-medium tabular-nums text-grafite">
+        <h2 className="min-w-0 flex-1 truncate font-mono text-dato font-medium tabular-nums text-grafite">
           {formattaData(foto.data)}
         </h2>
         <p className="shrink-0 font-mono text-dato tabular-nums text-grafite-tenue">{`${posizione} / ${totale}`}</p>
@@ -168,34 +177,91 @@ export function VisoreFoto({ espId, config, foto, posizione, totale, url, urlLet
 
 /** L'immagine, o il perché non c'è: archiviata, ancora in lettura, o non disponibile (URL scaduto, file tolto). */
 function Immagine({ foto, url, urlLetti, descrizione }: { foto: Foto; url: string | undefined; urlLetti: boolean; descrizione: string }) {
-  const [rotta, setRotta] = useState(false)
+  // L'URL che non si è caricato: un URL nuovo (rinnovato, o un'altra foto) riparte da capo.
+  const [urlRotto, setUrlRotto] = useState<string | null>(null)
+  const rotta = url !== undefined && urlRotto === url
   if (foto.archiviata) return <p className="px-6 text-center text-grafite-tenue">Archiviata nel .zip</p>
   if (url && !rotta) {
-    return <img src={url} alt={descrizione} draggable={false} onError={() => setRotta(true)} className="max-h-full max-w-full object-contain" />
+    return <img src={url} alt={descrizione} draggable={false} onError={() => setUrlRotto(url)} className="max-h-full max-w-full object-contain" />
   }
-  if (!urlLetti && !rotta) return <p role="status" className="text-grafite-tenue">Caricamento…</p>
+  if (!urlLetti) return <p role="status" className="text-grafite-tenue">Caricamento…</p>
   return <p className="px-6 text-center text-grafite-tenue">Foto non disponibile.</p>
 }
 
-/** Data, pianta ed «Elimina foto». Si ricrea a ogni foto (`key`), così la data scritta a metà non passa a un'altra. */
+/** Una data scritta per intero (AAAA-MM-GG) e plausibile: scrivendo l'anno a mano passano per date come 0002-10-28. */
+const dataSalvabile = (d: string): boolean => /^\d{4}-\d{2}-\d{2}$/.test(d) && d >= '2000-01-01'
+
+/** Quanto si aspetta, dopo l'ultima modifica, prima di salvare la data da sola. */
+const ATTESA_DATA_MS = 700
+
+/**
+ * Data, pianta ed «Elimina foto». Si ricrea a ogni foto (`key`), così la data scritta a metà non passa a un'altra.
+ *
+ * Come la pianta, anche la data si salva da sola: una pausa di 700 ms dopo l'ultima modifica, e subito uscendo (chiudendo
+ * il visore o scorrendo a un'altra foto), così una data scritta non si perde mai in silenzio. Con un errore il messaggio
+ * resta, la data scritta anche, e «Riprova» ci riprova.
+ */
 function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; config: ConfigEsperimento; foto: Foto; onElimina: () => void }) {
   const queryClient = useQueryClient()
   const id = useId()
   const [data, setData] = useState(foto.data)
+  const [salvandoData, setSalvandoData] = useState(false)
+  const [dataRifiutata, setDataRifiutata] = useState<string | null>(null)
   const [pianta, setPianta] = useState(foto.pianta_id ?? '')
   const [occupato, setOccupato] = useState(false)
   const [errore, setErrore] = useState<string | null>(null)
 
-  /** Scrive il cambio e rilegge le foto; con un errore il messaggio resta e `ripristina` rimette il campo com'era, se serve. */
-  async function salva(patch: Parameters<typeof aggiornaFoto>[2], ripristina: () => void) {
-    setOccupato(true)
+  // Lo stato che l'uscita legge: ciò che c'è scritto, ciò che è salvato, e se un salvataggio è già in viaggio.
+  const ultimo = useRef({ data, salvata: foto.data, inVolo: false })
+  useEffect(() => { ultimo.current = { data, salvata: foto.data, inVolo: salvandoData } })
+
+  async function salvaData(valore: string) {
+    setSalvandoData(true)
     setErrore(null)
     try {
-      await aggiornaFoto(espId, foto.id, patch)
+      await aggiornaFoto(espId, foto.id, { data: valore })
       // Il prefisso `foto` rilegge anche lo spazio; si aspetta la rilettura per mostrare il dato salvato.
       await queryClient.invalidateQueries({ queryKey: chiavi.foto(espId) })
     } catch (e) {
-      ripristina()
+      // La data scritta resta nel campo; non si riprova da sola con lo stesso valore, lo fa «Riprova».
+      setDataRifiutata(valore)
+      setErrore(messaggioErrore(e))
+    } finally {
+      setSalvandoData(false)
+    }
+  }
+
+  useEffect(() => {
+    if (data === foto.data || !dataSalvabile(data) || salvandoData || data === dataRifiutata) return
+    const timer = setTimeout(() => void salvaData(data), ATTESA_DATA_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, foto.data, salvandoData, dataRifiutata])
+
+  // Uscendo con una data scritta e non ancora salvata (chiudere, scorrere, lasciare la pagina) la si salva subito: la
+  // finestra non c'è più per mostrare un errore, quindi se fallisce lo dice un toast che resta.
+  useEffect(() => () => {
+    const { data: scritta, salvata, inVolo } = ultimo.current
+    if (inVolo || scritta === salvata || !dataSalvabile(scritta)) return
+    aggiornaFoto(espId, foto.id, { data: scritta })
+      .then(() => queryClient.invalidateQueries({ queryKey: chiavi.foto(espId) }))
+      .catch((e: unknown) => {
+        toast.error(`La data della foto non è stata salvata: ${messaggioErrore(e)}`, OPZIONI_ERRORE_TARDIVO)
+        void queryClient.invalidateQueries({ queryKey: chiavi.foto(espId) })
+      })
+  // Solo alla chiusura: i valori che servono li dà `ultimo`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Salva la pianta e rilegge le foto; con un errore il messaggio resta e la scelta torna com'era. */
+  async function salvaPianta(valore: string, prima: string) {
+    setOccupato(true)
+    setErrore(null)
+    try {
+      await aggiornaFoto(espId, foto.id, { pianta_id: valore === '' ? null : valore })
+      await queryClient.invalidateQueries({ queryKey: chiavi.foto(espId) })
+    } catch (e) {
+      setPianta(prima)
       setErrore(messaggioErrore(e))
     } finally {
       setOccupato(false)
@@ -204,27 +270,16 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
 
   const piante = [...config.piante].sort((a, b) => a.ordine - b.ordine)
   const trattamenti = new Map(config.trattamenti.map(t => [t.id, t.etichetta]))
-  const dataCambiata = data !== foto.data
 
   return (
     <div className="flex max-h-[50dvh] shrink-0 flex-col gap-4 overflow-y-auto border-t border-riga bg-carta px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-data`}>Data</Label>
-        <div className="flex gap-2">
-          <Input
-            id={`${id}-data`} type="date" variant="campo" className="min-w-0 flex-1"
-            disabled={occupato} value={data} onChange={e => setData(e.target.value)}
-          />
-          {dataCambiata && (
-            <Button
-              type="button" size="lg" disabled={occupato || data === ''}
-              // Con un errore la data scritta resta nel campo: basta ritoccare «Salva data».
-              onClick={() => void salva({ data }, () => {})}
-            >
-              Salva data
-            </Button>
-          )}
-        </div>
+        <Input
+          id={`${id}-data`} type="date" variant="campo"
+          value={data} onChange={e => { setData(e.target.value); setErrore(null) }}
+        />
+        {salvandoData && <p role="status" className="text-sm text-grafite-tenue">Salvataggio…</p>}
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -234,7 +289,7 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
           onChange={e => {
             const prima = pianta
             setPianta(e.target.value)
-            void salva({ pianta_id: e.target.value === '' ? null : e.target.value }, () => setPianta(prima))
+            void salvaPianta(e.target.value, prima)
           }}
         >
           <option value="">Nessuna pianta</option>
@@ -245,7 +300,14 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
         {foto.nota_id !== null && <p className="text-sm text-grafite-tenue">Allegata a una nota del Diario.</p>}
       </div>
 
-      {errore && <TestoErrore role="alert">{errore}</TestoErrore>}
+      {errore && (
+        <div className="flex flex-col items-start gap-1">
+          <TestoErrore role="alert">{errore}</TestoErrore>
+          {dataRifiutata !== null && dataRifiutata === data && (
+            <Button type="button" variant="ghost" size="sm" className="-ml-3" onClick={() => void salvaData(data)}>Riprova</Button>
+          )}
+        </div>
+      )}
 
       <Button type="button" variant="destructive" onClick={onElimina}>Elimina foto</Button>
     </div>
