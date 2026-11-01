@@ -1,7 +1,8 @@
-import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
+import { listaFoto, spazioFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
 import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
@@ -23,6 +24,11 @@ export const chiavi = {
   ultimeMisurePiante: (espId: string) => ['misure', 'ultimePiante', espId] as const,
   /** Le note del Diario di un esperimento (con i promemoria): fuori dalle misure, si invalidano a ogni salvataggio. */
   note: (espId: string) => ['note', espId] as const,
+  /** Le foto di un esperimento: salvataggio, eliminazione e modifica la invalidano (con lo spazio, che sta sotto di lei). */
+  foto: (espId: string) => ['foto', espId] as const,
+  spazioFoto: (espId: string) => ['foto', espId, 'spazio'] as const,
+  /** Gli URL firmati di un gruppo di percorsi: fuori dal prefisso `foto`, non si rileggono a ogni modifica di una foto. */
+  urlFoto: (percorsi: readonly string[]) => ['urlFoto', [...percorsi].sort().join('|')] as const,
   inviti: ['inviti'] as const,
   /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
   catalogo: ['catalogo'] as const,
@@ -142,6 +148,40 @@ export function useNote(espId: string | undefined) {
     queryKey: chiavi.note(espId ?? ''),
     queryFn: () => listaNote(espId as string),
     enabled: !!espId,
+  })
+}
+
+/** Le foto dell'esperimento (galleria, scheda della pianta, nota), dalla data più recente. */
+export function useFoto(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.foto(espId ?? ''),
+    queryFn: () => listaFoto(espId as string),
+    enabled: !!espId,
+  })
+}
+
+/**
+ * Gli URL firmati dei file di questi percorsi, per percorso. In cache per 50 minuti: gli URL valgono un'ora, quindi
+ * si rinnovano prima che scadano. Se l'elenco dei percorsi cambia (una foto in più o in meno) tiene gli URL di prima
+ * finché arrivano i nuovi, così le miniature non lampeggiano.
+ */
+export function useUrlFoto(percorsi: readonly string[]) {
+  return useQuery({
+    queryKey: chiavi.urlFoto(percorsi),
+    queryFn: () => urlFoto([...percorsi]),
+    enabled: percorsi.length > 0,
+    staleTime: (VALIDITA_URL_SECONDI - 600) * 1000,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Lo spazio occupato dalle foto, dell'esperimento e del progetto (Impostazioni). Sempre fresco all'apertura. */
+export function useSpazioFoto(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.spazioFoto(espId ?? ''),
+    queryFn: () => spazioFoto(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
   })
 }
 

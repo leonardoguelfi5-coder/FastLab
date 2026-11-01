@@ -37,3 +37,11 @@ export interface Misura { id: string; pianta_id: string; strumento_id: string; d
  */
 export interface Nota { id: string; data: string; testo: string; promemoria: boolean; fatto_il: string | null;
   pianta_ids: string[]; trattamento_ids: string[] }
+
+/**
+ * Una foto dell'esperimento. Il file sta nello Storage in `percorso` (`<esperimento_id>/<id>.jpg`); può essere collegata
+ * a una pianta, a una nota o a niente (solo l'esperimento). `archiviata`: il file è stato tolto dallo Storage dopo
+ * l'archivio .zip, la riga resta. Dimensioni e peso sono quelli del file compresso.
+ */
+export interface Foto { id: string; data: string; percorso: string; larghezza: number | null; altezza: number | null;
+  byte: number | null; pianta_id: string | null; nota_id: string | null; archiviata: boolean }

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { clonaConfig } from '@/domain/bozza'
-import type { Misura, Nota, Parametro, Strumento, Pianta } from '@/domain/tipi'
+import type { Foto, Misura, Nota, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import {
-  aRigaMisura, aRigaNota, aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta,
-  daRigaMisura, daRigaNota, daRigheConfig,
-  type RigaMisura, type RigaNota, type RigheConfig,
+  aRigaFoto, aRigaMisura, aRigaNota, aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta,
+  daRigaFoto, daRigaMisura, daRigaNota, daRigheConfig,
+  type RigaFoto, type RigaMisura, type RigaNota, type RigheConfig,
 } from './mappers'
 
 const E = 'e1'
@@ -256,6 +256,30 @@ describe('note', () => {
     // Una nota che non è un promemoria non può risultare fatta.
     expect(aRigaNota(E, { ...nota, promemoria: false })).toEqual({
       id: 'n1', esperimento_id: E, data: '2026-11-01', testo: 'Irrigato', promemoria: false, fatto_il: null,
+    })
+  })
+})
+
+describe('foto', () => {
+  const E = 'e0000000-0000-4000-8000-000000000001'
+  const ID = 'f0000000-0000-4000-8000-000000000002'
+  const riga: RigaFoto = {
+    id: ID, esperimento_id: E, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
+    pianta_id: 'p1', nota_id: null, archiviata: false, creato_da: 'u1', creato_il: '2026-11-01T08:00:00+00:00',
+  }
+
+  it('daRigaFoto porta nel dominio le colonne della foto e lascia nel database esperimento_id, creato_da e creato_il', () => {
+    expect(daRigaFoto(riga)).toEqual({
+      id: ID, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
+      pianta_id: 'p1', nota_id: null, archiviata: false,
+    })
+  })
+
+  it('aRigaFoto scrive solo colonne scrivibili: mai creato_da, mai archiviata (la cambia solo l\'archivio)', () => {
+    const foto: Foto = daRigaFoto(riga)
+    expect(aRigaFoto(E, foto)).toEqual({
+      id: ID, esperimento_id: E, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
+      pianta_id: 'p1', nota_id: null,
     })
   })
 })

@@ -1,5 +1,5 @@
 import type {
-  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Nota, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
+  ConfigEsperimento, Esperimento, Fattore, Livello, Foto, Misura, Nota, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
   Pianta, SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura, VoceCatalogo,
 } from '@/domain/tipi'
 
@@ -311,5 +311,31 @@ export function aRigaNota(espId: string, n: Nota) {
     testo: n.testo,
     promemoria: n.promemoria,
     ...(n.promemoria ? {} : { fatto_il: null }),
+  }
+}
+
+/** Una riga di `foto` come la restituisce PostgREST. */
+export interface RigaFoto {
+  id: string; esperimento_id: string; data: string; percorso: string; larghezza: number | null; altezza: number | null
+  byte: number | null; pianta_id: string | null; nota_id: string | null; archiviata: boolean
+  creato_da?: string; creato_il?: string
+}
+
+/** Da riga del database a Foto: esperimento_id, creato_da e creato_il restano nel database. */
+export function daRigaFoto(r: RigaFoto): Foto {
+  return {
+    id: r.id, data: r.data, percorso: r.percorso, larghezza: r.larghezza, altezza: r.altezza, byte: r.byte,
+    pianta_id: r.pianta_id, nota_id: r.nota_id, archiviata: r.archiviata,
+  }
+}
+
+/**
+ * Riga da scrivere per una foto: solo colonne scrivibili, mai creato_da. `archiviata` non c'è: la scrive solo l'archivio
+ * (e un nuovo tentativo di caricamento, che rimanda questa riga, non deve riaprire una foto già archiviata).
+ */
+export function aRigaFoto(espId: string, f: Foto) {
+  return {
+    id: f.id, esperimento_id: espId, data: f.data, percorso: f.percorso, larghezza: f.larghezza, altezza: f.altezza,
+    byte: f.byte, pianta_id: f.pianta_id, nota_id: f.nota_id,
   }
 }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
-  INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
+  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
 } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -25,6 +25,12 @@ describe('messaggioErrore', () => {
   it('elemento non trovato (nessuna riga aggiornata o eliminata): il messaggio è già per l\'utente', () => {
     expect(messaggioErrore(new Error(ELEMENTO_NON_TROVATO))).toBe(ELEMENTO_NON_TROVATO)
     expect(ELEMENTO_NON_TROVATO).toBe('Elemento non trovato: forse è stato rimosso. Ricarica la pagina.')
+  })
+
+  it('foto non leggibile e foto dell\'esperimento non rimosse: i messaggi passano come sono', () => {
+    expect(messaggioErrore(new Error(FOTO_NON_LEGGIBILE))).toBe(FOTO_NON_LEGGIBILE)
+    expect(messaggioErrore(new Error(FOTO_ESPERIMENTO_NON_RIMOSSE))).toBe(FOTO_ESPERIMENTO_NON_RIMOSSE)
+    expect(FOTO_ESPERIMENTO_NON_RIMOSSE).toContain('non è stato eliminato')
   })
 
   it('invito già usato o revocato, email già invitata, esperimento non trovato: i messaggi passano come sono', () => {

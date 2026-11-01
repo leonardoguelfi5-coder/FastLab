@@ -9,16 +9,18 @@ vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 vi.mock('./note', () => ({ listaNote: vi.fn() }))
+vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 
 import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
+import { listaFoto, spazioFoto, urlFoto } from './foto'
 import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useNote, useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
+  useFoto, useNote, useParametriConDati, useSpazioFoto, useUrlFoto, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
 } from './query'
 
 function wrapper() {
@@ -27,6 +29,18 @@ function wrapper() {
 }
 
 beforeEach(() => { vi.clearAllMocks() })
+
+describe('chiavi delle foto', () => {
+  it('l\'elenco e lo spazio stanno sotto lo stesso prefisso, per invalidarli insieme; gli URL fuori', () => {
+    expect(chiavi.foto('E')).toEqual(['foto', 'E'])
+    expect(chiavi.spazioFoto('E').slice(0, 2)).toEqual(chiavi.foto('E'))
+    expect(chiavi.urlFoto(['a'])[0]).not.toBe('foto')
+  })
+  it('la chiave degli URL non dipende dall\'ordine dei percorsi, ma dal loro insieme', () => {
+    expect(chiavi.urlFoto(['b', 'a'])).toEqual(chiavi.urlFoto(['a', 'b']))
+    expect(chiavi.urlFoto(['a'])).not.toEqual(chiavi.urlFoto(['a', 'b']))
+  })
+})
 
 describe('chiavi', () => {
   it('sono stabili e distinte per esperimento, data e pianta', () => {
@@ -199,6 +213,41 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useNote(undefined), { wrapper: wrapper() })
     expect(result.current.fetchStatus).toBe('idle')
     expect(listaNote).not.toHaveBeenCalled()
+  })
+
+  it('useFoto legge le foto dell\'esperimento, e senza esperimento non interroga nessuno', async () => {
+    const foto = [{ id: 'f1', data: '2026-11-01', percorso: 'E/f1.jpg', larghezza: 1600, altezza: 1200, byte: 1, pianta_id: null, nota_id: null, archiviata: false }]
+    vi.mocked(listaFoto).mockResolvedValue(foto)
+    const { result } = renderHook(() => useFoto('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(listaFoto).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe(foto)
+
+    vi.mocked(listaFoto).mockClear()
+    const senza = renderHook(() => useFoto(undefined), { wrapper: wrapper() })
+    expect(senza.result.current.fetchStatus).toBe('idle')
+    expect(listaFoto).not.toHaveBeenCalled()
+  })
+
+  it('useUrlFoto chiede gli URL dei percorsi, e senza percorsi non chiede niente', async () => {
+    const urls = new Map([['E/f1.jpg', 'https://s/f1']])
+    vi.mocked(urlFoto).mockResolvedValue(urls)
+    const { result } = renderHook(() => useUrlFoto(['E/f1.jpg']), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(urlFoto).toHaveBeenCalledWith(['E/f1.jpg'])
+    expect(result.current.data).toBe(urls)
+
+    vi.mocked(urlFoto).mockClear()
+    const vuoto = renderHook(() => useUrlFoto([]), { wrapper: wrapper() })
+    expect(vuoto.result.current.fetchStatus).toBe('idle')
+    expect(urlFoto).not.toHaveBeenCalled()
+  })
+
+  it('useSpazioFoto legge lo spazio occupato', async () => {
+    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 10, progetto: 30 })
+    const { result } = renderHook(() => useSpazioFoto('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual({ esperimento: 10, progetto: 30 })
   })
 
   it('useSonoAdmin legge il ruolo', async () => {

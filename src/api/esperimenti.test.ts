@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
+vi.mock('./foto', () => ({ eliminaFileEsperimento: vi.fn() }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
-import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
+import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE, messaggioErrore } from '@/lib/errori'
 import { configDiEsempio } from '@/domain/test-helpers'
 import { clonaConfig } from '@/domain/bozza'
 import type { RigheConfig } from './mappers'
 import {
-  aggiornaEsperimento, caricaConfig, creaEsperimento, listaEsperimenti, type RiepilogoEsperimento,
+  aggiornaEsperimento, caricaConfig, creaEsperimento, eliminaEsperimento, listaEsperimenti, type RiepilogoEsperimento,
 } from './esperimenti'
+import { eliminaFileEsperimento } from './foto'
 
 const errore = { code: '42501', message: 'permission denied', details: '', hint: '' }
 
@@ -18,6 +20,8 @@ let mock: ReturnType<typeof simulaSupabase>
 beforeEach(() => {
   vi.mocked(supabase.from).mockReset()
   vi.mocked(supabase.rpc).mockReset()
+  vi.mocked(eliminaFileEsperimento).mockReset()
+  vi.mocked(eliminaFileEsperimento).mockResolvedValue(0)
   mock = simulaSupabase(supabase)
 })
 
@@ -167,5 +171,48 @@ describe('caricaConfig', () => {
   it('con un id che non è un uuid (un link sbagliato) non interroga il database: esperimento non trovato', async () => {
     await expect(caricaConfig('non-un-id')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
     expect(supabase.from).not.toHaveBeenCalled()
+  })
+})
+
+describe('eliminaEsperimento', () => {
+  const E = 'e0000000-0000-4000-8000-000000000001'
+
+  it('prima toglie i file delle foto dallo Storage, poi elimina l\'esperimento', async () => {
+    const passi: string[] = []
+    vi.mocked(eliminaFileEsperimento).mockImplementation(async () => { passi.push('file'); return 3 })
+    mock.risponde('esperimenti', metodi => { if (metodi.includes('delete')) passi.push('riga'); return { data: [{ id: E }] } })
+
+    await eliminaEsperimento(E)
+
+    expect(eliminaFileEsperimento).toHaveBeenCalledWith(E)
+    expect(passi).toEqual(['file', 'riga'])
+    expect(mock.di('esperimenti').map(c => [c.metodo, ...c.args])).toEqual([['delete'], ['eq', 'id', E], ['select', 'id']])
+  })
+
+  it('se i file non si tolgono l\'esperimento non si elimina e il messaggio lo dice', async () => {
+    vi.mocked(eliminaFileEsperimento).mockRejectedValue(new Error('rete'))
+
+    const e = await eliminaEsperimento(E).catch((x: unknown) => x)
+
+    expect(e).toBeInstanceOf(Error)
+    expect((e as Error).message).toBe(FOTO_ESPERIMENTO_NON_RIMOSSE)
+    expect(messaggioErrore(e)).toBe(FOTO_ESPERIMENTO_NON_RIMOSSE)
+    expect(mock.di('esperimenti')).toEqual([])
+  })
+
+  it('un errore del database nell\'eliminazione si propaga', async () => {
+    mock.risponde('esperimenti', { error: errore })
+    await expect(eliminaEsperimento(E)).rejects.toBe(errore)
+  })
+
+  it('un esperimento che non c\'è più (nessuna riga eliminata) è un errore, non un successo', async () => {
+    mock.risponde('esperimenti', { data: [] })
+    await expect(eliminaEsperimento(E)).rejects.toThrow(ELEMENTO_NON_TROVATO)
+  })
+
+  it('un id che non è un uuid non tocca né lo Storage né il database', async () => {
+    await expect(eliminaEsperimento('..')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+    expect(eliminaFileEsperimento).not.toHaveBeenCalled()
+    expect(mock.chiamate).toEqual([])
   })
 })
