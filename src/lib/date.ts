@@ -5,6 +5,14 @@ export function oggiLocale(d: Date = new Date()): string {
   return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}`
 }
 
+/**
+ * La data locale AAAA-MM-GG di un istante ISO (come `fatto_il`, che si scrive in UTC). Serve per "fatto il GG/MM":
+ * tagliare la stringa UTC darebbe il giorno prima per un istante tra mezzanotte e le 1 o le 2 di notte in Italia.
+ */
+export function dataLocaleDa(iso: string): string {
+  return oggiLocale(new Date(iso))
+}
+
 /** Ora locale nel formato HH:MM. */
 export function oraLocale(d: Date = new Date()): string {
   return `${due(d.getHours())}:${due(d.getMinutes())}`

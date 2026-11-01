@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra, daQuanto } from './date'
+import { dataLocaleDa, oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra, daQuanto } from './date'
 
 describe('date', () => {
   it('oggiLocale usa la data locale anche dopo mezzanotte', () => {
@@ -8,6 +8,12 @@ describe('date', () => {
   })
   it('il fuso dei test è fissato a Europe/Rome (vite.config.ts): 23:30 UTC è già il giorno dopo', () =>
     expect(oggiLocale(new Date(Date.UTC(2026, 9, 27, 23, 30)))).toBe('2026-10-28'))
+  it('dataLocaleDa dà il giorno locale di un istante UTC: alle 00:30 locali non è il giorno prima', () => {
+    const mezzanotteEMezza = new Date(2026, 9, 28, 0, 30).toISOString()   // 22:30 UTC del 27
+    expect(mezzanotteEMezza.slice(0, 10)).toBe('2026-10-27')
+    expect(dataLocaleDa(mezzanotteEMezza)).toBe('2026-10-28')
+    expect(dataLocaleDa(new Date(2026, 9, 27, 23, 59).toISOString())).toBe('2026-10-27')
+  })
   it('oraLocale', () => expect(oraLocale(new Date(2026, 9, 28, 9, 5))).toBe('09:05'))
   it('formattaData', () => expect(formattaData('2026-10-28')).toBe('28/10/2026'))
   it('formattaGiornoMese', () => expect(formattaGiornoMese('2026-10-08')).toBe('08/10'))

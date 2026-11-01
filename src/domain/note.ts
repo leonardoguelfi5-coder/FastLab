@@ -15,7 +15,7 @@ export function ePromemoriaAlSalvataggio(data: string, oggi: string): boolean {
  */
 export function promemoriaDelGiorno(note: Nota[], oggi: string): Nota[] {
   return note
-    .filter(n => n.promemoria && n.fatto_il === null && n.data <= oggi)
+    .filter(n => n.promemoria && !n.fatto_il && n.data <= oggi)
     .sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : 0))
 }
 

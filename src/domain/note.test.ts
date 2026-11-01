@@ -65,6 +65,10 @@ describe('promemoriaDelGiorno', () => {
     expect(lista.map(n => n.id)).toEqual(['p', 'q', 'r'])
   })
 
+  it('un fatto_il vuoto non conta come fatto', () => {
+    expect(promemoriaDelGiorno([nota('v', { promemoria: true, fatto_il: '' })], '2026-11-01')).toHaveLength(1)
+  })
+
   it('un promemoria fatto e poi tolto dai promemoria non compare', () => {
     expect(promemoriaDelGiorno([nota('z', { promemoria: false, fatto_il: '2026-11-01T09:00:00Z' })], '2026-11-01')).toEqual([])
   })
