@@ -44,3 +44,6 @@ Ruling: C4 fix round 1 = I1 (file tolto solo con risposta PostgREST vera), M1 (c
 Ruling (carry to C5): `refetchInterval` ~50 min per gli URL firmati della galleria; `fileRimosso: true` non è una prova (remove di un file assente dà `[]`); stesso file → stesso id nei nuovi tentativi; l'etichetta dello spazio nelle Impostazioni dice che conta solo gli esperimenti di cui si è membri — cost if wrong: small
 Ruling (carry to C7/C8): collegare `eliminaEsperimento` a una UI con conferma forte, o dichiararlo nel README come solo API — cost if wrong: codice morto
 Task C4: fix round 1 dispatched (implementatore C4)
+Task C4: fix round 1 implemented 150640c (1725 Vitest): file tolto solo con `code` non vuoto o `status` numerico (verificato dal controller su postgrest-js: un errore di rete dà `code: ""` e nessuno status nell'errore → il file resta); canvas azzerato, smoothing high, `FOTO_TROPPO_GRANDE` oltre 15 MB, `eUuid` prima di comprimere, `eliminaFileEsperimento` elenca tutta la cartella poi toglie solo `<uuid>.jpg`
+Task C4: fix round 1/5; complete (commits 443794c..150640c)
+Task C5: dispatched implementer (sonnet), BASE 150640c
