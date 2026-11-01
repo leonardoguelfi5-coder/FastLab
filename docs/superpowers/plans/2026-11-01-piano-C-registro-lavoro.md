@@ -11,3 +11,4 @@ Ruling: eliminazione con "Annulla" per 5 s, poi eliminazione vera (prima la riga
 Ruling: archivio .zip e "Libera lo spazio" solo per esperimenti conclusi, solo dopo un download riuscito nella stessa sessione e con il nome dell'esperimento scritto per conferma — cost if wrong: un passaggio in più.
 
 ## Avanzamento
+Task C1: dispatched implementer (opus), BASE ce852ae
