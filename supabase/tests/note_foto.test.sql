@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(74);
+select plan(78);
 
 -- Fixture (superuser): A e' membro di due esperimenti (EA e EA2), B di uno (EB). In EA: il
 -- trattamento T1 con le piante 1 e 2 e il trattamento T2 senza piante; in EA2 la pianta 9; in EB la pianta 1 di B.
@@ -127,6 +127,15 @@ select lives_ok(
        larghezza = excluded.larghezza, altezza = excluded.altezza, byte = excluded.byte,
        pianta_id = excluded.pianta_id, nota_id = excluded.nota_id, archiviata = excluded.archiviata $$,
   'upsert di una foto senza creato_da nel payload: riesce');
+
+select results_eq(
+  $$ select p from piante_non_eliminabili('e5000000-0000-0000-0000-000000000001') as p order by 1 $$,
+  $$ values ('b5000000-0000-0000-0000-000000000001'::uuid), ('b5000000-0000-0000-0000-000000000002'::uuid) $$,
+  'piante_non_eliminabili: la pianta con una nota collegata e quella con una foto');
+
+select is_empty(
+  $$ select piante_con_dati('e5000000-0000-0000-0000-000000000001') $$,
+  'piante_con_dati resta sulle sole misure (una nota o una foto non bloccano il cambio di trattamento)');
 
 -- ===== Vincoli =====
 select throws_ok(
@@ -330,6 +339,21 @@ select is(
 select is_empty(
   $$ update note set testo = 'x' returning id $$,
   'B: update delle note di A tocca 0 righe');
+
+select throws_ok(
+  $$ insert into note (id, esperimento_id, data, testo)
+     values ('a5000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001', '2026-11-01', 'presa')
+     on conflict (id) do update set testo = excluded.testo $$,
+  '42501', null,
+  'B: upsert con l''id di una nota di A rifiutato');
+
+select throws_ok(
+  $$ insert into foto (id, esperimento_id, data, percorso)
+     values ('f5000000-0000-0000-0000-000000000002', 'e6000000-0000-0000-0000-000000000001', '2026-11-01',
+             'e6000000-0000-0000-0000-000000000001/f5000000-0000-0000-0000-000000000002.jpg')
+     on conflict (id) do update set data = excluded.data $$,
+  '42501', null,
+  'B: upsert con l''id di una foto di A rifiutato');
 
 select is_empty(
   $$ delete from foto returning id $$,

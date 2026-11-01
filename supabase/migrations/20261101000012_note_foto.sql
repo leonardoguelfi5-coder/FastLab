@@ -170,11 +170,11 @@ grant update (id, esperimento_id, data, percorso, larghezza, altezza, byte, pian
 -- Bucket privato: i file si leggono solo con URL firmati, che il servizio Storage concede a chi
 -- passa la policy di select. Il limite di dimensione e il tipo li controlla il servizio Storage
 -- (il client carica JPEG compressi di circa 350 KB; 5 MB lascia margine). Se il bucket c'e' gia'
--- non si tocca, ma se fosse pubblico la migration si ferma: ogni file sarebbe leggibile da
+-- (creato a mano) se ne impongono limite e tipo, non la visibilita'; se fosse pubblico la migration si ferma: ogni file sarebbe leggibile da
 -- chiunque ne conosca il percorso, senza passare dalle policy.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('foto', 'foto', false, 5242880, array['image/jpeg'])
-on conflict (id) do nothing;
+on conflict (id) do update set file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 do $$
 begin
@@ -217,3 +217,24 @@ create policy fastlab_foto_insert on storage.objects
 create policy fastlab_foto_delete on storage.objects
   for delete to authenticated
   using (bucket_id = 'foto' and public.is_membro(public.esperimento_della_foto(name)));
+
+
+-- Le piante che non si possono eliminare: quelle con misure, note collegate o foto (la FK verso piante
+-- darebbe 23503). Le Impostazioni la usano per offrire "Elimina"; piante_con_dati resta sulle sole
+-- misure perche' decide anche il cambio di trattamento, che una nota o una foto non vincolano
+-- (guardia_piante guarda solo le misure).
+create function piante_non_eliminabili(p_esperimento uuid) returns setof uuid
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select m.pianta_id from public.misure m where m.esperimento_id = p_esperimento
+  union
+  select np.pianta_id from public.note_piante np where np.esperimento_id = p_esperimento
+  union
+  select f.pianta_id from public.foto f where f.esperimento_id = p_esperimento and f.pianta_id is not null
+$$;
+
+revoke execute on function piante_non_eliminabili(uuid) from public, anon;
+grant execute on function piante_non_eliminabili(uuid) to authenticated;
