@@ -15,6 +15,8 @@ export const VALIDITA_URL_SECONDI = 3600
 
 /** Le righe che si chiedono in una volta: PostgREST può darne di meno (`max_rows`), si legge finché non arriva una pagina vuota. */
 const PAGINA = 1000
+/** Il nome di un file di foto nella cartella dell'esperimento. */
+const NOME_FOTO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/
 /** I percorsi per ogni richiesta di URL firmati e i file per ogni pagina di rimozione. */
 const PERCORSI_PER_RICHIESTA = 100
 
@@ -45,14 +47,18 @@ export interface DatiFoto {
 /**
  * Comprime una foto, la carica nello Storage e scrive la riga.
  *
- * Il file va prima della riga: una riga senza file mostrerebbe un'immagine rotta. Se la riga poi non si scrive, il file
- * appena caricato si toglie (best effort: l'errore che si vede è quello della riga), così non resta un file senza riga.
+ * Il file va prima della riga: una riga senza file mostrerebbe un'immagine rotta. Se la riga poi viene rifiutata dal
+ * server, il file appena caricato si toglie (best effort: l'errore che si vede è quello della riga), così non resta un
+ * file senza riga. Se l'esito è incerto (errore di rete) il file resta, vedi sotto.
  * Il caricamento è con `upsert: false` (lo Storage non ha una policy di aggiornamento) e "esiste già" vale come riuscito:
  * è il file di un tentativo precedente con lo stesso id, quindi con la stessa foto. In quel caso, se la riga non si
  * scrive, il file non si tocca: non l'ha messo questo tentativo, e un nuovo tentativo con lo stesso id lo riusa. La riga
  * si scrive per id, quindi anche un tentativo ripetuto dopo una risposta persa non crea doppioni.
  */
 export async function caricaFoto(espId: string, d: DatiFoto): Promise<Foto> {
+  // Prima di comprimere: con un id che non è un uuid la riga e il vincolo sul percorso fallirebbero dopo il lavoro e il caricamento.
+  if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
+  if (!eUuid(d.id)) throw new Error('Identificativo della foto non valido.')
   const { blob, larghezza, altezza } = await comprimi(d.file)
   const percorso = percorsoFoto(espId, d.id)
 
@@ -66,10 +72,20 @@ export async function caricaFoto(espId: string, d: DatiFoto): Promise<Foto> {
   }
   const { error } = await supabase.from('foto').upsert(aRigaFoto(espId, foto), { onConflict: 'id' })
   if (error) {
-    if (nuovo) await togliFileSilenzioso(percorso)
+    // Il file si toglie solo se la riga di sicuro non c'è: una risposta vera di PostgREST (un `code` o uno stato HTTP).
+    // Con un errore di rete la richiesta potrebbe essere arrivata lo stesso: togliere il file lascerebbe una riga senza
+    // file, peggio di un file senza riga, che un nuovo tentativo con lo stesso id riusa ("esiste già").
+    if (nuovo && eRispostaDelServer(error)) await togliFileSilenzioso(percorso)
     throw error
   }
   return foto
+}
+
+/** Vero se l'errore è una risposta del server (PostgREST ha un `code` testuale, o c'è uno stato HTTP), non un guasto di rete o ignoto. */
+function eRispostaDelServer(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false
+  const { code, status } = e as { code?: unknown; status?: unknown }
+  return (typeof code === 'string' && code !== '') || typeof status === 'number'
 }
 
 /** Toglie un file senza mai lanciare: serve dopo un errore, che è quello che deve arrivare a chi chiama. */
@@ -178,7 +194,7 @@ export async function spazioFoto(espId: string): Promise<{ esperimento: number; 
 /**
  * Toglie dallo Storage tutti i file di un esperimento (la sua cartella `<esperimento_id>/`) e dice quanti. Serve prima di
  * eliminarlo: il database non può toccare lo Storage, e dopo l'eliminazione nessuno ne è più membro, quindi nessuno
- * potrebbe più rimuoverli. Si elenca e si toglie a pagine, sempre dall'inizio (quelli tolti spariscono dall'elenco).
+ * potrebbe più rimuoverli.
  * Lancia se l'elenco o la rimozione falliscono, e anche se una rimozione non toglie nulla pur essendoci file (accesso
  * negato in silenzio): niente giri a vuoto.
  */
@@ -186,16 +202,27 @@ export async function eliminaFileEsperimento(espId: string): Promise<number> {
   // Una stringa vuota o con `..` elencherebbe altro: l'id deve essere un uuid.
   if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
   const cartella = espId.toLowerCase()
-  let tolti = 0
-  for (;;) {
-    const { data, error } = await supabase.storage.from(BUCKET).list(cartella, { limit: PERCORSI_PER_RICHIESTA, offset: 0 })
+
+  // Prima si elenca tutta la cartella, poi si toglie: elencare mentre si toglie sposterebbe le posizioni. Contano solo i
+  // nomi `<uuid>.jpg` (le foto): le sottocartelle (voci senza id) e altri file, come il segnaposto che il servizio può
+  // creare in una cartella vuota, non sono nostri e non si toccano.
+  const nomi = new Set<string>()
+  for (let offset = 0; ; offset += PERCORSI_PER_RICHIESTA) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(cartella, { limit: PERCORSI_PER_RICHIESTA, offset })
     if (error) throw error
-    // Le voci senza id sono sottocartelle: nella cartella dell'esperimento non dovrebbero esserci, e non si toccano.
-    const percorsi = (data ?? []).filter(f => f.id).map(f => `${cartella}/${f.name}`)
-    if (percorsi.length === 0) return tolti
-    const { data: rimossi, error: erroreRimozione } = await supabase.storage.from(BUCKET).remove(percorsi)
-    if (erroreRimozione) throw erroreRimozione
+    const pagina = data ?? []
+    for (const f of pagina) if (f.id && NOME_FOTO.test(f.name)) nomi.add(f.name)
+    if (pagina.length < PERCORSI_PER_RICHIESTA) break
+  }
+
+  const percorsi = [...nomi].map(n => `${cartella}/${n}`)
+  let tolti = 0
+  for (let i = 0; i < percorsi.length; i += PERCORSI_PER_RICHIESTA) {
+    const { data: rimossi, error } = await supabase.storage.from(BUCKET).remove(percorsi.slice(i, i + PERCORSI_PER_RICHIESTA))
+    if (error) throw error
+    // Un accesso negato in silenzio non toglie nulla senza dare errore: non si può dire che l'esperimento sia pulito.
     if (!rimossi || rimossi.length === 0) throw new Error('Lo Storage non ha tolto i file richiesti.')
     tolti += rimossi.length
   }
+  return tolti
 }

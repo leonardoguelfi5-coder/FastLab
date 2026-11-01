@@ -1,4 +1,4 @@
-import { FOTO_NON_LEGGIBILE } from './errori'
+import { FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE } from './errori'
 import { leggiJpeg, type MetadatiJpeg } from './exif'
 
 /** Lato lungo massimo di una foto salvata, in pixel. */
@@ -9,6 +9,9 @@ export const BYTE_OBIETTIVO = 350 * 1024
 const QUALITA_INIZIALE = 85
 const QUALITA_MINIMA = 60
 const PASSO_QUALITA = 5
+
+/** Oltre questo peso una foto che non si decodifica è quasi sempre troppo grande per la memoria del telefono. */
+const BYTE_TROPPO_GRANDE = 15 * 1024 * 1024
 
 /** Quanto del file si legge per i metadati: l'APP1/EXIF sta nei primi byte e non supera i 64 KB. */
 const BYTE_INTESTAZIONE = 256 * 1024
@@ -25,6 +28,8 @@ export function dimensioniRidotte(larghezza: number, altezza: number): { larghez
  * La matrice di `setTransform` che disegna un'immagine salvata di `larghezza` x `altezza` pixel nella posizione che dice
  * il suo orientamento EXIF (1..8). Per 5..8 il canvas ha larghezza e altezza scambiate.
  */
+// Le matrici 2..4 (specchi e 180 gradi) oggi non sono usate: `orientamentoDaApplicare` non le restituisce mai, perché non si
+// può sapere se il browser le ha già applicate e quei casi si lasciano a lui. Restano per completezza della tabella EXIF.
 export function matriceOrientamento(orientamento: number, l: number, a: number): [number, number, number, number, number, number] {
   switch (orientamento) {
     case 2: return [-1, 0, 0, 1, l, 0]
@@ -92,7 +97,11 @@ async function conImmagine(file: Blob): Promise<Decodificata> {
     const img = new Image()
     img.src = url
     await img.decode()
-    return { sorgente: img, larghezza: img.naturalWidth, altezza: img.naturalHeight, chiudi: () => URL.revokeObjectURL(url) }
+    return {
+      sorgente: img, larghezza: img.naturalWidth, altezza: img.naturalHeight,
+      // Svuotare `src` libera i pixel decodificati: sui telefoni la memoria delle immagini non si recupera aspettando il GC.
+      chiudi: () => { img.src = ''; URL.revokeObjectURL(url) },
+    }
   } catch (e) {
     URL.revokeObjectURL(url)
     throw e
@@ -136,9 +145,10 @@ export async function comprimi(file: Blob): Promise<FotoCompressa> {
   try {
     immagine = await decodifica(file)
   } catch {
-    throw new Error(FOTO_NON_LEGGIBILE)
+    throw new Error('size' in file && file.size > BYTE_TROPPO_GRANDE ? FOTO_TROPPO_GRANDE : FOTO_NON_LEGGIBILE)
   }
 
+  let canvas: HTMLCanvasElement | undefined
   try {
     if (!(immagine.larghezza > 0 && immagine.altezza > 0)) throw new Error(FOTO_NON_LEGGIBILE)
     const orientamento = orientamentoDaApplicare(
@@ -150,7 +160,7 @@ export async function comprimi(file: Blob): Promise<FotoCompressa> {
     const finali = dimensioniRidotte(ruotata ? immagine.altezza : immagine.larghezza, ruotata ? immagine.larghezza : immagine.altezza)
     const disegno = ruotata ? { l: finali.altezza, a: finali.larghezza } : { l: finali.larghezza, a: finali.altezza }
 
-    const canvas = document.createElement('canvas')
+    canvas = document.createElement('canvas')
     canvas.width = finali.larghezza
     canvas.height = finali.altezza
     const ctx = canvas.getContext('2d')
@@ -159,6 +169,8 @@ export async function comprimi(file: Blob): Promise<FotoCompressa> {
     ctx.fillStyle = '#fff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     if (orientamento > 1) ctx.setTransform(...matriceOrientamento(orientamento, disegno.l, disegno.a))
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
     ctx.drawImage(immagine.sorgente, 0, 0, disegno.l, disegno.a)
 
     let blob = await codifica(canvas, QUALITA_INIZIALE / 100)
@@ -168,5 +180,7 @@ export async function comprimi(file: Blob): Promise<FotoCompressa> {
     return { blob, larghezza: finali.larghezza, altezza: finali.altezza }
   } finally {
     immagine.chiudi()
+    // Un canvas da 1600 px pesa circa 10 MB: azzerarlo lo libera subito (Safari li tiene nel conto della memoria).
+    if (canvas) canvas.width = canvas.height = 0
   }
 }

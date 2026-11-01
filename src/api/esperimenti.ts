@@ -87,7 +87,11 @@ export async function aggiornaEsperimento(espId: string, patch: Partial<Omit<Esp
  * Elimina un esperimento con tutto ciò che contiene. Prima toglie dallo Storage i file delle sue foto: il database
  * cancella a cascata le righe ma non può toccare lo Storage, e dopo l'eliminazione nessuno ne sarebbe più membro, quindi
  * i file resterebbero per sempre (e occuperebbero lo spazio). Se i file non si tolgono, l'esperimento non si elimina e
- * l'errore lo dice: si può riprovare, e i file già tolti non si ritrovano (la cartella si svuota a pagine).
+ * l'errore lo dice: si può riprovare, e i file già tolti non si ritrovano.
+ *
+ * Il caso opposto è senza rimedio: se i file si tolgono ma poi la riga dell'esperimento non si elimina (rete, permessi),
+ * l'esperimento resta con le foto rotte (righe senza file). Per questo la UI deve chiedere una conferma forte prima di
+ * chiamarla, e dire che le foto andranno perse anche se l'eliminazione non finisce.
  */
 export async function eliminaEsperimento(espId: string): Promise<void> {
   if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
-  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
+  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
 } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -29,6 +29,7 @@ describe('messaggioErrore', () => {
 
   it('foto non leggibile e foto dell\'esperimento non rimosse: i messaggi passano come sono', () => {
     expect(messaggioErrore(new Error(FOTO_NON_LEGGIBILE))).toBe(FOTO_NON_LEGGIBILE)
+    expect(messaggioErrore(new Error(FOTO_TROPPO_GRANDE))).toBe(FOTO_TROPPO_GRANDE)
     expect(messaggioErrore(new Error(FOTO_ESPERIMENTO_NON_RIMOSSE))).toBe(FOTO_ESPERIMENTO_NON_RIMOSSE)
     expect(FOTO_ESPERIMENTO_NON_RIMOSSE).toContain('non è stato eliminato')
   })

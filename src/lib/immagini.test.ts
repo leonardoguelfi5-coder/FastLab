@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { creaFileJpeg } from '@/test/jpeg'
-import { FOTO_NON_LEGGIBILE } from './errori'
+import { FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE } from './errori'
 import {
   BYTE_OBIETTIVO, comprimi, dataDiScatto, dimensioniRidotte, matriceOrientamento, orientamentoDaApplicare,
 } from './immagini'
@@ -86,7 +86,7 @@ describe('dataDiScatto', () => {
 
 // ---- comprimi, con un canvas e un decodificatore finti (jsdom non ha né l'uno né l'altro) ----
 
-interface CanvasFinto { width: number; height: number; contesto: ContestoFinto; richieste: number[] }
+interface CanvasFinto { width: number; height: number; contesto: ContestoFinto; richieste: number[]; dimensioni: number[] }
 interface ContestoFinto { chiamate: [string, ...unknown[]][] }
 
 let canvasCreati: CanvasFinto[]
@@ -100,13 +100,14 @@ function installaCanvas(opzioni: { contesto?: boolean } = {}) {
     if (nome !== 'canvas') return crea(nome)
     const contesto: ContestoFinto = { chiamate: [] }
     const canvas = {
-      width: 0, height: 0, contesto, richieste: [] as number[],
+      width: 0, height: 0, contesto, richieste: [] as number[], dimensioni: [] as number[],
       getContext: () => opzioni.contesto === false ? null : new Proxy({}, {
         set: (_t, p, v) => { contesto.chiamate.push(['set:' + String(p), v]); return true },
         get: (_t, p) => (...args: unknown[]) => { contesto.chiamate.push([String(p), ...args]) },
       }),
       toBlob(cb: (b: Blob | null) => void, tipo: string, qualita: number) {
         canvas.richieste.push(qualita)
+        canvas.dimensioni = [canvas.width, canvas.height] // il canvas si azzera a fine lavoro: le dimensioni si leggono qui
         expect(tipo).toBe('image/jpeg')
         cb(new Blob([new Uint8Array(byteA(qualita))], { type: tipo }))
       },
@@ -135,10 +136,20 @@ describe('comprimi', () => {
 
     expect([r.larghezza, r.altezza]).toEqual([1600, 1200])
     expect(r.blob.type).toBe('image/jpeg')
-    expect([canvasCreati[0].width, canvasCreati[0].height]).toEqual([1600, 1200])
+    expect(canvasCreati[0].dimensioni).toEqual([1600, 1200])
     expect(chiamata(canvasCreati[0], 'drawImage')?.slice(1)).toEqual([expect.anything(), 0, 0, 1600, 1200])
     expect(chiamata(canvasCreati[0], 'setTransform')).toBeUndefined()
     expect(chiudi).toHaveBeenCalled() // la bitmap non resta in memoria
+  })
+
+  it('azzera il canvas a fine lavoro e disegna con lo smoothing di qualità alta', async () => {
+    installaBitmap(4000, 3000)
+    await comprimi(creaFileJpeg())
+    expect([canvasCreati[0].width, canvasCreati[0].height]).toEqual([0, 0])
+    const nomi = canvasCreati[0].contesto.chiamate.map(c => c[0])
+    expect(canvasCreati[0].contesto.chiamate).toContainEqual(['set:imageSmoothingEnabled', true])
+    expect(canvasCreati[0].contesto.chiamate).toContainEqual(['set:imageSmoothingQuality', 'high'])
+    expect(nomi.indexOf('set:imageSmoothingQuality')).toBeLessThan(nomi.indexOf('drawImage'))
   })
 
   it('riempie lo sfondo di bianco prima di disegnare (un PNG trasparente non diventa nero)', async () => {
@@ -180,7 +191,7 @@ describe('comprimi', () => {
       installaBitmap(3000, 4000)
       const r = await comprimi(creaFileJpeg({ orientamento: 6, larghezza: 4000, altezza: 3000 }))
       expect([r.larghezza, r.altezza]).toEqual([1200, 1600])
-      expect([canvasCreati[0].width, canvasCreati[0].height]).toEqual([1200, 1600])
+      expect(canvasCreati[0].dimensioni).toEqual([1200, 1600])
       expect(chiamata(canvasCreati[0], 'setTransform')).toBeUndefined()
       expect(chiamata(canvasCreati[0], 'drawImage')?.slice(2)).toEqual([0, 0, 1200, 1600])
     })
@@ -189,7 +200,7 @@ describe('comprimi', () => {
       installaBitmap(4000, 3000)
       const r = await comprimi(creaFileJpeg({ orientamento: 6, larghezza: 4000, altezza: 3000 }))
       expect([r.larghezza, r.altezza]).toEqual([1200, 1600])
-      expect([canvasCreati[0].width, canvasCreati[0].height]).toEqual([1200, 1600])
+      expect(canvasCreati[0].dimensioni).toEqual([1200, 1600])
       // Il file salvato scalato è 1600 x 1200; la rotazione di 90 gradi in senso orario porta l'angolo a x = altezza.
       expect(chiamata(canvasCreati[0], 'setTransform')?.slice(1)).toEqual([0, 1, -1, 0, 1200, 0])
       expect(chiamata(canvasCreati[0], 'drawImage')?.slice(2)).toEqual([0, 0, 1600, 1200])
@@ -238,6 +249,16 @@ describe('comprimi', () => {
       expect(chiamata(canvasCreati[0], 'setTransform')).toBeDefined()
     })
 
+    it('a fine lavoro svuota src dell\'immagine, per liberarne i pixel', async () => {
+      installaImmagine(4000, 3000)
+      const istanze: { src: string }[] = []
+      const Base = (globalThis as unknown as { Image: new () => { src: string } }).Image
+      vi.stubGlobal('Image', class extends Base { constructor() { super(); istanze.push(this) } })
+      await comprimi(creaFileJpeg({ larghezza: 4000, altezza: 3000 }))
+      expect(istanze).toHaveLength(1)
+      expect(istanze[0].src).toBe('')
+    })
+
     it('se anche l\'immagine non si apre dice che la foto non è leggibile', async () => {
       const revoca = installaImmagine(4000, 3000, false)
       await expect(comprimi(creaFileJpeg())).rejects.toThrow(FOTO_NON_LEGGIBILE)
@@ -260,6 +281,16 @@ describe('comprimi', () => {
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
     vi.stubGlobal('Image', class { src = ''; decode() { return Promise.reject(new Error('no')) } })
     await expect(comprimi(new File(['x'], 'a.heic'))).rejects.toThrow(FOTO_NON_LEGGIBILE)
+  })
+
+  it('un file molto grande (oltre 15 MB) che non si decodifica ha un messaggio suo: la memoria del telefono', async () => {
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => { throw new Error('no') }))
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:finto')
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.stubGlobal('Image', class { src = ''; decode() { return Promise.reject(new Error('no')) } })
+    const grande = new File([new Uint8Array(16 * 1024 * 1024)], 'enorme.jpg', { type: 'image/jpeg' })
+    await expect(comprimi(grande)).rejects.toThrow(FOTO_TROPPO_GRANDE)
+    await expect(comprimi(new File(['x'], 'piccolo.jpg'))).rejects.toThrow(FOTO_NON_LEGGIBILE)
   })
 
   it('senza contesto 2D non si può comprimere: errore chiaro, bitmap liberata', async () => {

@@ -87,6 +87,32 @@ describe('caricaFoto', () => {
     await expect(caricaFoto(E, { id: ID, file, data: '2026-10-28' })).rejects.toBe(errore)
   })
 
+  it('un errore di rete sulla riga lascia il file: l\'esito è incerto e una riga senza file è peggio di un file senza riga', async () => {
+    const rete = new TypeError('Failed to fetch')
+    mock.risponde('foto', { error: rete })
+
+    await expect(caricaFoto(E, { id: ID, file, data: '2026-10-28' })).rejects.toBe(rete)
+
+    expect(mock.storage.di('remove')).toEqual([])
+  })
+
+  it('un errore senza code né stato (sconosciuto) lascia il file; con uno stato HTTP lo toglie', async () => {
+    mock.risponde('foto', { error: { message: 'boh' } })
+    await expect(caricaFoto(E, { id: ID, file, data: '2026-10-28' })).rejects.toBeDefined()
+    expect(mock.storage.di('remove')).toEqual([])
+
+    mock.risponde('foto', { error: { message: 'Bad Gateway', status: 502 } })
+    await expect(caricaFoto(E, { id: ID, file, data: '2026-10-28' })).rejects.toBeDefined()
+    expect(mock.storage.di('remove')).toHaveLength(1)
+  })
+
+  it('un id che non è un uuid (esperimento o foto) si rifiuta prima di comprimere', async () => {
+    await expect(caricaFoto('..', { id: ID, file, data: '2026-10-28' })).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
+    await expect(caricaFoto(E, { id: 'f1', file, data: '2026-10-28' })).rejects.toThrow('Identificativo della foto non valido.')
+    expect(comprimi).not.toHaveBeenCalled()
+    expect(mock.storage.di('upload')).toEqual([])
+  })
+
   it('un caricamento che fallisce non scrive nessuna riga e non toglie nulla', async () => {
     const e = { message: 'Payload too large', statusCode: '413' }
     mock.storage.risponde('upload', { error: e })
@@ -356,23 +382,54 @@ describe('spazioFoto', () => {
 })
 
 describe('eliminaFileEsperimento', () => {
-  const file = (nome: string) => ({ name: nome, id: `id-${nome}` })
+  const nome = (i: number) => `f000000${i}-0000-4000-8000-000000000000.jpg`
+  const file = (i: number) => ({ name: nome(i), id: `id-${i}` })
 
-  it('elenca la cartella dell\'esperimento e toglie i file, fino a che non è vuota', async () => {
-    mock.storage.risponde('list', (_a, volta) => ({ data: volta === 0 ? [file('a.jpg'), file('b.jpg')] : volta === 1 ? [file('c.jpg')] : [] }))
+  it('elenca tutta la cartella dell\'esperimento e poi toglie i file', async () => {
+    mock.storage.risponde('list', { data: [file(1), file(2), file(3)] })
     mock.storage.risponde('remove', args => ({ data: (args[0] as string[]).map(name => ({ name })) }))
 
     const n = await eliminaFileEsperimento(E)
 
     expect(n).toBe(3)
-    expect(mock.storage.di('list').map(c => c.args[0])).toEqual([E, E, E])
-    expect(mock.storage.di('remove').map(c => c.args[0])).toEqual([[`${E}/a.jpg`, `${E}/b.jpg`], [`${E}/c.jpg`]])
+    expect(mock.storage.di('list').map(c => c.args[0])).toEqual([E])
+    expect(mock.storage.di('remove').map(c => c.args[0])).toEqual([[`${E}/${nome(1)}`, `${E}/${nome(2)}`, `${E}/${nome(3)}`]])
+    expect(ordine('storage:foto.list', 'storage:foto.remove')).toEqual(['storage:foto.list', 'storage:foto.remove'])
   })
 
-  it('chiede le pagine da 100 file, dall\'inizio ogni volta (quelli tolti spariscono dall\'elenco)', async () => {
-    mock.storage.risponde('list', { data: [] })
-    await eliminaFileEsperimento(E)
-    expect(mock.storage.di('list')[0].args[1]).toMatchObject({ limit: 100, offset: 0 })
+  it('con più di 100 file elenca e toglie a pagine da 100', async () => {
+    const tutti = Array.from({ length: 250 }, (_, i) => ({ name: `${String(i).padStart(8, '0')}-0000-4000-8000-000000000000.jpg`, id: `i${i}` }))
+    mock.storage.risponde('list', args => ({ data: tutti.slice((args[1] as { offset: number }).offset, (args[1] as { offset: number }).offset + 100) }))
+    mock.storage.risponde('remove', args => ({ data: (args[0] as string[]).map(name => ({ name })) }))
+
+    expect(await eliminaFileEsperimento(E)).toBe(250)
+
+    expect(mock.storage.di('list').map(c => (c.args[1] as { offset: number }).offset)).toEqual([0, 100, 200])
+    expect(mock.storage.di('remove').map(c => (c.args[0] as string[]).length)).toEqual([100, 100, 50])
+  })
+
+  it('un segnaposto della cartella (.emptyFolderPlaceholder) o altri nomi estranei si ignorano e l\'eliminazione finisce', async () => {
+    mock.storage.risponde('list', { data: [{ name: '.emptyFolderPlaceholder', id: 'p' }, file(1), { name: 'nota.txt', id: 'n' }] })
+    mock.storage.risponde('remove', args => ({ data: (args[0] as string[]).map(name => ({ name })) }))
+
+    expect(await eliminaFileEsperimento(E)).toBe(1)
+    expect(mock.storage.di('remove')[0].args[0]).toEqual([`${E}/${nome(1)}`])
+  })
+
+  it('una cartella con solo nomi estranei finisce senza errore e senza rimozioni', async () => {
+    mock.storage.risponde('list', { data: [{ name: '.emptyFolderPlaceholder', id: 'p' }] })
+    expect(await eliminaFileEsperimento(E)).toBe(0)
+    expect(mock.storage.di('remove')).toEqual([])
+    expect(mock.storage.di('list')).toHaveLength(1)
+  })
+
+  it('un segnaposto in prima pagina non nasconde le foto delle pagine dopo', async () => {
+    const pagina1 = [{ name: '.emptyFolderPlaceholder', id: 'p' }, ...Array.from({ length: 99 }, (_, i) => ({ name: `a${String(i).padStart(7, '0')}-0000-4000-8000-000000000000.jpg`, id: `a${i}` }))]
+    const pagina2 = [{ name: 'b0000000-0000-4000-8000-000000000000.jpg', id: 'b' }]
+    mock.storage.risponde('list', (_a, volta) => ({ data: volta === 0 ? pagina1 : pagina2 }))
+    mock.storage.risponde('remove', args => ({ data: (args[0] as string[]).map(name => ({ name })) }))
+
+    expect(await eliminaFileEsperimento(E)).toBe(100)
   })
 
   it('senza file non toglie niente', async () => {
@@ -389,24 +446,21 @@ describe('eliminaFileEsperimento', () => {
 
   it('un errore nella rimozione si propaga e non si va avanti', async () => {
     const e = { message: 'rete' }
-    mock.storage.risponde('list', { data: [file('a.jpg')] })
+    mock.storage.risponde('list', { data: [file(1)] })
     mock.storage.risponde('remove', { error: e })
     await expect(eliminaFileEsperimento(E)).rejects.toBe(e)
-    expect(mock.storage.di('list')).toHaveLength(1)
   })
 
-  it('una rimozione che non toglie nulla (accesso negato in silenzio) non gira a vuoto: errore', async () => {
-    mock.storage.risponde('list', { data: [file('a.jpg')] })
+  it('una rimozione che non toglie nulla (accesso negato in silenzio) è un errore', async () => {
+    mock.storage.risponde('list', { data: [file(1)] })
     mock.storage.risponde('remove', { data: [] })
     await expect(eliminaFileEsperimento(E)).rejects.toThrow()
-    expect(mock.storage.di('list')).toHaveLength(1)
   })
 
-  it('le sottocartelle (voci senza id) non si toccano e non fanno girare a vuoto', async () => {
-    mock.storage.risponde('list', { data: [{ name: 'sotto', id: null }] })
+  it('le sottocartelle (voci senza id) non si toccano', async () => {
+    mock.storage.risponde('list', { data: [{ name: nome(1), id: null }] })
     expect(await eliminaFileEsperimento(E)).toBe(0)
     expect(mock.storage.di('remove')).toEqual([])
-    expect(mock.storage.di('list')).toHaveLength(1)
   })
 
   it('un id che non è un uuid non elenca niente (una stringa vuota elencherebbe tutto il bucket)', async () => {

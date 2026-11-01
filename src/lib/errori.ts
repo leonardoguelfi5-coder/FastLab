@@ -26,6 +26,9 @@ export function eNomeGiaNelCatalogo(e: unknown): boolean {
 /** Una foto che il browser non sa aprire (formato non supportato, file rovinato). */
 export const FOTO_NON_LEGGIBILE = 'Non riesco ad aprire questa foto: prova con un\'altra o con una foto in formato JPEG.'
 
+/** Una foto che il browser non riesce a decodificare ed è molto grande (oltre 15 MB): di solito è la memoria del telefono. */
+export const FOTO_TROPPO_GRANDE = 'Foto troppo grande da elaborare sul telefono: scattala con una risoluzione più bassa.'
+
 /** `eliminaEsperimento` non è riuscito a togliere i file delle foto dallo Storage: l'esperimento è rimasto com'era. */
 export const FOTO_ESPERIMENTO_NON_RIMOSSE =
   'Non sono riuscito a eliminare le foto dell\'esperimento, quindi l\'esperimento non è stato eliminato. Riprova.'
@@ -81,7 +84,7 @@ export function messaggioErrore(e: unknown): string {
   }
   // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
   if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO, SENZA_SESSIONE,
-    FOTO_NON_LEGGIBILE, FOTO_ESPERIMENTO_NON_RIMOSSE].includes(messaggio)) {
+    FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, FOTO_ESPERIMENTO_NON_RIMOSSE].includes(messaggio)) {
     return messaggio
   }
   if (code === '23505' && messaggio.includes('catalogo_strumenti_nome_unico')) return MSG_NOME_NEL_CATALOGO
