@@ -41,4 +41,5 @@ Task B5: review (sonnet) → Approved (0 Critical/Important), 1466 Vitest, build
 Task B5: minor 2 corretto dal controller (la riga della data di rilievo si cerca per strumento, non per indice)
 Task B5: minor (deferred): con data di rilievo diversa da oggi la riga mostra il progresso di oggi ma il tocco riprende il giro dell'altra data (spiegato dal banner); due valori anomali nello stesso trattamento e giorno si coprono a vicenda; con più misure in un giorno il tocco apre l'ultima, il valore mostrato è la media del giorno
 Task B5: complete (commits 1e1ed8b..564d4be + correzione del controller)
-Task B6: README (Oggi, Piante, scheda, test del DB, struttura) aggiornato dal controller; verifica: 197 pgTAP PASS (emulato), 1467 Vitest, tsc 0, lint 0, build OK
+Task B6: README (Oggi, Piante, scheda, test del DB, struttura) aggiornato dal controller; verifica: 196 pgTAP PASS (emulato), 1467 Vitest, tsc 0, lint 0, build OK
+Task B6: migration 0011 applicata al progetto Supabase online (connettore); deploy di produzione di fastlab-v3 dal ramo
