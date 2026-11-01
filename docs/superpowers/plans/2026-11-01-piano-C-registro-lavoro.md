@@ -55,3 +55,6 @@ Task C6: implementatore (sonnet) DONE_WITH_CONCERNS c4d3b64 — 1899 Vitest, bui
 Ruling: filtro delle note in eliminazione al disegno (`senzaNoteInEliminazione`), non in `useNote` (un `select` lascerebbe nascosta la nota dopo Annulla) — cost if wrong: none
 Ruling: la sezione "Foto" della scheda si riduce a "Aggiungi foto" (le miniature stanno nella Storia), fatto nel fix del C5; visore della Storia per giorno accettato — cost if wrong: small
 Task C6: dispatched reviewer (sonnet) su copia; Task C5 fix round 1 dispatched (implementatore C5, sopra c4d3b64)
+Task C5: fix round 1 implemented dd2f81a (1914 Vitest; i test del filtro diventano rossi senza filtro): toast tardivo per le foto in errore allo smontaggio; data del visore salvata da sola (700 ms, flush uscendo, mai date < 2000 o incomplete, Riprova); stato del caricamento sotto il modulo con "!" sul 📷; `rotta` legata all'url; fuoco dopo eliminazione; `FotoPianta` = solo "Aggiungi foto" (niente link alla galleria: il filtro è per testo, troverebbe altre piante); `StoriaPianta` mostra anche l'errore di lettura delle foto
+Task C5: fix round 1/5; complete (commits e90d876..dd2f81a)
+Task C7: dispatched implementer (sonnet), BASE dd2f81a
