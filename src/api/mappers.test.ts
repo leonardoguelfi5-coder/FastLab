@@ -265,14 +265,22 @@ describe('foto', () => {
   const ID = 'f0000000-0000-4000-8000-000000000002'
   const riga: RigaFoto = {
     id: ID, esperimento_id: E, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
-    pianta_id: 'p1', nota_id: null, archiviata: false, creato_da: 'u1', creato_il: '2026-11-01T08:00:00+00:00',
+    pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null, creato_da: 'u1', creato_il: '2026-11-01T08:00:00+00:00',
   }
 
   it('daRigaFoto porta nel dominio le colonne della foto e lascia nel database esperimento_id, creato_da e creato_il', () => {
     expect(daRigaFoto(riga)).toEqual({
       id: ID, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
-      pianta_id: 'p1', nota_id: null, archiviata: false,
+      pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null,
     })
+  })
+
+  it('daRigaFoto porta la data dell\'archiviazione, e senza la colonna (database non ancora aggiornato) è null', () => {
+    expect(daRigaFoto({ ...riga, archiviata: true, archiviata_il: '2026-11-01T10:00:00+00:00' }))
+      .toMatchObject({ archiviata: true, archiviata_il: '2026-11-01T10:00:00+00:00' })
+    const senza: Partial<RigaFoto> = { ...riga }
+    delete senza.archiviata_il
+    expect(daRigaFoto(senza as RigaFoto).archiviata_il).toBeNull()
   })
 
   it('aRigaFoto scrive solo colonne scrivibili: mai creato_da, mai archiviata (la cambia solo l\'archivio)', () => {

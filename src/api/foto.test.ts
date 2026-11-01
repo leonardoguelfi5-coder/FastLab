@@ -9,7 +9,7 @@ import { simulaSupabase } from '@/test/supabase-mock'
 import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import type { Foto } from '@/domain/tipi'
 import {
-  aggiornaFoto, caricaFoto, eliminaFileEsperimento, eliminaFoto, listaFoto, spazioFoto, urlFoto,
+  aggiornaFoto, archiviaFileFoto, caricaFoto, eliminaFileEsperimento, eliminaFoto, listaFoto, spazioFoto, urlFoto,
 } from './foto'
 
 const E = 'e0000000-0000-4000-8000-000000000001'
@@ -20,7 +20,7 @@ const giaEsiste = { name: 'StorageApiError', message: 'The resource already exis
 
 const foto: Foto = {
   id: ID, data: '2026-11-01', percorso: PERCORSO, larghezza: 1600, altezza: 1200, byte: 250000,
-  pianta_id: null, nota_id: null, archiviata: false,
+  pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null,
 }
 
 let mock: ReturnType<typeof simulaSupabase>
@@ -54,7 +54,7 @@ describe('caricaFoto', () => {
     ]])
     expect(f).toEqual({
       id: ID, data: '2026-10-28', percorso: PERCORSO, larghezza: 1600, altezza: 1200, byte: 250000,
-      pianta_id: 'p1', nota_id: null, archiviata: false,
+      pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null,
     })
   })
 
@@ -196,7 +196,7 @@ describe('listaFoto', () => {
   }
   const riga = (i: number) => ({
     id: `f${i}`, esperimento_id: E, data: '2026-11-01', percorso: `${E}/f${i}.jpg`, larghezza: 1600, altezza: 1200, byte: 1000,
-    pianta_id: null, nota_id: null, archiviata: false, creato_da: 'u1', creato_il: '2026-11-01T08:00:00Z',
+    pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null, creato_da: 'u1', creato_il: '2026-11-01T08:00:00Z',
   })
 
   it('legge le foto dell\'esperimento, dalla data più recente, fino a una pagina vuota', async () => {
@@ -467,5 +467,135 @@ describe('eliminaFileEsperimento', () => {
     await expect(eliminaFileEsperimento('')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
     await expect(eliminaFileEsperimento('../altro')).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
     expect(mock.storage.di('list')).toEqual([])
+  })
+})
+
+describe('archiviaFileFoto', () => {
+  const idDi = (i: number) => `f${String(i).padStart(7, '0')}-0000-4000-8000-000000000000`
+  const fotoN = (i: number): Foto => ({ ...foto, id: idDi(i), percorso: `${E}/${idDi(i)}.jpg` })
+  const elenco = (n: number) => Array.from({ length: n }, (_, i) => fotoN(i + 1))
+  /** Il file `i` nello Storage, come lo elenca `list`. */
+  const file = (i: number) => ({ name: `${idDi(i)}.jpg`, id: `o${i}` })
+  const rimuovi = (args: unknown[]) => ({ data: (args[0] as string[]).map(name => ({ name })) })
+  /** Gli update sulle righe: i valori scritti e gli id colpiti. */
+  const aggiornamenti = () => {
+    const out: { valori: unknown; ids: unknown }[] = []
+    let corrente: { valori?: unknown; ids?: unknown } = {}
+    for (const c of mock.di('foto')) {
+      if (c.metodo === 'update') corrente = { valori: c.args[0] }
+      if (c.metodo === 'in') { corrente.ids = c.args[1]; out.push(corrente as { valori: unknown; ids: unknown }) }
+    }
+    return out
+  }
+  /** Gli update riescono e rispondono con una riga per id colpito. */
+  const aggiornaRiuscito = () => mock.risponde('foto', () => ({ data: mock.di('foto').filter(c => c.metodo === 'in').slice(-1).flatMap(c => (c.args[1] as string[]).map(id => ({ id }))) }))
+
+  it('toglie i file a gruppi da 100 e segna archiviate, con la data, le foto il cui file è stato tolto', async () => {
+    mock.storage.risponde('list', { data: [file(1), file(2), file(3)] })
+    mock.storage.risponde('remove', rimuovi)
+    aggiornaRiuscito()
+
+    const n = await archiviaFileFoto(E, elenco(3))
+
+    expect(n).toBe(3)
+    expect(mock.storage.di('remove').map(c => c.args[0])).toEqual([[1, 2, 3].map(i => `${E}/${idDi(i)}.jpg`)])
+    const [u] = aggiornamenti()
+    expect(u.ids).toEqual([1, 2, 3].map(idDi))
+    expect(u.valori).toEqual({ archiviata: true, archiviata_il: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) })
+    expect(mock.di('foto').some(c => c.metodo === 'eq' && c.args[0] === 'esperimento_id' && c.args[1] === E)).toBe(true)
+    // Prima si guarda cosa c'è, poi si toglie, poi si scrive.
+    expect(ordine('storage:foto.list', 'storage:foto.remove', 'foto.update')).toEqual(['storage:foto.list', 'storage:foto.remove', 'foto.update'])
+  })
+
+  it('con più di 100 foto toglie e segna a gruppi da 100: le righe seguono i file, gruppo per gruppo', async () => {
+    const tutte = elenco(250)
+    mock.storage.risponde('list', args => ({ data: tutte.slice((args[1] as { offset: number }).offset, (args[1] as { offset: number }).offset + 100).map((_, i) => file((args[1] as { offset: number }).offset + i + 1)) }))
+    mock.storage.risponde('remove', rimuovi)
+    aggiornaRiuscito()
+
+    expect(await archiviaFileFoto(E, tutte)).toBe(250)
+
+    expect(mock.storage.di('remove').map(c => (c.args[0] as string[]).length)).toEqual([100, 100, 50])
+    expect(aggiornamenti().map(u => (u.ids as string[]).length)).toEqual([100, 100, 50])
+    expect(ordine('storage:foto.remove', 'foto.update')).toEqual([
+      'storage:foto.remove', 'foto.update', 'storage:foto.remove', 'foto.update', 'storage:foto.remove', 'foto.update',
+    ])
+  })
+
+  it('segna archiviata solo la foto il cui file è stato davvero tolto: una voce non restituita da remove resta com\'è, e si dice', async () => {
+    mock.storage.risponde('list', { data: [file(1), file(2)] })
+    mock.storage.risponde('remove', args => ({ data: (args[0] as string[]).filter(p => p.includes(idDi(1))).map(name => ({ name })) }))
+    aggiornaRiuscito()
+
+    await expect(archiviaFileFoto(E, elenco(2))).rejects.toThrow(/1 file/)
+
+    expect(aggiornamenti().map(u => u.ids)).toEqual([[idDi(1)]])
+  })
+
+  it('se la rimozione dà errore non segna niente', async () => {
+    const e = { message: 'rete' }
+    mock.storage.risponde('list', { data: [file(1)] })
+    mock.storage.risponde('remove', { error: e })
+
+    await expect(archiviaFileFoto(E, elenco(1))).rejects.toBe(e)
+    expect(aggiornamenti()).toEqual([])
+  })
+
+  it('se l\'update fallisce dopo la rimozione l\'errore arriva a chi chiama; il nuovo giro segna le foto il cui file non c\'è più, senza togliere altro', async () => {
+    const e = { code: '57014', message: 'timeout', details: '', hint: '' }
+    mock.storage.risponde('list', { data: [file(1), file(2)] })
+    mock.storage.risponde('remove', rimuovi)
+    mock.risponde('foto', { error: e })
+    await expect(archiviaFileFoto(E, elenco(2))).rejects.toBe(e)
+    expect(mock.storage.di('remove')).toHaveLength(1)
+
+    // Secondo giro: i file ora non ci sono più, le righe risultano ancora non archiviate.
+    mock.storage.risponde('list', { data: [] })
+    aggiornaRiuscito()
+    expect(await archiviaFileFoto(E, elenco(2))).toBe(2)
+
+    expect(mock.storage.di('remove')).toHaveLength(1)
+    expect(aggiornamenti().slice(-1).map(u => u.ids)).toEqual([[idDi(1), idDi(2)]])
+  })
+
+  it('un giro misto: segna quelle già senza file e toglie le altre', async () => {
+    mock.storage.risponde('list', { data: [file(2)] })
+    mock.storage.risponde('remove', rimuovi)
+    aggiornaRiuscito()
+
+    expect(await archiviaFileFoto(E, elenco(2))).toBe(2)
+
+    expect(mock.storage.di('remove').map(c => c.args[0])).toEqual([[`${E}/${idDi(2)}.jpg`]])
+    expect(aggiornamenti().map(u => u.ids)).toEqual([[idDi(1)], [idDi(2)]])
+  })
+
+  it('tocca solo le foto date: un file di una foto non in elenco non si rimuove né si segna', async () => {
+    mock.storage.risponde('list', { data: [file(1), file(2), file(9)] })
+    mock.storage.risponde('remove', rimuovi)
+    aggiornaRiuscito()
+
+    await archiviaFileFoto(E, elenco(2))
+
+    expect(mock.storage.di('remove').flatMap(c => c.args[0] as string[])).not.toContain(`${E}/${idDi(9)}.jpg`)
+    expect(aggiornamenti().flatMap(u => u.ids as string[])).not.toContain(idDi(9))
+  })
+
+  it('senza foto non fa niente', async () => {
+    expect(await archiviaFileFoto(E, [])).toBe(0)
+    expect(mock.chiamate).toEqual([])
+  })
+
+  it('un errore nell\'elenco dello Storage si propaga e non si toglie né si segna niente', async () => {
+    const e = { message: 'rete' }
+    mock.storage.risponde('list', { error: e })
+    await expect(archiviaFileFoto(E, elenco(1))).rejects.toBe(e)
+    expect(mock.storage.di('remove')).toEqual([])
+    expect(aggiornamenti()).toEqual([])
+  })
+
+  it('una foto il cui percorso non è quello dell\'esperimento si rifiuta prima di toccare qualcosa', async () => {
+    await expect(archiviaFileFoto(E, [{ ...fotoN(1), percorso: 'altro/x.jpg' }])).rejects.toThrow()
+    expect(mock.chiamate).toEqual([])
+    await expect(archiviaFileFoto('../altro', elenco(1))).rejects.toThrow(ESPERIMENTO_NON_TROVATO)
   })
 })

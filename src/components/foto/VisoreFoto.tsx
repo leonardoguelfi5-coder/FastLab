@@ -8,7 +8,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { descriviFoto } from '@/domain/foto'
+import { descriviFoto, testoArchiviata } from '@/domain/foto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
@@ -180,7 +180,7 @@ function Immagine({ foto, url, urlLetti, descrizione }: { foto: Foto; url: strin
   // L'URL che non si è caricato: un URL nuovo (rinnovato, o un'altra foto) riparte da capo.
   const [urlRotto, setUrlRotto] = useState<string | null>(null)
   const rotta = url !== undefined && urlRotto === url
-  if (foto.archiviata) return <p className="px-6 text-center text-grafite-tenue">Archiviata nel .zip</p>
+  if (foto.archiviata) return <p className="px-6 text-center text-grafite-tenue">{testoArchiviata(foto)}</p>
   if (url && !rotta) {
     return <img src={url} alt={descrizione} draggable={false} onError={() => setUrlRotto(url)} className="max-h-full max-w-full object-contain" />
   }

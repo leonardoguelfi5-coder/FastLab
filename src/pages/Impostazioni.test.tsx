@@ -24,7 +24,7 @@ vi.mock('@/api/configurazione', () => ({
 }))
 vi.mock('@/api/foto', () => ({
   listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
-  VALIDITA_URL_SECONDI: 3600,
+  archiviaFileFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/api/catalogo', () => ({
   listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
@@ -37,7 +37,7 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
 import { listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
-import { spazioFoto } from '@/api/foto'
+import { listaFoto, spazioFoto } from '@/api/foto'
 import {
   aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro,
   eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaParametro, salvaStrumento, strumentiConDati,
@@ -111,6 +111,7 @@ beforeEach(() => {
   // Nessuna nota o foto: non si può eliminare solo la pianta 1, quella con le misure.
   vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1')]))
   vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 12_340_000, progetto: 456_700_000 })
+  vi.mocked(listaFoto).mockResolvedValue([])
   // Le misure della pianta 1 sono col Termometro; gli altri strumenti non ne hanno.
   vi.mocked(strumentiConDati).mockImplementation(async () => new Set([strum('Termometro').id]))
   vi.mocked(listaCatalogo).mockResolvedValue(SEMI_CATALOGO)
@@ -515,6 +516,25 @@ describe('Impostazioni: spazio delle foto', () => {
     await dentro.findByText('1200 MB')
     expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '100')
     expect(dentro.getByText(/Oltre l'80%/)).toBeInTheDocument()
+  })
+
+  it('un esperimento in corso spiega che l\'archivio .zip si fa a esperimento concluso, e dove si conclude', async () => {
+    apri()
+    const dentro = within(await spazio())
+    expect(await dentro.findByText(/quando l'esperimento è concluso/)).toBeInTheDocument()
+    expect(dentro.queryByRole('button', { name: 'Scarica le foto (.zip)' })).not.toBeInTheDocument()
+  })
+
+  it('un esperimento concluso offre «Scarica le foto (.zip)» e non «Libera lo spazio» finché non si è scaricato', async () => {
+    vi.mocked(listaFoto).mockResolvedValue([{
+      id: 'f1', data: '2026-10-28', percorso: 'E/f1.jpg', larghezza: 1, altezza: 1, byte: 1, pianta_id: null, nota_id: null,
+      archiviata: false, archiviata_il: null,
+    }])
+    vi.mocked(caricaConfig).mockImplementation(async () => structuredClone({ ...config, esperimento: { ...config.esperimento, stato: 'concluso' as const } }))
+    apri()
+    const dentro = within(await spazio())
+    expect(await dentro.findByRole('button', { name: 'Scarica le foto (.zip)' })).toBeInTheDocument()
+    expect(dentro.queryByRole('button', { name: 'Libera lo spazio' })).not.toBeInTheDocument()
   })
 
   it('mentre calcola non dà numeri; se non riesce lo dice con «Riprova»', async () => {

@@ -1,4 +1,4 @@
-import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
+import { ErroreApp, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import { comprimi } from '@/lib/immagini'
 import { eUuid } from '@/lib/percorsi'
 import { supabase } from '@/lib/supabase'
@@ -68,7 +68,7 @@ export async function caricaFoto(espId: string, d: DatiFoto): Promise<Foto> {
 
   const foto: Foto = {
     id: d.id, data: d.data, percorso, larghezza, altezza, byte: blob.size,
-    pianta_id: d.piantaId ?? null, nota_id: d.notaId ?? null, archiviata: false,
+    pianta_id: d.piantaId ?? null, nota_id: d.notaId ?? null, archiviata: false, archiviata_il: null,
   }
   const { error } = await supabase.from('foto').upsert(aRigaFoto(espId, foto), { onConflict: 'id' })
   if (error) {
@@ -192,6 +192,23 @@ export async function spazioFoto(espId: string): Promise<{ esperimento: number; 
 }
 
 /**
+ * I nomi dei file delle foto nella cartella di un esperimento (`<uuid>.jpg`), letti a pagine. Contano solo i nomi
+ * `<uuid>.jpg` (le foto): le sottocartelle (voci senza id) e altri file, come il segnaposto che il servizio può creare in
+ * una cartella vuota, non sono nostri e non si toccano. Lancia se l'elenco fallisce.
+ */
+async function nomiFileFoto(cartella: string): Promise<Set<string>> {
+  const nomi = new Set<string>()
+  for (let offset = 0; ; offset += PERCORSI_PER_RICHIESTA) {
+    const { data, error } = await supabase.storage.from(BUCKET).list(cartella, { limit: PERCORSI_PER_RICHIESTA, offset })
+    if (error) throw error
+    const pagina = data ?? []
+    for (const f of pagina) if (f.id && NOME_FOTO.test(f.name)) nomi.add(f.name)
+    if (pagina.length < PERCORSI_PER_RICHIESTA) break
+  }
+  return nomi
+}
+
+/**
  * Toglie dallo Storage tutti i file di un esperimento (la sua cartella `<esperimento_id>/`) e dice quanti. Serve prima di
  * eliminarlo: il database non può toccare lo Storage, e dopo l'eliminazione nessuno ne è più membro, quindi nessuno
  * potrebbe più rimuoverli.
@@ -203,17 +220,8 @@ export async function eliminaFileEsperimento(espId: string): Promise<number> {
   if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
   const cartella = espId.toLowerCase()
 
-  // Prima si elenca tutta la cartella, poi si toglie: elencare mentre si toglie sposterebbe le posizioni. Contano solo i
-  // nomi `<uuid>.jpg` (le foto): le sottocartelle (voci senza id) e altri file, come il segnaposto che il servizio può
-  // creare in una cartella vuota, non sono nostri e non si toccano.
-  const nomi = new Set<string>()
-  for (let offset = 0; ; offset += PERCORSI_PER_RICHIESTA) {
-    const { data, error } = await supabase.storage.from(BUCKET).list(cartella, { limit: PERCORSI_PER_RICHIESTA, offset })
-    if (error) throw error
-    const pagina = data ?? []
-    for (const f of pagina) if (f.id && NOME_FOTO.test(f.name)) nomi.add(f.name)
-    if (pagina.length < PERCORSI_PER_RICHIESTA) break
-  }
+  // Prima si elenca tutta la cartella, poi si toglie: elencare mentre si toglie sposterebbe le posizioni.
+  const nomi = await nomiFileFoto(cartella)
 
   const percorsi = [...nomi].map(n => `${cartella}/${n}`)
   let tolti = 0
@@ -225,4 +233,63 @@ export async function eliminaFileEsperimento(espId: string): Promise<number> {
     tolti += rimossi.length
   }
   return tolti
+}
+
+/** Segna archiviate (con la data di adesso) le righe date: `archiviata` e `archiviata_il` insieme, come impone il database. Dice quante ne ha toccate. */
+async function segnaArchiviate(espId: string, ids: string[], adesso: string): Promise<number> {
+  if (ids.length === 0) return 0
+  const { data, error } = await supabase
+    .from('foto')
+    .update({ archiviata: true, archiviata_il: adesso })
+    .eq('esperimento_id', espId)
+    .in('id', ids)
+    .select('id')
+  controllaRighe({ data, error })
+  return data?.length ?? 0
+}
+
+/**
+ * Libera lo spazio di foto già scaricate nell'archivio .zip: toglie i loro file dallo Storage e segna le righe
+ * archiviate. Le righe restano. Le `foto` sono quelle da archiviare (non già archiviate); ogni altra foto, anche
+ * un'altra che ha il file nella stessa cartella, non si tocca. Dice quante righe ha segnato.
+ *
+ * Coerenza tra file e righe, a gruppi da 100:
+ * 1. Prima si elenca la cartella. Una foto il cui file non c'è già (un giro precedente l'aveva tolto ma la riga non si
+ *    era aggiornata: errore di rete tra la rimozione e l'update) si segna subito archiviata. Per le foto date il file
+ *    c'è stato di sicuro (è nello zip), quindi la sua assenza non può che essere una rimozione nostra.
+ * 2. Poi per ogni gruppo si tolgono i file e SOLO per i nomi che `remove` restituisce, cioè i file davvero rimossi, si
+ *    aggiornano le righe, prima di passare al gruppo dopo. Un file non rimosso (accesso negato in silenzio) lascia la
+ *    sua foto com'è, con il file: alla fine si lancia un errore, e un nuovo giro riprova solo quelle.
+ * 3. Se è l'update a fallire dopo una rimozione riuscita, l'errore arriva a chi chiama: il file non c'è più e la riga dice
+ *    ancora "non archiviata", ma il passo 1 del giro dopo la sistema. Nessun file va perso senza che lo zip lo abbia.
+ */
+export async function archiviaFileFoto(espId: string, foto: Foto[]): Promise<number> {
+  if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
+  // Il percorso di una riga è sempre `<esperimento>/<id>.jpg` (lo impone il database): se non lo è, qualcosa non va e non si tocca niente.
+  for (const f of foto) if (f.percorso !== percorsoFoto(espId, f.id)) throw new Error('Percorso della foto non valido.')
+  if (foto.length === 0) return 0
+
+  const cartella = espId.toLowerCase()
+  const esistenti = await nomiFileFoto(cartella)
+  const nomeDi = (f: Foto) => f.percorso.slice(cartella.length + 1)
+  const adesso = new Date().toISOString()
+
+  let archiviate = await segnaArchiviate(espId, foto.filter(f => !esistenti.has(nomeDi(f))).map(f => f.id), adesso)
+
+  const daTogliere = foto.filter(f => esistenti.has(nomeDi(f)))
+  let nonTolti = 0
+  for (let i = 0; i < daTogliere.length; i += PERCORSI_PER_RICHIESTA) {
+    const gruppo = daTogliere.slice(i, i + PERCORSI_PER_RICHIESTA)
+    const { data: rimossi, error } = await supabase.storage.from(BUCKET).remove(gruppo.map(f => f.percorso))
+    if (error) throw error
+    // Il servizio dà il nome completo nel bucket; si accetta anche solo il nome del file, per non dipendere dal formato.
+    const tolti = new Set((rimossi ?? []).flatMap(r => [r.name, r.name.split('/').pop() ?? '']))
+    const fatti = gruppo.filter(f => tolti.has(f.percorso) || tolti.has(nomeDi(f)))
+    nonTolti += gruppo.length - fatti.length
+    archiviate += await segnaArchiviate(espId, fatti.map(f => f.id), adesso)
+  }
+  if (nonTolti > 0) {
+    throw new ErroreApp(nonTolti === 1 ? 'Lo Storage non ha tolto 1 file: la sua foto resta com\'è.' : `Lo Storage non ha tolto ${nonTolti} file: le loro foto restano come sono.`)
+  }
+  return archiviate
 }

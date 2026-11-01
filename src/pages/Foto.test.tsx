@@ -47,7 +47,7 @@ const trattamentoDi = (etichetta: string) => config.trattamenti.find(t => t.id =
 
 const foto = (id: string, extra: Partial<FotoTipo> = {}): FotoTipo => ({
   id, data: '2026-10-28', percorso: `E/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 200000,
-  pianta_id: null, nota_id: null, archiviata: false, ...extra,
+  pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null, ...extra,
 })
 
 function apri() {
@@ -158,6 +158,13 @@ describe('Foto: la galleria', () => {
     expect(vi.mocked(urlFoto).mock.calls.flat(2)).not.toContain('E/z.jpg')
     expect(screen.getAllByText('Archiviata nel .zip')).toHaveLength(1)
     expect(document.querySelectorAll('img')).toHaveLength(1)
+  })
+
+  it('il segnaposto di una foto archiviata dice il giorno dell\'archiviazione', async () => {
+    db = [foto('z', { archiviata: true, archiviata_il: '2026-11-03T12:00:00Z' })]
+    apri()
+    await attesa()
+    expect(screen.getByText('Archiviata nel .zip del 03/11')).toBeInTheDocument()
   })
 
   it('le miniature sono bersagli da almeno 44 px', async () => {
@@ -405,6 +412,14 @@ describe('Foto: il visore', () => {
     await r.utente.click(miniature()[0])
     expect(nelVisore().getByText('Archiviata nel .zip')).toBeInTheDocument()
     expect(nelVisore().queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('il segnaposto del visore dice il giorno dell\'archiviazione', async () => {
+    db = [foto('z', { archiviata: true, archiviata_il: '2026-11-03T12:00:00Z' })]
+    const r = apri()
+    await attesa()
+    await r.utente.click(miniature()[0])
+    expect(nelVisore().getByText('Archiviata nel .zip del 03/11')).toBeInTheDocument()
   })
 
   describe('la data', () => {

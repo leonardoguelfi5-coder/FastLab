@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { descriviFoto, raggruppaPerData } from '@/domain/foto'
+import { descriviFoto, raggruppaPerData, testoArchiviata } from '@/domain/foto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { eliminaFotoConAnnulla } from './eliminaFotoConAnnulla'
@@ -31,7 +31,7 @@ function Miniatura({ foto, config, url, onApri }: MiniaturaProps) {
         className="relative block aspect-square min-h-11 w-full overflow-hidden rounded-sm bg-carta-ombra transition-colors -outline-offset-2 active:bg-riga"
       >
         {foto.archiviata ? (
-          <span className="flex size-full items-center justify-center p-1 text-center text-sm text-grafite-tenue">Archiviata nel .zip</span>
+          <span className="flex size-full items-center justify-center p-1 text-center text-sm text-grafite-tenue">{testoArchiviata(foto)}</span>
         ) : url && !rotta ? (
           <img src={url} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setUrlRotto(url)} className="size-full object-cover" />
         ) : (

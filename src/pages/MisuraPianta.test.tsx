@@ -174,7 +174,7 @@ beforeEach(() => {
   vi.mocked(dataDiScatto).mockResolvedValue(null)
   vi.mocked(caricaFoto).mockImplementation(async (_e, d) => ({
     id: d.id, data: d.data, percorso: `E/${d.id}.jpg`, larghezza: 1, altezza: 1, byte: 1,
-    pianta_id: d.piantaId ?? null, nota_id: d.notaId ?? null, archiviata: false,
+    pianta_id: d.piantaId ?? null, nota_id: d.notaId ?? null, archiviata: false, archiviata_il: null,
   }))
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)

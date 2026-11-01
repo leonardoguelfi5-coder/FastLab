@@ -1,5 +1,5 @@
 import type { ConfigEsperimento, Foto, Pianta } from './tipi'
-import { formattaData } from '@/lib/date'
+import { dataLocaleDa, formattaData, formattaGiornoMese } from '@/lib/date'
 import { formattaNumero } from '@/lib/numeri'
 import { filtraPiante } from './elencoPiante'
 
@@ -26,6 +26,11 @@ export function reinserisciFoto(foto: Foto[], f: Foto, indice: number): Foto[] {
   if (foto.some(x => x.id === f.id)) return foto
   const posto = indice < 0 ? 0 : Math.min(indice, foto.length)
   return [...foto.slice(0, posto), f, ...foto.slice(posto)]
+}
+
+/** Il segnaposto di una foto archiviata (galleria, storia, visore): «Archiviata nel .zip del GG/MM», senza giorno se la riga non lo ha. */
+export function testoArchiviata(foto: Pick<Foto, 'archiviata_il'>): string {
+  return foto.archiviata_il === null ? 'Archiviata nel .zip' : `Archiviata nel .zip del ${formattaGiornoMese(dataLocaleDa(foto.archiviata_il))}`
 }
 
 /** Le foto collegate a una pianta, nell'ordine dato. */

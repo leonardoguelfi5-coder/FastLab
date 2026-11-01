@@ -7,7 +7,7 @@ const misura = (id: string, data: string, ora = '09:00'): Misura =>
 const nota = (id: string, data: string, extra: Partial<Nota> = {}): Nota =>
   ({ id, data, testo: id, promemoria: false, fatto_il: null, pianta_ids: [], trattamento_ids: [], ...extra })
 const foto = (id: string, data: string): Foto =>
-  ({ id, data, percorso: `E/${id}.jpg`, larghezza: null, altezza: null, byte: null, pianta_id: 'p', nota_id: null, archiviata: false })
+  ({ id, data, percorso: `E/${id}.jpg`, larghezza: null, altezza: null, byte: null, pianta_id: 'p', nota_id: null, archiviata: false, archiviata_il: null })
 
 describe('storiaPianta', () => {
   it('senza nulla non ha giorni', () => {

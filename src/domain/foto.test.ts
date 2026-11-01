@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  descriviFoto, filtraFoto, formattaMegabyte, fotoDellaNota, fotoDellaPianta, LIMITE_SPAZIO_BYTE, percorsoFoto, quotaSpazio,
+  descriviFoto, filtraFoto, testoArchiviata, formattaMegabyte, fotoDellaNota, fotoDellaPianta, LIMITE_SPAZIO_BYTE, percorsoFoto, quotaSpazio,
   raggruppaPerData, reinserisciFoto, senzaFoto,
 } from './foto'
 import type { ConfigEsperimento, Foto } from './tipi'
@@ -19,7 +19,7 @@ describe('percorsoFoto', () => {
 
 const foto = (id: string, extra: Partial<Foto> = {}): Foto => ({
   id, data: '2026-10-28', percorso: `e/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 1000,
-  pianta_id: null, nota_id: null, archiviata: false, ...extra,
+  pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null, ...extra,
 })
 
 describe('senzaFoto e reinserisciFoto', () => {
@@ -132,5 +132,15 @@ describe('quotaSpazio', () => {
     const q = quotaSpazio(1_200_000_000)
     expect(q.percentuale).toBe(120)
     expect(q.oltreSoglia).toBe(true)
+  })
+})
+
+describe('testoArchiviata', () => {
+  it('dice del .zip e del giorno dell\'archiviazione, in data locale', () => {
+    expect(testoArchiviata(foto('a', { archiviata: true, archiviata_il: '2026-11-03T12:00:00Z' }))).toBe('Archiviata nel .zip del 03/11')
+  })
+
+  it('senza la data (riga archiviata prima che la si salvasse) non inventa un giorno', () => {
+    expect(testoArchiviata(foto('a', { archiviata: true, archiviata_il: null }))).toBe('Archiviata nel .zip')
   })
 })

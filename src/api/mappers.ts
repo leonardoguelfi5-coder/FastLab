@@ -318,6 +318,7 @@ export function aRigaNota(espId: string, n: Nota) {
 export interface RigaFoto {
   id: string; esperimento_id: string; data: string; percorso: string; larghezza: number | null; altezza: number | null
   byte: number | null; pianta_id: string | null; nota_id: string | null; archiviata: boolean
+  archiviata_il: string | null
   creato_da?: string; creato_il?: string
 }
 
@@ -325,12 +326,12 @@ export interface RigaFoto {
 export function daRigaFoto(r: RigaFoto): Foto {
   return {
     id: r.id, data: r.data, percorso: r.percorso, larghezza: r.larghezza, altezza: r.altezza, byte: r.byte,
-    pianta_id: r.pianta_id, nota_id: r.nota_id, archiviata: r.archiviata,
+    pianta_id: r.pianta_id, nota_id: r.nota_id, archiviata: r.archiviata, archiviata_il: r.archiviata_il ?? null,
   }
 }
 
 /**
- * Riga da scrivere per una foto: solo colonne scrivibili, mai creato_da. `archiviata` non c'è: la scrive solo l'archivio
+ * Riga da scrivere per una foto: solo colonne scrivibili, mai creato_da. `archiviata` e `archiviata_il` non ci sono: le scrive solo l'archivio
  * (e un nuovo tentativo di caricamento, che rimanda questa riga, non deve riaprire una foto già archiviata).
  */
 export function aRigaFoto(espId: string, f: Foto) {

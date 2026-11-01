@@ -82,7 +82,7 @@ const notaDi = (id: string, extra: Partial<Nota> = {}): Nota => ({
 
 const fotoDi = (id: string, extra: Partial<Foto> = {}): Foto => ({
   id, data: '2026-10-27', percorso: `E/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 200000,
-  pianta_id: null, nota_id: null, archiviata: false, ...extra,
+  pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null, ...extra,
 })
 
 function Posizione() {

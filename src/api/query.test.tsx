@@ -216,7 +216,7 @@ describe('hook di lettura', () => {
   })
 
   it('useFoto legge le foto dell\'esperimento, e senza esperimento non interroga nessuno', async () => {
-    const foto = [{ id: 'f1', data: '2026-11-01', percorso: 'E/f1.jpg', larghezza: 1600, altezza: 1200, byte: 1, pianta_id: null, nota_id: null, archiviata: false }]
+    const foto = [{ id: 'f1', data: '2026-11-01', percorso: 'E/f1.jpg', larghezza: 1600, altezza: 1200, byte: 1, pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null }]
     vi.mocked(listaFoto).mockResolvedValue(foto)
     const { result } = renderHook(() => useFoto('E'), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))

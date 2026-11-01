@@ -47,6 +47,17 @@ export function eMisuraNonTrovata(e: unknown): boolean {
   return e instanceof Error && e.message === MISURA_NON_TROVATA
 }
 
+/**
+ * Un errore il cui messaggio è già in italiano e spiegato (archivio delle foto: «Una foto non si è scaricata…»):
+ * `messaggioErrore` lo mostra così com'è, senza il prefisso «Errore imprevisto».
+ */
+export class ErroreApp extends Error {
+  constructor(messaggio: string) {
+    super(messaggio)
+    this.name = 'ErroreApp'
+  }
+}
+
 /** Estrae campi comuni da errori di fetch, PostgREST e GoTrue (Error o oggetti semplici). */
 function leggi(e: unknown): { messaggio: string; code?: string; status?: number } {
   if (typeof e === 'string') return { messaggio: e }
@@ -83,6 +94,7 @@ export function messaggioErrore(e: unknown): string {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
   // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
+  if (e instanceof ErroreApp) return messaggio
   if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO, SENZA_SESSIONE,
     FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, FOTO_ESPERIMENTO_NON_RIMOSSE].includes(messaggio)) {
     return messaggio

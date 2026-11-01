@@ -74,7 +74,7 @@ export function Impostazioni() {
               onGestisciCatalogo={evento => esci(evento, percorsoCatalogo)}
             />
             <SezioneFenologica espId={espId} config={dati} datiParametri={parametriConDati} datiStrumenti={strumentiConDati} />
-            <SezioneSpazioFoto espId={espId} />
+            <SezioneSpazioFoto espId={espId} config={dati} />
           </div>
         </ContestoModifiche.Provider>
       )}

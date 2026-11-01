@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
+  EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, ErroreApp, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
   FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
 } from './errori'
 
@@ -161,6 +161,16 @@ describe('messaggioErrore', () => {
     expect(messaggioErrore(null)).toBe('Errore imprevisto.')
     expect(messaggioErrore(undefined)).toBe('Errore imprevisto.')
     expect(messaggioErrore({})).toBe('Errore imprevisto.')
+  })
+})
+
+describe('ErroreApp', () => {
+  it('il suo messaggio, già in italiano, passa così com\'è', () => {
+    expect(messaggioErrore(new ErroreApp('Una foto non si è scaricata.'))).toBe('Una foto non si è scaricata.')
+  })
+
+  it('un Error qualsiasi con lo stesso testo resta «Errore imprevisto»', () => {
+    expect(messaggioErrore(new Error('Una foto non si è scaricata.'))).toBe('Errore imprevisto: Una foto non si è scaricata.')
   })
 })
 

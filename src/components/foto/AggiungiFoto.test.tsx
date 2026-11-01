@@ -23,7 +23,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const jpg = (nome: string) => new File(['x'], nome, { type: 'image/jpeg' })
 const salvata = (id: string): Foto => ({
-  id, data: '2026-10-28', percorso: `${E}/${id}.jpg`, larghezza: 1, altezza: 1, byte: 1, pianta_id: null, nota_id: null, archiviata: false,
+  id, data: '2026-10-28', percorso: `${E}/${id}.jpg`, larghezza: 1, altezza: 1, byte: 1, pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null,
 })
 
 /** Una promessa che si risolve (o si rifiuta) quando lo decide il test: serve a guardare gli stati intermedi. */

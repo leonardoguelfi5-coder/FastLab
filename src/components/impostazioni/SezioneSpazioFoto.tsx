@@ -3,6 +3,8 @@ import { useSpazioFoto } from '@/api/query'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { formattaMegabyte, LIMITE_SPAZIO_BYTE, quotaSpazio } from '@/domain/foto'
 import { cn } from '@/lib/utils'
+import type { ConfigEsperimento } from '@/domain/tipi'
+import { ArchivioFoto } from './ArchivioFoto'
 import { Sezione, Spiegazione } from './Sezione'
 
 /**
@@ -10,8 +12,9 @@ import { Sezione, Spiegazione } from './Sezione'
  * membri, contro 1 GB del piano gratuito. Il limite vero è dell'intero progetto, e da qui si vedono solo gli esperimenti
  * a cui si ha accesso: lo dice l'etichetta. Oltre l'80% la barra e l'avviso passano al tono attenzione (mai verde: il
  * verde è solo di "salvato"); il numero resta quello vero anche oltre il 100%. Senza il calcolo non c'è nessun numero.
+ * Sotto c'è l'archivio .zip con «Libera lo spazio» (`ArchivioFoto`).
  */
-export function SezioneSpazioFoto({ espId }: { espId: string }) {
+export function SezioneSpazioFoto({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const spazio = useSpazioFoto(espId)
   const dati = spazio.data
   const quota = dati ? quotaSpazio(dati.progetto) : null
@@ -66,6 +69,8 @@ export function SezioneSpazioFoto({ espId }: { espId: string }) {
           )}
         </div>
       )}
+
+      <ArchivioFoto espId={espId} config={config} />
     </Sezione>
   )
 }

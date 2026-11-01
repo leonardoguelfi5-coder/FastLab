@@ -15,7 +15,7 @@ import { chiaveEliminazioneFoto, eliminaFotoConAnnulla } from './eliminaFotoConA
 
 const E = 'E'
 const foto = (id: string): Foto => ({
-  id, data: '2026-10-28', percorso: `E/${id}.jpg`, larghezza: 1, altezza: 1, byte: 1, pianta_id: null, nota_id: null, archiviata: false,
+  id, data: '2026-10-28', percorso: `E/${id}.jpg`, larghezza: 1, altezza: 1, byte: 1, pianta_id: null, nota_id: null, archiviata: false, archiviata_il: null,
 })
 const elenco = () => [foto('a'), foto('b'), foto('c')]
 
