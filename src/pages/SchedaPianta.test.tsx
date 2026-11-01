@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -21,14 +21,22 @@ vi.mock('@/api/misure', () => ({
   misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
   ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn(),
 }))
+vi.mock('@/api/foto', () => ({
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  VALIDITA_URL_SECONDI: 3600,
+}))
+vi.mock('@/lib/immagini', () => ({ dataDiScatto: vi.fn() }))
+vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
+import { caricaFoto, listaFoto, urlFoto } from '@/api/foto'
 import { misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento } from '@/api/misure'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
+import type { ConfigEsperimento, Foto, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
+import { dataDiScatto } from '@/lib/immagini'
 import { useCampoStore } from '@/store/campo'
 import { MisuraPianta } from './MisuraPianta'
 import { SchedaPianta } from './SchedaPianta'
@@ -40,6 +48,8 @@ const OGGI = '2026-10-28'
 let config: ConfigEsperimento
 /** Le misure "nel database": le letture le filtrano. */
 let archivio: Misura[]
+/** Le foto "nel database". */
+let fotoDb: Foto[]
 
 const strumento = (nome: string) => config.strumenti.find(s => s.nome === nome)!
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
@@ -57,6 +67,11 @@ function misura(
   }
 }
 const spad = (n: number | string, valore: number, data: string, ora?: string) => misura(n, 'SPAD', { SPAD: [valore] }, data, ora)
+
+const fotoDi = (id: string, extra: Partial<Foto> = {}): Foto => ({
+  id, data: '2026-10-27', percorso: `E/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 200000,
+  pianta_id: null, nota_id: null, archiviata: false, ...extra,
+})
 
 function Posizione() {
   const { pathname } = useLocation()
@@ -111,6 +126,15 @@ beforeEach(() => {
   config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   archivio = []
+  fotoDb = []
+  vi.mocked(dataDiScatto).mockResolvedValue(null)
+  vi.mocked(listaFoto).mockImplementation(async () => structuredClone(fotoDb))
+  vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}`])))
+  vi.mocked(caricaFoto).mockImplementation(async (_e, d) => {
+    const nuova = fotoDi(d.id, { data: d.data, pianta_id: d.piantaId ?? null })
+    fotoDb.unshift(nuova)
+    return nuova
+  })
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
   vi.mocked(caricaConfig).mockImplementation(async () => config)
@@ -673,5 +697,58 @@ describe('SchedaPianta: misura questa pianta', () => {
     vi.mocked(misurePianta).mockImplementation(() => new Promise(() => {}))
     apri('35')
     expect(await screen.findByRole('button', { name: 'Misura questa pianta' })).toBeInTheDocument()
+  })
+})
+
+describe('SchedaPianta: le foto', () => {
+  it('ha la sezione «Foto» con le miniature della pianta, e solo le sue', async () => {
+    fotoDb = [
+      fotoDi('a', { pianta_id: pianta(35).id }), fotoDi('b', { pianta_id: pianta(35).id, data: '2026-10-20' }),
+      fotoDi('c', { pianta_id: pianta(1).id }), fotoDi('d'),
+    ]
+    apri('35')
+    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    const miniature = await within(sezione).findAllByRole('button', { name: /^Foto del / })
+    expect(miniature.map(m => m.getAttribute('aria-label'))).toEqual(['Foto del 27/10/2026, pianta 35', 'Foto del 20/10/2026, pianta 35'])
+    await waitFor(() => expect(urlFoto).toHaveBeenCalledWith(['E/a.jpg', 'E/b.jpg']))
+  })
+
+  it('senza foto lo dice', async () => {
+    apri('35')
+    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    expect(await within(sezione).findByText('Ancora nessuna foto per questa pianta.')).toBeInTheDocument()
+  })
+
+  it('toccando una miniatura si apre il visore', async () => {
+    fotoDb = [fotoDi('a', { pianta_id: pianta(35).id })]
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('button', { name: 'Foto del 27/10/2026, pianta 35' }))
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Foto 1 di 1')
+  })
+
+  it('«Aggiungi foto» carica le foto collegate a questa pianta e le mostra', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    await utente.click(within(sezione).getByRole('button', { name: 'Aggiungi foto' }))
+    expect(screen.getByRole('button', { name: 'Scatta' })).toBeInTheDocument()
+    fireEvent.change(document.querySelector('input[type="file"][capture]')!, { target: { files: [new File(['x'], 'a.jpg', { type: 'image/jpeg' })] } })
+
+    await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(caricaFoto).mock.calls[0][0]).toBe('E')
+    expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ piantaId: pianta(35).id, notaId: null })
+    expect(await within(sezione).findByRole('button', { name: 'Foto del 28/10/2026, pianta 35' })).toBeInTheDocument()
+  })
+
+  it('se le foto non si leggono lo dice con «Riprova», senza toccare il resto della scheda', async () => {
+    vi.mocked(listaFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup()
+    apri('35')
+    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    expect(await within(sezione).findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await pronta()).toBeInTheDocument()
+    await utente.click(within(sezione).getByRole('button', { name: 'Riprova' }))
+    expect(await within(sezione).findByText('Ancora nessuna foto per questa pianta.')).toBeInTheDocument()
   })
 })

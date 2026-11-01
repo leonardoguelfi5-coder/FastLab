@@ -235,11 +235,13 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
       {modifica ? (
         <>
           <EditorNota
+            espId={espId}
             config={config}
             stato={modifica.stato}
             onCambia={cambia}
             oggi={oggi}
             eraPromemoria={modifica.esistente?.promemoria ?? false}
+            notaSalvataId={modifica.esistente?.id ?? null}
             nuova={modifica.esistente === null}
             ripresa={modifica.ripresa}
             problemi={problemi}

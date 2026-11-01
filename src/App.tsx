@@ -7,6 +7,7 @@ import { Diario } from '@/pages/Diario'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
 import { FineGiro } from '@/pages/FineGiro'
+import { Foto } from '@/pages/Foto'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/Impostazioni'
 import { InArrivo } from '@/pages/InArrivo'
@@ -41,7 +42,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/dataset" element={<InArrivo titolo="Dataset" />} />
         <Route path="/esperimenti/:espId/esporta" element={<InArrivo titolo="Esporta Excel" />} />
         <Route path="/esperimenti/:espId/diario" element={<Diario />} />
-        <Route path="/esperimenti/:espId/foto" element={<InArrivo titolo="Foto" />} />
+        <Route path="/esperimenti/:espId/foto" element={<Foto />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>
 

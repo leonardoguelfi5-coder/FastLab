@@ -21,10 +21,17 @@ vi.mock('@/api/misure', () => ({
   misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
   ultimaMisuraPerStrumento: vi.fn(),
 }))
+vi.mock('@/api/foto', () => ({
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  VALIDITA_URL_SECONDI: 3600,
+}))
+vi.mock('@/lib/immagini', () => ({ dataDiScatto: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }) }))
 
 import { toast } from 'sonner'
+import { caricaFoto } from '@/api/foto'
+import { dataDiScatto } from '@/lib/immagini'
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
@@ -164,6 +171,11 @@ beforeEach(() => {
   config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   archivio = []
+  vi.mocked(dataDiScatto).mockResolvedValue(null)
+  vi.mocked(caricaFoto).mockImplementation(async (_e, d) => ({
+    id: d.id, data: d.data, percorso: `E/${d.id}.jpg`, larghezza: 1, altezza: 1, byte: 1,
+    pianta_id: d.piantaId ?? null, nota_id: d.notaId ?? null, archiviata: false,
+  }))
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
   vi.mocked(caricaConfig).mockImplementation(async () => config)
@@ -2116,5 +2128,133 @@ describe('MisuraPianta: dettagli del passaggio tra piante', () => {
     apriT('35')
     await pronta()
     await waitFor(() => expect(misurePianta).toHaveBeenCalledWith(idPianta('36')))
+  })
+})
+
+describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
+  const foto = () => screen.getByRole('button', { name: 'Aggiungi foto a questa pianta' })
+  const inputScatto = () => document.querySelector<HTMLInputElement>('input[type="file"][capture]')!
+  const scegliFile = (nome = 'a.jpg') =>
+    fireEvent.change(inputScatto(), { target: { files: [new File(['x'], nome, { type: 'image/jpeg' })] } })
+
+  it('sta nell\'intestazione della pianta: non nella barra delle azioni e fuori da ogni modulo', async () => {
+    apriT('35')
+    await pronta()
+    expect(foto().closest('[data-slot="barra-azioni"]')).toBeNull()
+    expect(foto().closest('form')).toBeNull()
+    expect(foto()).toHaveAttribute('type', 'button')
+    expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' }).parentElement).toContainElement(foto())
+    // Un bersaglio da almeno 44 px.
+    expect(foto().className).toMatch(/size-11/)
+  })
+
+  it('aprire la scelta del file non fa partire nessuna conferma e non tocca il modulo, la bozza né la posizione', async () => {
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    const bozzeAllaPartenza = bozzeSalvate()
+    expect(bozzeAllaPartenza.length).toBeGreaterThan(0)
+    const contenuti = bozzeAllaPartenza.map(k => sessionStorage.getItem(k))
+    const aperta = vi.spyOn(inputScatto(), 'click').mockImplementation(() => {})
+
+    await utente.click(foto())
+    await utente.click(screen.getByRole('button', { name: 'Scatta' }))
+
+    expect(aperta).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(posizione()).toBe(percorso('Termometro', '35'))
+    expect(campo('Temp aria').value).toBe('24,5')
+    expect(bozzeSalvate()).toEqual(bozzeAllaPartenza)
+    expect(bozzeSalvate().map(k => sessionStorage.getItem(k))).toEqual(contenuti)
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(pulsante('Salva')).toBeEnabled()
+  })
+
+  it('con il modulo intatto, aprire la scelta del file non mette nessuna conferma alla chiusura della scheda', async () => {
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    vi.spyOn(inputScatto(), 'click').mockImplementation(() => {})
+    await utente.click(foto())
+    await utente.click(screen.getByRole('button', { name: 'Scatta' }))
+
+    const evento = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(evento)
+    expect(evento.defaultPrevented).toBe(false)
+  })
+
+  it('scegliere la foto la carica collegata a questa pianta, senza salvare né cambiare la misura in corso', async () => {
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    const bozze = bozzeSalvate().map(k => sessionStorage.getItem(k))
+
+    scegliFile()
+
+    await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(caricaFoto).mock.calls[0][0]).toBe('E')
+    expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ piantaId: idPianta('35'), notaId: null })
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(campo('Temp aria').value).toBe('24,5')
+    expect(bozzeSalvate().map(k => sessionStorage.getItem(k))).toEqual(bozze)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('una foto che non si carica mostra l\'errore con «Riprova» senza toccare il modulo', async () => {
+    vi.mocked(caricaFoto).mockRejectedValueOnce(new Error('Il server non risponde.'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+
+    scegliFile('rotta.jpg')
+
+    expect(await screen.findByText('rotta.jpg')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Il server non risponde.')
+    expect(campo('Temp aria').value).toBe('24,5')
+    expect(pulsante('Salva')).toBeEnabled()
+    await utente.click(screen.getByRole('button', { name: 'Riprova rotta.jpg' }))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('non consuma la finestra di 500 ms del «Salva comunque»: un tocco troppo vicino all\'avviso resta ignorato', async () => {
+    par('Temp aria').valore_max = 40
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '45')
+    await utente.click(pulsante('Salva'))
+    expect(pulsante('Salva comunque')).toBeInTheDocument()
+    vi.spyOn(inputScatto(), 'click').mockImplementation(() => {})
+
+    // Il 📷 si usa nella stessa finestra: l\'avviso e il valore restano, e il tocco di conferma è ancora il «secondo» del doppio tocco.
+    await utente.click(foto())
+    await utente.click(screen.getByRole('button', { name: 'Scatta' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('è fuori dall\'intervallo atteso')
+    await utente.click(pulsante('Salva comunque'))
+    expect(salvaMisura).not.toHaveBeenCalled()
+
+    piuTardi()
+    await utente.click(pulsante('Salva comunque'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori[par('Temp aria').id]).toEqual([45])
+  })
+
+  it('con il giro che continua il pulsante c\'è anche sulla pianta dopo', async () => {
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    piuTardi()
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await pianta('36')
+    expect(foto()).toBeInTheDocument()
+    scegliFile()
+    await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ piantaId: idPianta('36') })
   })
 })

@@ -3,10 +3,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ConfigEsperimento } from '@/domain/tipi'
+import { FotoNota } from './FotoNota'
 import { SceltaCollegamento } from './SceltaCollegamento'
 import { conData, conPromemoria, type StatoNota } from './statoNota'
 
 interface EditorNotaProps {
+  espId: string
   config: ConfigEsperimento
   stato: StatoNota
   onCambia: (stato: StatoNota) => void
@@ -14,6 +16,8 @@ interface EditorNotaProps {
   oggi: string
   /** Se la nota è già un promemoria (salvata): la casella ci torna, se la data non è futura e non è stata toccata. */
   eraPromemoria: boolean
+  /** La nota già salvata che si sta modificando, a cui si collegano le foto; null per una nota nuova. */
+  notaSalvataId: string | null
   /** Una nota nuova: il cursore parte nel testo. */
   nuova: boolean
   /** Il modulo riparte da una bozza lasciata a metà. */
@@ -24,10 +28,10 @@ interface EditorNotaProps {
 }
 
 /**
- * L'editor di una nota in pagina (spec §5.7): testo, data (di base oggi, anche passata o futura), collegamento e la
- * casella "Ricordamelo quel giorno". Controllato: chi lo usa tiene lo stato, la bozza e il salvataggio.
+ * L'editor di una nota in pagina (spec §5.7): testo, data (di base oggi, anche passata o futura), collegamento, la
+ * casella "Ricordamelo quel giorno" e le foto della nota. Controllato: chi lo usa tiene lo stato, la bozza e il salvataggio.
  */
-export function EditorNota({ config, stato, onCambia, oggi, eraPromemoria, nuova, ripresa, problemi, disabilitato }: EditorNotaProps) {
+export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria, notaSalvataId, nuova, ripresa, problemi, disabilitato }: EditorNotaProps) {
   const id = useId()
   return (
     <div className="flex flex-col gap-6">
@@ -77,6 +81,8 @@ export function EditorNota({ config, stato, onCambia, oggi, eraPromemoria, nuova
           Quel giorno la nota compare in Oggi, finché non la spunti. Con una data futura la casella si spunta da sola.
         </p>
       </div>
+
+      <FotoNota espId={espId} config={config} notaId={notaSalvataId} />
 
       {problemi.length > 0 && (
         <div className="flex flex-col gap-1">

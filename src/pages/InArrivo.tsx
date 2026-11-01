@@ -2,7 +2,7 @@ import { useParams } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { percorsoHome } from '@/lib/percorsi'
 
-/** Segnaposto di una sezione della home che arriva con un prossimo aggiornamento (Dataset, Esporta, Foto). */
+/** Segnaposto di una sezione della home che arriva con un prossimo aggiornamento (Dataset, Esporta). */
 export function InArrivo({ titolo }: { titolo: string }) {
   const { espId = '' } = useParams()
 

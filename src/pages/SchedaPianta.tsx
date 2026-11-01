@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { AvvisiMancanti } from '@/components/scheda/AvvisiMancanti'
 import { DatiPianta } from '@/components/scheda/DatiPianta'
+import { FotoPianta } from '@/components/scheda/FotoPianta'
 import { MisuraQuestaPianta } from '@/components/scheda/MisuraQuestaPianta'
 import { StoriaPianta } from '@/components/scheda/StoriaPianta'
 import { UltimiValori } from '@/components/scheda/UltimiValori'
@@ -61,6 +62,9 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
           <StoriaPianta espId={espId} config={config} misure={misure.data} />
         </>
       )}
+
+      {/* Le foto hanno la loro lettura: non aspettano le misure e un loro errore non nasconde la scheda. */}
+      <FotoPianta espId={espId} config={config} piantaId={pianta.id} />
 
       <DatiPianta config={config} pianta={pianta} />
 

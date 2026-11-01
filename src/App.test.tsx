@@ -41,6 +41,9 @@ vi.mock('@/pages/Oggi', () => ({
 vi.mock('@/pages/Diario', () => ({
   Diario: () => <h1>Diario (prova)</h1>,
 }))
+vi.mock('@/pages/Foto', () => ({
+  Foto: () => <h1>Foto (prova)</h1>,
+}))
 vi.mock('@/pages/Impostazioni', () => ({
   Impostazioni: () => <h1>Impostazioni dell'esperimento (prova)</h1>,
 }))
@@ -138,7 +141,7 @@ describe('AppRoutes', () => {
   })
 
   it.each([
-    ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'], ['foto', 'Foto'],
+    ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'],
   ])('con la sessione /esperimenti/:espId/%s mostra il segnaposto «%s»', (sezione, titolo) => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA(`/esperimenti/x/${sezione}`)
@@ -150,6 +153,13 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/diario')
     expect(screen.getByRole('heading', { level: 1, name: 'Diario (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/foto mostra la galleria, non il segnaposto', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/foto')
+    expect(screen.getByRole('heading', { level: 1, name: 'Foto (prova)' })).toBeInTheDocument()
     expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 

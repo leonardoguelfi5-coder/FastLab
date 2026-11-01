@@ -5,6 +5,8 @@ import { useConfig, useMisureGiorno, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { PulsanteAggiungiFoto, StatoCaricamentoFoto } from '@/components/foto/AggiungiFoto'
+import { useCaricaFoto } from '@/components/foto/useCaricaFoto'
 import { TestoErrore } from '@/components/TestoErrore'
 import { AvvisoGiro } from '@/components/scheda/AvvisoGiro'
 import type { Avanti, StatoModulo } from '@/components/scheda/ModuloOggi'
@@ -180,6 +182,8 @@ interface MisuraCaricataProps {
 function MisuraCaricata({
   espId, config, strumento, piantaId, dataRilievo, oggi, misure, misureGiorno, conferma, onModifiche,
 }: MisuraCaricataProps) {
+  // Le foto di questa pianta: un caricamento a parte, che non passa dal modulo e continua anche passando alla pianta dopo.
+  const carica = useCaricaFoto(espId, { piantaId })
   const pianta = config.piante.find(p => p.id === piantaId)
   if (!pianta) {
     // Lo strumento c'è: si torna a scegliere da dove ripartire, non "un altro" strumento.
@@ -189,7 +193,6 @@ function MisuraCaricata({
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
   // Il modulo aspetta le misure della pianta (i progressivi, la domanda all'arrivo) e quelle del giorno (la pianta dopo).
   const inErrore = misure.isError ? misure : misureGiorno.isError ? misureGiorno : null
-
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -199,13 +202,18 @@ function MisuraCaricata({
             <span className="text-label text-grafite-tenue">Pianta</span>{' '}
             <span className="truncate font-mono text-numero text-grafite tabular-nums">{`#${pianta.etichetta}`}</span>
           </h2>
-          {trattamento && (
-            <p className="mb-1 shrink-0">
-              <span className="sr-only">Trattamento: </span>
-              <Badge variant="secondary" className="h-7 px-2.5 text-sm">{trattamento.etichetta}</Badge>
-            </p>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {trattamento && (
+              <p>
+                <span className="sr-only">Trattamento: </span>
+                <Badge variant="secondary" className="h-7 px-2.5 text-sm">{trattamento.etichetta}</Badge>
+              </p>
+            )}
+            {/* Nell'intestazione, non nella barra delle azioni: non tocca il modulo, le bozze né la conferma di uscita. */}
+            <PulsanteAggiungiFoto carica={carica} variante="icona" nome="Aggiungi foto a questa pianta" />
+          </div>
         </div>
+        <StatoCaricamentoFoto carica={carica} />
         <VaiAllaPianta espId={espId} config={config} strumentoId={strumento.id} piantaId={pianta.id} conferma={conferma} />
         <BannerData espId={espId} conferma={conferma} />
       </div>

@@ -162,7 +162,7 @@ export function useFoto(espId: string | undefined) {
 
 /**
  * Gli URL firmati dei file di questi percorsi, per percorso. In cache per 50 minuti: gli URL valgono un'ora, quindi
- * si rinnovano prima che scadano. Se l'elenco dei percorsi cambia (una foto in più o in meno) tiene gli URL di prima
+ * si rinnovano prima che scadano (anche da soli, con la pagina aperta). Se l'elenco dei percorsi cambia (una foto in più o in meno) tiene gli URL di prima
  * finché arrivano i nuovi, così le miniature non lampeggiano.
  */
 export function useUrlFoto(percorsi: readonly string[]) {
@@ -171,6 +171,8 @@ export function useUrlFoto(percorsi: readonly string[]) {
     queryFn: () => urlFoto([...percorsi]),
     enabled: percorsi.length > 0,
     staleTime: (VALIDITA_URL_SECONDI - 600) * 1000,
+    // Una galleria lasciata aperta più di un'ora (il telefono in serra) rinnova gli URL prima che scadano.
+    refetchInterval: (VALIDITA_URL_SECONDI - 600) * 1000,
     placeholderData: keepPreviousData,
   })
 }

@@ -19,6 +19,11 @@ vi.mock('@/api/esperimenti', () => ({
 vi.mock('@/api/note', () => ({
   listaNote: vi.fn(), salvaNota: vi.fn(), eliminaNota: vi.fn(), segnaFatto: vi.fn(),
 }))
+vi.mock('@/api/foto', () => ({
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  VALIDITA_URL_SECONDI: 3600,
+}))
+vi.mock('@/lib/immagini', () => ({ dataDiScatto: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }) }))
 
@@ -27,11 +32,13 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { eliminaNota, listaNote, salvaNota, segnaFatto } from '@/api/note'
+import { caricaFoto, listaFoto, urlFoto } from '@/api/foto'
+import { dataDiScatto } from '@/lib/immagini'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Nota } from '@/domain/tipi'
+import type { ConfigEsperimento, Foto, Nota } from '@/domain/tipi'
 import { ATTESA_ANNULLA_MS } from '@/lib/eliminaConAnnulla'
-import { oggiLocale } from '@/lib/date'
+import { formattaData, oggiLocale } from '@/lib/date'
 import { scriviBozzaNota } from '@/components/note/bozzaNota'
 import { statoVuoto } from '@/components/note/statoNota'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -44,12 +51,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 let config: ConfigEsperimento
 /** Le note "nel database": le funzioni dell'API finta le leggono e le cambiano. */
 let db: Nota[]
+/** Le foto "nel database". */
+let fotoDb: Foto[]
 
 const idPianta = (etichetta: string) => config.piante.find(p => p.etichetta === etichetta)!.id
 const idTrattamento = (etichetta: string) => config.trattamenti.find(t => t.etichetta === etichetta)!.id
 
 const nota = (id: string, extra: Partial<Nota> = {}): Nota => ({
   id, data: '2026-10-28', testo: `Testo ${id}`, promemoria: false, fatto_il: null, pianta_ids: [], trattamento_ids: [], ...extra,
+})
+
+const fotoDi = (id: string, extra: Partial<Foto> = {}): Foto => ({
+  id, data: '2026-10-27', percorso: `E/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 200000,
+  pianta_id: null, nota_id: null, archiviata: false, ...extra,
 })
 
 function Posizione() {
@@ -91,6 +105,15 @@ beforeEach(() => {
   config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
   db = []
+  fotoDb = []
+  vi.mocked(dataDiScatto).mockResolvedValue(null)
+  vi.mocked(listaFoto).mockImplementation(async () => structuredClone(fotoDb))
+  vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}`])))
+  vi.mocked(caricaFoto).mockImplementation(async (_e, d) => {
+    const nuova = fotoDi(d.id, { data: d.data, nota_id: d.notaId ?? null })
+    fotoDb.unshift(nuova)
+    return nuova
+  })
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
   vi.mocked(caricaConfig).mockResolvedValue(config)
@@ -747,5 +770,65 @@ describe('Diario: uscire con modifiche', () => {
     const sporca = new Event('beforeunload', { cancelable: true })
     window.dispatchEvent(sporca)
     expect(sporca.defaultPrevented).toBe(true)
+  })
+})
+
+describe('Diario: le foto della nota', () => {
+  const scegliFile = (nome = 'a.jpg') => fireEvent.change(
+    document.querySelector('input[type="file"][capture]')!, { target: { files: [new File(['x'], nome, { type: 'image/jpeg' })] } },
+  )
+  const sezione = () => screen.getByRole('region', { name: 'Foto' })
+
+  async function apriModifica(testo = 'Da correggere') {
+    const r = apri()
+    await r.utente.click(await screen.findByRole('button', { name: new RegExp(testo) }))
+    await r.utente.click(within(riga(testo)).getByRole('button', { name: 'Modifica' }))
+    return r
+  }
+
+  it('una nota nuova non ha ancora dove collegare le foto: dice di salvarla prima', async () => {
+    const { utente } = apri()
+    await utente.click(await nuovaNota())
+    expect(within(sezione()).getByText(/Salva la nota/)).toBeInTheDocument()
+    expect(within(sezione()).queryByRole('button', { name: 'Aggiungi foto' })).not.toBeInTheDocument()
+  })
+
+  it('una nota salvata mostra le sue miniature e non quelle delle altre', async () => {
+    db = [nota('a', { testo: 'Da correggere' }), nota('b')]
+    fotoDb = [fotoDi('f1', { nota_id: 'a' }), fotoDi('f2', { nota_id: 'b' }), fotoDi('f3')]
+    await apriModifica()
+    const miniature = await within(sezione()).findAllByRole('button', { name: /^Foto del / })
+    expect(miniature).toHaveLength(1)
+    await waitFor(() => expect(urlFoto).toHaveBeenCalledWith(['E/f1.jpg']))
+  })
+
+  it('«Aggiungi foto» carica le foto collegate alla nota, e non fa risultare la nota modificata', async () => {
+    db = [nota('a', { testo: 'Da correggere' })]
+    const { utente } = await apriModifica()
+    await utente.click(within(sezione()).getByRole('button', { name: 'Aggiungi foto' }))
+    scegliFile()
+
+    await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ notaId: 'a', piantaId: null })
+    expect(await within(sezione()).findByRole('button', { name: `Foto del ${formattaData(oggiLocale())}` })).toBeInTheDocument()
+    // La nota resta com\'era: nessuna bozza, e «Annulla» esce senza chiedere di scartare.
+    expect(sessionStorage.length).toBe(0)
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('con la nota modificata e non salvata, aggiungere una foto non tocca il testo scritto né la bozza', async () => {
+    db = [nota('a', { testo: 'Da correggere' })]
+    const { utente } = await apriModifica()
+    await utente.type(screen.getByLabelText('Nota'), ' ancora')
+    const bozza = Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))
+
+    scegliFile()
+
+    await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
+    expect(screen.getByLabelText('Nota')).toHaveValue('Da correggere ancora')
+    expect(Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))).toEqual(bozza)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

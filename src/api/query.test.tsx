@@ -243,6 +243,17 @@ describe('hook di lettura', () => {
     expect(urlFoto).not.toHaveBeenCalled()
   })
 
+  it('useUrlFoto si rinnova da solo ogni 50 minuti: gli URL valgono un\'ora e una galleria può restare aperta più a lungo', async () => {
+    vi.mocked(urlFoto).mockResolvedValue(new Map())
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { result } = renderHook(() => useUrlFoto(['E/f1.jpg']), {
+      wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const osservatore = client.getQueryCache().find({ queryKey: chiavi.urlFoto(['E/f1.jpg']) })?.observers[0]
+    expect(osservatore?.options.refetchInterval).toBe(50 * 60 * 1000)
+  })
+
   it('useSpazioFoto legge lo spazio occupato', async () => {
     vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 10, progetto: 30 })
     const { result } = renderHook(() => useSpazioFoto('E'), { wrapper: wrapper() })

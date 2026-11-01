@@ -7,7 +7,7 @@ import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
-import { percorsoDiario, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
+import { percorsoDiario, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -128,7 +128,7 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
         <Voce to={percorsoSezione(espId, 'dataset')} icona="📊" nome="Dataset" />
         <Voce to={percorsoSezione(espId, 'esporta')} icona="⬇️" nome="Esporta Excel" />
         <Voce to={percorsoDiario(espId)} icona="📒" nome="Diario" />
-        <Voce to={percorsoSezione(espId, 'foto')} icona="📷" nome="Foto" />
+        <Voce to={percorsoGalleria(espId)} icona="📷" nome="Foto" />
         <Voce to={percorsoImpostazioni(espId)} icona="⚙️" nome="Impostazioni" className="col-span-2" />
       </nav>
     </>
