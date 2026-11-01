@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { clonaConfig } from '@/domain/bozza'
-import type { Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
+import type { Misura, Nota, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import {
-  aRigaMisura, aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta,
-  daRigaMisura, daRigheConfig,
-  type RigaMisura, type RigheConfig,
+  aRigaMisura, aRigaNota, aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta,
+  daRigaMisura, daRigaNota, daRigheConfig,
+  type RigaMisura, type RigaNota, type RigheConfig,
 } from './mappers'
 
 const E = 'e1'
@@ -225,6 +225,37 @@ describe('mapper di scrittura della configurazione', () => {
   it('aRigaStrumentoParametro collega strumento e parametro nello stesso esperimento', () => {
     expect(aRigaStrumentoParametro('E', 'pa1', strumento.parametri[0])).toEqual({
       esperimento_id: 'E', strumento_id: 'pa1', parametro_id: 'par1', obbligatorio: true, ordine: 0,
+    })
+  })
+})
+
+describe('note', () => {
+  const riga: RigaNota = {
+    id: 'n1', esperimento_id: E, data: '2026-11-01', testo: 'Irrigato', promemoria: true, fatto_il: null,
+    creato_da: 'u1', creato_il: '2026-11-01T08:00:00+00:00', aggiornato_il: '2026-11-01T08:00:00+00:00',
+    note_piante: [{ pianta_id: 'p2' }, { pianta_id: 'p1' }],
+    note_trattamenti: [{ trattamento_id: 't1' }],
+  }
+
+  it('daRigaNota porta i collegamenti nella nota e lascia nel database le colonne solo-database', () => {
+    expect(daRigaNota(riga)).toEqual({
+      id: 'n1', data: '2026-11-01', testo: 'Irrigato', promemoria: true, fatto_il: null,
+      pianta_ids: ['p2', 'p1'], trattamento_ids: ['t1'],
+    })
+  })
+
+  it('daRigaNota tollera i collegamenti mancanti', () => {
+    const senza: RigaNota = { ...riga, note_piante: undefined, note_trattamenti: undefined }
+    expect(daRigaNota(senza)).toMatchObject({ pianta_ids: [], trattamento_ids: [] })
+  })
+
+  it('aRigaNota scrive solo colonne scrivibili: mai creato_da, e fatto_il solo per azzerarlo', () => {
+    const nota: Nota = { id: 'n1', data: '2026-11-01', testo: 'Irrigato', promemoria: true, fatto_il: '2026-11-01T09:00:00Z', pianta_ids: ['p1'], trattamento_ids: [] }
+    // Un promemoria: fatto_il lo scrive solo la spunta, così salvare una modifica non cancella una spunta fatta altrove.
+    expect(aRigaNota(E, nota)).toEqual({ id: 'n1', esperimento_id: E, data: '2026-11-01', testo: 'Irrigato', promemoria: true })
+    // Una nota che non è un promemoria non può risultare fatta.
+    expect(aRigaNota(E, { ...nota, promemoria: false })).toEqual({
+      id: 'n1', esperimento_id: E, data: '2026-11-01', testo: 'Irrigato', promemoria: false, fatto_il: null,
     })
   })
 })

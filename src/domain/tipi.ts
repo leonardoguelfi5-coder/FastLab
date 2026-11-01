@@ -29,3 +29,11 @@ export interface ConfigEsperimento { esperimento: Esperimento; fattori: Fattore[
   piante: Pianta[]; parametri: Parametro[]; strumenti: Strumento[] }
 export type BozzaEsperimento = ConfigEsperimento   // stessa forma; ids generati dal client con nuovoId() (src/lib/id.ts)
 export interface Misura { id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string; valori: ValoriMisura }
+/**
+ * Una nota del Diario. Senza collegamenti (`pianta_ids` e `trattamento_ids` vuoti) riguarda tutto l'esperimento; con i
+ * collegamenti, solo quei trattamenti o quelle piante (la scelta è una sola delle tre, non si mescolano).
+ * `promemoria`: lo decide chi salva (data futura) e resta anche quando la data arriva; `fatto_il` (data e ora ISO) c'è
+ * solo dopo la spunta.
+ */
+export interface Nota { id: string; data: string; testo: string; promemoria: boolean; fatto_il: string | null;
+  pianta_ids: string[]; trattamento_ids: string[] }

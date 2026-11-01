@@ -8,15 +8,17 @@ vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), ca
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
+vi.mock('./note', () => ({ listaNote: vi.fn() }))
 
 import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
+import { listaNote } from './note'
 import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
+  useNote, useParametriConDati, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
 } from './query'
 
 function wrapper() {
@@ -55,6 +57,13 @@ describe('chiavi', () => {
     expect(chiavi.strumentiConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.parametriConDati('E')).not.toEqual(chiavi.pianteConDati('E'))
     expect(chiavi.strumentiConDati('E')).not.toEqual(chiavi.parametriConDati('E'))
+  })
+
+  it('le note hanno una chiave per esperimento, fuori dal prefisso delle misure e della configurazione', () => {
+    expect(chiavi.note('E')).toEqual(['note', 'E'])
+    expect(chiavi.note('E')).not.toEqual(chiavi.note('F'))
+    expect(chiavi.note('E')[0]).not.toBe(chiavi.misure[0])
+    expect(chiavi.note('E')[0]).not.toBe(chiavi.config('E')[0])
   })
 
   it('il catalogo è condiviso tra esperimenti: la sua chiave sta fuori dal prefisso della configurazione', () => {
@@ -175,6 +184,21 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useCatalogo(), { wrapper: wrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(result.current.data).toBe(voci)
+  })
+
+  it('useNote legge le note dell\'esperimento', async () => {
+    const note = [{ id: 'n1', data: '2026-11-01', testo: 'Irrigato', promemoria: false, fatto_il: null, pianta_ids: [], trattamento_ids: [] }]
+    vi.mocked(listaNote).mockResolvedValue(note)
+    const { result } = renderHook(() => useNote('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(listaNote).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe(note)
+  })
+
+  it('useNote senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useNote(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(listaNote).not.toHaveBeenCalled()
   })
 
   it('useSonoAdmin legge il ruolo', async () => {

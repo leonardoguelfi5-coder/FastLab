@@ -1,5 +1,5 @@
 import type {
-  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
+  ConfigEsperimento, Esperimento, Fattore, Livello, Misura, Nota, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
   Pianta, SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura, VoceCatalogo,
 } from '@/domain/tipi'
 
@@ -271,5 +271,45 @@ export function aRigaCatalogo(v: VoceCatalogo) {
       chiave: p.chiave, nome: p.nome, unita: p.unita, n_letture: p.n_letture, valore_min: p.valore_min, valore_max: p.valore_max,
     })),
     archiviato: v.archiviato,
+  }
+}
+
+/**
+ * Una nota come la restituisce PostgREST con i collegamenti incorporati
+ * (`select('*, note_piante(pianta_id), note_trattamenti(trattamento_id)')`).
+ */
+export interface RigaNota {
+  id: string; esperimento_id: string; data: string; testo: string; promemoria: boolean; fatto_il: string | null
+  creato_da?: string; creato_il?: string; aggiornato_il?: string
+  note_piante?: { pianta_id: string }[]; note_trattamenti?: { trattamento_id: string }[]
+}
+
+/** Da riga del database a Nota: i collegamenti passano negli elenchi di id, le colonne solo-database cadono. */
+export function daRigaNota(r: RigaNota): Nota {
+  return {
+    id: r.id,
+    data: r.data,
+    testo: r.testo,
+    promemoria: r.promemoria,
+    fatto_il: r.fatto_il,
+    pianta_ids: (r.note_piante ?? []).map(p => p.pianta_id),
+    trattamento_ids: (r.note_trattamenti ?? []).map(t => t.trattamento_id),
+  }
+}
+
+/**
+ * Riga da scrivere per una nota: solo colonne scrivibili, mai creato_da. `fatto_il` lo scrive di norma solo la spunta
+ * (`segnaFatto`): salvare una modifica con una copia vecchia della nota non deve cancellare una spunta fatta nel
+ * frattempo da un altro. Fa eccezione una nota che non è (più) un promemoria, che non può risultare fatta.
+ * I collegamenti vanno in note_piante e note_trattamenti.
+ */
+export function aRigaNota(espId: string, n: Nota) {
+  return {
+    id: n.id,
+    esperimento_id: espId,
+    data: n.data,
+    testo: n.testo,
+    promemoria: n.promemoria,
+    ...(n.promemoria ? {} : { fatto_il: null }),
   }
 }

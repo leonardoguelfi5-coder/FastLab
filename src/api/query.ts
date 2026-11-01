@@ -3,6 +3,7 @@ import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
+import { listaNote } from './note'
 import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 
 /** Chiavi di cache delle query. Quelle delle misure iniziano tutte con 'misure': si invalidano insieme. */
@@ -20,6 +21,8 @@ export const chiavi = {
   misurePianta: (piantaId: string) => ['misure', 'pianta', piantaId] as const,
   ultimeMisure: (espId: string) => ['misure', 'ultime', espId] as const,
   ultimeMisurePiante: (espId: string) => ['misure', 'ultimePiante', espId] as const,
+  /** Le note del Diario di un esperimento (con i promemoria): fuori dalle misure, si invalidano a ogni salvataggio. */
+  note: (espId: string) => ['note', espId] as const,
   inviti: ['inviti'] as const,
   /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
   catalogo: ['catalogo'] as const,
@@ -130,6 +133,15 @@ export function useMisura(id: string | undefined) {
     queryFn: () => caricaMisura(id as string),
     enabled: !!id,
     gcTime: 0,
+  })
+}
+
+/** Le note dell'esperimento (Diario, promemoria di Oggi, storia della pianta), dalla data più recente. */
+export function useNote(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.note(espId ?? ''),
+    queryFn: () => listaNote(espId as string),
+    enabled: !!espId,
   })
 }
 
