@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { oggiLocale } from '@/lib/date'
 import type { Nota, Pianta, Trattamento } from './tipi'
-import { descriviCollegamento, ePromemoriaAlSalvataggio, noteDellaPianta, promemoriaDelGiorno } from './note'
+import {
+  descriviCollegamento, ePromemoriaAlSalvataggio, noteDellaPianta, promemoriaDelGiorno, reinserisciNota, senzaNota,
+} from './note'
 
 /** Solo ciò che serve a `descriviCollegamento`: i trattamenti e le piante. */
 const config = (trattamenti: Trattamento[], piante: Pianta[]) => ({ trattamenti, piante })
@@ -141,5 +143,31 @@ describe('descriviCollegamento', () => {
 
   it('se ci fossero entrambi (non dovrebbe) li mostra tutti e due', () => {
     expect(descriviCollegamento(nota('a', { trattamento_ids: ['t1'], pianta_ids: ['p3'] }), cfg)).toBe('S1 + HC · Pianta 3')
+  })
+})
+
+describe('senzaNota e reinserisciNota', () => {
+  const elenco = [nota('a'), nota('b'), nota('c')]
+
+  it('senzaNota toglie solo quella nota e lascia l\'ordine delle altre', () => {
+    expect(senzaNota(elenco, 'b').map(n => n.id)).toEqual(['a', 'c'])
+    expect(senzaNota(elenco, 'x').map(n => n.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('reinserisciNota rimette la nota dov\'era', () => {
+    const b = elenco[1]
+    expect(reinserisciNota(senzaNota(elenco, 'b'), b, 1).map(n => n.id)).toEqual(['a', 'b', 'c'])
+    expect(reinserisciNota(senzaNota(elenco, 'a'), elenco[0], 0).map(n => n.id)).toEqual(['a', 'b', 'c'])
+    expect(reinserisciNota(senzaNota(elenco, 'c'), elenco[2], 2).map(n => n.id)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('se nel frattempo l\'elenco è cambiato, l\'indice si contiene nei limiti', () => {
+    expect(reinserisciNota([nota('a')], nota('z'), 5).map(n => n.id)).toEqual(['a', 'z'])
+    expect(reinserisciNota([], nota('z'), 0).map(n => n.id)).toEqual(['z'])
+  })
+
+  it('senza indice (la nota non c\'era nella copia) va in cima; mai due volte la stessa nota', () => {
+    expect(reinserisciNota(elenco, nota('z'), -1).map(n => n.id)).toEqual(['z', 'a', 'b', 'c'])
+    expect(reinserisciNota(elenco, elenco[1], 1).map(n => n.id)).toEqual(['a', 'b', 'c'])
   })
 })

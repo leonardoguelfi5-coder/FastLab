@@ -26,10 +26,13 @@ export const percorsoFineGiro = (espId: string, strumentoId: string) =>
 export const percorsoOggi = (espId: string) => `${percorsoHome(espId)}/oggi`
 
 /** Le sezioni della home che per ora sono segnaposto "In arrivo". */
-export type SezioneInArrivo = 'dataset' | 'esporta' | 'diario' | 'foto'
+export type SezioneInArrivo = 'dataset' | 'esporta' | 'foto'
 
 /** Una sezione della home dell'esperimento ancora segnaposto. */
 export const percorsoSezione = (espId: string, sezione: SezioneInArrivo) => `${percorsoHome(espId)}/${sezione}`
+
+/** Il Diario: le note e i promemoria dell'esperimento. */
+export const percorsoDiario = (espId: string) => `${percorsoHome(espId)}/diario`
 
 /** Elenco delle piante di un esperimento. */
 export const percorsoPiante = (espId: string) => `${percorsoHome(espId)}/piante`

@@ -3,6 +3,7 @@ import { RequireAuth } from '@/components/RequireAuth'
 import { Accedi } from '@/pages/Accedi'
 import { AdminInviti } from '@/pages/AdminInviti'
 import { Catalogo } from '@/pages/Catalogo'
+import { Diario } from '@/pages/Diario'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
 import { FineGiro } from '@/pages/FineGiro'
@@ -39,7 +40,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/oggi" element={<Oggi />} />
         <Route path="/esperimenti/:espId/dataset" element={<InArrivo titolo="Dataset" />} />
         <Route path="/esperimenti/:espId/esporta" element={<InArrivo titolo="Esporta Excel" />} />
-        <Route path="/esperimenti/:espId/diario" element={<InArrivo titolo="Diario" />} />
+        <Route path="/esperimenti/:espId/diario" element={<Diario />} />
         <Route path="/esperimenti/:espId/foto" element={<InArrivo titolo="Foto" />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>

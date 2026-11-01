@@ -60,3 +60,19 @@ export function descriviCollegamento(
 
   return parti.length > 0 ? parti.join(' · ') : 'Tutto l\'esperimento'
 }
+
+/** L'elenco senza una nota: l'eliminazione in attesa la toglie dalla vista prima di cancellarla davvero. */
+export function senzaNota(note: Nota[], id: string): Nota[] {
+  return note.filter(n => n.id !== id)
+}
+
+/**
+ * Rimette una nota nell'elenco, dove stava (`indice` è la sua posizione quando è stata tolta; -1 se non c'era e allora
+ * va in cima, tra le più recenti). L'elenco può essere cambiato nel frattempo: l'indice si tiene nei limiti, e una nota
+ * già presente (riletta dal server) non si duplica.
+ */
+export function reinserisciNota(note: Nota[], nota: Nota, indice: number): Nota[] {
+  if (note.some(n => n.id === nota.id)) return note
+  const posto = indice < 0 ? 0 : Math.min(indice, note.length)
+  return [...note.slice(0, posto), nota, ...note.slice(posto)]
+}

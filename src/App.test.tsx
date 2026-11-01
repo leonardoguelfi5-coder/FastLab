@@ -38,6 +38,9 @@ vi.mock('@/pages/ModificaMisura', () => ({
 vi.mock('@/pages/Oggi', () => ({
   Oggi: () => <h1>Oggi (prova)</h1>,
 }))
+vi.mock('@/pages/Diario', () => ({
+  Diario: () => <h1>Diario (prova)</h1>,
+}))
 vi.mock('@/pages/Impostazioni', () => ({
   Impostazioni: () => <h1>Impostazioni dell'esperimento (prova)</h1>,
 }))
@@ -135,12 +138,19 @@ describe('AppRoutes', () => {
   })
 
   it.each([
-    ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'], ['diario', 'Diario'], ['foto', 'Foto'],
+    ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'], ['foto', 'Foto'],
   ])('con la sessione /esperimenti/:espId/%s mostra il segnaposto «%s»', (sezione, titolo) => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA(`/esperimenti/x/${sezione}`)
     expect(screen.getByRole('heading', { level: 1, name: titolo })).toBeInTheDocument()
     expect(screen.getByText('Questa sezione arriva con il prossimo aggiornamento.')).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/diario mostra il Diario, non il segnaposto', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/diario')
+    expect(screen.getByRole('heading', { level: 1, name: 'Diario (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/oggi mostra la pagina Oggi, non il segnaposto', () => {
