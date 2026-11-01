@@ -67,7 +67,7 @@ Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piant
 ### Oggi
 
 - **Strumenti:** per ognuno il progresso di oggi (per esempio "34/56" o "fatto ✓") oppure da quanto non si misura ("ultima 20/10 (14 giorni fa)", "mai misurato"). Toccandolo parte la misura, come da "Nuova misura".
-- **Da sistemare:** i valori di oggi molto lontani dalla media delle altre piante dello stesso trattamento, forse errori di battitura. "Molto lontano" vuol dire oltre 3 deviazioni standard dalla media delle altre piante, con almeno 3 altre piante misurate. Toccando un valore si apre la misura da correggere.
+- **Da sistemare:** i valori di oggi molto lontani dalla media delle altre piante dello stesso trattamento, forse errori di battitura. "Molto lontano" vuol dire oltre 5 deviazioni standard e oltre il 20% dalla media delle altre piante, con almeno 3 altre piante misurate: la soglia è prudente, per non segnalare scarti normali in gruppi piccoli. Toccando un valore si apre la misura da correggere.
 
 ### Piante
 

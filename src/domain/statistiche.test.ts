@@ -118,22 +118,38 @@ describe('fuoriDalGruppo', () => {
     expect(fuoriDalGruppo(100, [10, 12])).toBeNull()
   })
   it('media e deviazione standard (n-1) delle altre piante, senza la pianta stessa', () => {
-    // altri 10, 10, 12, 12: media 11, varianza 4/3, ds = 1,1547; soglia 3 ds = 3,4641
+    // altri 10, 10, 12, 12: media 11, varianza 4/3, ds = 1,1547; soglia 5 ds = 5,7735 (il 20% della media è 2,2: vale la più alta)
     const r = fuoriDalGruppo(11, [10, 10, 12, 12])
     expect(r?.media).toBe(11)
     expect(r?.ds).toBeCloseTo(1.1547, 4)
     expect(r?.fuori).toBe(false)
   })
-  it('la soglia è 3 deviazioni standard: appena sotto non è fuori, appena sopra sì (da entrambi i lati)', () => {
-    expect(fuoriDalGruppo(14.4, [10, 10, 12, 12])?.fuori).toBe(false)   // scarto 3,4 < 3,4641
-    expect(fuoriDalGruppo(14.5, [10, 10, 12, 12])?.fuori).toBe(true)    // scarto 3,5 > 3,4641
-    expect(fuoriDalGruppo(7.6, [10, 10, 12, 12])?.fuori).toBe(false)    // scarto 3,4
-    expect(fuoriDalGruppo(7.5, [10, 10, 12, 12])?.fuori).toBe(true)     // scarto 3,5
+  it('la soglia è 5 deviazioni standard: appena sotto non è fuori, appena sopra sì (da entrambi i lati)', () => {
+    // altri 10, 10, 12, 12: media 11, soglia = max(5 ds = 5,7735; 20% di 11 = 2,2) = 5,7735
+    expect(fuoriDalGruppo(16.7, [10, 10, 12, 12])?.fuori).toBe(false)   // scarto 5,7 < 5,7735
+    expect(fuoriDalGruppo(16.8, [10, 10, 12, 12])?.fuori).toBe(true)    // scarto 5,8 > 5,7735
+    expect(fuoriDalGruppo(5.3, [10, 10, 12, 12])?.fuori).toBe(false)    // scarto 5,7
+    expect(fuoriDalGruppo(5.2, [10, 10, 12, 12])?.fuori).toBe(true)     // scarto 5,8
+  })
+  it('lo scarto deve superare anche il 20% della media: appena sotto non è fuori, appena sopra sì (da entrambi i lati)', () => {
+    // altri 100, 100, 102, 102: media 101, ds 1,1547 (5 ds = 5,7735), il 20% della media è 20,2: vale il 20%
+    expect(fuoriDalGruppo(121.1, [100, 100, 102, 102])?.fuori).toBe(false)   // scarto 20,1 < 20,2
+    expect(fuoriDalGruppo(121.3, [100, 100, 102, 102])?.fuori).toBe(true)    // scarto 20,3 > 20,2
+    expect(fuoriDalGruppo(80.9, [100, 100, 102, 102])?.fuori).toBe(false)    // scarto 20,1
+    expect(fuoriDalGruppo(80.7, [100, 100, 102, 102])?.fuori).toBe(true)     // scarto 20,3
+  })
+  it('un gruppo molto compatto non dà falsi allarmi per scarti piccoli in valore assoluto', () => {
+    // temperature 24,5 / 24,6 / 24,5 / 24,6: ds 0,0577 (5 ds = 0,2887), il 20% della media è 4,91; 24,8 è a 0,25
+    expect(fuoriDalGruppo(24.8, [24.5, 24.6, 24.5, 24.6])?.fuori).toBe(false)
+  })
+  it('un errore di battitura evidente è fuori', () => {
+    // SPAD 40, 41, 39, 40, 42: media 40,4, ds 1,14; 400 è a 359,6 (soglia = max(5,7; 8,08) = 8,08)
+    expect(fuoriDalGruppo(400, [40, 41, 39, 40, 42])?.fuori).toBe(true)
   })
   it('esattamente 3 altre piante bastano', () => {
-    // altri 10, 12, 14: media 12, ds 2, soglia 6
-    expect(fuoriDalGruppo(18.1, [10, 12, 14])?.fuori).toBe(true)
-    expect(fuoriDalGruppo(17.9, [10, 12, 14])?.fuori).toBe(false)
+    // altri 10, 12, 14: media 12, ds 2, soglia = max(5 ds = 10; 20% di 12 = 2,4) = 10
+    expect(fuoriDalGruppo(22.1, [10, 12, 14])?.fuori).toBe(true)    // scarto 10,1
+    expect(fuoriDalGruppo(21.9, [10, 12, 14])?.fuori).toBe(false)   // scarto 9,9
   })
   it('deviazione standard 0: mai fuori, ma media e ds ci sono', () => {
     const r = fuoriDalGruppo(100, [5, 5, 5])
@@ -146,14 +162,14 @@ describe('fuoriDalGruppo', () => {
     expect(r?.fuori).toBe(false)
   })
   it('con 6 piante scatta (senza leave-one-out la soglia non scatterebbe mai: massimo 2,04 ds)', () => {
-    // le altre cinque: 10, 10, 10, 10, 11 (media 10,2, ds 0,4472); la sesta vale 12: scarto 1,8 > 3 ds = 1,3416
-    const r = fuoriDalGruppo(12, [10, 10, 10, 10, 11])
+    // le altre cinque: 10, 10, 10, 10, 11 (media 10,2, ds 0,4472); la sesta vale 13: scarto 2,8 > max(5 ds = 2,236; 20% = 2,04)
+    const r = fuoriDalGruppo(13, [10, 10, 10, 10, 11])
     expect(r?.fuori).toBe(true)
-    // lo stesso gruppo di sei con la pianta dentro: media 10,5, ds 0,8367, scarto 1,5 = 1,79 ds, sotto 3
-    const tutti = [10, 10, 10, 10, 11, 12]
+    // lo stesso gruppo di sei con la pianta dentro: media 10,67, ds 1,211, scarto 2,33 = 1,93 ds, lontano da 5
+    const tutti = [10, 10, 10, 10, 11, 13]
     const m = tutti.reduce((a, b) => a + b) / tutti.length
     const ds = Math.sqrt(tutti.reduce((a, x) => a + (x - m) ** 2, 0) / (tutti.length - 1))
-    expect(Math.abs(12 - m) / ds).toBeLessThan(2.04)
+    expect(Math.abs(13 - m) / ds).toBeLessThan(2.04)
   })
 })
 
@@ -263,6 +279,11 @@ describe('avvisiMancanti', () => {
   })
   it('la pianta è più recente dell\'ultima data nota: nessun avviso', () => {
     expect(avvisiMancanti(config, [spadMis('p1', '2026-10-30', 40)], new Map([['s-spad', '2026-10-28']]), oggi)).toEqual([])
+  })
+  it('con una data nel futuro (orologio indietro) o di oggi non esce "da 0 giorni" né "da -1 giorni"', () => {
+    const ultimeFuture = new Map([['s-spad', '2026-11-03']])
+    expect(avvisiMancanti(config, [spadMis('p1', '2026-11-01', 40)], ultimeFuture, '2026-10-31')).toEqual([])   // da -1 giorni
+    expect(avvisiMancanti(config, [spadMis('p1', '2026-10-31', 40)], ultimeFuture, '2026-10-31')).toEqual([])   // da 0 giorni
   })
   it('gli strumenti archiviati non danno avvisi e l\'ordine segue quello degli strumenti', () => {
     const arch = { ...config, strumenti: [{ ...sSpad, archiviato: true }, sCiras] }

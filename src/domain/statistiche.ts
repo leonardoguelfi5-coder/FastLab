@@ -11,7 +11,9 @@ import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, Va
 /** Quante altre piante servono per giudicare se una è "molto fuori dal gruppo". */
 const MINIMO_ALTRE_PIANTE = 3
 /** Quante deviazioni standard dalla media delle altre piante rendono un valore "molto lontano". */
-const SOGLIA_DS = 3
+const SOGLIA_DS = 5
+/** Lo scarto minimo, in frazione della media delle altre piante, perché un valore sia "molto lontano". */
+const SCARTO_MINIMO_RELATIVO = 0.2
 
 const media = (xs: number[]): number => xs.reduce((a, b) => a + b, 0) / xs.length
 
@@ -63,7 +65,11 @@ export function valoriGiornalieri(parametro: Parametro, misure: Misura[]): Map<s
 
 /**
  * "Molto fuori dal gruppo": il valore di una pianta contro le ALTRE piante dello stesso trattamento nella stessa data
- * (leave-one-out). Fuori se lo scarto dalla loro media supera 3 deviazioni standard, con deviazione standard > 0.
+ * (leave-one-out). Fuori se lo scarto dalla loro media supera 5 deviazioni standard E il 20% della media, con
+ * deviazione standard > 0. La soglia è prudente perché un falso allarme costa più di un errore non segnalato: con
+ * 3 a 6 piante una soglia di 3 deviazioni standard dava il 4-12% di falsi allarmi per ogni valore (la deviazione
+ * standard di pochi valori è molto instabile), e in un gruppo molto compatto (24,5 e 24,6 °C) segnalava scarti
+ * di pochi decimi che non sono errori. Il 20% della media evita proprio questi scarti piccoli in valore assoluto.
  * Con la pianta inclusa nel calcolo, su 6 piante lo scarto non supera mai circa 2,04 deviazioni standard e la soglia
  * non scatterebbe mai. Con meno di 3 altre piante non si giudica: `null`.
  */
@@ -71,18 +77,18 @@ export function fuoriDalGruppo(valore: number, altri: number[]): { media: number
   if (altri.length < MINIMO_ALTRE_PIANTE) return null
   const m = media(altri)
   const ds = deviazioneStandard(altri, m)
-  return { media: m, ds, fuori: ds > 0 && Math.abs(valore - m) > SOGLIA_DS * ds }
+  return { media: m, ds, fuori: ds > 0 && Math.abs(valore - m) > Math.max(SOGLIA_DS * ds, SCARTO_MINIMO_RELATIVO * Math.abs(m)) }
 }
 
-/** Le piante di un trattamento diverse da `escludi`, con il valore giornaliero di `data` (quelle senza valore saltano). */
+/** I valori giornalieri di `data` delle piante di un trattamento diverse da `escludi` (quelle senza valore saltano). */
 function valoriDelTrattamento(
   config: ConfigEsperimento, perPianta: Map<string, Map<string, number>>, trattamentoId: string, data: string, escludi?: string,
-): { piantaId: string; valore: number }[] {
+): number[] {
   return config.piante
     .filter(p => p.trattamento_id === trattamentoId && p.id !== escludi)
     .flatMap(p => {
       const valore = perPianta.get(p.id)?.get(data)
-      return valore === undefined ? [] : [{ piantaId: p.id, valore }]
+      return valore === undefined ? [] : [valore]
     })
 }
 
@@ -99,7 +105,7 @@ export function confrontoTrattamento(
   const perPianta = valoriGiornalieri(parametro, misureGiorno)
   const valore = perPianta.get(piantaId)?.get(data)
   if (valore === undefined) return null
-  const altri = valoriDelTrattamento(config, perPianta, pianta.trattamento_id, data, piantaId).map(x => x.valore)
+  const altri = valoriDelTrattamento(config, perPianta, pianta.trattamento_id, data, piantaId)
   return {
     valore,
     media: altri.length === 0 ? null : media(altri),
@@ -152,7 +158,8 @@ export function ultimiValoriPianta(config: ConfigEsperimento, misurePianta: Misu
 
 /**
  * Gli avvisi di dati mancanti della scheda. Per ogni strumento attivo, se l'esperimento ha una data di misura più
- * recente dell'ultima della pianta: "<Strumento> non misurato da N giorni" (N dall'ultima misura della pianta a `oggi`),
+ * recente dell'ultima della pianta: "<Strumento> non misurato da N giorni" (N dall'ultima misura della pianta a `oggi`,
+ * e solo se N > 0: con date nel futuro, per un orologio indietro, non c'è nessun avviso),
  * o "<Strumento> mai misurato" se la pianta non ha misure di quello strumento. Se nessuna pianta ha misure dello
  * strumento (non è in `ultimeDatePerStrumento`) nessun avviso.
  */
@@ -171,6 +178,8 @@ export function avvisiMancanti(
     const ultima = date.reduce((a, b) => (a >= b ? a : b))
     if (dellEsperimento <= ultima) continue
     const giorni = giorniTra(ultima, oggi)
+    // Una misura di oggi o del futuro (orologio del telefono indietro) non è "non misurato da 0 giorni".
+    if (giorni <= 0) continue
     avvisi.push(`${strumento.nome} non misurato da ${giorni} ${giorni === 1 ? 'giorno' : 'giorni'}`)
   }
   return avvisi
@@ -218,7 +227,7 @@ export function daSistemare(config: ConfigEsperimento, misureGiorno: Misura[], d
     for (const pianta of ordinati(config.piante)) {
       const valore = perPianta.get(pianta.id)?.get(data)
       if (valore === undefined) continue
-      const altri = valoriDelTrattamento(config, perPianta, pianta.trattamento_id, data, pianta.id).map(x => x.valore)
+      const altri = valoriDelTrattamento(config, perPianta, pianta.trattamento_id, data, pianta.id)
       const giudizio = fuoriDalGruppo(valore, altri)
       if (!giudizio?.fuori) continue
       // la misura da toccare: l'ultima per ora che ha un valore (a parità di ora, l'ultima ricevuta)

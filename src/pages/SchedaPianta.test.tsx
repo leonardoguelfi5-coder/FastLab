@@ -314,8 +314,9 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 
-  it('con più di 3 deviazioni standard dalle altre piante compare "fuori dal gruppo", a parole', async () => {
-    archivio = [spad(35, 44, '2026-10-27'), ...altreDellaW1()]
+  it('molto lontano dalle altre piante (oltre 5 deviazioni standard e oltre il 20% della media) compare "fuori dal gruppo", a parole', async () => {
+    // Le altre: 40, 41, 39, 40, 40 (media 40, ds 0,71): soglia = max(5 ds = 3,5; 20% = 8) = 8. Il 49 è a 9.
+    archivio = [spad(35, 49, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
     const [riga] = await righe('SPAD')
@@ -323,14 +324,42 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     expect(riga).toHaveTextContent('media trattamento 40')
   })
 
-  it('un valore a tre deviazioni standard esatte non è ancora fuori', async () => {
-    // Le altre: 39, 40, 41 (media 40, ds 1): 43 è a 3 ds, non oltre.
-    archivio = [spad(35, 43, '2026-10-27'), spad(33, 39, '2026-10-27'), spad(34, 40, '2026-10-27'), spad(36, 41, '2026-10-27')]
+  it('oltre 5 deviazioni standard ma entro il 20% della media non è fuori', async () => {
+    // Le altre: 40, 41, 39, 40, 40 (ds 0,71): il 44 è a 4 dalla media, oltre 5 ds (3,5) ma sotto il 20% (8).
+    archivio = [spad(35, 44, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
     const [riga] = await righe('SPAD')
     await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['47,9 (scarto 7,9) è appena dentro il 20% della media', 47.9, false],
+    ['48,1 (scarto 8,1) è appena oltre il 20% della media', 48.1, true],
+  ])('confine del 20%%: %s', async (_nome, valore, fuori) => {
+    // Le altre: 39, 40, 41 (media 40, ds 1): 5 ds = 5, il 20% della media è 8 e prevale.
+    archivio = [spad(35, valore, '2026-10-27'), spad(33, 39, '2026-10-27'), spad(34, 40, '2026-10-27'), spad(36, 41, '2026-10-27')]
+    apri('35')
+    await pronta()
+    const [riga] = await righe('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    if (fuori) expect(await within(riga).findByText('fuori dal gruppo')).toBeInTheDocument()
+    else expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['89 (scarto 49) è appena dentro 5 deviazioni standard', 89, false],
+    ['91 (scarto 51) è appena oltre 5 deviazioni standard', 91, true],
+  ])('confine delle 5 deviazioni standard: %s', async (_nome, valore, fuori) => {
+    // Le altre: 30, 40, 50 (media 40, ds 10): 5 ds = 50 prevale sul 20% della media (8).
+    archivio = [spad(35, valore, '2026-10-27'), spad(33, 30, '2026-10-27'), spad(34, 40, '2026-10-27'), spad(36, 50, '2026-10-27')]
+    apri('35')
+    await pronta()
+    const [riga] = await righe('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    if (fuori) expect(await within(riga).findByText('fuori dal gruppo')).toBeInTheDocument()
+    else expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 
   it('con meno di 3 altre piante mostra la media ma non giudica', async () => {

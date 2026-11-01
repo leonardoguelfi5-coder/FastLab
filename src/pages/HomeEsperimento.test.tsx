@@ -336,7 +336,7 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
   /**
    * Gli SPAD di oggi per due trattamenti. Controllo (piante 1 a 7 misurate): 40, 41, 39, 40, 42, 38 e la pianta 7 con
    * 40, o con 80 se richiesta. Controllo + HC (piante 15 a 20): 20, 21, 19, 20, 22 e la pianta 20 con 20, o con 80 se
-   * richiesta. Con l'80 la pianta è oltre 3 deviazioni standard dalle altre; le altre non lo sono mai.
+   * richiesta. Con l'80 la pianta è oltre 5 deviazioni standard e il 20% dalle altre; le altre non lo sono mai.
    */
   const conStonate = (...piante: number[]): Misura[] => {
     const id = config.parametri.find(p => p.catalogo_chiave === 'spad')!.id

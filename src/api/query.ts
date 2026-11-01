@@ -98,8 +98,9 @@ export function useUltimeMisure(espId: string | undefined) {
 }
 
 /**
- * Le misure più recenti di ogni pianta per strumento. Sotto il prefisso `misure`: ogni salvataggio, modifica o
- * eliminazione di una misura le rilegge, così i valori mostrati non restano indietro.
+ * Le misure più recenti di ogni pianta per strumento. Sotto il prefisso `misure`: la modifica o l'eliminazione di una
+ * misura invalida tutto il prefisso, e il salvataggio dal modulo (`ModuloOggi`) invalida questa chiave in modo
+ * esplicito, così i valori mostrati non restano indietro.
  */
 export function useUltimeMisurePiante(espId: string | undefined) {
   return useQuery({

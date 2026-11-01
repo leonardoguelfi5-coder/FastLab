@@ -72,8 +72,8 @@ const spad = (n: number, valore: number, extra: Partial<Misura> = {}): Misura =>
 
 /**
  * Le piante 1 a 7 sono nel Controllo (le altre sette del trattamento non hanno misure). Le prime sei hanno 40, 41, 39,
- * 40, 42, 38 (media 40, deviazione standard campionaria √2 ≈ 1,414, soglia 3 ds ≈ 4,24): la 7 con 80 è molto fuori dal
- * gruppo. Per le altre piante le "altre" includono l'80, quindi la deviazione standard è enorme e nessuna scatta.
+ * 40, 42, 38 (media 40, deviazione standard campionaria √2 ≈ 1,414, soglia = max(5 ds ≈ 7,07; 20% di 40 = 8) = 8): la 7 con 80 è molto
+ * fuori dal gruppo. Per le altre piante le "altre" includono l'80, quindi la deviazione standard è enorme e nessuna scatta.
  */
 const controlloConUnaStonata = (): Misura[] =>
   [40, 41, 39, 40, 42, 38, 80].map((v, i) => spad(i + 1, v))

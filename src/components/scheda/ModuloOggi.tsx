@@ -305,6 +305,8 @@ export function ModuloOggi({
     void queryClient.invalidateQueries({ queryKey: chiavi.misureGiorno(espId, m.data_rilievo) })
     // "ultima volta" nella scelta dello strumento: questa può essere la misura più recente del suo strumento.
     void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisure(espId) })
+    // Gli ultimi valori di ogni pianta (elenco Piante): senza questa resterebbero quelli di prima fino alla scadenza della cache.
+    void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId) })
     void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
     // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
     if (!montato.current) return

@@ -1006,7 +1006,7 @@ describe('MisuraPianta: salvataggio', () => {
     expect(salvaMisura).not.toHaveBeenCalled()
   })
 
-  it('se riesce: toast "Pianta #35 salvata ✓" e invalidazione di misure della pianta, del giorno, "ultima volta" ed esperimenti', async () => {
+  it('se riesce: toast "Pianta #35 salvata ✓" e invalidazione di misure della pianta, del giorno, "ultima volta", ultime delle piante ed esperimenti', async () => {
     const utente = userEvent.setup()
     const { invalida } = apriT('35')
     await pronta()
@@ -1019,6 +1019,8 @@ describe('MisuraPianta: salvataggio', () => {
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', OGGI) })
     // "ultima volta" nella scelta dello strumento: questa misura può essere la più recente del suo strumento.
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.ultimeMisure('E') })
+    // l'elenco Piante mostra gli ultimi valori di ogni pianta: non deve restare indietro fino alla scadenza della cache
+    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.ultimeMisurePiante('E') })
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.esperimenti })
   })
 
