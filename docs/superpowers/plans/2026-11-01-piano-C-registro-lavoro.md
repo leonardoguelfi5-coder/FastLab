@@ -12,3 +12,8 @@ Ruling: archivio .zip e "Libera lo spazio" solo per esperimenti conclusi, solo d
 
 ## Avanzamento
 Task C1: dispatched implementer (opus), BASE ce852ae
+Task C1: implementatore (opus) DONE_WITH_CONCERNS d6d4e7e — 270 pgTAP (74 nuovi, emulato con schema storage minimo nello stub), 1475 Vitest
+Ruling: accettate le deviazioni C1: policy dello Storage con `esperimento_della_foto(name)` (uuid solo per nomi esattamente `<uuid>/<uuid>.jpg`, altrimenti null → nessun accesso; il cast diretto del piano faceva fallire ogni lettura con un solo oggetto estraneo); vincolo `percorso = esperimento_id/id.jpg`; stop se il bucket `foto` esiste già pubblico; bucket 5 MB e solo image/jpeg; insert firmato `creato_da = auth.uid()` — cost if wrong: nessuno
+Ruling (carry to C4): upload con `upsert: false` (niente policy di update), "esiste già" = riuscito, `contentType: 'image/jpeg'`; eliminando un esperimento il client rimuove prima i suoi file dallo Storage (il DB non può farlo e dopo nessuno ne è più membro) — cost if wrong: file orfani nello Storage
+Ruling (carry to C1 fix): `piante_con_dati` deve contare anche note e foto collegate (oggi le Impostazioni offrono "Elimina" su una pianta con note o foto e poi mostrano l'errore generico 23503) — cost if wrong: small
+Task C1: dispatched reviewer (opus) su copia ce852ae..d6d4e7e; Task C2 dispatched implementer (sonnet), BASE d6d4e7e
