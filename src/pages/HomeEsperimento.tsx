@@ -1,12 +1,16 @@
 import { useMemo, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { useConfig, useMisureGiorno } from '@/api/query'
+import { useConfig, useMisureGiorno, useNote } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { senzaNoteInEliminazione } from '@/components/note/eliminaNotaConAnnulla'
+import { chiaveSpuntaPromemoria } from '@/components/note/spuntaPromemoriaConAnnulla'
+import { promemoriaDelGiorno } from '@/domain/note'
 import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
+import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDiario, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
@@ -85,29 +89,48 @@ function Voce({ to, icona, nome, className, children }: { to: string; icona: str
   )
 }
 
+/** Che cosa c'è da guardare in Oggi: quanti promemoria e quanti valori da sistemare. */
+interface DaControllare { promemoria: number; valori: number }
+
 /**
- * Quanti valori di oggi sono da controllare (`daSistemare`), per il numerino su Oggi. "Oggi" è il giorno di calendario
- * (`useOggi()`), come nella pagina Oggi: non la data di rilievo scelta. Senza le misure (in arrivo, o non arrivate) non
- * si dice nulla: la home non mostra un numero finto né allarma per un errore di lettura. Con la data di rilievo di oggi
- * è la stessa query della striscia: una sola lettura.
+ * Quanto c'è da guardare in Oggi, per il numerino: i promemoria del giorno (`promemoriaDelGiorno`) e i valori di oggi da
+ * controllare (`daSistemare`), contati con lo stesso `oggi` (`useOggi()`) delle righe della pagina Oggi, non con la
+ * data di rilievo scelta. Ciò che non è arrivato (in arrivo, o non riuscito) vale zero: la home non mostra un numero
+ * finto né allarma per un errore di lettura (la pagina Oggi, se serve, lo dice). I promemoria spuntati o le note
+ * eliminate con l'"Annulla" ancora aperto non si contano. Con la data di rilievo di oggi le misure sono la stessa query
+ * della striscia: una sola lettura.
  */
-function useDaControllare(espId: string, config: ConfigEsperimento): number {
+function useDaControllare(espId: string, config: ConfigEsperimento): DaControllare {
   const oggi = useOggi()
-  const dati = useMisureGiorno(espId, oggi).data
-  return useMemo(() => (dati ? daSistemare(config, dati, oggi).length : 0), [dati, config, oggi])
+  const misure = useMisureGiorno(espId, oggi).data
+  const note = useNote(espId).data
+  const valori = useMemo(() => (misure ? daSistemare(config, misure, oggi).length : 0), [misure, config, oggi])
+  // Senza memoria: dipende anche da ciò che è "in attesa" (fuori da React), e l'elenco è breve.
+  const promemoria = note
+    ? promemoriaDelGiorno(senzaNoteInEliminazione(note), oggi).filter(n => !inEliminazione(chiaveSpuntaPromemoria(n.id))).length
+    : 0
+  return { promemoria, valori }
+}
+
+/** La frase per chi non vede il numerino: "2 promemoria e 1 valore da controllare". */
+function descriviDaControllare({ promemoria, valori }: DaControllare): string {
+  const parti: string[] = []
+  if (promemoria > 0) parti.push(`${promemoria} promemoria`)
+  if (valori > 0) parti.push(valori === 1 ? '1 valore da controllare' : `${valori} valori da controllare`)
+  return parti.join(' e ')
 }
 
 /**
- * Il numerino su Oggi: un segno in attenzione velato con il numero, e a chi non lo vede (lettori di schermo) la frase
- * intera. Mai solo colore: c'è il numero.
+ * Il numerino su Oggi: un segno in attenzione velato con il totale (promemoria più valori da sistemare), e a chi non lo
+ * vede (lettori di schermo) la frase intera. Mai solo colore: c'è il numero.
  */
-function NumerinoDaControllare({ n }: { n: number }) {
+function NumerinoDaControllare({ da }: { da: DaControllare }) {
   return (
     <>
-      <span aria-hidden className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-attenzione-velato px-1.5 font-mono text-label tabular-nums text-attenzione">{n}</span>
+      <span aria-hidden className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-attenzione-velato px-1.5 font-mono text-label tabular-nums text-attenzione">{da.promemoria + da.valori}</span>
       {/* Lo spazio tiene staccata la frase da "Oggi" nel nome del link. */}
       {' '}
-      <span className="sr-only">{`${n === 1 ? '1 valore' : `${n} valori`} da controllare`}</span>
+      <span className="sr-only">{descriviDaControllare(da)}</span>
     </>
   )
 }
@@ -122,7 +145,7 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
       <StrisciaNuovaMisura espId={espId} config={config} />
       <nav aria-label="Sezioni" className="grid grid-cols-2 gap-2.5">
         <Voce to={percorsoOggi(espId)} icona="📅" nome="Oggi">
-          {daControllare > 0 && <NumerinoDaControllare n={daControllare} />}
+          {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}
         </Voce>
         <Voce to={percorsoPiante(espId)} icona="🌿" nome="Piante" />
         <Voce to={percorsoSezione(espId, 'dataset')} icona="📊" nome="Dataset" />

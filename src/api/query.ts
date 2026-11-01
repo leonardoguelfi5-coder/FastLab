@@ -1,6 +1,6 @@
 import { keepPreviousData, QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
+import { parametriConDati, pianteConDati, pianteNonEliminabili, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaFoto, spazioFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
 import { listaInviti, sonoAdmin } from './inviti'
@@ -14,6 +14,7 @@ export const chiavi = {
   /** Sotto il prefisso della configurazione: invalidando `config(espId)` si rileggono anche questi. */
   parametriConDati: (espId: string) => ['config', espId, 'parametriConDati'] as const,
   pianteConDati: (espId: string) => ['config', espId, 'pianteConDati'] as const,
+  pianteNonEliminabili: (espId: string) => ['config', espId, 'pianteNonEliminabili'] as const,
   strumentiConDati: (espId: string) => ['config', espId, 'strumentiConDati'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
@@ -72,6 +73,23 @@ export function usePianteConDati(espId: string | undefined) {
     queryFn: () => pianteConDati(espId as string),
     enabled: !!espId,
     staleTime: 0,
+  })
+}
+
+/**
+ * Gli id delle piante che non si possono eliminare (misure, note collegate o foto). Da questo dipende se offrire
+ * "Rimuovi", e misure, note e foto si salvano in altre pagine: nessuna di quelle invalida questa chiave, quindi non si
+ * tiene una copia (`gcTime: 0`, come `useMisura`). Chiusa la pagina la query sparisce, e riaprendola non c'è nulla da
+ * mostrare finché la risposta nuova non arriva. Dentro le Impostazioni la chiave sta sotto la configurazione: ogni
+ * modifica delle piante la rilegge.
+ */
+export function usePianteNonEliminabili(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.pianteNonEliminabili(espId ?? ''),
+    queryFn: () => pianteNonEliminabili(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
+    gcTime: 0,
   })
 }
 

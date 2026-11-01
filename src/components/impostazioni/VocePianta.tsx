@@ -18,6 +18,8 @@ interface VocePiantaProps {
   modificata: boolean
   /** Se la pianta ha misure; `undefined` finché non lo si sa. */
   haDati: boolean | undefined
+  /** Se la pianta si può rimuovere (nessuna misura, nota collegata o foto); `undefined` finché non lo si sa. */
+  eliminabile: boolean | undefined
   aperta: boolean
   inCorso: boolean
   onApri: () => void
@@ -33,12 +35,19 @@ function riassunto(p: Pianta, haDati: boolean | undefined): string {
   return parti.join(' · ')
 }
 
+/** Perché la pianta non si può rimuovere: le misure, oppure (solo se non ne ha) le note collegate o le foto. */
+function motivoRimozione(haDati: boolean | undefined): string {
+  if (haDati === true) return 'Ha dati: non si può rimuovere'
+  if (haDati === false) return 'Ha note o foto: non si può rimuovere'
+  return 'Ha dati, note o foto: non si può rimuovere'
+}
+
 /**
  * Una pianta nell'elenco delle impostazioni: chiusa è una riga "#12 · Blocco B · ha dati"; aperta modifica etichetta,
- * blocco e (solo senza dati) trattamento, e offre "Rimuovi" solo a una pianta senza misure.
+ * blocco e (solo senza misure) trattamento, e offre "Rimuovi" solo a una pianta senza misure, note collegate né foto.
  */
 export function VocePianta({
-  pianta, valore, trattamenti, problema, modificata, haDati, aperta, inCorso,
+  pianta, valore, trattamenti, problema, modificata, haDati, eliminabile, aperta, inCorso,
   onApri, onChange, onSalva, onAnnulla, onRimuovi,
 }: VocePiantaProps) {
   const id = useId()
@@ -104,10 +113,10 @@ export function VocePianta({
       </div>
 
       {/* Lontano da "Salva": non si rimuove una pianta per sbaglio. */}
-      {haDati ? (
-        <p className="text-sm text-grafite-tenue">Ha dati: non si può rimuovere</p>
+      {eliminabile === false ? (
+        <p className="text-sm text-grafite-tenue">{motivoRimozione(haDati)}</p>
       ) : (
-        <Button variant="destructive" size="sm" className="self-start" disabled={haDati === undefined || inCorso} onClick={onRimuovi}>
+        <Button variant="destructive" size="sm" className="self-start" disabled={eliminabile === undefined || inCorso} onClick={onRimuovi}>
           Rimuovi
         </Button>
       )}

@@ -21,6 +21,9 @@ vi.mock('@/api/misure', () => ({
   misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
   ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn(),
 }))
+vi.mock('@/api/note', () => ({
+  listaNote: vi.fn(), salvaNota: vi.fn(), eliminaNota: vi.fn(), segnaFatto: vi.fn(),
+}))
 vi.mock('@/api/foto', () => ({
   listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
   VALIDITA_URL_SECONDI: 3600,
@@ -32,10 +35,13 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { caricaFoto, listaFoto, urlFoto } from '@/api/foto'
+import { listaNote } from '@/api/note'
+import { eliminaNotaConAnnulla } from '@/components/note/eliminaNotaConAnnulla'
+import { eliminaFotoConAnnulla } from '@/components/foto/eliminaFotoConAnnulla'
 import { misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento } from '@/api/misure'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Foto, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
+import type { ConfigEsperimento, Foto, Misura, Nota, Parametro, ValoriMisura } from '@/domain/tipi'
 import { dataDiScatto } from '@/lib/immagini'
 import { useCampoStore } from '@/store/campo'
 import { MisuraPianta } from './MisuraPianta'
@@ -50,6 +56,8 @@ let config: ConfigEsperimento
 let archivio: Misura[]
 /** Le foto "nel database". */
 let fotoDb: Foto[]
+/** Le note "nel database". */
+let noteDb: Nota[]
 
 const strumento = (nome: string) => config.strumenti.find(s => s.nome === nome)!
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
@@ -67,6 +75,10 @@ function misura(
   }
 }
 const spad = (n: number | string, valore: number, data: string, ora?: string) => misura(n, 'SPAD', { SPAD: [valore] }, data, ora)
+
+const notaDi = (id: string, extra: Partial<Nota> = {}): Nota => ({
+  id, data: '2026-10-27', testo: `Testo ${id}`, promemoria: false, fatto_il: null, pianta_ids: [], trattamento_ids: [], ...extra,
+})
 
 const fotoDi = (id: string, extra: Partial<Foto> = {}): Foto => ({
   id, data: '2026-10-27', percorso: `E/${id}.jpg`, larghezza: 1600, altezza: 1200, byte: 200000,
@@ -92,6 +104,7 @@ function apri(etichetta: string | number = '35') {
         <Routes>
           <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
           <Route path="/esperimenti/:espId/misure/:misuraId" element={<StatoArrivo />} />
+          <Route path="/esperimenti/:espId/diario" element={<StatoArrivo />} />
           <Route path="/esperimenti/:espId/misura/:strumentoId/:piantaId" element={<MisuraPianta />} />
           <Route path="*" element={null} />
         </Routes>
@@ -127,6 +140,8 @@ beforeEach(() => {
   config.esperimento.id = 'E'
   archivio = []
   fotoDb = []
+  noteDb = []
+  vi.mocked(listaNote).mockImplementation(async () => structuredClone(noteDb))
   vi.mocked(dataDiScatto).mockResolvedValue(null)
   vi.mocked(listaFoto).mockImplementation(async () => structuredClone(fotoDb))
   vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}`])))
@@ -723,7 +738,8 @@ describe('SchedaPianta: le foto', () => {
     fotoDb = [fotoDi('a', { pianta_id: pianta(35).id })]
     const utente = userEvent.setup()
     apri('35')
-    await utente.click(await screen.findByRole('button', { name: 'Foto del 27/10/2026, pianta 35' }))
+    const sezione = await screen.findByRole('region', { name: 'Foto' })
+    await utente.click(await within(sezione).findByRole('button', { name: 'Foto del 27/10/2026, pianta 35' }))
     expect(screen.getByRole('dialog')).toHaveAccessibleName('Foto 1 di 1')
   })
 
@@ -750,5 +766,160 @@ describe('SchedaPianta: le foto', () => {
     expect(await pronta()).toBeInTheDocument()
     await utente.click(within(sezione).getByRole('button', { name: 'Riprova' }))
     expect(await within(sezione).findByText('Ancora nessuna foto per questa pianta.')).toBeInTheDocument()
+  })
+})
+
+describe('SchedaPianta: note e foto nella storia', () => {
+  const storia = () => screen.findByRole('region', { name: 'Storia' })
+  const trattamentoDi = (n: number) => pianta(n).trattamento_id
+
+  it('mostra nella stessa linea del tempo, per data, misure, note e foto della pianta', async () => {
+    archivio = [misura(35, 'SPAD', { SPAD: [38.1] }, '2026-10-21', '09:00')]
+    noteDb = [
+      notaDi('n1', { data: '2026-10-27', testo: 'Foglie ingiallite', pianta_ids: [pianta(35).id] }),
+      notaDi('n2', { data: '2026-10-21', testo: 'Dopo la misura' }),
+    ]
+    fotoDb = [fotoDi('f1', { data: '2026-10-27', pianta_id: pianta(35).id })]
+    apri('35')
+    const dentro = within(await storia())
+    expect(await dentro.findByText('Foglie ingiallite')).toBeInTheDocument()
+
+    expect(dentro.getAllByRole('heading', { level: 4 }).map(h => h.textContent)).toEqual(['27/10/2026', '21/10/2026'])
+    const giorni = dentro.getAllByRole('listitem').filter(li => li.querySelector('h4'))
+    expect(within(giorni[0]).getByText('Foglie ingiallite')).toBeInTheDocument()
+    expect(await within(giorni[0]).findByRole('button', { name: 'Foto del 27/10/2026, pianta 35' })).toBeInTheDocument()
+    expect(within(giorni[1]).getByText('Dopo la misura')).toBeInTheDocument()
+    expect(within(giorni[1]).getByRole('link', { name: /SPAD/ })).toBeInTheDocument()
+  })
+
+  it('una giornata con la sola nota o la sola foto compare lo stesso', async () => {
+    noteDb = [notaDi('n1', { data: '2026-10-20', testo: 'Solo una nota' })]
+    fotoDb = [fotoDi('f1', { data: '2026-10-10', pianta_id: pianta(35).id })]
+    apri('35')
+    const dentro = within(await storia())
+    expect(await dentro.findByText('Solo una nota')).toBeInTheDocument()
+    await dentro.findByRole('button', { name: 'Foto del 10/10/2026, pianta 35' })
+    expect(dentro.getAllByRole('heading', { level: 4 }).map(h => h.textContent)).toEqual(['20/10/2026', '10/10/2026'])
+    expect(dentro.queryByText('Ancora nessuna misura per questa pianta.')).not.toBeInTheDocument()
+  })
+
+  it('le note arrivano anche via trattamento ed esperimento, con il collegamento indicato; le altre no', async () => {
+    noteDb = [
+      notaDi('diretta', { testo: 'Diretta', pianta_ids: [pianta(35).id, pianta(2).id] }),
+      notaDi('trattamento', { testo: 'Del trattamento', trattamento_ids: [trattamentoDi(35)] }),
+      notaDi('esperimento', { testo: 'Di tutto' }),
+      notaDi('altra', { testo: 'Di un\'altra pianta', pianta_ids: [pianta(1).id] }),
+      notaDi('altro-trattamento', { testo: 'Di un altro trattamento', trattamento_ids: [trattamentoDi(1)] }),
+    ]
+    apri('35')
+    const dentro = within(await storia())
+    await dentro.findByText('Diretta')
+    expect(dentro.getByText('Del trattamento')).toBeInTheDocument()
+    expect(dentro.getByText('Di tutto')).toBeInTheDocument()
+    expect(dentro.queryByText('Di un\'altra pianta')).not.toBeInTheDocument()
+    expect(dentro.queryByText('Di un altro trattamento')).not.toBeInTheDocument()
+
+    const riga = (testo: string) => dentro.getByText(testo).closest('li') as HTMLElement
+    expect(within(riga('Diretta')).getByText('Piante 2, 35')).toHaveClass('font-mono')
+    expect(within(riga('Del trattamento')).getByText('W1')).toHaveClass('font-mono')
+    expect(within(riga('Di tutto')).getByText('Tutto l\'esperimento')).toHaveClass('font-mono')
+  })
+
+  it('una nota è un tocco che la apre nel Diario; un promemoria si riconosce, e fatto è barrato', async () => {
+    noteDb = [
+      notaDi('a', { testo: 'Da ricordare', promemoria: true, fatto_il: '2026-10-27T08:00:00.000Z' }),
+    ]
+    const utente = userEvent.setup()
+    apri('35')
+    const collegamento = await within(await storia()).findByRole('link', { name: /Da ricordare/ })
+    expect(collegamento).toHaveAttribute('href', '/esperimenti/E/diario')
+    expect(collegamento).toHaveTextContent(/^Promemoria · /)
+    expect(within(collegamento).getByText('Da ricordare')).toHaveClass('line-through')
+    await utente.click(collegamento)
+    expect(posizione()).toBe('/esperimenti/E/diario')
+    expect(screen.getByTestId('arrivo')).toHaveTextContent('{"apriNota":"a"}')
+  })
+
+  it('le miniature delle foto aprono il visore, che scorre solo tra le foto di quel giorno', async () => {
+    fotoDb = [
+      fotoDi('a', { pianta_id: pianta(35).id }), fotoDi('b', { pianta_id: pianta(35).id }),
+      fotoDi('c', { pianta_id: pianta(35).id, data: '2026-10-20' }),
+    ]
+    const utente = userEvent.setup()
+    apri('35')
+    const dentro = within(await storia())
+    const miniature = await dentro.findAllByRole('button', { name: 'Foto del 27/10/2026, pianta 35' })
+    expect(miniature).toHaveLength(2)
+    await utente.click(miniature[0])
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Foto 1 di 2')
+  })
+
+  it('le foto di altre piante non compaiono', async () => {
+    fotoDb = [fotoDi('a', { pianta_id: pianta(1).id }), fotoDi('b')]
+    apri('35')
+    await pronta()
+    await waitFor(() => expect(listaFoto).toHaveBeenCalled())
+    await within(await screen.findByRole('region', { name: 'Foto' })).findByText('Ancora nessuna foto per questa pianta.')
+    expect(within(await storia()).queryByRole('button', { name: /^Foto del / })).not.toBeInTheDocument()
+  })
+
+  it('le note e le foto in attesa di eliminazione non compaiono, nemmeno se gli elenchi vengono riletti', async () => {
+    // Id propri: lo stato "in attesa" è del modulo e dura 5 secondi, anche oltre la fine del test.
+    noteDb = [notaDi('nota-da-eliminare', { testo: 'Da eliminare' }), notaDi('nota-che-resta', { testo: 'Resta' })]
+    fotoDb = [
+      fotoDi('foto-da-eliminare', { pianta_id: pianta(35).id }),
+      fotoDi('foto-che-resta', { pianta_id: pianta(35).id, data: '2026-10-20' }),
+    ]
+    const client = apri('35')
+    const dentro = within(await storia())
+    await dentro.findByText('Da eliminare')
+    await dentro.findByRole('button', { name: 'Foto del 20/10/2026, pianta 35' })
+
+    await act(async () => {
+      eliminaNotaConAnnulla(client, 'E', noteDb[0])
+      eliminaFotoConAnnulla(client, 'E', fotoDb[0])
+      await client.invalidateQueries()
+    })
+    await waitFor(() => expect(dentro.queryByText('Da eliminare')).not.toBeInTheDocument())
+    expect(dentro.getByText('Resta')).toBeInTheDocument()
+    expect(dentro.queryByRole('button', { name: 'Foto del 27/10/2026, pianta 35' })).not.toBeInTheDocument()
+    expect(dentro.getByRole('button', { name: 'Foto del 20/10/2026, pianta 35' })).toBeInTheDocument()
+  })
+
+  it('se le note non si leggono lo dice con «Riprova» e le misure restano; poi compaiono', async () => {
+    archivio = [misura(35, 'SPAD', { SPAD: [38.1] }, '2026-10-21', '09:00')]
+    vi.mocked(listaNote).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    noteDb = [notaDi('n1', { testo: 'Arrivata dopo', data: '2026-10-21' })]
+    const utente = userEvent.setup()
+    apri('35')
+    const dentro = within(await storia())
+    expect(await dentro.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(dentro.getByRole('link', { name: /SPAD/ })).toBeInTheDocument()
+    await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
+    expect(await dentro.findByText('Arrivata dopo')).toBeInTheDocument()
+    expect(dentro.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('senza misure, note e foto dice che non c\'è nulla', async () => {
+    apri('35')
+    expect(within(await storia()).getByText('Ancora nessuna misura per questa pianta.')).toBeInTheDocument()
+  })
+})
+
+describe('SchedaPianta: «Aggiungi nota»', () => {
+  it('porta all\'editor del Diario già collegato a questa pianta, con il ritorno alla scheda', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await utente.click(await screen.findByRole('link', { name: 'Aggiungi nota' }))
+    expect(posizione()).toBe('/esperimenti/E/diario')
+    expect(JSON.parse(screen.getByTestId('arrivo').textContent!)).toEqual({
+      nuovaPerPianta: pianta(35).id, ritorno: `/esperimenti/E/piante/${pianta(35).id}`,
+    })
+  })
+
+  it('c\'è anche se le misure non si caricano', async () => {
+    vi.mocked(misurePianta).mockRejectedValue(new TypeError('Failed to fetch'))
+    apri('35')
+    expect(await screen.findByRole('link', { name: 'Aggiungi nota' })).toBeInTheDocument()
   })
 })

@@ -34,6 +34,33 @@ export const percorsoSezione = (espId: string, sezione: SezioneInArrivo) => `${p
 /** Il Diario: le note e i promemoria dell'esperimento. */
 export const percorsoDiario = (espId: string) => `${percorsoHome(espId)}/diario`
 
+/**
+ * Lo stato di navigazione con cui si arriva al Diario da un'altra pagina (Oggi, la scheda della pianta). Vive nella
+ * rotta e non in un parametro: un ricaricamento non deve riaprire da solo un editor, e la bozza a metà ha la precedenza.
+ */
+export interface ArrivoDiario {
+  /** La nota da mostrare aperta nell'elenco (dal promemoria di Oggi e dalla storia della pianta). */
+  apriNota?: string
+  /** Apre una nota nuova già collegata a questa pianta (dalla scheda della pianta). */
+  nuovaPerPianta?: string
+  /** Dove tornare dopo il salvataggio o l'annullamento della nota nuova (la scheda da cui si è partiti). */
+  ritorno?: string
+}
+
+/**
+ * Lo stato di arrivo al Diario, letto da `location.state` (che può essere qualunque cosa: la cronologia del browser
+ * lo conserva). Si tengono solo i testi, e un ritorno solo se resta dentro l'esperimento: la scheda da cui si è partiti.
+ */
+export function leggiArrivoDiario(stato: unknown, espId: string): ArrivoDiario {
+  if (typeof stato !== 'object' || stato === null) return {}
+  const { apriNota, nuovaPerPianta, ritorno } = stato as Record<string, unknown>
+  const arrivo: ArrivoDiario = {}
+  if (typeof apriNota === 'string') arrivo.apriNota = apriNota
+  if (typeof nuovaPerPianta === 'string') arrivo.nuovaPerPianta = nuovaPerPianta
+  if (typeof ritorno === 'string' && ritorno.startsWith(`${percorsoHome(espId)}/`)) arrivo.ritorno = ritorno
+  return arrivo
+}
+
 /** La galleria delle foto dell'esperimento. */
 export const percorsoGalleria = (espId: string) => `${percorsoHome(espId)}/foto`
 

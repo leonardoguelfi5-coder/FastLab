@@ -41,6 +41,17 @@ export async function pianteConDati(espId: string): Promise<Set<string>> {
   return new Set((data ?? []) as string[])
 }
 
+/**
+ * Ids delle piante dell'esperimento che non si possono eliminare: con almeno una misura, una nota collegata o una
+ * foto (RPC `piante_non_eliminabili`, migration 0012). Serve a offrire "Rimuovi" solo dove il database lo permette;
+ * `pianteConDati` resta sulle sole misure perché decide anche il cambio di trattamento, che note e foto non vincolano.
+ */
+export async function pianteNonEliminabili(espId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.rpc('piante_non_eliminabili', { p_esperimento: espId })
+  if (error) throw error
+  return new Set((data ?? []) as string[])
+}
+
 /** Le righe di misure che si leggono in una volta: il massimo che PostgREST restituisce di norma. */
 const PAGINA_MISURE = 1000
 

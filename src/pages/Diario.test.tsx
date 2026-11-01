@@ -67,14 +67,16 @@ const fotoDi = (id: string, extra: Partial<Foto> = {}): Foto => ({
 })
 
 function Posizione() {
-  return <p data-testid="posizione">{useLocation().pathname}</p>
+  const { pathname, state } = useLocation()
+  return <><p data-testid="posizione">{pathname}</p><p data-testid="stato">{JSON.stringify(state)}</p></>
 }
 
-function apri() {
+/** `stato`: lo stato di navigazione con cui si arriva al Diario (da Oggi o dalla scheda di una pianta). */
+function apri(stato?: unknown) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const resa = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/esperimenti/E', '/esperimenti/E/diario']} initialIndex={1}>
+      <MemoryRouter initialEntries={['/esperimenti/E', { pathname: '/esperimenti/E/diario', state: stato ?? null }]} initialIndex={1}>
         <Routes>
           <Route path="/esperimenti/:espId/diario" element={<Diario />} />
           <Route path="*" element={<p>Schermata in campo</p>} />
@@ -830,5 +832,134 @@ describe('Diario: le foto della nota', () => {
     expect(screen.getByLabelText('Nota')).toHaveValue('Da correggere ancora')
     expect(Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))).toEqual(bozza)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {
+  const scheda = () => `/esperimenti/E/piante/${idPianta('35')}`
+  const dallaScheda = () => ({ nuovaPerPianta: idPianta('35'), ritorno: scheda() })
+  const posizione = () => screen.getByTestId('posizione').textContent
+  const scelta = (nome: string) => screen.getByRole('radio', { name: nome })
+
+  it('da un promemoria di Oggi la nota si apre nell\'elenco, e solo quella', async () => {
+    db = [nota('a', { testo: 'Altra' }), nota('b', { testo: 'Da guardare' })]
+    apri({ apriNota: 'b' })
+    await screen.findByRole('list', { name: 'Note del diario' })
+    expect(within(riga('Da guardare')).getByRole('button', { name: 'Modifica' })).toBeInTheDocument()
+    expect(within(riga('Altra')).queryByRole('button', { name: 'Modifica' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Nota')).not.toBeInTheDocument()
+  })
+
+  it('una nota che non c\'è più non rompe nulla: si vede l\'elenco com\'è', async () => {
+    db = [nota('a', { testo: 'Altra' })]
+    apri({ apriNota: 'sparita' })
+    await screen.findByRole('list', { name: 'Note del diario' })
+    expect(within(riga('Altra')).queryByRole('button', { name: 'Modifica' })).not.toBeInTheDocument()
+  })
+
+  it('«Aggiungi nota» dalla scheda apre l\'editor già collegato a quella pianta, senza nulla da scartare', async () => {
+    apri(dallaScheda())
+    expect(await screen.findByRole('heading', { level: 1, name: 'Nuova nota' })).toBeInTheDocument()
+    expect(scelta('Piante')).toBeChecked()
+    expect(screen.getByText(/Piante scelte/)).toHaveTextContent('Piante scelte: 35')
+    expect(salva()).toBeDisabled()
+    // Nessuna bozza né ricordo di nota aperta finché non si scrive: il collegamento iniziale non è una modifica.
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('lo stato di arrivo si consuma: ricaricando non si riapre da solo un editor, ma il ritorno resta', async () => {
+    apri(dallaScheda())
+    await screen.findByLabelText('Nota')
+    await waitFor(() => expect(JSON.parse(screen.getByTestId('stato').textContent!)).toEqual({ ritorno: scheda() }))
+  })
+
+  it('salvando, la nota è collegata alla pianta e si torna alla scheda', async () => {
+    const { utente } = apri(dallaScheda())
+    await utente.type(await screen.findByLabelText('Nota'), 'Foglie arricciate')
+    await utente.click(salva())
+    await waitFor(() => expect(posizione()).toBe(scheda()))
+    expect(salvaNota).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(salvaNota).mock.calls[0][1]).toMatchObject({
+      testo: 'Foglie arricciate', pianta_ids: [idPianta('35')], trattamento_ids: [],
+    })
+    expect(toastSalvato).toHaveBeenCalledWith('Nota salvata.')
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('«Annulla» senza aver scritto nulla torna alla scheda, senza domande', async () => {
+    const { utente } = apri(dallaScheda())
+    await screen.findByLabelText('Nota')
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(posizione()).toBe(scheda())
+    expect(salvaNota).not.toHaveBeenCalled()
+  })
+
+  it('«Annulla» dopo aver scritto chiede se scartare; scartando si torna alla scheda e la bozza va via', async () => {
+    const { utente } = apri(dallaScheda())
+    await utente.type(await screen.findByLabelText('Nota'), 'Qualcosa')
+    expect(sessionStorage.length).toBeGreaterThan(0)
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
+    expect(posizione()).toBe(scheda())
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('la freccia indietro porta alla scheda (non alla home); con modifiche chiede prima di scartare', async () => {
+    const { utente } = apri(dallaScheda())
+    await utente.type(await screen.findByLabelText('Nota'), 'Qualcosa')
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', scheda())
+    await utente.click(screen.getByRole('link', { name: 'Indietro' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
+    expect(posizione()).toBe(scheda())
+  })
+
+  it('ritornando al Diario con la bozza (ricarica), riparte da lì, collegata alla pianta, e salvando torna alla scheda', async () => {
+    const prima = apri(dallaScheda())
+    await prima.utente.type(await screen.findByLabelText('Nota'), 'A metà')
+    prima.resa.unmount()
+
+    // Ricaricando, la rotta ha ancora il ritorno ma non più la richiesta di una nota nuova.
+    const { utente } = apri({ ritorno: scheda() })
+    expect(await screen.findByLabelText('Nota')).toHaveValue('A metà')
+    expect(scelta('Piante')).toBeChecked()
+    expect(screen.getByText(/Piante scelte/)).toHaveTextContent('Piante scelte: 35')
+    await utente.click(salva())
+    await waitFor(() => expect(posizione()).toBe(scheda()))
+    expect(vi.mocked(salvaNota).mock.calls[0][1]).toMatchObject({ testo: 'A metà', pianta_ids: [idPianta('35')] })
+  })
+
+  it('una bozza già lasciata a metà ha la precedenza: non si perde e non si sovrascrive con la nota collegata', async () => {
+    scriviBozzaNota('E', {
+      id: 'vecchia', esistente: false,
+      stato: { ...statoVuoto(oggiLocale()), testo: 'Scritta prima', collegamento: 'trattamenti', trattamento_ids: [idTrattamento('Controllo')] },
+    })
+    apri(dallaScheda())
+    expect(await screen.findByLabelText('Nota')).toHaveValue('Scritta prima')
+    expect(scelta('Trattamenti')).toBeChecked()
+    expect(JSON.parse(sessionStorage.getItem(Object.keys(sessionStorage).find(k => k.endsWith('vecchia'))!)!).stato.testo).toBe('Scritta prima')
+  })
+
+  it('una pianta che non c\'è più si ignora: si vede l\'elenco', async () => {
+    apri({ nuovaPerPianta: 'inesistente', ritorno: scheda() })
+    expect(await screen.findByRole('button', { name: '+ Nuova nota' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Nota')).not.toBeInTheDocument()
+  })
+
+  it('un ritorno fuori dall\'esperimento si ignora: si esce verso la home', async () => {
+    const { utente } = apri({ nuovaPerPianta: idPianta('35'), ritorno: 'https://altro.example/x' })
+    await screen.findByLabelText('Nota')
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E')
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(posizione()).toBe('/esperimenti/E/diario')
+  })
+
+  it('le note aperte dall\'elenco dopo un arrivo dalla scheda non tornano alla scheda', async () => {
+    db = [nota('a', { testo: 'Esistente' })]
+    const { utente } = apri({ apriNota: 'a', ritorno: scheda() })
+    await utente.click(within(await screen.findByRole('list', { name: 'Note del diario' })).getByRole('button', { name: 'Modifica' }))
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(posizione()).toBe('/esperimenti/E/diario')
+    expect(screen.getByRole('heading', { level: 1, name: 'Diario' })).toBeInTheDocument()
   })
 })

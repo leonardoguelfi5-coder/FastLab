@@ -8,7 +8,7 @@ import type { Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
   aggiornaParametroDaCatalogo, aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento,
-  collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, parametriConDati, salvaParametro,
+  collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, pianteNonEliminabili, parametriConDati, salvaParametro,
   salvaStrumento, strumentiConDati,
 } from './configurazione'
 
@@ -403,5 +403,26 @@ describe('aggiornaTrattamento', () => {
   it('lancia l\'errore di Supabase', async () => {
     mock.risponde('trattamenti', { error: errore })
     await expect(aggiornaTrattamento('E', 't1', 'x')).rejects.toBe(errore)
+  })
+})
+
+describe('pianteNonEliminabili', () => {
+  it('chiama la RPC nuova (misure, note collegate e foto) e restituisce un Set di id', async () => {
+    mock.risponde('rpc:piante_non_eliminabili', { data: ['p1', 'p2'] })
+
+    expect(await pianteNonEliminabili('E')).toEqual(new Set(['p1', 'p2']))
+    expect(supabase.rpc).toHaveBeenCalledWith('piante_non_eliminabili', { p_esperimento: 'E' })
+    // Non è piante_con_dati: quella decide il cambio di trattamento e resta sulle sole misure.
+    expect(supabase.rpc).not.toHaveBeenCalledWith('piante_con_dati', expect.anything())
+  })
+
+  it('senza dati restituisce un Set vuoto', async () => {
+    mock.risponde('rpc:piante_non_eliminabili', { data: null })
+    expect((await pianteNonEliminabili('E')).size).toBe(0)
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('rpc:piante_non_eliminabili', { error: errore })
+    await expect(pianteNonEliminabili('E')).rejects.toBe(errore)
   })
 })

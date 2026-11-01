@@ -24,7 +24,7 @@ export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, 
   const fatto = nota.promemoria && nota.fatto_il !== null
   const data = formattaData(nota.data)
   return (
-    <li className="border-b border-riga">
+    <li id={`nota-${nota.id}`} className="border-b border-riga">
       <div className="flex items-start">
         <button
           type="button"

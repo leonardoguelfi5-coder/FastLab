@@ -3,10 +3,19 @@ import { eliminaNota } from '@/api/note'
 import { chiavi } from '@/api/query'
 import { reinserisciNota, senzaNota } from '@/domain/note'
 import type { Nota } from '@/domain/tipi'
-import { eliminaConAnnulla } from '@/lib/eliminaConAnnulla'
+import { eliminaConAnnulla, inEliminazione } from '@/lib/eliminaConAnnulla'
 
 /** La chiave con cui una nota in attesa di eliminazione è nota a `inEliminazione` (per chi rilegge l'elenco). */
 export const chiaveEliminazioneNota = (id: string): string => `nota:${id}`
+
+/**
+ * Le note senza quelle in attesa di eliminazione. Il filtro è al momento del disegno e non dentro `useNote`
+ * (`select`): `select` si calcolerebbe quando "Annulla" riscrive la cache, un istante prima che la nota smetta di
+ * essere "in eliminazione", e la lascerebbe nascosta fino alla lettura dopo. Lo usano il Diario, Oggi e la storia
+ * della pianta: così una rilettura dal server nei 5 secondi non fa riapparire ciò che sta per sparire.
+ */
+export const senzaNoteInEliminazione = (note: Nota[]): Nota[] =>
+  note.filter(n => !inEliminazione(chiaveEliminazioneNota(n.id)))
 
 /**
  * Elimina una nota con "Annulla" (Piano C, Decisione 4). La nota esce subito dall'elenco in cache (aggiornamento

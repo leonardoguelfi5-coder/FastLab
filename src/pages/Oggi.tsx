@@ -6,6 +6,7 @@ import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { VoceStrumento } from '@/components/VoceStrumento'
+import { PromemoriaOggi } from '@/components/note/PromemoriaOggi'
 import { Badge } from '@/components/ui/badge'
 import { righeStrumenti, type Giro } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
@@ -174,7 +175,7 @@ function DaSistemare({ espId, config, oggi }: { espId: string; config: ConfigEsp
   )
 }
 
-/** Il contenuto a configurazione caricata: la data, il banner della data di rilievo, gli strumenti e i valori da sistemare. */
+/** Il contenuto a configurazione caricata: la data, il banner della data di rilievo, i promemoria, gli strumenti e i valori da sistemare. */
 function OggiCaricato({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const idStrumenti = useId()
   const oggi = useOggi()
@@ -185,6 +186,7 @@ function OggiCaricato({ espId, config }: { espId: string; config: ConfigEsperime
         <p className="font-mono text-dato tabular-nums text-grafite-tenue">{formattaData(oggi)}</p>
         <BannerData espId={espId} />
       </div>
+      <PromemoriaOggi espId={espId} config={config} oggi={oggi} />
       <section aria-labelledby={idStrumenti} className="flex flex-col gap-3">
         <h2 id={idStrumenti} className="text-label text-grafite-tenue uppercase">Strumenti</h2>
         <Strumenti espId={espId} config={config} oggi={oggi} />
@@ -195,8 +197,8 @@ function OggiCaricato({ espId, config }: { espId: string; config: ConfigEsperime
 }
 
 /**
- * "Oggi": cosa si è misurato oggi e cosa manca (gli strumenti con il loro giro), e i valori da controllare. I
- * promemoria arrivano con il Diario (Piano C).
+ * "Oggi": i promemoria del giorno, cosa si è misurato oggi e cosa manca (gli strumenti con il loro giro), e i valori
+ * da controllare.
  */
 export function Oggi() {
   const { espId = '' } = useParams()

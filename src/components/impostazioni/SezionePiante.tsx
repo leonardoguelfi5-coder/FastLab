@@ -1,16 +1,15 @@
 import { useId, useState } from 'react'
 import { useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { aggiornaPianta, eliminaPianta, pianteConDati } from '@/api/configurazione'
+import { aggiornaPianta, eliminaPianta, pianteConDati, pianteNonEliminabili } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { Conferma } from '@/components/Conferma'
-import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { Scelta } from '@/components/Scelta'
 import { Label } from '@/components/ui/label'
 import type { ConfigEsperimento, Pianta } from '@/domain/tipi'
 import { AggiungiPiante } from './AggiungiPiante'
 import { ErroreDaMostrare, useAzione } from './azione'
 import { uguali, useBozze, useSegnalaModifiche } from './modifiche'
-import { ControlloDati, Sezione, Spiegazione } from './Sezione'
+import { AvvisoDati, Sezione, Spiegazione } from './Sezione'
 import { VocePianta } from './VocePianta'
 
 const TUTTI = ''
@@ -28,14 +27,18 @@ function problemaEtichetta(p: Pianta, piante: Pianta[]): string | null {
 interface SezionePianteProps {
   espId: string
   config: ConfigEsperimento
+  /** Le piante con almeno una misura: decidono il cambio di trattamento. */
   conDati: UseQueryResult<Set<string>>
+  /** Le piante con misure, note collegate o foto: decidono "Rimuovi". */
+  nonEliminabili: UseQueryResult<Set<string>>
 }
 
 /**
  * Le piante, raggruppate per trattamento e filtrabili: una riga per pianta, che si apre per la modifica (niente griglia
- * fitta da foglio di calcolo). Sotto, l'aggiunta di piante a un trattamento.
+ * fitta da foglio di calcolo). Sotto, l'aggiunta di piante a un trattamento. Il trattamento non si cambia con le misure;
+ * la pianta non si rimuove con misure, note collegate o foto (il database lo vieta).
  */
-export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
+export function SezionePiante({ espId, config, conDati, nonEliminabili }: SezionePianteProps) {
   const id = useId()
   const queryClient = useQueryClient()
   const azione = useAzione(espId)
@@ -45,6 +48,7 @@ export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
   // La pianta resta anche a dialogo chiuso: il titolo non cambia mentre il dialogo sparisce.
   const [daRimuovere, setDaRimuovere] = useState<{ pianta: Pianta; aperto: boolean } | null>(null)
   const dati = conDati.data
+  const bloccate = nonEliminabili.data
 
   /** La pianta come si vede: con dati il trattamento resta quello salvato, anche se una bozza diceva altro. */
   function valore(p: Pianta): Pianta {
@@ -79,7 +83,16 @@ export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
 
   async function rimuovi(p: Pianta) {
     setDaRimuovere({ pianta: p, aperto: false })
-    const riuscito = await azione.esegui(() => eliminaPianta(espId, p.id), {
+    const riuscito = await azione.esegui(async () => {
+      // Una nota, una foto o una misura può essere arrivata dopo l'apertura della pagina: si ricontrolla sul database.
+      const fresche = await queryClient.fetchQuery({
+        queryKey: chiavi.pianteNonEliminabili(espId), queryFn: () => pianteNonEliminabili(espId), staleTime: 0,
+      })
+      if (fresche.has(p.id)) {
+        throw new ErroreDaMostrare(`La pianta #${p.etichetta} ha già dati, note o foto: non si può più rimuovere.`)
+      }
+      await eliminaPianta(espId, p.id)
+    }, {
       messaggio: `Pianta #${p.etichetta} rimossa.`,
       neutro: true,
       aggiorna: c => ({ ...c, piante: c.piante.filter(x => x.id !== p.id) }),
@@ -99,11 +112,9 @@ export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
   return (
     <Sezione titolo="Piante">
       <Spiegazione>
-        {`${conteggio(config.piante.length)}. Tocca una pianta per cambiarne etichetta, blocco o trattamento. Una pianta con misure resta nel suo trattamento e non si può rimuovere.`}
+        {`${conteggio(config.piante.length)}. Tocca una pianta per cambiarne etichetta, blocco o trattamento. Una pianta con misure resta nel suo trattamento; con misure, note o foto non si può rimuovere.`}
       </Spiegazione>
-      {dati === undefined && (conDati.isError
-        ? <ErroreConRiprova errore={conDati.error} onRiprova={() => void conDati.refetch()} />
-        : <ControlloDati />)}
+      <AvvisoDati letture={[conDati, nonEliminabili]} />
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-filtro`}>Mostra</Label>
@@ -134,6 +145,7 @@ export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
                 problema={problemaEtichetta(valore(p), config.piante)}
                 modificata={modificata(p)}
                 haDati={dati?.has(p.id)}
+                eliminabile={bloccate === undefined ? undefined : !bloccate.has(p.id)}
                 aperta={aperta === p.id}
                 inCorso={azione.inCorso}
                 onApri={() => setAperta(aperta === p.id ? null : p.id)}
@@ -152,7 +164,7 @@ export function SezionePiante({ espId, config, conDati }: SezionePianteProps) {
       <Conferma
         aperta={daRimuovere?.aperto ?? false}
         titolo={`Rimuovere la pianta #${daRimuovere?.pianta.etichetta ?? ''}?`}
-        testo="La pianta non ha misure. L'operazione non si può annullare."
+        testo="La pianta non ha misure, note né foto. L'operazione non si può annullare."
         annulla="Annulla"
         conferma="Rimuovi"
         onAnnulla={() => setDaRimuovere(d => d && { ...d, aperto: false })}

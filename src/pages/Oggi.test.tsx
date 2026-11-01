@@ -20,14 +20,22 @@ vi.mock('@/api/misure', () => ({
   misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
   ultimaMisuraPerStrumento: vi.fn(),
 }))
+vi.mock('@/api/note', () => ({
+  listaNote: vi.fn(), salvaNota: vi.fn(), eliminaNota: vi.fn(), segnaFatto: vi.fn(),
+}))
+vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() }) }))
 
+import { toast } from 'sonner'
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { misureDelGiorno, ultimaMisuraPerStrumento } from '@/api/misure'
+import { eliminaNota, listaNote, segnaFatto } from '@/api/note'
+import { eliminaNotaConAnnulla } from '@/components/note/eliminaNotaConAnnulla'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Misura } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Nota } from '@/domain/tipi'
+import { ATTESA_ANNULLA_MS } from '@/lib/eliminaConAnnulla'
 import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import { useCampoStore } from '@/store/campo'
 import { Oggi } from './Oggi'
@@ -44,6 +52,12 @@ function esperimento(): ConfigEsperimento {
 }
 
 let config: ConfigEsperimento
+/** Le note "nel database". */
+let noteDb: Nota[]
+
+const nota = (id: string, extra: Partial<Nota> = {}): Nota => ({
+  id, data: OGGI, testo: `Testo ${id}`, promemoria: true, fatto_il: null, pianta_ids: [], trattamento_ids: [], ...extra,
+})
 
 const strumento = (nome: string) => config.strumenti.find(s => s.nome === nome)!
 const parametroSpad = () => config.parametri.find(p => p.catalogo_chiave === 'spad')!
@@ -123,6 +137,12 @@ beforeEach(() => {
   vi.mocked(caricaConfig).mockResolvedValue(config)
   vi.mocked(misureDelGiorno).mockResolvedValue([])
   vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map())
+  noteDb = []
+  vi.mocked(listaNote).mockImplementation(async () => structuredClone(noteDb))
+  vi.mocked(segnaFatto).mockImplementation(async (_e, id, fatto) => {
+    noteDb = noteDb.map(n => (n.id === id ? { ...n, fatto_il: fatto ? new Date().toISOString() : null } : n))
+  })
+  vi.mocked(eliminaNota).mockImplementation(async (_e, id) => { noteDb = noteDb.filter(n => n.id !== id) })
 })
 
 afterEach(() => {
@@ -414,5 +434,172 @@ describe('Oggi: caricamento ed errori', () => {
     vi.mocked(caricaConfig).mockRejectedValue(new Error(ESPERIMENTO_NON_TROVATO))
     vaiAllaPagina()
     expect(await screen.findByRole('link', { name: 'I miei esperimenti' })).toHaveAttribute('href', '/')
+  })
+})
+
+/** L'azione "Annulla" del toast mostrato per ultimo. */
+function azioneAnnulla() {
+  const [, opzioni] = vi.mocked(toast).mock.calls.at(-1) as unknown as [string, { action: { label: string; onClick: () => void } }]
+  return opzioni.action
+}
+
+describe('Oggi: i promemoria', () => {
+  // Lo stato "in attesa" è del modulo: ogni test lo lascia vuoto facendo scadere ciò che ha sospeso.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date(2026, 9, 28, 10, 0))
+  })
+  afterEach(async () => { await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS * 2)) })
+
+  const sezione = () => screen.findByRole('region', { name: 'Promemoria' })
+  const spunta = (testo: string) => screen.getByRole('button', { name: `Segna fatto: ${testo}` })
+
+  it('è la prima sezione, sopra gli strumenti, e mostra i promemoria con data di oggi o passata non fatti', async () => {
+    noteDb = [
+      nota('a', { testo: 'Annaffiare', data: OGGI }),
+      nota('b', { testo: 'Scaduto', data: '2026-10-20' }),
+      nota('c', { testo: 'Domani', data: '2026-10-29' }),
+      nota('d', { testo: 'Già fatto', fatto_il: '2026-10-28T08:00:00.000Z' }),
+      nota('e', { testo: 'Una nota semplice', promemoria: false }),
+    ]
+    vaiAllaPagina()
+    const promemoria = within(await sezione())
+    expect(promemoria.getAllByRole('listitem').map(li => li.textContent)).toEqual([
+      expect.stringContaining('Scaduto'), expect.stringContaining('Annaffiare'),
+    ])
+    expect(screen.queryByText('Domani')).not.toBeInTheDocument()
+    expect(screen.queryByText('Già fatto')).not.toBeInTheDocument()
+    expect(screen.queryByText('Una nota semplice')).not.toBeInTheDocument()
+    const titoli = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
+    expect(titoli.slice(0, 2)).toEqual(['Promemoria', 'Strumenti'])
+  })
+
+  it('senza promemoria la sezione non c\'è', async () => {
+    noteDb = [nota('c', { data: '2026-10-29' })]
+    vaiAllaPagina()
+    await aspettaStrumenti()
+    await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
+    expect(screen.queryByRole('region', { name: 'Promemoria' })).not.toBeInTheDocument()
+  })
+
+  it('ogni riga dice la data, il testo e a cosa è collegata, in Geist Mono', async () => {
+    noteDb = [nota('a', { testo: 'Controllare le foglie', data: '2026-10-26', pianta_ids: [idPianta(3)] })]
+    vaiAllaPagina()
+    const riga = within(await sezione()).getByRole('listitem')
+    expect(within(riga).getByText('26/10/2026')).toHaveClass('font-mono')
+    expect(within(riga).getByText('Controllare le foglie')).toBeInTheDocument()
+    expect(within(riga).getByText('Pianta 3')).toHaveClass('font-mono')
+  })
+
+  it('il tocco sulla riga apre la nota nel Diario', async () => {
+    noteDb = [nota('a', { testo: 'Controllare le foglie' })]
+    const utente = userEvent.setup()
+    vaiAllaPagina()
+    await utente.click(within(await sezione()).getByRole('link', { name: /Controllare le foglie/ }))
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/diario')
+    expect(JSON.parse(screen.getByTestId('stato').textContent!)).toEqual({ apriNota: 'a' })
+  })
+
+  it('la spunta ha un bersaglio di almeno 44 px ed è un pulsante a parte, fuori dal tocco che apre la nota', async () => {
+    noteDb = [nota('a', { testo: 'Annaffiare' })]
+    vaiAllaPagina()
+    await sezione()
+    expect(spunta('Annaffiare')).toHaveClass('size-11')
+    expect(spunta('Annaffiare').closest('a')).toBeNull()
+  })
+
+  it('spuntare toglie subito il promemoria, mostra "Annulla" e salva solo dopo 5 secondi', async () => {
+    noteDb = [nota('a', { testo: 'Annaffiare' }), nota('b', { testo: 'Concimare' })]
+    const utente = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vaiAllaPagina()
+    await sezione()
+    await utente.click(spunta('Annaffiare'))
+
+    expect(screen.queryByText('Annaffiare')).not.toBeInTheDocument()
+    expect(screen.getByText('Concimare')).toBeInTheDocument()
+    expect(toast).toHaveBeenCalledWith('Promemoria fatto.', expect.objectContaining({ duration: ATTESA_ANNULLA_MS }))
+    expect(azioneAnnulla().label).toBe('Annulla')
+    expect(segnaFatto).not.toHaveBeenCalled()
+
+    await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS - 100))
+    expect(segnaFatto).not.toHaveBeenCalled()
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    expect(segnaFatto).toHaveBeenCalledExactlyOnceWith('E', 'a', true)
+    expect(screen.queryByText('Annaffiare')).not.toBeInTheDocument()
+  })
+
+  it('"Annulla" rimette il promemoria e non scrive mai nulla', async () => {
+    noteDb = [nota('a', { testo: 'Annaffiare' })]
+    const utente = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vaiAllaPagina()
+    await sezione()
+    await utente.click(spunta('Annaffiare'))
+    act(() => azioneAnnulla().onClick())
+
+    expect(await screen.findByText('Annaffiare')).toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS * 2))
+    expect(segnaFatto).not.toHaveBeenCalled()
+    expect(screen.getByText('Annaffiare')).toBeInTheDocument()
+  })
+
+  it('se il salvataggio vero fallisce il promemoria ricompare e l\'errore resta finché non lo si chiude', async () => {
+    noteDb = [nota('a', { testo: 'Annaffiare' })]
+    vi.mocked(segnaFatto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vaiAllaPagina()
+    await sezione()
+    await utente.click(spunta('Annaffiare'))
+    await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS + 100))
+
+    expect(await screen.findByText('Annaffiare')).toBeInTheDocument()
+    expect(toast.error).toHaveBeenCalledWith(
+      expect.stringContaining('Il promemoria non è stato segnato come fatto'), expect.objectContaining({ duration: Infinity }),
+    )
+  })
+
+  it('una rilettura dal server nei 5 secondi non fa riapparire il promemoria spuntato', async () => {
+    noteDb = [nota('a', { testo: 'Annaffiare' })]
+    const utente = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const client = vaiAllaPagina()
+    await sezione()
+    await utente.click(spunta('Annaffiare'))
+    // Il server non sa ancora nulla: la rilettura riporta la nota da fare.
+    await act(async () => { await client.invalidateQueries({ queryKey: ['note', 'E'] }); await vi.advanceTimersByTimeAsync(10) })
+    expect(screen.queryByText('Annaffiare')).not.toBeInTheDocument()
+  })
+
+  it('una nota in attesa di eliminazione non compare, nemmeno se l\'elenco viene riletto', async () => {
+    noteDb = [nota('a', { testo: 'Da eliminare' }), nota('b', { testo: 'Resta' })]
+    const client = vaiAllaPagina()
+    await sezione()
+    await act(async () => { eliminaNotaConAnnulla(client, 'E', noteDb[0]); await vi.advanceTimersByTimeAsync(10) })
+    expect(screen.queryByText('Da eliminare')).not.toBeInTheDocument()
+    await act(async () => { await client.invalidateQueries({ queryKey: ['note', 'E'] }); await vi.advanceTimersByTimeAsync(10) })
+    expect(screen.queryByText('Da eliminare')).not.toBeInTheDocument()
+    expect(screen.getByText('Resta')).toBeInTheDocument()
+    expect(eliminaNota).not.toHaveBeenCalled()
+  })
+
+  it('se le note non arrivano lo dice con «Riprova», senza nascondere gli strumenti', async () => {
+    vi.mocked(listaNote).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const utente = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    vaiAllaPagina()
+    const promemoria = within(await sezione())
+    expect(await promemoria.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await aspettaStrumenti()).toBeInTheDocument()
+    noteDb = [nota('a', { testo: 'Annaffiare' })]
+    await utente.click(promemoria.getByRole('button', { name: 'Riprova' }))
+    expect(await promemoria.findByText('Annaffiare')).toBeInTheDocument()
+  })
+
+  it('a mezzanotte un promemoria di domani passa tra quelli di oggi', async () => {
+    noteDb = [nota('a', { testo: 'Domani', data: '2026-10-29' })]
+    vi.setSystemTime(new Date(2026, 9, 28, 23, 59, 30))
+    vaiAllaPagina()
+    await aspettaStrumenti()
+    await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
+    expect(screen.queryByText('Domani')).not.toBeInTheDocument()
+    await act(() => vi.advanceTimersByTimeAsync(31_000))
+    expect(await screen.findByText('Domani')).toBeInTheDocument()
   })
 })

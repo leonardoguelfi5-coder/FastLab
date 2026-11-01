@@ -1,5 +1,6 @@
 import type { ConfigEsperimento, Foto, Pianta } from './tipi'
 import { formattaData } from '@/lib/date'
+import { formattaNumero } from '@/lib/numeri'
 import { filtraPiante } from './elencoPiante'
 
 /**
@@ -77,4 +78,20 @@ export function filtraFoto(foto: Foto[], config: Pick<ConfigEsperimento, 'piante
 export function descriviFoto(foto: Foto, piante: Pick<Pianta, 'id' | 'etichetta'>[]): string {
   const pianta = foto.pianta_id === null ? undefined : piante.find(p => p.id === foto.pianta_id)
   return `Foto del ${formattaData(foto.data)}${pianta ? `, pianta ${pianta.etichetta}` : ''}`
+}
+
+/** Lo spazio del piano gratuito per le foto: 1 GB per l'intero progetto (Piano C, Decisione 5). Decimale: avvisa un po' prima. */
+export const LIMITE_SPAZIO_BYTE = 1_000_000_000
+
+/** Oltre questa quota dello spazio (l'80%) le Impostazioni avvisano. */
+const SOGLIA_AVVISO_SPAZIO = 0.8
+
+/** I byte in megabyte (1 MB = 1 000 000 byte), con la virgola e un decimale: "12,3 MB". */
+export function formattaMegabyte(byte: number): string {
+  return `${formattaNumero(Math.round(byte / 100_000) / 10)} MB`
+}
+
+/** Quanto del limite è usato: la percentuale arrotondata (anche oltre il 100) e se si è oltre l'80%. */
+export function quotaSpazio(byte: number): { percentuale: number; oltreSoglia: boolean } {
+  return { percentuale: Math.round((byte / LIMITE_SPAZIO_BYTE) * 100), oltreSoglia: byte > LIMITE_SPAZIO_BYTE * SOGLIA_AVVISO_SPAZIO }
 }

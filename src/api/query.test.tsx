@@ -6,13 +6,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
-vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn() }))
+vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 vi.mock('./note', () => ({ listaNote: vi.fn() }))
 vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati, strumentiConDati } from './configurazione'
+import { parametriConDati, pianteConDati, pianteNonEliminabili, strumentiConDati } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
@@ -20,7 +20,7 @@ import { listaFoto, spazioFoto, urlFoto } from './foto'
 import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useFoto, useNote, useParametriConDati, useSpazioFoto, useUrlFoto, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
+  useFoto, useNote, useParametriConDati, usePianteNonEliminabili, useSpazioFoto, useUrlFoto, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
 } from './query'
 
 function wrapper() {
@@ -313,6 +313,45 @@ describe('parametri e piante con dati', () => {
     expect(strumentiConDati).not.toHaveBeenCalled()
     expect(parametriConDati).not.toHaveBeenCalled()
     expect(pianteConDati).not.toHaveBeenCalled()
+  })
+})
+
+describe('piante non eliminabili', () => {
+  const conClient = (client: QueryClient) =>
+    ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+
+  it('la chiave sta sotto la configurazione (si rilegge a ogni modifica delle piante) e non coincide con quella delle piante con dati', () => {
+    expect(chiavi.pianteNonEliminabili('E').slice(0, 2)).toEqual(chiavi.config('E'))
+    expect(chiavi.pianteNonEliminabili('E')).not.toEqual(chiavi.pianteConDati('E'))
+    expect(chiavi.pianteNonEliminabili('E')).not.toEqual(chiavi.pianteNonEliminabili('F'))
+  })
+
+  it('usePianteNonEliminabili legge gli id (misure, note e foto)', async () => {
+    vi.mocked(pianteNonEliminabili).mockResolvedValue(new Set(['p1', 'p2']))
+    const { result } = renderHook(() => usePianteNonEliminabili('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.data).toEqual(new Set(['p1', 'p2'])))
+    expect(pianteNonEliminabili).toHaveBeenCalledWith('E')
+  })
+
+  it('non resta in cache dopo la chiusura della pagina: salvando misure, note o foto altrove non c\'è una copia vecchia che offra "Elimina"', async () => {
+    vi.mocked(pianteNonEliminabili).mockResolvedValueOnce(new Set(['p1'])).mockResolvedValueOnce(new Set(['p1', 'p2']))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
+    const prima = renderHook(() => usePianteNonEliminabili('E'), { wrapper: conClient(client) })
+    await waitFor(() => expect(prima.result.current.data).toEqual(new Set(['p1'])))
+    prima.unmount()
+    await new Promise(r => setTimeout(r, 20))
+    expect(client.getQueryData(chiavi.pianteNonEliminabili('E'))).toBeUndefined()
+
+    const dopo = renderHook(() => usePianteNonEliminabili('E'), { wrapper: conClient(client) })
+    // Alla riapertura non c'è nulla da mostrare finché la risposta nuova non arriva.
+    expect(dopo.result.current.data).toBeUndefined()
+    await waitFor(() => expect(dopo.result.current.data).toEqual(new Set(['p1', 'p2'])))
+    expect(pianteNonEliminabili).toHaveBeenCalledTimes(2)
+  })
+
+  it('senza esperimento non interroga il database', () => {
+    renderHook(() => usePianteNonEliminabili(undefined), { wrapper: wrapper() })
+    expect(pianteNonEliminabili).not.toHaveBeenCalled()
   })
 })
 

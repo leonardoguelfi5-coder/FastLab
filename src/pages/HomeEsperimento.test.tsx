@@ -19,14 +19,19 @@ vi.mock('@/api/esperimenti', () => ({
 vi.mock('@/api/misure', () => ({
   misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), salvaMisura: vi.fn(), eliminaMisura: vi.fn(),
 }))
+vi.mock('@/api/note', () => ({
+  listaNote: vi.fn(), salvaNota: vi.fn(), eliminaNota: vi.fn(), segnaFatto: vi.fn(),
+}))
 
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
 import { misureDelGiorno } from '@/api/misure'
+import { listaNote } from '@/api/note'
+import { eliminaNotaConAnnulla } from '@/components/note/eliminaNotaConAnnulla'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
-import type { ConfigEsperimento, Misura } from '@/domain/tipi'
+import type { ConfigEsperimento, Misura, Nota } from '@/domain/tipi'
 import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import { useCampoStore } from '@/store/campo'
 import { HomeEsperimento } from './HomeEsperimento'
@@ -112,6 +117,7 @@ beforeEach(() => {
   vi.mocked(sonoAdmin).mockResolvedValue(false)
   vi.mocked(caricaConfig).mockResolvedValue(config)
   vi.mocked(misureDelGiorno).mockResolvedValue([])
+  vi.mocked(listaNote).mockResolvedValue([])
 })
 
 afterEach(() => {
@@ -426,6 +432,89 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
     await aspettaLaHome()
     await within(oggi()).findByText('1')
     expect(misureDelGiorno).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('HomeEsperimento: il numerino con i promemoria', () => {
+  const oggi = () => screen.getByRole('link', { name: /^Oggi/ })
+  const promemoria = (id: string, extra: Partial<Nota> = {}): Nota => ({
+    id, data: OGGI, testo: `Promemoria ${id}`, promemoria: true, fatto_il: null, pianta_ids: [], trattamento_ids: [], ...extra,
+  })
+  /** Un solo valore di oggi molto fuori dal gruppo (la pianta 7 del Controllo con 80). */
+  const unaStonata = (): Misura[] => {
+    const id = config.parametri.find(p => p.catalogo_chiave === 'spad')!.id
+    const valori: [number, number][] = [[1, 40], [2, 41], [3, 39], [4, 40], [5, 42], [6, 38], [7, 80]]
+    return valori.map(([n, v]): Misura => ({
+      id: `s${n}`, pianta_id: idPianta(n), strumento_id: strumento('SPAD').id, data_rilievo: OGGI, ora: '09:00', valori: { [id]: [v] },
+    }))
+  }
+
+  it('conta i promemoria del giorno e li dice a parole', async () => {
+    vi.mocked(listaNote).mockResolvedValue([promemoria('a'), promemoria('b', { data: '2026-10-20' })])
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 2 promemoria'))
+    expect(within(oggi()).getByText('2')).toHaveAttribute('aria-hidden', 'true')
+    expect(within(oggi()).getByText('2 promemoria')).toHaveClass('sr-only')
+  })
+
+  it('con un solo promemoria dice "1 promemoria"', async () => {
+    vi.mocked(listaNote).mockResolvedValue([promemoria('a')])
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 1 promemoria'))
+  })
+
+  it('somma i promemoria ai valori da sistemare: un solo numero, due frasi a parole', async () => {
+    vi.mocked(listaNote).mockResolvedValue([promemoria('a'), promemoria('b')])
+    vi.mocked(misureDelGiorno).mockResolvedValue(unaStonata())
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 2 promemoria e 1 valore da controllare'))
+    expect(within(oggi()).getByText('3')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('non conta i promemoria di domani, quelli fatti né le note semplici', async () => {
+    vi.mocked(listaNote).mockResolvedValue([
+      promemoria('futuro', { data: '2026-10-29' }),
+      promemoria('fatto', { fatto_il: '2026-10-28T08:00:00.000Z' }),
+      promemoria('semplice', { promemoria: false }),
+    ])
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
+    await misureLette()
+    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+  })
+
+  it('usa il giorno di oggi, non la data di rilievo scelta', async () => {
+    useCampoStore.getState().setData('E', IERI)
+    vi.mocked(listaNote).mockResolvedValue([promemoria('a', { data: OGGI })])
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 1 promemoria'))
+  })
+
+  it('non conta una nota in attesa di eliminazione, nemmeno se l\'elenco viene riletto', async () => {
+    const nota = promemoria('a')
+    vi.mocked(listaNote).mockResolvedValue([nota, promemoria('b')])
+    const client = vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 2 promemoria'))
+    await act(async () => { eliminaNotaConAnnulla(client, 'E', nota); await new Promise(r => setTimeout(r, 20)) })
+    expect(oggi()).toHaveAccessibleName('Oggi 1 promemoria')
+    await act(async () => { await client.invalidateQueries({ queryKey: ['note', 'E'] }); await new Promise(r => setTimeout(r, 20)) })
+    expect(oggi()).toHaveAccessibleName('Oggi 1 promemoria')
+  })
+
+  it('mentre le note caricano o se non arrivano non mostra nulla e la home non allarma', async () => {
+    vi.mocked(listaNote).mockRejectedValue(new TypeError('Failed to fetch'))
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
+    await misureLette()
+    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

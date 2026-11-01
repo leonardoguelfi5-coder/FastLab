@@ -4,7 +4,9 @@ import { segnaFatto } from '@/api/note'
 import { chiavi } from '@/api/query'
 import type { Nota } from '@/domain/tipi'
 import { messaggioErrore } from '@/lib/errori'
+import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
+import { chiaveSpuntaPromemoria } from './spuntaPromemoriaConAnnulla'
 
 /** Le note con una spunta in corso: un secondo tocco mentre la prima è in viaggio non deve ripartire. */
 const inCorso = new Set<string>()
@@ -16,6 +18,9 @@ const inCorso = new Set<string>()
  */
 export async function spuntaNota(queryClient: QueryClient, espId: string, nota: Nota): Promise<void> {
   if (inCorso.has(nota.id)) return
+  // Un promemoria già spuntato da Oggi, con il suo "Annulla" ancora aperto: il salvataggio vero parte allo scadere, e
+  // una seconda spunta da qui (che lo riaprirebbe) verrebbe scavalcata. Si decide con l'"Annulla" di quel toast.
+  if (inEliminazione(chiaveSpuntaPromemoria(nota.id))) return
   inCorso.add(nota.id)
   const chiave = chiavi.note(espId)
   const fatto = nota.fatto_il === null

@@ -10,8 +10,9 @@ import { MisuraQuestaPianta } from '@/components/scheda/MisuraQuestaPianta'
 import { StoriaPianta } from '@/components/scheda/StoriaPianta'
 import { UltimiValori } from '@/components/scheda/UltimiValori'
 import { Badge } from '@/components/ui/badge'
+import { buttonVariants } from '@/components/ui/button'
 import type { ConfigEsperimento, Misura } from '@/domain/tipi'
-import { percorsoImpostazioni, percorsoPiante } from '@/lib/percorsi'
+import { percorsoDiario, percorsoImpostazioni, percorsoPianta, percorsoPiante, type ArrivoDiario } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
@@ -59,9 +60,19 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
             <UltimiValori espId={espId} config={config} pianta={pianta} misure={misure.data} oggi={oggi} />
             <AvvisiMancanti espId={espId} config={config} misure={misure.data} oggi={oggi} />
           </div>
-          <StoriaPianta espId={espId} config={config} misure={misure.data} />
+          <StoriaPianta espId={espId} config={config} pianta={pianta} misure={misure.data} />
         </>
       )}
+
+      {/* Non dipende dalle misure: si può scrivere una nota anche se non si leggono. Porta all'editor del Diario già
+          collegato a questa pianta, e a nota salvata o annullata si torna qui. */}
+      <Link
+        to={percorsoDiario(espId)}
+        state={{ nuovaPerPianta: pianta.id, ritorno: percorsoPianta(espId, pianta.id) } satisfies ArrivoDiario}
+        className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+      >
+        Aggiungi nota
+      </Link>
 
       {/* Le foto hanno la loro lettura: non aspettano le misure e un loro errore non nasconde la scheda. */}
       <FotoPianta espId={espId} config={config} piantaId={pianta.id} />

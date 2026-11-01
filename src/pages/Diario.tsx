@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { salvaNota, segnaFatto } from '@/api/note'
@@ -12,7 +12,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { cancellaBozzaNota, leggiBozzaNota, notaAperta, scriviBozzaNota } from '@/components/note/bozzaNota'
 import { EditorNota } from '@/components/note/EditorNota'
-import { chiaveEliminazioneNota, eliminaNotaConAnnulla } from '@/components/note/eliminaNotaConAnnulla'
+import { eliminaNotaConAnnulla, senzaNoteInEliminazione } from '@/components/note/eliminaNotaConAnnulla'
 import { RigaNota } from '@/components/note/RigaNota'
 import { spuntaNota } from '@/components/note/spuntaNota'
 import {
@@ -20,10 +20,9 @@ import {
 } from '@/components/note/statoNota'
 import type { ConfigEsperimento, Nota } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
-import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
-import { percorsoHome } from '@/lib/percorsi'
+import { leggiArrivoDiario, percorsoHome, type ArrivoDiario } from '@/lib/percorsi'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useOggi } from '@/lib/useOggi'
@@ -38,6 +37,8 @@ interface Modifica {
   stato: StatoNota
   /** Riparte da una bozza lasciata a metà. */
   ripresa: boolean
+  /** Dove tornare dopo il salvataggio o l'annullamento (la scheda della pianta da cui si è partiti), o `null`: l'elenco del Diario. */
+  ritorno: string | null
 }
 
 /** Lascia nella bozza solo ciò che esiste ancora: una pianta o un trattamento tolti nel frattempo farebbero fallire il salvataggio. */
@@ -64,7 +65,7 @@ function coerenteConOggi(stato: StatoNota, esistente: Nota | null, oggi: string)
  * riparte da lì. Una nota che nel frattempo non c'è più (eliminata altrove) si riprende come nuova, con lo stesso id:
  * il testo scritto non va perso.
  */
-function riprendi(espId: string, config: ConfigEsperimento, note: Nota[], oggi: string): Modifica | null {
+function riprendi(espId: string, config: ConfigEsperimento, note: Nota[], oggi: string, ritorno: string | null): Modifica | null {
   const id = notaAperta(espId)
   if (id === null) return null
   const bozza = leggiBozzaNota(espId, id)
@@ -76,7 +77,19 @@ function riprendi(espId: string, config: ConfigEsperimento, note: Nota[], oggi: 
     base: esistente ? statoDaNota(esistente) : statoVuoto(oggi),
     stato: coerenteConOggi(senzaIdSconosciuti(bozza.stato, config), esistente, oggi),
     ripresa: true,
+    ritorno,
   }
+}
+
+/**
+ * Una nota nuova già collegata a una pianta («Aggiungi nota» dalla scheda). Il collegamento fa parte dello stato di
+ * partenza (`base`), non è una modifica: finché non si scrive non c'è nulla da scartare né una bozza da ricordare.
+ * Una pianta che non c'è più non apre nulla.
+ */
+function nuovaPerPianta(config: ConfigEsperimento, piantaId: string, oggi: string, ritorno: string | null): Modifica | null {
+  if (!config.piante.some(p => p.id === piantaId)) return null
+  const stato = statoVuoto(oggi, { collegamento: 'piante', pianta_ids: [piantaId] })
+  return { id: nuovoId(), esistente: null, base: stato, stato, ripresa: false, ritorno }
 }
 
 /** Il Diario dell'esperimento (spec §5.7): le note per data e, in pagina, l'editor per scriverne o ritoccarne una. */
@@ -101,7 +114,10 @@ export function Diario() {
 
 function DiarioCaricato({ espId, config, note }: { espId: string; config: ConfigEsperimento; note: Nota[] }) {
   const navigate = useNavigate()
+  const posizione = useLocation()
   const queryClient = useQueryClient()
+  // Come si è arrivati (da Oggi, o dalla scheda di una pianta): letto una volta, all'apertura della pagina.
+  const [arrivo] = useState<ArrivoDiario>(() => leggiArrivoDiario(posizione.state, espId))
   // A mezzanotte la nota aperta riapplica la regola del promemoria con il giorno nuovo: la casella mostra ciò che si salva.
   const oggi = useOggi((_prima, dopo) => {
     if (!modifica) return
@@ -109,8 +125,13 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     if (stato.promemoria !== modifica.stato.promemoria) cambia(stato)
   })
 
-  const [modifica, setModifica] = useState<Modifica | null>(() => riprendi(espId, config, note, oggi))
-  const [apertaId, setApertaId] = useState<string | null>(null)
+  // Una bozza lasciata a metà ha la precedenza su tutto: «Aggiungi nota» non la scavalca, e non la sovrascrive.
+  const [modifica, setModifica] = useState<Modifica | null>(() => {
+    const ritorno = arrivo.ritorno ?? null
+    return riprendi(espId, config, note, oggi, ritorno)
+      ?? (arrivo.nuovaPerPianta ? nuovaPerPianta(config, arrivo.nuovaPerPianta, oggi, ritorno) : null)
+  })
+  const [apertaId, setApertaId] = useState<string | null>(() => (arrivo.apriNota && note.some(n => n.id === arrivo.apriNota) ? arrivo.apriNota : null))
   const [occupato, setOccupato] = useState(false)
   const [errore, setErrore] = useState<string | null>(null)
   const [conferma, setConferma] = useState<'esci' | 'chiudi' | null>(null)
@@ -123,6 +144,17 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
   useEffect(() => {
     montata.current = true
     return () => { montata.current = false }
+  }, [])
+
+  // La richiesta di una nota nuova si consuma: ricaricando la pagina (o tornandoci con "avanti") non deve riaprire da
+  // sola un editor. Il ritorno resta, per una bozza ripresa; la nota aperta da Oggi viene portata in vista.
+  useEffect(() => {
+    if (arrivo.nuovaPerPianta) {
+      navigate(posizione.pathname, { replace: true, state: arrivo.ritorno ? { ritorno: arrivo.ritorno } satisfies ArrivoDiario : null })
+    }
+    if (arrivo.apriNota) document.getElementById(`nota-${arrivo.apriNota}`)?.scrollIntoView?.({ block: 'center' })
+    // Solo all'apertura della pagina.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const modificato = modifica !== null && firma(modifica.stato) !== firma(modifica.base)
@@ -143,7 +175,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
 
   function apriNuova() {
     const stato = statoVuoto(oggi)
-    setModifica({ id: nuovoId(), esistente: null, base: stato, stato, ripresa: false })
+    setModifica({ id: nuovoId(), esistente: null, base: stato, stato, ripresa: false, ritorno: null })
     setErrore(null)
   }
 
@@ -152,7 +184,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     // Una bozza lasciata a metà su questa nota (uscita senza passare dall'app) ha la precedenza.
     const bozza = leggiBozzaNota(espId, nota.id)
     setModifica({
-      id: nota.id, esistente: nota, base, ripresa: bozza !== null,
+      id: nota.id, esistente: nota, base, ripresa: bozza !== null, ritorno: null,
       stato: bozza ? coerenteConOggi(senzaIdSconosciuti(bozza.stato, config), nota, oggi) : base,
     })
     setApertaId(null)
@@ -168,10 +200,19 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     else scriviBozzaNota(espId, { id: modifica.id, esistente: modifica.esistente !== null, stato })
   }
 
+  /** Dove si va lasciando l'editor: la scheda da cui si è partiti, o la home dell'esperimento. */
+  const ritornoCorrente = modifica?.ritorno ?? null
+  const uscita = ritornoCorrente ?? percorsoHome(espId)
+
   function chiudi() {
     if (modifica) cancellaBozzaNota(espId, modifica.id)
     setModifica(null)
     setErrore(null)
+  }
+
+  /** Finito con l'editor aperto dalla scheda (salvato o annullato): si torna lì. L'editor del Diario resta l'elenco. */
+  function tornaAlRitorno(ritorno: string | null) {
+    if (ritorno) navigate(ritorno, { replace: true })
   }
 
   async function salva() {
@@ -180,7 +221,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     inCorso.current = true
     setOccupato(true)
     setErrore(null)
-    const { id, esistente } = modifica
+    const { id, esistente, ritorno } = modifica
     // Il giorno di adesso, non quello di quando si è aperto l'editor: a mezzanotte "futura" può non esserlo più.
     const adesso = oggiLocale()
     const nuova = notaDaStato(id, modifica.stato, esistente, adesso)
@@ -211,15 +252,16 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     setModifica(null)
     inCorso.current = false
     setOccupato(false)
+    tornaAlRitorno(ritorno)
   }
 
   // Le note in attesa di eliminazione restano fuori anche se l'elenco viene riletto dal server nei 5 secondi.
-  const visibili = note.filter(n => !inEliminazione(chiaveEliminazioneNota(n.id)))
+  const visibili = senzaNoteInEliminazione(note)
 
   return (
     <AppShell
       titolo={modifica ? (modifica.esistente ? 'Modifica nota' : 'Nuova nota') : 'Diario'}
-      indietro={percorsoHome(espId)}
+      indietro={uscita}
       onIndietro={evento => {
         // Salvataggio in viaggio: né uscita né scarto, come per il pulsante Annulla. Scartare ora cancellerebbe la
         // bozza proprio mentre il salvataggio potrebbe fallire.
@@ -260,7 +302,15 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
             >
               {occupato ? 'Salvataggio…' : 'Salva'}
             </Button>
-            <Button variant="outline" disabled={occupato} onClick={() => (modificato ? setConferma('chiudi') : chiudi())}>
+            <Button
+              variant="outline"
+              disabled={occupato}
+              onClick={() => {
+                if (modificato) return setConferma('chiudi')
+                chiudi()
+                tornaAlRitorno(ritornoCorrente)
+              }}
+            >
               Annulla
             </Button>
           </BarraAzioni>
@@ -311,7 +361,8 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
           const cosa = conferma
           setConferma(null)
           chiudi()
-          if (cosa === 'esci') navigate(percorsoHome(espId))
+          if (cosa === 'esci') navigate(uscita)
+          else tornaAlRitorno(ritornoCorrente)
         }}
       />
     </AppShell>

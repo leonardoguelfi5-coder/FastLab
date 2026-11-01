@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useConfig, useParametriConDati, usePianteConDati, useStrumentiConDati } from '@/api/query'
+import { useConfig, useParametriConDati, usePianteConDati, usePianteNonEliminabili, useStrumentiConDati } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { Conferma } from '@/components/Conferma'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { ContestoModifiche } from '@/components/impostazioni/modifiche'
 import { SezioneGenerale } from '@/components/impostazioni/SezioneGenerale'
 import { SezioneFenologica } from '@/components/impostazioni/SezioneFenologica'
+import { SezioneSpazioFoto } from '@/components/impostazioni/SezioneSpazioFoto'
 import { SezioneStrumenti } from '@/components/impostazioni/SezioneStrumenti'
 import { SezionePiante } from '@/components/impostazioni/SezionePiante'
 import { SezioneTrattamenti } from '@/components/impostazioni/SezioneTrattamenti'
@@ -14,7 +15,7 @@ import { percorsoCatalogo, percorsoHome } from '@/lib/percorsi'
 
 /**
  * Impostazioni di un esperimento già avviato (spec §5.3, "Modifiche a esperimento avviato"): dati generali, etichette
- * dei trattamenti, piante, strumenti (con i loro valori) e tabella fenologica. Ogni elemento si salva da sé, con il suo esito; quel che non è salvato
+ * dei trattamenti, piante, strumenti (con i loro valori), tabella fenologica e spazio delle foto. Ogni elemento si salva da sé, con il suo esito; quel che non è salvato
  * resta nella pagina (anche se la configurazione si ricarica) e uscire con la freccia o verso il catalogo chiede se
  * scartarlo.
  */
@@ -24,6 +25,7 @@ export function Impostazioni() {
   const config = useConfig(espId)
   const parametriConDati = useParametriConDati(espId)
   const pianteConDati = usePianteConDati(espId)
+  const pianteNonEliminabili = usePianteNonEliminabili(espId)
   const strumentiConDati = useStrumentiConDati(espId)
 
   // Le sezioni dicono qui se hanno modifiche non salvate; si legge al momento del tocco, senza ridisegnare la pagina.
@@ -66,12 +68,13 @@ export function Impostazioni() {
           <div className="flex flex-col gap-12">
             <SezioneGenerale espId={espId} esperimento={dati.esperimento} />
             <SezioneTrattamenti espId={espId} config={dati} />
-            <SezionePiante espId={espId} config={dati} conDati={pianteConDati} />
+            <SezionePiante espId={espId} config={dati} conDati={pianteConDati} nonEliminabili={pianteNonEliminabili} />
             <SezioneStrumenti
               espId={espId} config={dati} datiParametri={parametriConDati} datiStrumenti={strumentiConDati}
               onGestisciCatalogo={evento => esci(evento, percorsoCatalogo)}
             />
             <SezioneFenologica espId={espId} config={dati} datiParametri={parametriConDati} datiStrumenti={strumentiConDati} />
+            <SezioneSpazioFoto espId={espId} />
           </div>
         </ContestoModifiche.Provider>
       )}

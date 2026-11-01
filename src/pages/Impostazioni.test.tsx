@@ -17,10 +17,14 @@ vi.mock('@/api/esperimenti', () => ({
   listaEsperimenti: vi.fn(), caricaConfig: vi.fn(), creaEsperimento: vi.fn(), aggiornaEsperimento: vi.fn(),
 }))
 vi.mock('@/api/configurazione', () => ({
-  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), strumentiConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
+  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), strumentiConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
   archiviaParametro: vi.fn(), archiviaStrumento: vi.fn(),
   salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
   aggiornaTrattamento: vi.fn(),
+}))
+vi.mock('@/api/foto', () => ({
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/api/catalogo', () => ({
   listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
@@ -33,9 +37,10 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
 import { listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
+import { spazioFoto } from '@/api/foto'
 import {
   aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro,
-  eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, salvaParametro, salvaStrumento, strumentiConDati,
+  eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaParametro, salvaStrumento, strumentiConDati,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
@@ -103,6 +108,9 @@ beforeEach(() => {
   // Temp aria ha dati; la pianta 1 ha misure.
   vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Temp aria').id]))
   vi.mocked(pianteConDati).mockImplementation(async () => new Set([idPianta('1')]))
+  // Nessuna nota o foto: non si può eliminare solo la pianta 1, quella con le misure.
+  vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1')]))
+  vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 12_340_000, progetto: 456_700_000 })
   // Le misure della pianta 1 sono col Termometro; gli altri strumenti non ne hanno.
   vi.mocked(strumentiConDati).mockImplementation(async () => new Set([strum('Termometro').id]))
   vi.mocked(listaCatalogo).mockResolvedValue(SEMI_CATALOGO)
@@ -244,6 +252,58 @@ describe('Impostazioni: dal piano', () => {
     const due = aperta(rigaPianta('2'))
     expect(due.getByRole('button', { name: 'Rimuovi' })).toBeEnabled()
     expect(due.getByLabelText('Trattamento')).toBeEnabled()
+  })
+
+  it('una pianta con note o foto, senza misure, non ha "Rimuovi" e lo dice; il trattamento si può ancora cambiare', async () => {
+    // La 3 ha una nota collegata o una foto: l'eliminazione darebbe l'errore 23503 del database.
+    vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1'), idPianta('3')]))
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaPianta('3'))
+    const tre = aperta(rigaPianta('3'))
+    expect(tre.queryByRole('button', { name: 'Rimuovi' })).not.toBeInTheDocument()
+    expect(tre.getByText('Ha note o foto: non si può rimuovere')).toBeInTheDocument()
+    // `piante_con_dati` resta sulle sole misure: il cambio di trattamento non è vincolato da note e foto.
+    expect(tre.getByLabelText('Trattamento')).toBeEnabled()
+  })
+
+  it('finché non si sa se una pianta ha note o foto "Rimuovi" resta spento', async () => {
+    vi.mocked(pianteNonEliminabili).mockReturnValue(new Promise(() => undefined))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    await waitFor(() => expect(sezione('Piante').getByText('Controllo dei dati in corso…')).toBeInTheDocument())
+
+    await utente.click(rigaPianta('2'))
+    expect(aperta(rigaPianta('2')).getByRole('button', { name: 'Rimuovi' })).toBeDisabled()
+  })
+
+  it('se la lettura non arriva lo dice con «Riprova», e "Rimuovi" non si offre', async () => {
+    vi.mocked(pianteNonEliminabili).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+    const piante = sezione('Piante')
+    expect(await piante.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    await utente.click(rigaPianta('2'))
+    expect(aperta(rigaPianta('2')).getByRole('button', { name: 'Rimuovi' })).toBeDisabled()
+    await utente.click(piante.getByRole('button', { name: 'Riprova' }))
+    await waitFor(() => expect(aperta(rigaPianta('2')).getByRole('button', { name: 'Rimuovi' })).toBeEnabled())
+  })
+
+  it('"Rimuovi" si ricontrolla al momento: se nel frattempo la pianta ha ricevuto una nota o una foto non la elimina', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaPianta('2'))
+    await utente.click(aperta(rigaPianta('2')).getByRole('button', { name: 'Rimuovi' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Rimuovere la pianta #2?' })
+    // Mentre il dialogo è aperto qualcuno le collega una nota.
+    vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1'), idPianta('2')]))
+    await utente.click(within(dialogo).getByRole('button', { name: 'Rimuovi' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
+      'La pianta #2 ha già dati, note o foto: non si può più rimuovere.'))
+    expect(eliminaPianta).not.toHaveBeenCalled()
   })
 
   it('"Aggiungi 3 piante a «S1»" aggiunge le piante 57, 58, 59 in fondo all\'ordine', async () => {
@@ -405,6 +465,67 @@ describe('Impostazioni: piante', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'La pianta #2 ha già dei dati: il trattamento non si può più cambiare.'))
     expect(aggiornaPianta).not.toHaveBeenCalled()
+  })
+})
+
+describe('Impostazioni: spazio delle foto', () => {
+  const spazio = () => screen.findByRole('region', { name: 'Spazio delle foto' })
+
+  it('mostra lo spazio dell\'esperimento e il totale contro 1 GB, in MB e in Geist Mono', async () => {
+    apri()
+    const dentro = within(await spazio())
+    expect(await dentro.findByText('12,3 MB')).toHaveClass('font-mono')
+    expect(dentro.getByText('456,7 MB')).toHaveClass('font-mono')
+    expect(dentro.getByText(/su 1000 MB/)).toBeInTheDocument()
+    expect(spazioFoto).toHaveBeenCalledWith('E')
+  })
+
+  it('dice che il totale conta solo gli esperimenti di cui si è membri, mentre il limite è dell\'intero progetto', async () => {
+    apri()
+    const dentro = within(await spazio())
+    await dentro.findByText('12,3 MB')
+    expect(dentro.getByText(/solo gli esperimenti di cui sei membro/)).toBeInTheDocument()
+    expect(dentro.getByText(/limite.*intero progetto/i)).toBeInTheDocument()
+  })
+
+  it('sotto l\'80% non avvisa', async () => {
+    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 12_340_000, progetto: 800_000_000 })
+    apri()
+    const dentro = within(await spazio())
+    await dentro.findByText('800 MB')
+    expect(dentro.queryByText(/Oltre l'80%/)).not.toBeInTheDocument()
+    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '80')
+  })
+
+  it('oltre l\'80% avvisa, in tono attenzione e mai verde, e la barra lo ripete', async () => {
+    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 300_000_000, progetto: 850_000_000 })
+    apri()
+    const dentro = within(await spazio())
+    const avviso = (await dentro.findByText(/Oltre l'80% dello spazio/)).closest('p') as HTMLElement
+    expect(avviso).toHaveAttribute('role', 'status')
+    expect(avviso).toHaveClass('text-attenzione')
+    expect(avviso.className).not.toMatch(/success|green|verde/)
+    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '85')
+  })
+
+  it('oltre il limite la barra si ferma al 100 ma il numero è quello vero', async () => {
+    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 300_000_000, progetto: 1_200_000_000 })
+    apri()
+    const dentro = within(await spazio())
+    await dentro.findByText('1200 MB')
+    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '100')
+    expect(dentro.getByText(/Oltre l'80%/)).toBeInTheDocument()
+  })
+
+  it('mentre calcola non dà numeri; se non riesce lo dice con «Riprova»', async () => {
+    vi.mocked(spazioFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    const dentro = within(await spazio())
+    expect(await dentro.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(dentro.queryByText('12,3 MB')).not.toBeInTheDocument()
+    expect(dentro.queryByRole('progressbar')).not.toBeInTheDocument()
+    await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
+    expect(await dentro.findByText('12,3 MB')).toBeInTheDocument()
   })
 })
 
