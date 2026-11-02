@@ -52,3 +52,8 @@ Ruling (carry to fix finale): il test di prestazione del D6 (< 1000 ms) ha poco 
 Ruling: D8 prima del D7 (la pagina collega l'orchestratore già pronto); la riga "la pagina mostra le fasi" passa al D7 - cost if wrong: none
 Task D6: complete (commits 4b59563..d1f635e), revisione rimandata alla finale
 Task D8: dispatched implementer (opus), BASE d1f635e
+Task D8: implementatore (opus) DONE_WITH_CONCERNS 902eac6 - 2484 Vitest (42 nuovi), 13 mutazioni prese; exceljs 4.4.0 esatto (lockfile con `npx npm@11`, nessun `libc` perso); `src/lib/excel/scriviXlsx.ts` (unico import di exceljs, dinamico; date `Date.UTC` verificate in Europe/Rome con exceljs vero; ogni stringa come testo, nessun `<f>`); `src/components/esporta/scaricaExcel.ts` (fasi, doppio tocco, interruzione, toast neutro); `npm run test:bundle` controlla il grafo dei moduli; chunk exceljs 930 kB (256 kB gzip); 18 000 misure → circa 5 s di scrittura, blocco più lungo circa 2,7 s in `writeBuffer`
+Ruling: accettate le deviazioni D8: le immagini già disegnate restano nel file e il toast dice quante mancano; date prima del 01/03/1900 come testo; note in eliminazione escluse - cost if wrong: none
+Ruling (carry to collaudo/futuro): con esperimenti molto grandi la scrittura blocca il telefono per qualche secondo; se pesa, spostare lo scrittore in un Web Worker - cost if wrong: qualche secondo di attesa
+Task D8: complete (commits 5416a76..902eac6), revisione rimandata alla finale
+Task D7: dispatched implementer (sonnet), BASE 902eac6
