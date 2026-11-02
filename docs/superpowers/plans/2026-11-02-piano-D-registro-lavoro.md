@@ -57,3 +57,8 @@ Ruling: accettate le deviazioni D8: le immagini già disegnate restano nel file 
 Ruling (carry to collaudo/futuro): con esperimenti molto grandi la scrittura blocca il telefono per qualche secondo; se pesa, spostare lo scrittore in un Web Worker - cost if wrong: qualche secondo di attesa
 Task D8: complete (commits 5416a76..902eac6), revisione rimandata alla finale
 Task D7: dispatched implementer (sonnet), BASE 902eac6
+Task D7: dispatched implementer (sonnet), BASE e92f0d7 (interrotto dal limite di utilizzo, ripreso con il lavoro intatto nel checkout)
+Task D7: implementatore (sonnet) DONE 920794a - 2542 Vitest (61 nuovi), `npm run test:bundle` ok (exceljs e react-dom/server caricati a richiesta, chunk principale 355 kB / 106 kB gzip); pagina Esporta (arrivo dal Dataset, riepilogo su scelta differita, export salvati con Annulla e "Sostituisci", download con fasi e interruzione all'uscita, un solo inchiostro pieno); `InArrivo` e `SezioneInArrivo` rimossi
+Ruling: accettate le deviazioni D7: archiviati anche senza dati in fondo ai chip; riga "Dal … al …" nel riepilogo; solo Info → file valido; N delle settimane non scelto a mano - cost if wrong: small
+Task D7: complete (commits e92f0d7..920794a), revisione nella finale
+Revisione finale del Piano D: dispatched (opus) su 25066f1..920794a (D3-D8 senza revisione a sé: la finale li rivede con la cura di un task singolo)
