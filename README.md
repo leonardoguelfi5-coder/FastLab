@@ -31,6 +31,7 @@ Comandi utili:
 | `npm run test:db` | Test del database (pgTAP), serve `npx supabase start` |
 | `npm run lint` | Controllo del codice (ESLint) |
 | `npm run build` | Controllo dei tipi e build di produzione in `dist/` |
+| `npm run test:bundle` | Controlla che exceljs e `react-dom/server` restino fuori dal chunk principale (vedi sotto) |
 
 ### Test del database
 
@@ -45,11 +46,16 @@ Comandi utili:
 - `ultime_misure.test.sql`: la data dell'ultima misura di ogni strumento ("ultima volta"), letta rispettando le policy;
 - `ultime_misure_piante.test.sql`: le misure dell'ultima data di ogni pianta per ogni strumento (elenco delle piante), lette rispettando le policy;
 - `note_foto.test.sql`: note, promemoria e foto (collegamenti, vincoli, policy per membro) e il bucket privato `foto` dello Storage con le sue policy;
-- `foto_archiviata.test.sql`: la data di archiviazione di una foto e il vincolo che la tiene allineata a `archiviata`.
+- `foto_archiviata.test.sql`: la data di archiviazione di una foto e il vincolo che la tiene allineata a `archiviata`;
+- `export_salvati.test.sql`: gli export salvati di Esporta Excel (ognuno vede e tocca solo i suoi, `creato_da` non si cambia, nome unico per esperimento e utente, forma delle scelte validata da `scelte_export_valide`) e l'indice che serve alla lettura delle misure per strumento.
 
-In tutto sono 282 test pgTAP in 10 file.
+In tutto sono 377 test pgTAP in 11 file.
 
 Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
+
+### Il bundle: `npm run test:bundle`
+
+exceljs (circa 930 kB, 256 kB gzip) e `react-dom/server` servono solo a "Scarica Excel" e si caricano con un `import()` dinamico, al tocco del pulsante: devono restare fuori dal chunk che il browser scarica all'apertura dell'app. `npm run test:bundle` fa una build di produzione in memoria (non scrive `dist/`), chiede a Vite in quali chunk è finito ciascun modulo e stampa le dimensioni; esce con errore se uno dei due è nel chunk principale, e altrimenti scrive "caricato a richiesta". Non cerca parole nel codice minificato: il principale contiene comunque il nome del file del chunk di exceljs, per l'import dinamico. Per questo legge il grafo dei moduli: in questo ambiente la build emette un chunk principale incompleto, e un controllo sul testo dei file in `dist/assets` non sarebbe affidabile.
 
 #### Senza Docker (ambienti cloud)
 
@@ -61,13 +67,14 @@ Servono i pacchetti apt `postgresql-16`, `postgresql-16-pgtap` e `libtap-parser-
 
 ### La home dell'esperimento
 
-Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piante, trattamenti, in corso o concluso). Sotto c'è la striscia "Nuova misura", l'unico elemento a inchiostro pieno: se un giro è a metà, dice a che punto è (per esempio "SPAD in corso · 34/56"). Poi ci sono sette icone:
+Aprendo un esperimento si arriva alla sua home. In cima c'è il riepilogo (piante, trattamenti, in corso o concluso). Sotto c'è la striscia "Nuova misura", l'unico elemento a inchiostro pieno: se un giro è a metà, dice a che punto è (per esempio "SPAD in corso · 34/56"). Poi ci sono sette icone, tutte sezioni vere (non ci sono più voci "in arrivo"):
 
 - Oggi: i promemoria del giorno, gli strumenti con il progresso e i valori da controllare (vedi sotto); il numerino sull'icona conta i promemoria del giorno più i valori da sistemare;
 - Piante: l'elenco delle piante per trattamento e la scheda di ogni pianta (vedi sotto);
 - Diario: le note datate dell'esperimento, con i promemoria (vedi sotto);
 - Foto: la galleria delle foto dell'esperimento (vedi sotto);
-- Dataset ed Esporta Excel sono "In arrivo": aprono una pagina che dice che la sezione arriva con un prossimo aggiornamento;
+- Dataset: i grafici filtrabili (vedi sotto);
+- Esporta Excel: il file con i dati, le medie e i grafici (vedi sotto);
 - Impostazioni è a tutta larghezza in fondo: fattori, trattamenti, piante, strumenti, tabella fenologica e spazio delle foto.
 
 ### Oggi
@@ -94,6 +101,34 @@ Una nota con data **dopo oggi** è un **promemoria** (la casella "Ricordamelo qu
 - **Spazio:** nelle Impostazioni, "Spazio delle foto" mostra quanto occupano le foto dell'esperimento e di tutti gli esperimenti di cui sei membro, contro 1 GB di file del piano gratuito, con un avviso oltre l'80%. Il limite è dell'intero progetto, mentre il totale conta solo gli esperimenti che vedi.
 - **Archivio .zip e "Libera lo spazio":** solo per un esperimento **concluso**. "Scarica le foto (.zip)" prepara un file con le foto e un `foto.csv` (data, pianta, trattamento, nota, nome del file) che Excel italiano apre direttamente. Se una foto non si scarica, il download si ferma con un errore e "Riprova". Solo dopo un download riuscito **in quella sessione** compare "Libera lo spazio": chiede di scrivere il nome dell'esperimento e toglie dallo spazio i file delle sole foto che sono nello zip. Le righe restano e la galleria mostra "Archiviata nel .zip del GG/MM". Ricaricando la pagina il download va rifatto. Se l'operazione si interrompe a metà, si riprova: righe e file restano coerenti.
 - **Eliminare un esperimento:** `eliminaEsperimento` (toglie prima i file delle foto, poi l'esperimento) esiste solo come funzione dell'app, senza una schermata che la usi.
+
+### Dataset
+
+Il grafico della **media per trattamento nel tempo ± errore standard**, una linea per trattamento, con i segni verticali delle note del Diario (di tutto l'esperimento, del trattamento o delle piante mostrate; toccando un segno si legge la nota e si apre nel Diario). L'unità statistica è la pianta: prima la media del giorno di ogni pianta (con più misure nello stesso giorno, la media delle misure; con più letture, la media delle letture non vuote), poi media, errore standard (deviazione standard campionaria diviso la radice di n) e n tra le piante del trattamento. Toccando o trascinando sul grafico si legge il valore di quella data.
+
+- **Filtri, sempre in alto:** strumento, parametro (se lo strumento ne ha più di uno), trattamenti, fattore (un livello per fattore, più fattori in "e"), periodo (tutto, ultime 2, 4 o 8 settimane, dal… al…) e piante. Le "ultime N settimane" valgono da oggi, estremi compresi (4 settimane = 28 giorni); per un esperimento concluso finiscono all'ultima misura.
+- **Cerca piante:** le etichette separate da virgola (`3, 12, A4`), a **corrispondenza esatta**: `3` non trova la `13`, `035` trova `35`. Le etichette che non ci sono compaiono sotto il campo ("Non trovata: 99"). La ricerca ha la precedenza su trattamenti e fattore, e il grafico mostra le piante cercate (al più 8) con la media del loro trattamento come riferimento tenue.
+- **Tutto nella URL:** i filtri stanno nell'indirizzo (`s`, `p`, `t`, `f`, `per`, `cerca`), quindi sopravvivono a un ricaricamento e al tasto indietro, e un link ridà la stessa vista. Un id che non c'è si scarta in silenzio.
+- **Parametri non numerici:** una lista si disegna come numero di elementi; un sì/no come percentuale di sì tra le piante (ultima misura del giorno, senza barre d'errore); il testo non si disegna, e al suo posto c'è la tabella.
+- **"Mostra i valori":** la tabella con esattamente i numeri del grafico (media ± ES e n per data, dalla più recente).
+- **"Scarica questa vista":** apre Esporta Excel già compilato con strumento, piante e periodo di quella vista.
+
+### Esporta Excel
+
+Una schermata con quattro scelte e il riepilogo, poi "Scarica Excel":
+
+1. **Cosa:** gli strumenti (e la tabella fenologica), a scelta multipla, almeno uno.
+2. **Quali piante:** tutte, per trattamento o piante precise (stessa ricerca esatta del Dataset).
+3. **Periodo:** tutto, ultime N settimane (di base 4) o dal… al….
+4. **Come:** "Valori di ogni pianta", "Medie per trattamento" e, in tre caselle, "Grafici", "Diario", "Info esperimento".
+
+- **Riepilogo:** "Il file conterrà:" con i fogli e le righe, calcolato sulla stessa descrizione da cui nasce il file (quindi "Dati: 896 righe" è vero per costruzione). Con migliaia di misure il conto arriva dopo un attimo, senza bloccare i chip.
+- **Il file** `FastLab_<esperimento>_<AAAA-MM-GG>.xlsx` ha i fogli `Dati` (una riga per pianta e data: Esperimento, Pianta, una colonna per fattore, Trattamento, Blocco se c'è, Data e un parametro per colonna; con più misure nello stesso giorno vale la media e accanto c'è la colonna `N_<parametro>`), `Medie` (una riga per trattamento e data: media, ES e n per parametro, gli stessi numeri del Dataset), `Misure` (ogni singola lettura con la sua ora), un foglio per ogni lista ripetuta, `Grafici` (i grafici come immagini), `Diario` e `Info` (configurazione, regola delle medie, data dell'export). Ciascuno c'è solo se la scelta lo chiede e ha righe.
+- **Date, ore e numeri veri:** le date sono date di Excel (`gg/mm/aaaa`, lo stesso giorno anche in Italia), le ore sono ore, i numeri sono numeri a precisione piena, i sì/no sono booleani (VERO/FALSO), l'etichetta della pianta è testo (`035` resta `035`) e un testo che comincia con `=` resta testo.
+- **Grafici senza immagini:** se il browser non riesce a disegnarli, il file parte lo stesso senza, il foglio `Grafici` lo scrive in una riga e il messaggio finale lo dice.
+- **Durante il download** la pagina mostra la fase sotto il pulsante ("Preparo i dati…", "Disegno i grafici 3 di 12…", "Scrivo il file…") e tiene fermo il pulsante; lasciando la pagina il download si interrompe. Gli errori restano visibili con "Riprova".
+- **Export salvati:** "Salva questa scelta" dà un nome alle scelte. In cima compaiono "📌 Tutto l'esperimento" (sempre, non si elimina) e gli export dell'utente in questo esperimento: toccandone uno si applicano le scelte (non scarica). Sono per esperimento **e per utente**: un collega non vede i tuoi. Un periodo relativo ("ultime 4 settimane") resta relativo: lo stesso export, scaricato fra un mese, dà le ultime 4 settimane di allora. Un nome già usato chiede se sostituire; "Elimina" ha "Annulla" per 5 secondi; le piante, i trattamenti o gli strumenti che non ci sono più si scartano e la riga lo dice.
+- **Libreria:** il file si scrive con exceljs, in un chunk separato caricato al tocco di "Scarica Excel" (vedi `npm run test:bundle`). La libreria `xlsx` non c'è più.
 
 ### Nuova misura
 
@@ -196,11 +231,12 @@ Per un esperimento da qualche decina di piante il database resta molto sotto il 
 
 ## Struttura del codice
 
-- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, note, foto e archivio .zip, bozze, `giro.ts` per lo stato delle piante e il giro di misura di uno strumento, `statistiche.ts` per medie, confronti e valori da sistemare, `catalogo.ts` per le copie dal catalogo, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
+- `src/domain`: le regole dell'app, senza React né database (tipi, trattamenti, piante, misure, note, foto e archivio .zip, bozze, `giro.ts` per lo stato delle piante e il giro di misura di uno strumento, `statistiche.ts` per medie, confronti e valori da sistemare, `dataset.ts` e `grafico.ts` per le serie, i filtri e la geometria del grafico, `export/` per le scelte, i fogli e il riepilogo di Esporta, `catalogo.ts` per le copie dal catalogo, modello Hydrochar). Ha test propri, che non hanno bisogno né di React né del database.
 - `src/api`: le chiamate a Supabase (database e Storage, per le foto) e la conversione tra righe del database e tipi del dominio.
-- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, home dell'esperimento, scelta dello strumento, misura di una pianta, fine giro, Oggi, catalogo, elenco e scheda delle piante, Diario, Foto, impostazioni, inviti, sezioni "In arrivo").
+- `src/pages`: una pagina per ogni schermata (accesso, esperimenti, creazione guidata in `wizard/`, home dell'esperimento, scelta dello strumento, misura di una pianta, fine giro, Oggi, catalogo, elenco e scheda delle piante, Diario, Foto, Dataset, Esporta Excel, impostazioni, inviti).
 - `src/components`: i pezzi riusati dalle pagine; `ui/` contiene i componenti di base, le altre cartelle sono raggruppate per schermata.
-- `src/lib` e `src/store`: utilità (date, numeri, errori, client Supabase) e lo stato della misura in campo (strumento scelto, data di rilievo, valori mantenuti).
+- `src/lib`: utilità (date, numeri, errori, client Supabase), la consegna dei file (`scaricaFile.ts`), il grafico in PNG (`graficoPng.ts`) e `excel/scriviXlsx.ts`, l'unico modulo che importa exceljs.
+- `src/store`: lo stato della misura in campo (strumento scelto, data di rilievo, valori mantenuti).
 - `supabase/`: `migrations/` (schema, sicurezza per riga, inviti, funzioni, note e foto con il bucket dello Storage), `tests/` (pgTAP) e `config.toml`.
 
 Per l'aspetto dell'interfaccia vedi `PRODUCT.md` e `DESIGN.md`.
