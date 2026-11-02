@@ -1,5 +1,5 @@
 import type {
-  ConfigEsperimento, Esperimento, Fattore, Livello, Foto, Misura, Nota, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
+  ConfigEsperimento, Esperimento, ExportSalvato, Fattore, Livello, Foto, Misura, Nota, Parametro, ParametroCatalogo, Strumento, StrumentoParametro,
   Pianta, SottoCampo, Trattamento, TipoParametro, TipoStrumento, ValoriMisura, VoceCatalogo,
 } from '@/domain/tipi'
 
@@ -31,9 +31,15 @@ export interface RigaStrumento {
 export interface RigaStrumentoParametro {
   esperimento_id: string; strumento_id: string; parametro_id: string; obbligatorio: boolean; ordine: number
 }
+/** `esperimento_id` manca nella lettura a pagine di `misureStrumento` (solo le colonne che servono): il mapper non lo usa. */
 export interface RigaMisura {
-  id: string; esperimento_id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string
+  id: string; esperimento_id?: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string
   valori: ValoriMisura; creato_da?: string; creato_il?: string; aggiornato_il?: string
+}
+
+/** Una riga di `export_salvati` come la restituisce PostgREST. Le scelte (jsonb) si leggono nella pagina, non qui. */
+export interface RigaExportSalvato {
+  id: string; esperimento_id: string; nome: string; scelte: unknown; creato_da: string; creato_il: string; aggiornato_il: string
 }
 
 export interface RigheConfig {
@@ -339,4 +345,9 @@ export function aRigaFoto(espId: string, f: Foto) {
     id: f.id, esperimento_id: espId, data: f.data, percorso: f.percorso, larghezza: f.larghezza, altezza: f.altezza,
     byte: f.byte, pianta_id: f.pianta_id, nota_id: f.nota_id,
   }
+}
+
+/** Da riga del database a ExportSalvato: le scelte restano come sono (`unknown`), le valida chi le usa. */
+export function daRigaExportSalvato(r: RigaExportSalvato): ExportSalvato {
+  return { id: r.id, nome: r.nome, scelte: r.scelte, aggiornato_il: r.aggiornato_il }
 }

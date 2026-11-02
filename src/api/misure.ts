@@ -15,6 +15,55 @@ export async function misureDelGiorno(espId: string, data: string): Promise<Misu
   return (righe ?? []).map(daRigaMisura)
 }
 
+/** Le righe di misure che si chiedono in una volta (PostgREST può darne di meno: `max_rows`). */
+const PAGINA_MISURE = 1000
+
+/**
+ * L'ordine in cui il dominio legge le misure: data, ora, poi il momento in cui sono state create e infine l'`id`. A parità
+ * di data e ora il dominio tiene "l'ultima misura del giorno" per ordine di arrivo: le pagine per `id` (uuid casuali)
+ * non dicono quale è venuta dopo, `creato_il` sì. L'`id` chiude i pareggi, perché l'ordine non dipenda da come arrivano le
+ * pagine. Sono tutti testi in formato ISO: il confronto fra testi è quello cronologico.
+ */
+function perOrdineDiRilievo(a: RigaMisura, b: RigaMisura): number {
+  return confronta(a.data_rilievo, b.data_rilievo) || confronta(a.ora, b.ora) || confronta(a.creato_il ?? '', b.creato_il ?? '') || confronta(a.id, b.id)
+}
+const confronta = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/**
+ * Tutte le misure di uno strumento dell'esperimento, in tutto il periodo (periodo e piante si filtrano sul client, così
+ * cambiare un filtro non rilegge nulla). Si legge a pagine "keyset": ordinate per `id`, 1000 righe, e dalla seconda
+ * `id > <ultimo id ricevuto>`; a differenza dell'offset, un inserimento o un'eliminazione concorrente non fa saltare
+ * righe. Ci si ferma solo davanti a una pagina vuota: il server può dare meno righe di quelle chieste (`max_rows`), e
+ * fermarsi a una pagina "corta" perderebbe in silenzio le misure più recenti (come in `listaNote`). Un errore a metà
+ * si rilancia senza restituire il risultato parziale: un grafico o un Excel con i dati a metà sarebbero peggio di niente.
+ * Alla fine le misure si riordinano in modo stabile (`perOrdineDiRilievo`), non nell'ordine arbitrario delle pagine.
+ * L'indice `misure (esperimento_id, strumento_id, id)` serve proprio a queste pagine.
+ */
+export async function misureStrumento(espId: string, strumentoId: string): Promise<Misura[]> {
+  const misure = new Map<string, RigaMisura>()
+  let cursore: string | null = null
+  for (;;) {
+    let query = supabase
+      .from('misure')
+      .select('id, pianta_id, strumento_id, data_rilievo, ora, valori, creato_il')
+      .eq('esperimento_id', espId)
+      .eq('strumento_id', strumentoId)
+      .order('id')
+      .limit(PAGINA_MISURE)
+    if (cursore !== null) query = query.gt('id', cursore)
+    const { data, error } = await query
+    if (error) throw error
+    const righe = (data ?? []) as RigaMisura[]
+    if (righe.length === 0) return [...misure.values()].sort(perOrdineDiRilievo).map(daRigaMisura)
+    // L'ultima riga nell'ordine del server è la più grande: il confronto lo fa il database, non JavaScript.
+    const ultimo = righe[righe.length - 1].id
+    // Un server che ignorasse il filtro rimanderebbe sempre la stessa pagina: meglio un errore che un ciclo infinito.
+    if (ultimo === cursore) throw new Error('La lettura delle misure non avanza: riprova.')
+    for (const r of righe) if (!misure.has(r.id)) misure.set(r.id, r)
+    cursore = ultimo
+  }
+}
+
 /** Tutte le misure di una pianta, dalla più recente. */
 export async function misurePianta(piantaId: string): Promise<Misura[]> {
   const { data, error } = await supabase

@@ -308,6 +308,8 @@ export function ModuloOggi({
     // Gli ultimi valori di ogni pianta (elenco Piante): senza questa resterebbero quelli di prima fino alla scadenza della cache.
     void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId) })
     void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
+    // Dataset ed Esporta leggono tutte le misure di ogni strumento: senza questa resterebbero indietro di un giro.
+    void queryClient.invalidateQueries({ queryKey: chiavi.misureStrumento(espId, m.strumento_id) })
     // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
     if (!montato.current) return
     if (azione === 'vai' && avanti) {

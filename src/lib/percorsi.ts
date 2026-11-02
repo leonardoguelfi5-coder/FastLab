@@ -31,6 +31,18 @@ export type SezioneInArrivo = 'dataset' | 'esporta'
 /** Una sezione della home dell'esperimento ancora segnaposto. */
 export const percorsoSezione = (espId: string, sezione: SezioneInArrivo) => `${percorsoHome(espId)}/${sezione}`
 
+/** I parametri di una vista (filtri del Dataset, scelte di Esporta) da mettere in coda a un percorso. */
+function coda(ricerca: string | URLSearchParams | undefined): string {
+  const testo = (typeof ricerca === 'string' ? ricerca : ricerca?.toString() ?? '').replace(/^\?/, '')
+  return testo === '' ? '' : `?${testo}`
+}
+
+/** Il Dataset: i grafici. `ricerca` sono i filtri nella URL (`s`, `p`, `t`, `f`, `per`, `cerca`). */
+export const percorsoDataset = (espId: string, ricerca?: string | URLSearchParams) => `${percorsoHome(espId)}/dataset${coda(ricerca)}`
+
+/** Esporta Excel. `ricerca` sono le scelte iniziali, per esempio quelle di "Scarica questa vista" dal Dataset. */
+export const percorsoEsporta = (espId: string, ricerca?: string | URLSearchParams) => `${percorsoHome(espId)}/esporta${coda(ricerca)}`
+
 /** Il Diario: le note e i promemoria dell'esperimento. */
 export const percorsoDiario = (espId: string) => `${percorsoHome(espId)}/diario`
 

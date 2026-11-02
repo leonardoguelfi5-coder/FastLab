@@ -18,6 +18,15 @@ export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\
 /** Un nome già usato da un'altra voce non archiviata del catalogo (indice unico `catalogo_strumenti_nome_unico`). */
 const MSG_NOME_NEL_CATALOGO = 'Nel catalogo c\'è già uno strumento con questo nome.'
 
+/** Un nome già usato da un altro export salvato dello stesso utente nello stesso esperimento (indice `export_salvati_nome_unico`). */
+const MSG_NOME_EXPORT = 'Hai già un export salvato con questo nome: scegline un altro o sostituisci quello.'
+
+/** Il salvataggio di un export è stato rifiutato perché il nome c'è già (la pagina chiede se sostituire). */
+export function eNomeExportGiaUsato(e: unknown): boolean {
+  const { code, messaggio } = leggi(e)
+  return code === '23505' && messaggio.includes('export_salvati_nome_unico')
+}
+
 /** Il salvataggio di una voce è stato rifiutato perché il nome c'è già nel catalogo (si risolve rinominando). */
 export function eNomeGiaNelCatalogo(e: unknown): boolean {
   return messaggioErrore(e) === MSG_NOME_NEL_CATALOGO
@@ -106,6 +115,12 @@ export function messaggioErrore(e: unknown): string {
   }
   // Una sola tabella fenologica per esperimento, anche archiviata (indice unico parziale su strumenti).
   if (code === '23505' && messaggio.includes('strumenti_un_fenologico')) return 'C\'è già una tabella fenologica in questo esperimento.'
+  if (eNomeExportGiaUsato(e)) return MSG_NOME_EXPORT
+  // Il database rifiuta scelte che la pagina non dovrebbe mai mandare (check `export_salvati_scelte_valide`) e un nome vuoto o oltre 80 caratteri.
+  if (code === '23514' && messaggio.includes('export_salvati_scelte_valide')) {
+    return 'Le scelte di questo export non sono valide: controlla strumenti, piante, periodo e fogli, poi riprova.'
+  }
+  if (code === '23514' && messaggio.includes('export_salvati_nome_check')) return 'Il nome dell\'export deve avere da 1 a 80 caratteri.'
   if (code === '23505') return 'Esiste già un elemento con questo nome o etichetta.'
   // catalogo_id di uno strumento che punta a una voce che non c'è (crea_esperimento o salvaStrumento).
   if (code === '23503' && messaggio.includes('strumenti_catalogo_id_fkey')) {

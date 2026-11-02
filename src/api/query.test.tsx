@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { Misura } from '@/domain/tipi'
 
 vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn() }))
+vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn(), misureStrumento: vi.fn() }))
+vi.mock('./exportSalvati', () => ({ listaExportSalvati: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), strumentiConDati: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
@@ -17,10 +19,12 @@ import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
 import { listaFoto, spazioFoto, urlFoto } from './foto'
-import { caricaMisura, misureDelGiorno, misurePianta, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
+import { listaExportSalvati } from './exportSalvati'
+import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
   useFoto, useNote, useParametriConDati, usePianteNonEliminabili, useSpazioFoto, useUrlFoto, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
+  useExportSalvati, useMisureStrumenti, useMisureStrumento, useUltimaData, ultimaDataConMisure,
 } from './query'
 
 function wrapper() {
@@ -63,6 +67,19 @@ describe('chiavi', () => {
     expect(chiavi.ultimeMisurePiante('E')).not.toEqual(chiavi.ultimeMisurePiante('F'))
     expect(chiavi.misura('m1')).not.toEqual(chiavi.misura('m2'))
     expect(chiavi.misure).toEqual(['misure'])
+  })
+
+  it('le misure di uno strumento stanno sotto il prefisso delle misure (modifica ed eliminazione le invalidano già)', () => {
+    expect(chiavi.misureStrumento('E', 's1')).toEqual(['misure', 'strumento', 'E', 's1'])
+    expect(chiavi.misureStrumento('E', 's1')[0]).toBe(chiavi.misure[0])
+    expect(chiavi.misureStrumento('E', 's1')).not.toEqual(chiavi.misureStrumento('E', 's2'))
+    expect(chiavi.misureStrumento('E', 's1')).not.toEqual(chiavi.misureStrumento('F', 's1'))
+  })
+
+  it('gli export salvati hanno una chiave per esperimento, fuori dal prefisso delle misure', () => {
+    expect(chiavi.exportSalvati('E')).toEqual(['exportSalvati', 'E'])
+    expect(chiavi.exportSalvati('E')).not.toEqual(chiavi.exportSalvati('F'))
+    expect(chiavi.exportSalvati('E')[0]).not.toBe(chiavi.misure[0])
   })
 
   it('i parametri e le piante con dati stanno sotto la configurazione: si invalidano con lei', () => {
@@ -360,5 +377,147 @@ describe('creaQueryClient', () => {
     const a = creaQueryClient()
     expect(a).toBeInstanceOf(QueryClient)
     expect(creaQueryClient()).not.toBe(a)
+  })
+})
+
+describe('ultimaDataConMisure', () => {
+  it('è la data più recente tra tutti gli strumenti', () => {
+    expect(ultimaDataConMisure(new Map([['s1', '2026-10-21'], ['s2', '2026-11-03'], ['s3', '2026-09-30']]))).toBe('2026-11-03')
+  })
+  it('con un solo strumento è la sua data', () => {
+    expect(ultimaDataConMisure(new Map([['s1', '2026-10-21']]))).toBe('2026-10-21')
+  })
+  it('senza misure è null (niente da mostrare: le settimane finiscono oggi)', () => {
+    expect(ultimaDataConMisure(new Map())).toBeNull()
+  })
+})
+
+describe('useUltimaData', () => {
+  it('dà l\'ultima data con misure tra tutti gli strumenti, la stessa per Dataset ed Esporta', async () => {
+    vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map([['s1', '2026-10-21'], ['s2', '2026-10-28']]))
+    const { result } = renderHook(() => useUltimaData('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(ultimaMisuraPerStrumento).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe('2026-10-28')
+  })
+
+  it('senza misure è null, non undefined: si distingue dal "non ancora letta"', async () => {
+    vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map())
+    const { result } = renderHook(() => useUltimaData('E'), { wrapper: wrapper() })
+    expect(result.current.data).toBeUndefined()
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toBeNull()
+  })
+
+  it('condivide la lettura con useUltimeMisure: una sola chiamata al database', async () => {
+    vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map([['s1', '2026-10-21']]))
+    const { result } = renderHook(() => ({ a: useUltimeMisure('E'), b: useUltimaData('E') }), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.b.isSuccess && result.current.a.isSuccess).toBe(true))
+    expect(ultimaMisuraPerStrumento).toHaveBeenCalledTimes(1)
+  })
+
+  it('senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useUltimaData(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(ultimaMisuraPerStrumento).not.toHaveBeenCalled()
+  })
+})
+
+describe('useMisureStrumento', () => {
+  it('legge le misure di quello strumento', async () => {
+    const misure = [{ id: 'm1' }]
+    vi.mocked(misureStrumento).mockResolvedValue(misure as never)
+    const { result } = renderHook(() => useMisureStrumento('E', 's1'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(misureStrumento).toHaveBeenCalledWith('E', 's1')
+    expect(result.current.data).toBe(misure)
+  })
+
+  it('senza esperimento o senza strumento non interroga il database', () => {
+    const a = renderHook(() => useMisureStrumento(undefined, 's1'), { wrapper: wrapper() })
+    const b = renderHook(() => useMisureStrumento('E', undefined), { wrapper: wrapper() })
+    expect(a.result.current.fetchStatus).toBe('idle')
+    expect(b.result.current.fetchStatus).toBe('idle')
+    expect(misureStrumento).not.toHaveBeenCalled()
+  })
+})
+
+describe('useMisureStrumenti', () => {
+  const dueMisure = (id: string) => [{ id, strumento_id: id }] as unknown as Misura[]
+
+  it('dà i dati solo quando tutte le letture sono arrivate, per id di strumento', async () => {
+    let finisciS2: (m: Misura[]) => void = () => {}
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) =>
+      id === 's2' ? new Promise(ok => { finisciS2 = ok }) : dueMisure(id))
+    const { result } = renderHook(() => useMisureStrumenti('E', ['s1', 's2']), { wrapper: wrapper() })
+
+    await waitFor(() => expect(misureStrumento).toHaveBeenCalledTimes(2))
+    // s1 è arrivata, s2 no: niente dati a metà.
+    expect(result.current.dati).toBeUndefined()
+    expect(result.current.isPending).toBe(true)
+
+    finisciS2(dueMisure('s2'))
+    await waitFor(() => expect(result.current.isPending).toBe(false))
+    expect([...result.current.dati!.keys()]).toEqual(['s1', 's2'])
+    expect(result.current.dati!.get('s2')).toEqual(dueMisure('s2'))
+    expect(result.current.isError).toBe(false)
+  })
+
+  it('con un errore dà il primo errore e nessun dato', async () => {
+    const errore = new Error('rete')
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) => { if (id === 's2') throw errore; return dueMisure(id) })
+    const { result } = renderHook(() => useMisureStrumenti('E', ['s1', 's2']), { wrapper: wrapper() })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toBe(errore)
+    expect(result.current.dati).toBeUndefined()
+  })
+
+  it('refetch rilegge tutte le misure', async () => {
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) => dueMisure(id))
+    const { result } = renderHook(() => useMisureStrumenti('E', ['s1', 's2']), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.dati).toBeDefined())
+    expect(misureStrumento).toHaveBeenCalledTimes(2)
+
+    await act(async () => { await result.current.refetch() })
+
+    expect(misureStrumento).toHaveBeenCalledTimes(4)
+  })
+
+  it('senza strumenti da leggere i dati sono una mappa vuota, subito', () => {
+    const { result } = renderHook(() => useMisureStrumenti('E', []), { wrapper: wrapper() })
+    expect(result.current.isPending).toBe(false)
+    expect(result.current.dati?.size).toBe(0)
+    expect(misureStrumento).not.toHaveBeenCalled()
+  })
+
+  it('senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useMisureStrumenti(undefined, ['s1']), { wrapper: wrapper() })
+    expect(result.current.dati).toBeUndefined()
+    expect(misureStrumento).not.toHaveBeenCalled()
+  })
+
+  it('condivide la cache con useMisureStrumento: stessa chiave, una sola lettura', async () => {
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) => dueMisure(id))
+    const { result } = renderHook(() => ({ uno: useMisureStrumento('E', 's1'), tutti: useMisureStrumenti('E', ['s1']) }), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.uno.isSuccess && result.current.tutti.dati !== undefined).toBe(true))
+    expect(misureStrumento).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useExportSalvati', () => {
+  it('legge gli export salvati dell\'esperimento', async () => {
+    const lista = [{ id: 'x1', nome: 'A', scelte: {}, aggiornato_il: 'x' }]
+    vi.mocked(listaExportSalvati).mockResolvedValue(lista)
+    const { result } = renderHook(() => useExportSalvati('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(listaExportSalvati).toHaveBeenCalledWith('E')
+    expect(result.current.data).toBe(lista)
+  })
+
+  it('senza esperimento non interroga il database', () => {
+    const { result } = renderHook(() => useExportSalvati(undefined), { wrapper: wrapper() })
+    expect(result.current.fetchStatus).toBe('idle')
+    expect(listaExportSalvati).not.toHaveBeenCalled()
   })
 })

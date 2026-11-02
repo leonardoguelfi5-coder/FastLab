@@ -1034,6 +1034,8 @@ describe('MisuraPianta: salvataggio', () => {
     // l'elenco Piante mostra gli ultimi valori di ogni pianta: non deve restare indietro fino alla scadenza della cache
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.ultimeMisurePiante('E') })
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.esperimenti })
+    // Dataset ed Esporta leggono le misure di ogni strumento: senza questa resterebbero indietro di un giro.
+    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureStrumento('E', idStrumento('Termometro')) })
   })
 
   it('con la data di rilievo di ieri la misura si salva con quella data', async () => {

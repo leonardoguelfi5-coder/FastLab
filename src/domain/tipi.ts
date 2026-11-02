@@ -47,3 +47,9 @@ export interface Nota { id: string; data: string; testo: string; promemoria: boo
 export interface Foto { id: string; data: string; percorso: string; larghezza: number | null; altezza: number | null;
   byte: number | null; pianta_id: string | null; nota_id: string | null; archiviata: boolean;
   archiviata_il: string | null }
+
+/**
+ * Un export salvato (Esporta Excel): nome e scelte, per esperimento e per utente. Le `scelte` arrivano dal database
+ * come json qualunque: la pagina le legge con `leggiSceltaExport`, che scarta quello che non c'è più.
+ */
+export interface ExportSalvato { id: string; nome: string; scelte: unknown; aggiornato_il: string }

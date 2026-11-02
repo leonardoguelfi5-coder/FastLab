@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, ErroreApp, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
-  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
+  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, eNomeExportGiaUsato, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
 } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -126,6 +126,31 @@ describe('messaggioErrore', () => {
     expect(messaggioErrore({
       code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"',
     })).toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
+  it('nome doppio tra gli export salvati (indice export_salvati_nome_unico)', () => {
+    const e = { code: '23505', message: 'duplicate key value violates unique constraint "export_salvati_nome_unico"' }
+    expect(messaggioErrore(e)).toBe('Hai già un export salvato con questo nome: scegline un altro o sostituisci quello.')
+    expect(eNomeExportGiaUsato(e)).toBe(true)
+  })
+
+  it('eNomeExportGiaUsato riconosce solo quell\'indice, e non dipende dalla rete', () => {
+    expect(eNomeExportGiaUsato({ code: '23505', message: 'duplicate key value violates unique constraint "export_salvati_pkey"' })).toBe(false)
+    expect(eNomeExportGiaUsato({ code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"' })).toBe(false)
+    expect(eNomeExportGiaUsato(new Error('export_salvati_nome_unico'))).toBe(false)
+    expect(eNomeExportGiaUsato(null)).toBe(false)
+  })
+
+  it('scelte di un export non valide (check export_salvati_scelte_valide, 23514)', () => {
+    expect(messaggioErrore({
+      code: '23514', message: 'new row for relation "export_salvati" violates check constraint "export_salvati_scelte_valide"',
+    })).toBe('Le scelte di questo export non sono valide: controlla strumenti, piante, periodo e fogli, poi riprova.')
+  })
+
+  it('nome di un export vuoto o troppo lungo (check export_salvati_nome_check, 23514)', () => {
+    expect(messaggioErrore({
+      code: '23514', message: 'new row for relation "export_salvati" violates check constraint "export_salvati_nome_check"',
+    })).toBe('Il nome dell\'export deve avere da 1 a 80 caratteri.')
   })
 
   it('strumento collegato a una voce del catalogo che non c\'è (23503 su strumenti_catalogo_id_fkey)', () => {

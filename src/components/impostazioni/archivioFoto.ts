@@ -4,14 +4,13 @@ import { creaCsvFoto, nomeFileZip, nomiFileZip } from '@/domain/archivioFoto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData, oggiLocale } from '@/lib/date'
 import { ErroreApp } from '@/lib/errori'
+import { consegna } from '@/lib/scaricaFile'
 import { useArchivioSessione } from './archivioSessione'
 
 /** Le foto scaricate in parallelo: poche, per non saturare la rete del telefono né la memoria. */
 const CONCORRENZA = 3
 /** Gli URL firmati si chiedono a gruppi di questa misura, appena prima di scaricarli (valgono un'ora). */
 const URL_PER_RICHIESTA = 100
-/** Quanto si aspetta prima di liberare l'indirizzo del Blob: tolto subito, qualche browser (Safari su iPhone) non farebbe in tempo a leggerlo. */
-const ATTESA_REVOCA_MS = 30_000
 
 /** Esegue `lavora` su tutti gli elementi, `quanti` alla volta; al primo errore non parte più nessuno e l'errore si rilancia. */
 async function inParallelo<T>(elementi: T[], quanti: number, lavora: (elemento: T) => Promise<void>): Promise<void> {
@@ -39,19 +38,6 @@ async function scaricaBytes(url: string): Promise<Uint8Array> {
   const risposta = await fetch(url)
   if (!risposta.ok) throw new ErroreApp(`Una foto non si è scaricata (errore ${risposta.status}). Riprova.`)
   return new Uint8Array(await risposta.arrayBuffer())
-}
-
-/** Consegna il file al browser: un link `download` su un Blob, che poi si libera. */
-function consegna(blob: Blob, nome: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nome
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), ATTESA_REVOCA_MS)
 }
 
 export interface EsitoArchivio {
