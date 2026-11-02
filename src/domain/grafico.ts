@@ -403,10 +403,23 @@ export function dataPiuVicina(imp: Impaginazione, x: number): string | null {
 export interface VoceLettura { indice: number; etichetta: string; stile: StileSerie; valore: string; n: number }
 export interface LetturaDelGiorno { data: string; voci: VoceLettura[]; note: Nota[] }
 
+/**
+ * Un valore del grafico come si scrive: da 1 in su come `formattaMedia` (al più due decimali); sotto 1 in valore assoluto
+ * tre cifre significative, perché parametri come la conduttanza stomatica hanno valori di decimi e centesimi e un errore
+ * standard di 0,004 non deve diventare «0». Sempre con la virgola, senza zeri inutili e mai in notazione scientifica.
+ */
+export function formattaDato(n: number): string {
+  const assoluto = Math.abs(n)
+  if (assoluto >= 1 || assoluto === 0 || !Number.isFinite(n)) return formattaMedia(n)
+  const decimali = Math.min(20, 2 - Math.floor(Math.log10(assoluto)))
+  const testo = n.toFixed(decimali).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  return testo.replace('.', ',')
+}
+
 /** Il valore di un punto come si scrive: `41,2 ± 0,8`, senza ± quando non c'è errore standard; `62,5%` per i sì/no. */
 export function valoreScritto(punto: { media: number; es: number | null }, scala: ScalaGrafico): string {
-  if (scala === 'percentuale') return `${formattaMedia(punto.media)}%`
-  return punto.es === null ? formattaMedia(punto.media) : `${formattaMedia(punto.media)} ± ${formattaMedia(punto.es)}`
+  if (scala === 'percentuale') return `${formattaDato(punto.media)}%`
+  return punto.es === null ? formattaDato(punto.media) : `${formattaDato(punto.media)} ± ${formattaDato(punto.es)}`
 }
 
 /** Che cosa dire di una data: per ogni serie con un punto quel giorno `valore ± ES` e n, e le note segnate quel giorno. */
@@ -431,7 +444,7 @@ export function riassuntoGrafico(imp: Impaginazione, titolo: string): string {
   const date = [...new Set(conPunti.flatMap(s => s.punti.map(p => p.data)))].sort()
   const ultimi = conPunti.map(s => {
     const p = s.punti[s.punti.length - 1]
-    return `${s.etichetta} ${formattaMedia(p.media)}${imp.scala === 'percentuale' ? '%' : ''}`
+    return `${s.etichetta} ${formattaDato(p.media)}${imp.scala === 'percentuale' ? '%' : ''}`
   })
   const periodo = date[0] === date[date.length - 1]
     ? `Il ${formattaData(date[0])}`

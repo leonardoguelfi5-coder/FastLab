@@ -19,6 +19,18 @@ const note: NoteDellaData[] = [{ data: '2026-10-06', note: [
 const base = { serie: DUE(), note, scala: 'valore' as const, unita: 'SPAD', larghezza: 360, altezza: 260, titolo: 'SPAD · media per trattamento ± ES' }
 const render = (extra = {}) => renderToStaticMarkup(<GraficoSvg {...base} {...extra} />)
 
+describe('GraficoSvg: dimensioni', () => {
+  it('nell\'app si adatta al contenitore (larghezza massima 100%, altezza automatica)', () => {
+    expect(render()).toMatch(/style="[^"]*max-width:100%[^"]*height:auto/)
+  })
+  it('per l\'immagine ha le dimensioni vere, senza stili che le cambiano (il PNG deve venire 800 × 450)', () => {
+    const html = render({ perImmagine: true, larghezza: 800, altezza: 450 })
+    expect(html).toContain('width="800"')
+    expect(html).toContain('height="450"')
+    expect(html).not.toMatch(/max-width|height:auto/)
+  })
+})
+
 describe('GraficoSvg', () => {
   it('è un SVG autonomo con role="img" e un\'etichetta che riassume', () => {
     const html = render()

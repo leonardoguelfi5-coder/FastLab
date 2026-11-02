@@ -72,7 +72,8 @@ export function TabellaValori({ serie, righe, scala, descrizione }: TabellaValor
                       <svg aria-hidden width={12} height={12} viewBox="-6 -6 12 12" className="shrink-0" opacity={s.tenue ? 0.4 : undefined}>
                         <path d={s.marcatore} fill={s.colore} />
                       </svg>
-                      {etichettaSerie(riga.serie)}
+                      {/* l'etichetta di una pianta è un identificativo: Geist Mono con cifre tabellari */}
+                      <span className={riga.serie.tipo === 'pianta' ? 'font-mono tabular-nums' : undefined}>{etichettaSerie(riga.serie)}</span>
                     </span>
                   </th>
                   <td className={cn(CELLA, 'text-right font-mono text-dato tabular-nums whitespace-nowrap', riga.serie.riferimento && 'text-grafite-tenue')}>

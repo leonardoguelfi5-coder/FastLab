@@ -1,4 +1,4 @@
-import { cercaPiante, limitaCerca, strumentiPerScelta } from '@/domain/dataset'
+import { cercaPiante, strumentiPerScelta } from '@/domain/dataset'
 import {
   MASSIMO_IDS, MASSIMO_SETTIMANE, leggiSceltaExport, type ComeExport, type SceltaExport, type SceltaPiante, type SceltaStrumenti,
 } from '@/domain/export/scelte'
@@ -90,8 +90,9 @@ function pianteDellaScelta(
       ? { valore: null, problema: 'Scegli almeno un trattamento.', nonTrovate: [], trovate: [] }
       : { valore: { modo: 'trattamenti', ids }, nonTrovate: [], trovate: [] }
   }
-  // La ricerca è quella del Dataset: etichette esatte separate da virgola (`3` non trova la `13`), `035` = `35`.
-  const { trovate, nonTrovate } = cercaPiante(config.piante, limitaCerca(ui.cercato))
+  // La ricerca è quella del Dataset: etichette esatte separate da virgola (`3` non trova la `13`), `035` = `35`. Il limite
+  // di pezzi della URL del Dataset qui non c'è: un export salvato con centinaia di piante si riapre intero.
+  const { trovate, nonTrovate } = cercaPiante(config.piante, ui.cercato)
   const etichette = trovate.map(p => p.etichetta)
   if (trovate.length === 0) return { valore: null, problema: 'Scrivi almeno una pianta che c\'è.', nonTrovate, trovate: etichette }
   if (trovate.length > MASSIMO_IDS) return { valore: null, problema: 'Troppe piante: scegli per trattamento.', nonTrovate, trovate: etichette }

@@ -4,6 +4,7 @@ import {
   MASSIMO_PEZZI_CERCA, SETTIMANE_DEL_DATASET, haFiltriAttivi, limitaCerca, parametriDelloStrumento, strumentiPerScelta,
   type FiltriDataset, type Intervallo, type Periodo,
 } from '@/domain/dataset'
+import { ordinati } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { eDataValida, formattaData, formattaGiornoMese } from '@/lib/date'
 import { SceltaSingola } from '@/components/SceltaSingola'
@@ -25,9 +26,6 @@ const CHIP_NORMALE = 'border-riga-controllo bg-foglio text-grafite hover:border-
 const CHIP_ATTIVO = 'border-inchiostro bg-inchiostro-velato text-grafite active:bg-inchiostro-velato'
 const CHIP_SCELTO = 'border-inchiostro bg-inchiostro text-foglio active:bg-inchiostro-scuro'
 const CHIP_LIBERO = 'border-riga-controllo bg-foglio text-grafite hover:border-grafite-tenue active:bg-carta-ombra'
-
-
-const ordinati = <T extends { ordine: number }>(xs: T[]): T[] => [...xs].sort((a, b) => a.ordine - b.ordine)
 
 function etichettaTrattamenti(config: ConfigEsperimento, ids: string[]): string {
   if (ids.length === 0) return 'Trattamenti: tutti'
@@ -103,7 +101,8 @@ function PannelloStrumento({ config, filtri, onCambia, chiudi }: PannelloProps &
       nome="Strumento"
       scelto={filtri.strumentoId}
       opzioni={strumenti.map(s => ({ valore: s.id, testo: s.archiviato ? `${s.nome} (archiviato)` : s.nome }))}
-      onScegli={id => { onCambia({ strumentoId: id }); chiudi() }}
+      onScegli={id => onCambia({ strumentoId: id })}
+      onConferma={chiudi}
     />
   )
 }
@@ -118,7 +117,8 @@ function PannelloParametro({ config, filtri, onCambia, chiudi }: PannelloProps &
         valore: parametro.id,
         testo: `${parametro.nome}${parametro.archiviato ? ' (archiviato)' : ''}${disegnabile ? '' : ' (solo tabella)'}`,
       }))}
-      onScegli={id => { onCambia({ parametroId: id }); chiudi() }}
+      onScegli={id => onCambia({ parametroId: id })}
+      onConferma={chiudi}
     />
   )
 }

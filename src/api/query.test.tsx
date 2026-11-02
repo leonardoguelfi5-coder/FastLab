@@ -484,6 +484,24 @@ describe('useMisureStrumenti', () => {
     expect(misureStrumento).toHaveBeenCalledTimes(4)
   })
 
+  it('dopo un nuovo disegno (anche con un elenco di ids nuovo ma uguale) i dati sono lo stesso oggetto', async () => {
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) => dueMisure(id))
+    const { result, rerender } = renderHook(() => useMisureStrumenti('E', ['s1', 's2']), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.dati).toBeDefined())
+    const dati = result.current.dati
+    rerender()
+    rerender()
+    expect(result.current.dati).toBe(dati)
+  })
+
+  it('cambiando gli strumenti i dati cambiano', async () => {
+    vi.mocked(misureStrumento).mockImplementation(async (_e, id) => dueMisure(id))
+    const { result, rerender } = renderHook(({ ids }) => useMisureStrumenti('E', ids), { wrapper: wrapper(), initialProps: { ids: ['s1'] } })
+    await waitFor(() => expect(result.current.dati).toBeDefined())
+    rerender({ ids: ['s1', 's2'] })
+    await waitFor(() => expect([...(result.current.dati?.keys() ?? [])]).toEqual(['s1', 's2']))
+  })
+
   it('senza strumenti da leggere i dati sono una mappa vuota, subito', () => {
     const { result } = renderHook(() => useMisureStrumenti('E', []), { wrapper: wrapper() })
     expect(result.current.isPending).toBe(false)

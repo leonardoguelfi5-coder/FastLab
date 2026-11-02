@@ -49,7 +49,8 @@ export function GraficoSvg({
       viewBox={`0 0 ${imp.larghezza} ${imp.altezza}`}
       role="img"
       aria-label={riassuntoGrafico(imp, titolo)}
-      style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+      // nell'app il disegno segue il contenitore; nell'immagine le dimensioni sono quelle vere (niente stili che le cambino)
+      style={perImmagine ? undefined : { display: 'block', maxWidth: '100%', height: 'auto' }}
     >
       {perImmagine && fontIncorporato && (
         <style>{`@font-face{font-family:"Geist Mono Variable";src:url(${fontIncorporato}) format("woff2");font-weight:100 900;font-style:normal}`}</style>

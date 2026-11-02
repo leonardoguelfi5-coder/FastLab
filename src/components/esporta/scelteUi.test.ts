@@ -102,6 +102,15 @@ describe('sceltaDaScelteUi', () => {
     expect(sceltaDaScelteUi({ ...nuova(), modoPiante: 'piante', cercato: '' }, config).problemi.piante).toBe('Scrivi almeno una pianta che c\'è.')
   })
 
+  it('un export con centinaia di piante si riapre intero: il campo non taglia a 200 pezzi come la URL del Dataset', () => {
+    config = configDiEsempio()
+    const [trattamento] = config.trattamenti
+    config.piante = Array.from({ length: 250 }, (_, i) => ({ id: crypto.randomUUID(), trattamento_id: trattamento.id, etichetta: `P${i + 1}`, blocco: null, ordine: i }))
+    const scelta: SceltaExport = { ...SCELTA_TUTTO, piante: { modo: 'piante', ids: config.piante.map(p => p.id) } }
+    const ui = scelteDaScelta(scelta, config)
+    expect(sceltaDaScelteUi(ui, config).scelta).toEqual(scelta)
+  })
+
   it('periodo: settimane relative, intervallo giusto, e i due modi sbagliati dell\'intervallo', () => {
     const ui = nuova()
     expect(sceltaDaScelteUi({ ...ui, modoPeriodo: 'settimane', settimane: 12 }, config).scelta?.periodo).toEqual({ modo: 'settimane', n: 12 })

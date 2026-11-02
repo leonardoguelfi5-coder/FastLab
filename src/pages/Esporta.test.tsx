@@ -399,6 +399,20 @@ describe('Esporta: il riepilogo', () => {
     expect(scarica()).toBeEnabled()
   })
 
+  it('un errore delle note blocca il riepilogo solo se il file ha Diario o Grafici', async () => {
+    vi.mocked(listaNote).mockRejectedValue(new Error('rete'))
+    const { utente } = apri()
+    const errore = await within(await screen.findByRole('status', { name: 'Riepilogo' })).findByRole('alert')
+    expect(errore).toBeInTheDocument()
+    const come = sezione('4 · Come')
+    await utente.click(come.getByRole('button', { name: /Grafici · Diario · Info/ }))
+    await utente.click(come.getByRole('checkbox', { name: /Grafici/ }))
+    await utente.click(come.getByRole('checkbox', { name: /Diario/ }))
+    await riepilogoPronto()
+    expect(riepilogo()).toHaveTextContent('Dati: 12 righe')
+    expect(scarica()).toBeEnabled()
+  })
+
   it('un esperimento concluso aspetta l\'ultima data prima di contare le settimane', async () => {
     config = { ...config, esperimento: { ...config.esperimento, stato: 'concluso' } }
     let finisci: (m: Map<string, string>) => void = () => {}
@@ -618,6 +632,39 @@ describe('Esporta: Salva questa scelta', () => {
     expect(toastSalvato).toHaveBeenCalled()
   })
 
+  it('se il nome è di un export che si sta eliminando non si offre «Sostituisci»: si dice di annullare o aspettare', async () => {
+    salvati = [salvato('vecchio', 'SPAD', SOLO_ALTEZZA())]
+    const { utente } = apri()
+    await riepilogoPronto()
+    await elencoSalvati().findByText('SPAD')
+    await utente.click(within(rigaSalvata('SPAD')).getByRole('button', { name: 'Elimina' }))
+    // la riga è già fuori dall'elenco, ma nel database c'è ancora: il nome è occupato
+    vi.mocked(salvaExportSalvato).mockRejectedValueOnce({ code: '23505', message: 'duplicate key value violates unique constraint "export_salvati_nome_unico"' })
+    await utente.click(pulsante('Salva questa scelta'))
+    await utente.type(screen.getByLabelText('Nome'), 'SPAD')
+    await utente.click(pulsante('Salva'))
+    expect(await screen.findByText('«SPAD» si sta eliminando: annulla l\'eliminazione o riprova tra qualche secondo.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sostituisci' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Nome')).toHaveValue('SPAD')
+    expect(salvaExportSalvato).toHaveBeenCalledTimes(1)
+    // passati i 5 secondi l'export non c'è più e lo stesso nome si salva
+    salvati = []
+    await act(() => vi.advanceTimersByTimeAsync(ATTESA_ANNULLA_MS))
+    await utente.click(pulsante('Salva'))
+    await waitFor(() => expect(salvaExportSalvato).toHaveBeenCalledTimes(2))
+  })
+
+  it('con le scelte diventate non valide a campo aperto «Salva» dice di completarle e non salva', async () => {
+    const { utente } = await apriIlCampo()
+    await utente.type(screen.getByLabelText('Nome'), 'Prova')
+    await utente.click(sezione('1 · Cosa').getByRole('button', { name: 'Altezza' }))
+    await utente.click(sezione('1 · Cosa').getByRole('button', { name: 'Fenologici' }))
+    await utente.click(sezione('1 · Cosa').getByRole('button', { name: /Calibro/ }))
+    await utente.click(pulsante('Salva'))
+    expect(screen.getByText('Completa le scelte prima di salvarle.')).toBeInTheDocument()
+    expect(salvaExportSalvato).not.toHaveBeenCalled()
+  })
+
   it('«Cambia nome» torna al campo con il nome scritto, senza salvare', async () => {
     salvati = [salvato('esistente', 'SPAD ultimo mese', SOLO_ALTEZZA())]
     const { utente } = await apriIlCampo()
@@ -738,6 +785,21 @@ describe('Esporta: Scarica Excel', () => {
     await utente.click(scarica())
     expect(passaggi).toHaveLength(1)
     await act(async () => { passaggi[0].finisci(null) })
+  })
+
+  it('le fasi del download non rifanno il conto del riepilogo: la cartella si costruisce una volta sola', async () => {
+    const passaggi = scaricamentoManuale()
+    const { utente } = apri()
+    await riepilogoPronto()
+    const chiamate = vi.mocked(costruisciCartella).mock.calls.length
+    await utente.click(scarica())
+    for (const f of [{ fase: 'dati' }, { fase: 'grafici', numero: 1, totale: 2 }, { fase: 'grafici', numero: 2, totale: 2 }, { fase: 'file' }] as const) {
+      await act(async () => { passaggi[0].dati.onProgresso?.(f) })
+    }
+    expect(vi.mocked(costruisciCartella).mock.calls.length).toBe(chiamate)
+    await act(async () => { passaggi[0].finisci(null) })
+    await waitFor(() => expect(scarica()).toBeEnabled())
+    expect(vi.mocked(costruisciCartella).mock.calls.length).toBe(chiamate)
   })
 
   it('lasciando la pagina il download si interrompe: il segnale è interrotto e non resta nulla da mostrare', async () => {

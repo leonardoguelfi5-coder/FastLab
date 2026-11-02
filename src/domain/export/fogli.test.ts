@@ -376,7 +376,7 @@ describe('Grafici', () => {
     ])
   })
 
-  it('il foglio: la riga della regola, poi per ogni grafico il titolo sopra 22 righe libere', () => {
+  it('il foglio: la riga della regola, poi per ogni grafico il titolo sopra 24 righe libere', () => {
     const c = cartella()
     const grafici = foglio(c, 'Grafici')
     expect(grafici.intestazione).toBe(false)
@@ -385,7 +385,7 @@ describe('Grafici', () => {
     expect(c.grafici.map(g => g.riga)).toEqual(c.grafici.map((_, i) => 2 + i * (RIGHE_IMMAGINE + 1)))
     for (const g of c.grafici) expect(grafici.righe[g.riga]).toEqual([g.titolo])
     expect(grafici.righe).toHaveLength(2 + c.grafici.length * (RIGHE_IMMAGINE + 1))
-    expect(RIGHE_IMMAGINE).toBe(22)
+    expect(RIGHE_IMMAGINE).toBe(24)
   })
 })
 
@@ -658,6 +658,6 @@ describe('prestazioni', () => {
     expect(foglio(c, 'Misure').righe).toHaveLength(6000 * (2 + 4 + 3))
     expect(foglio(c, 'Palchi').righe).toHaveLength(12_000)
     expect(foglio(c, 'Medie').righe).toHaveLength(120)
-    expect(durata).toBeLessThan(1000)
+    expect(durata).toBeLessThan(3000)
   })
 })

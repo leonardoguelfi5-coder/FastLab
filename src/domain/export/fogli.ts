@@ -4,7 +4,7 @@ import {
   type Intervallo, type NoteDellaData, type PuntoSerie, type ScalaGrafico, type SerieTrattamento,
 } from '../dataset'
 import { descriviCollegamento } from '../note'
-import { ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo } from '../statistiche'
+import { ordinati, ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo } from '../statistiche'
 import type { ConfigEsperimento, ElementoLista, Misura, Nota, Parametro, Pianta, Strumento, Trattamento } from '../tipi'
 import { nomeFileExcel } from './riepilogo'
 import { applicaAllaConfigurazione, descriviPeriodo, descriviPiante, leggiSceltaExport, type SceltaExport } from './scelte'
@@ -82,8 +82,8 @@ export interface DatiCartella {
   ultimaData: string | null
 }
 
-/** Quante righe libere ha ogni grafico sotto il suo titolo: lo spazio dell'immagine (800 × 450 px). */
-export const RIGHE_IMMAGINE = 22
+/** Quante righe libere ha ogni grafico sotto il suo titolo: lo spazio dell'immagine (800 × 450 px: 23 righe da 20 px, una in più di margine). */
+export const RIGHE_IMMAGINE = 24
 export const TESTO_GRAFICI = 'Media per trattamento ± errore standard. Unità: la pianta (prima la media del giorno di ogni pianta).'
 export const REGOLA_DELLE_MEDIE = 'Unità: la pianta. Prima il valore del giorno di ogni pianta (per un numero la media delle letture '
   + 'non vuote di ogni misura, poi la media delle misure del giorno; per una lista il numero di elementi; per testo e sì/no '
@@ -99,7 +99,6 @@ const LARGHEZZA_MASSIMA = 40
 /** Excel mostra un numero in formato generale con al più 11 cifre: una media lunga non allarga la colonna oltre. */
 const LARGHEZZA_NUMERO = 12
 
-const ordinati = <T extends { ordine: number }>(xs: T[]): T[] => [...xs].sort((a, b) => a.ordine - b.ordine)
 const TIPI_A_PAROLE: Record<Parametro['tipo'], string> = { numero: 'numero', testo: 'testo', sino: 'sì/no', lista: 'lista' }
 
 // ---- testo, nomi e larghezze ----

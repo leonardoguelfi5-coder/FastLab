@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   COLORI_GRAFICO, COLORI_SERIE, MARCATORI, MASSIMA_DISTANZA_NOTA, dataPiuVicina, dateSelezionabili, dominioVerticale,
-  etichettaSerie, impagina, letturaDelGiorno, percorsoBarre, riassuntoGrafico, tacche, type OpzioniImpagina,
+  etichettaSerie, impagina, letturaDelGiorno, percorsoBarre, riassuntoGrafico, tacche, valoreScritto, type OpzioniImpagina,
 } from './grafico'
 import type { NoteDellaData, PuntoSerie, Serie, SerieTrattamento } from './dataset'
 import type { Nota, Pianta, Trattamento } from './tipi'
@@ -367,7 +367,32 @@ describe('lettura per data', () => {
   })
 })
 
+describe('valoreScritto: numeri piccoli', () => {
+  it('sotto 1 in valore assoluto tiene tre cifre significative, con la virgola: 0,123 ± 0,004 non diventa ± 0', () => {
+    expect(valoreScritto({ media: 0.123, es: 0.004 }, 'valore')).toBe('0,123 ± 0,004')
+    expect(valoreScritto({ media: 0.0412333, es: 0.00081 }, 'valore')).toBe('0,0412 ± 0,00081')
+    expect(valoreScritto({ media: -0.5, es: 0.25 }, 'valore')).toBe('-0,5 ± 0,25')
+    expect(valoreScritto({ media: 0.00000041, es: null }, 'valore')).toBe('0,00000041')
+  })
+  it('da 1 in su restano due decimali al massimo, senza zeri inutili; lo zero è 0', () => {
+    expect(valoreScritto({ media: 41.2333, es: 0.8 }, 'valore')).toBe('41,23 ± 0,8')
+    expect(valoreScritto({ media: 1, es: 0 }, 'valore')).toBe('1 ± 0')
+    expect(valoreScritto({ media: 0, es: null }, 'valore')).toBe('0')
+  })
+  it('un valore che arrotondando arriva a 1 si scrive 1', () => {
+    expect(valoreScritto({ media: 0.9996, es: null }, 'valore')).toBe('1')
+  })
+  it('la percentuale dei sì', () => {
+    expect(valoreScritto({ media: 62.5, es: null }, 'percentuale')).toBe('62,5%')
+    expect(valoreScritto({ media: 0.333, es: null }, 'percentuale')).toBe('0,333%')
+  })
+})
+
 describe('riassuntoGrafico', () => {
+  it('l\'ultimo valore di un parametro piccolo non si arrotonda a zero', () => {
+    const imp = impagina([serieT('S1', 0, [punto('2026-10-01', 0.0123), punto('2026-10-08', 0.0456)])], [], OPZ)
+    expect(riassuntoGrafico(imp, 'gs')).toContain('S1 0,0456')
+  })
   it('dice titolo, serie, periodo e ultimo valore', () => {
     const imp = impagina([
       serieT('S1', 0, [punto('2026-10-01', 40), punto('2026-10-11', 43.5)]),

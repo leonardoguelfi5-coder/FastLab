@@ -74,11 +74,13 @@ function EsportaCaricato({ espId, config }: { espId: string; config: ConfigEsper
   // «Ultime N settimane» di un esperimento concluso finiscono all'ultima misura: finché la data non arriva non si conta.
   const attesaData = config.esperimento.stato === 'concluso' && ultimaData.data === undefined
 
+  // Le note servono solo a Diario e Grafici (i segni sulle date): senza questi due fogli un errore delle note non blocca il conto.
+  const serveNote = sceltaDifferita !== null && (sceltaDifferita.come.diario || sceltaDifferita.come.grafici)
   const calcolo = useMemo(() => {
-    if (!sceltaDifferita || !misure.dati || !note.data || attesaData) return null
+    if (!sceltaDifferita || !misure.dati || (serveNote && !note.data) || attesaData) return null
     try {
       const cartella = costruisciCartella({
-        config, misure: idsDaLeggere.flatMap(id => misure.dati?.get(id) ?? []), note: senzaNoteInEliminazione(note.data),
+        config, misure: idsDaLeggere.flatMap(id => misure.dati?.get(id) ?? []), note: senzaNoteInEliminazione(note.data ?? []),
         scelta: sceltaDifferita, oggi,
         // il riepilogo conta soltanto: l'istante vero dell'export lo scrive `scaricaExcel` al momento del download
         adesso: new Date(`${oggi}T12:00:00`).toISOString(),
@@ -88,13 +90,13 @@ function EsportaCaricato({ espId, config }: { espId: string; config: ConfigEsper
     } catch {
       return { errore: true as const }
     }
-  }, [config, sceltaDifferita, idsDaLeggere, misure.dati, note.data, attesaData, oggi, ultimaData.data])
+  }, [config, sceltaDifferita, idsDaLeggere, misure.dati, note.data, serveNote, attesaData, oggi, ultimaData.data])
 
   let stato: StatoRiepilogo
   if (scelta === null) stato = { tipo: 'incompleto' }
   else if (scelta !== sceltaDifferita) stato = { tipo: 'conto' }
   else if (misure.isError) stato = { tipo: 'errore', errore: misure.error, onRiprova: () => void misure.refetch() }
-  else if (note.isError && !note.data) stato = { tipo: 'errore', errore: note.error, onRiprova: () => void note.refetch() }
+  else if (serveNote && note.isError && !note.data) stato = { tipo: 'errore', errore: note.error, onRiprova: () => void note.refetch() }
   else if (ultimaData.isError && attesaData) stato = { tipo: 'errore', errore: ultimaData.error, onRiprova: () => void ultimaData.refetch() }
   else if (calcolo === null) stato = { tipo: 'conto' }
   else if ('errore' in calcolo) stato = { tipo: 'errore', errore: NON_PREPARATO, onRiprova: () => window.location.reload() }

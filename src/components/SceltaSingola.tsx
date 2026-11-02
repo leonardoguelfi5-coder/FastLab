@@ -8,11 +8,17 @@ interface SceltaSingolaProps<T extends string> {
   nome: string
   opzioni: { valore: T; testo: ReactNode }[]
   scelto: T | null
+  /** La scelta cambia: con un tocco, con Invio o Spazio e anche con le frecce (come in un `radiogroup`). */
   onScegli: (valore: T) => void
+  /**
+   * La scelta è confermata: solo con un tocco, Invio o Spazio, mai con le frecce. Chi tiene la scelta in un pannello che
+   * si chiude dopo la scelta lo chiude qui: con le frecce si scorre tra le voci senza perdere il fuoco.
+   */
+  onConferma?: (valore: T) => void
 }
 
 /** Una scelta tra poche: righe da quaderno, `radiogroup` con la sola scelta attiva in tabulazione e le frecce che spostano. */
-export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegli }: SceltaSingolaProps<T>) {
+export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegli, onConferma }: SceltaSingolaProps<T>) {
   const gruppo = useRef<HTMLDivElement>(null)
 
   function frecce(evento: KeyboardEvent<HTMLDivElement>) {
@@ -37,7 +43,7 @@ export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegl
             data-valore={o.valore}
             aria-checked={attiva}
             tabIndex={attiva || (scelto === null && i === 0) ? 0 : -1}
-            onClick={() => onScegli(o.valore)}
+            onClick={() => { onScegli(o.valore); onConferma?.(o.valore) }}
             className={cn(RIGA_SCELTA, attiva && 'font-semibold')}
           >
             <Check aria-hidden strokeWidth={2.5} className={cn('size-4 shrink-0 text-inchiostro', !attiva && 'invisible')} />

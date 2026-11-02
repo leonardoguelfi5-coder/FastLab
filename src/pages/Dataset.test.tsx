@@ -276,6 +276,36 @@ describe('Dataset: pagina e filtri dalla URL', () => {
   })
 })
 
+describe('Dataset: scelta singola con le frecce', () => {
+  it('le frecce spostano la scelta senza chiudere il pannello e il fuoco segue; un tocco la conferma e chiude', async () => {
+    const { utente } = apri()
+    await grafico()
+    await utente.click(chip('Crescita'))
+    const radio = within(pannello('Strumento')).getByRole('radio', { name: 'Crescita' })
+    radio.focus()
+    await utente.keyboard('{ArrowDown}')
+    // il pannello c'è ancora, lo strumento è già cambiato nella URL e il fuoco è sulla voce nuova
+    expect(pannello('Strumento')).toBeInTheDocument()
+    expect(parametriUrl().get('s')).toBe(strumento('Fenologici').id)
+    const nuova = within(pannello('Strumento')).getByRole('radio', { name: 'Fenologici' })
+    expect(nuova).toHaveAttribute('aria-checked', 'true')
+    expect(nuova).toHaveFocus()
+    await utente.keyboard('{ArrowUp}')
+    expect(within(pannello('Strumento')).getByRole('radio', { name: 'Crescita' })).toHaveFocus()
+    await utente.click(within(pannello('Strumento')).getByRole('radio', { name: 'Crescita' }))
+    expect(screen.queryByRole('group', { name: 'Strumento' })).not.toBeInTheDocument()
+  })
+
+  it('Invio sulla voce a fuoco la conferma e chiude il pannello', async () => {
+    const { utente } = apri()
+    await grafico()
+    await utente.click(chip('Crescita'))
+    within(pannello('Strumento')).getByRole('radio', { name: 'Crescita' }).focus()
+    await utente.keyboard('{Enter}')
+    expect(screen.queryByRole('group', { name: 'Strumento' })).not.toBeInTheDocument()
+  })
+})
+
 describe('Dataset: i pannelli dei filtri', () => {
   it('un pannello si apre e si chiude, uno alla volta, con aria-expanded', async () => {
     const { utente } = apri()

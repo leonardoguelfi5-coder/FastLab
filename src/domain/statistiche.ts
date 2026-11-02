@@ -177,7 +177,8 @@ export interface UltimoValorePianta {
   tendenza: Tendenza | null
 }
 
-const ordinati = <T extends { ordine: number }>(xs: T[]): T[] => [...xs].sort((a, b) => a.ordine - b.ordine)
+/** Gli elementi nell'ordine della configurazione (`ordine`), senza toccare l'elenco originale. Una sola definizione per il dominio. */
+export const ordinati = <T extends { ordine: number }>(xs: T[]): T[] => [...xs].sort((a, b) => a.ordine - b.ordine)
 
 /**
  * Per ogni strumento attivo e ogni suo parametro attivo numero o lista (non testo né sì/no), l'ultimo valore giornaliero

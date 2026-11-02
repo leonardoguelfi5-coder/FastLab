@@ -249,6 +249,18 @@ describe('seriePiante', () => {
     expect(r.serie.filter(s => s.tipo === 'pianta').map(s => s.tipo === 'pianta' && s.pianta.id)).toEqual(molte.slice(0, 8).map(p => p.id))
     expect(r.oltre).toBe(3)
   })
+  it('sì/no: ogni pianta è 100 o 0, senza errore standard, e il riferimento è la percentuale di sì del trattamento', () => {
+    const sino = (p: Pianta, v: boolean | null, ora = '09:00') => mis(p, sFeno, D, { [vigore.id]: v }, ora)
+    // p1 sì, p2 no, p3 non scelto (esclusa dal riferimento); p12 no (alle 15, dopo il sì delle 9), p13 non scelto
+    const misure = [sino(p1, true), sino(p2, false), sino(p3, null), sino(p12, true, '09:00'), sino(p12, false, '15:00'), sino(p13, null)]
+    const r = seriePiante(config, vigore, misure, [p1, p12], TUTTO)
+    expect(r.serie.map(s => s.tipo === 'pianta' ? s.pianta.id : s.trattamento.id)).toEqual([p1.id, p12.id, tCN.id, tCS.id])
+    expect(r.serie[0].punti).toEqual([{ data: D, media: 100, es: null, n: 1 }])
+    expect(r.serie[1].punti).toEqual([{ data: D, media: 0, es: null, n: 1 }])
+    // riferimenti in percentuale: Controllo + No = 1 sì su 2 piante con un valore; Controllo + Sì = 0 su 1
+    expect(r.serie[2].riferimento && r.serie[2].punti).toEqual([{ data: D, media: 50, es: null, n: 2 }])
+    expect(r.serie[3].punti).toEqual([{ data: D, media: 0, es: null, n: 1 }])
+  })
   it('testo: nessuna serie', () => expect(seriePiante(config, note, [], [p1], TUTTO)).toEqual({ serie: [], oltre: 0 }))
 })
 

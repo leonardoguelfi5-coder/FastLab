@@ -3,7 +3,6 @@ import { SceltaSingola } from '@/components/SceltaSingola'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { MASSIMO_PEZZI_CERCA, limitaCerca } from '@/domain/dataset'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { Chip } from './Chip'
 import type { ModoPiante } from './scelteUi'
@@ -71,9 +70,6 @@ export function SceltaPiante({ config, modo, trattamenti, cercato, trovate, nonT
             placeholder="es. 35, 36" value={cercato} onChange={e => onCercato(e.target.value)}
           />
           <p className="text-label text-grafite-tenue">Le etichette separate da virgola. Il numero esatto: 3 non trova la 13.</p>
-          {limitaCerca(cercato) !== cercato && (
-            <p role="status" className="text-base text-grafite-tenue">{`Si cercano solo i primi ${MASSIMO_PEZZI_CERCA} pezzi.`}</p>
-          )}
           {trovate.length > 0 && (
             <p className="text-base text-grafite-tenue">
               {trovate.length === 1 ? 'Trovata: ' : 'Trovate: '}

@@ -2,12 +2,14 @@ import { useRef, useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { listaExportSalvati, salvaExportSalvato } from '@/api/exportSalvati'
 import { chiavi, useExportSalvati } from '@/api/query'
+import { chiaveEliminazioneExport } from './eliminaExportConAnnulla'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { SceltaExport } from '@/domain/export/scelte'
 import type { ExportSalvato } from '@/domain/tipi'
+import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { eNomeExportGiaUsato, messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -57,8 +59,24 @@ export function SalvaScelta({ espId, scelta, onSalvato }: SalvaSceltaProps) {
     setConflitto(null)
   }
 
+  /**
+   * Il nome è di un export già salvato. Se quell'export si sta eliminando (i 5 secondi di «Annulla») non si offre di
+   * sostituirlo: l'eliminazione lo toglierebbe subito dopo il salvataggio. Si dice di annullare o aspettare.
+   */
+  function nomeOccupato(esistente: ExportSalvato) {
+    if (inEliminazione(chiaveEliminazioneExport(esistente.id))) {
+      setErrore(`«${esistente.nome}» si sta eliminando: annulla l'eliminazione o riprova tra qualche secondo.`)
+    } else {
+      setConflitto(esistente)
+    }
+  }
+
   async function salva(idDaUsare: string, nomeDaUsare: string) {
-    if (scelta === null || occupato.current) return
+    if (occupato.current) return
+    if (scelta === null) {
+      setErrore('Completa le scelte prima di salvarle.')
+      return
+    }
     occupato.current = true
     setInCorso(true)
     setErrore(null)
@@ -74,7 +92,7 @@ export function SalvaScelta({ espId, scelta, onSalvato }: SalvaSceltaProps) {
         try {
           const elenco = await queryClient.fetchQuery({ queryKey: chiavi.exportSalvati(espId), queryFn: () => listaExportSalvati(espId), staleTime: 0 })
           const esistente = elenco.find(x => chiaveNome(x.nome) === chiaveNome(nomeDaUsare))
-          if (esistente) setConflitto(esistente)
+          if (esistente) nomeOccupato(esistente)
           else setErrore(messaggioErrore(e))
         } catch {
           setErrore(messaggioErrore(e))
@@ -97,7 +115,7 @@ export function SalvaScelta({ espId, scelta, onSalvato }: SalvaSceltaProps) {
     }
     const esistente = salvati.data?.find(x => chiaveNome(x.nome) === chiaveNome(pulito))
     if (esistente) {
-      setConflitto(esistente)
+      nomeOccupato(esistente)
       return
     }
     void salva(id, pulito)

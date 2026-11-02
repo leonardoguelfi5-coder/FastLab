@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import { keepPreviousData, QueryClient, queryOptions, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { listaCatalogo } from './catalogo'
 import { parametriConDati, pianteConDati, pianteNonEliminabili, strumentiConDati } from './configurazione'
@@ -200,23 +201,29 @@ export interface MisureStrumenti {
  * errore, `refetch` le rilegge tutte. Stesse chiavi di `useMisureStrumento`, quindi stessa cache.
  */
 export function useMisureStrumenti(espId: string | undefined, strumentoIds: readonly string[]): MisureStrumenti {
+  // Gli ids contano per il loro contenuto, non per l'array (chi chiama ne passa uno nuovo a ogni disegno): così `combine`
+  // resta lo stesso e React Query ridà la stessa `Map` finché le letture non cambiano. Chi la usa in un `useMemo`
+  // (Esporta ricalcola la cartella, mezzo secondo con migliaia di misure) non la rifà a ogni disegno.
+  const chiave = strumentoIds.join('\u0000')
+  const ids = useMemo(() => (chiave === '' ? [] : chiave.split('\u0000')), [chiave])
+  const combine = useCallback((risultati: UseQueryResult<Misura[]>[]): MisureStrumenti => {
+    const errore = risultati.find(r => r.isError)
+    const pronti = !!espId && risultati.every(r => r.data !== undefined)
+    return {
+      dati: pronti ? new Map(ids.map((id, i) => [id, risultati[i].data as Misura[]])) : undefined,
+      isPending: !pronti,
+      isError: errore !== undefined,
+      error: errore?.error,
+      refetch: () => Promise.all(risultati.map(r => r.refetch())),
+    }
+  }, [espId, ids])
   return useQueries({
-    queries: strumentoIds.map(id => ({
+    queries: ids.map(id => ({
       queryKey: chiavi.misureStrumento(espId ?? '', id),
       queryFn: () => misureStrumento(espId as string, id),
       enabled: !!espId,
     })),
-    combine: (risultati: UseQueryResult<Misura[]>[]): MisureStrumenti => {
-      const errore = risultati.find(r => r.isError)
-      const pronti = !!espId && risultati.every(r => r.data !== undefined)
-      return {
-        dati: pronti ? new Map(strumentoIds.map((id, i) => [id, risultati[i].data as Misura[]])) : undefined,
-        isPending: !pronti,
-        isError: errore !== undefined,
-        error: errore?.error,
-        refetch: () => Promise.all(risultati.map(r => r.refetch())),
-      }
-    },
+    combine,
   })
 }
 

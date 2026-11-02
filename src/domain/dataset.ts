@@ -1,7 +1,7 @@
 import { eDataValida, spostaGiorni } from '@/lib/date'
 import { eUuid } from '@/lib/percorsi'
 import { trovaPianta } from './piante'
-import { mediaEsN, ultimoTestoDelGiorno, valoriGiornalieri, valoriGiornalieriSiNo } from './statistiche'
+import { mediaEsN, ordinati, ultimoTestoDelGiorno, valoriGiornalieri, valoriGiornalieriSiNo } from './statistiche'
 import type { ConfigEsperimento, Esperimento, Misura, Nota, Parametro, Pianta, Strumento, Trattamento } from './tipi'
 
 /**
@@ -24,8 +24,6 @@ export const SETTIMANE_DEL_DATASET = [2, 4, 8] as const
 export const POSTI_COLORE = 8
 /** Quante piante cercate si disegnano al più: oltre, il grafico non si legge più. */
 export const MASSIMO_PIANTE = 8
-
-const ordinati = <T extends { ordine: number }>(xs: T[]): T[] => [...xs].sort((a, b) => a.ordine - b.ordine)
 
 /**
  * Il giorno a cui finiscono le "ultime N settimane": oggi per un esperimento in corso; per uno concluso l'ultima data
