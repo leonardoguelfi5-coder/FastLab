@@ -41,3 +41,8 @@ Ruling: accettate le deviazioni D4: `svgInPng` dà null e non lancia (il toast l
 Ruling (carry to collaudo): aspetto dei segni delle note ed etichetta `Pianta 12 (S1)` da verificare sul telefono; disegno reale e PNG su Safari non provati qui - cost if wrong: small
 Task D4: complete (commits 528bd97..e8c5092), revisione rimandata alla finale (geometria testata, mutazioni prese)
 Task D5: dispatched implementer (sonnet), BASE e8c5092
+Task D5: implementatore (sonnet) DONE_WITH_CONCERNS 867a76d - 2305 Vitest (44 nuovi nella pagina), 3 mutazioni prese; `src/pages/Dataset.tsx` (filtri nella URL, grafico prima, "Mostra i valori", "Scarica questa vista" come link ghost), `BarraFiltri` (chip sticky da 44 px con pannelli), `TabellaValori`, `limitaCerca` (200 pezzi, 2000 caratteri) in `filtriDaRicerca`; tutti gli stati (caricamento, errori con Riprova, nessuno strumento, nessuna misura, nessun dato con "Azzera i filtri")
+Ruling: accettate le deviazioni D5: oltre 8 piante cercate il grafico e la tabella mostrano le prime 8 e lo dicono; `useMisureStrumento` singolare (niente Map nuova a ogni render); `ultimaData` attesa solo per un esperimento concluso; "Scarica questa vista" non nella BarraAzioni (il piano la vuole ghost) - cost if wrong: small
+Ruling (carry to collaudo): aspetto della barra sticky, dei pannelli e del selettore di data da verificare sul telefono - cost if wrong: small
+Task D5: complete (commits 45ca696..867a76d), revisione rimandata alla finale
+Task D6: dispatched implementer (opus), BASE 867a76d
