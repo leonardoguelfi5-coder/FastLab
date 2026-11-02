@@ -16,3 +16,5 @@ Ruling: riepilogo e file dallo stesso modello puro (`costruisciCartella`); al do
 Ruling: se il browser non disegna le immagini il file parte senza, e lo dicono il foglio `Grafici` e il toast - cost if wrong: nessuno.
 
 ## Avanzamento
+Ruling: dubbi del piano decisi dal controller (l'utente ha detto "Ok vai"): (1) 8 colori nei grafici, sì; (2) sì/no nell'Excel come booleani (VERO/FALSO, utili alla statistica); (3) "ultime N settimane" da oggi per un esperimento in corso, dall'ultima data con misure per un esperimento concluso (altrimenti vuoto); (4) la ricerca delle piante vince su trattamenti e fattore; (5) foglio Medie in formato largo; (6) lo .zip delle foto resta solo foto (l'Excel si scarica da Esporta) - cost if wrong: small, da confermare con l'utente al collaudo
+Task D1: dispatched implementer (opus), BASE 25066f1
