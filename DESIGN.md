@@ -164,6 +164,28 @@ Neutri caldi da carta e un solo inchiostro freddo: il contrasto tra carta e inch
 - **Attenzione** (oklch(50% 0.11 68)) con **attenzione velato** (oklch(95.5% 0.04 80)): avvisi non bloccanti (valore fuori intervallo, "non oggi").
 - **Errore** (oklch(49% 0.16 28)) con **errore velato** (oklch(95.5% 0.025 28)): salvataggio fallito, campo non valido, azioni distruttive.
 
+### Colori dei dati
+Dentro i grafici (e nella loro legenda, e nell'immagine dell'Excel) otto trattamenti non si leggono con un solo inchiostro: esiste una **tavolozza dei dati** di otto colori sobri, in ordine fisso. Vive solo lì: nell'interfaccia il colore resta carta, grafite e un solo inchiostro. Validata con lo script della skill dataviz (tema chiaro, carta come superficie): fascia di luminosità, croma minima, separazione fra colori vicini anche per i daltonici, contrasto di almeno 3:1. La definizione è `COLORI_SERIE` in `src/domain/grafico.ts`.
+
+| Posto | Colore | Esadecimale | Marcatore |
+|---|---|---|---|
+| 1 | petrolio | `#0e8ca0` | cerchio |
+| 2 | arancio | `#d9622b` | quadrato |
+| 3 | viola | `#6a4fc8` | triangolo |
+| 4 | ocra | `#b8860b` | rombo |
+| 5 | magenta | `#c2457e` | triangolo in giù |
+| 6 | azzurro | `#2a8fc4` | croce |
+| 7 | rosso | `#d03b3b` | x |
+| 8 | lilla | `#9a6fd8` | pentagono |
+
+- **Il colore segue il trattamento, non il filtro.** Il posto è l'indice del trattamento nell'ordine della configurazione: togliendo un trattamento dal filtro gli altri non cambiano colore.
+- **Dal nono trattamento in poi** niente colore generato: linea grafite tenue tratteggiata, con il suo marcatore e la sua etichetta.
+- **Mai solo colore.** Ogni serie ha un marcatore diverso (la tabella) e compare in legenda con il suo nome, anche una serie sola. Le piante cercate hanno il colore del loro trattamento e marcatori diversi fra loro.
+- **Le serie di riferimento** (la media del trattamento accanto a una pianta cercata) sono sottili, tratteggiate e al 40%.
+- **Testi in grafite.** Tacche, etichette e legenda restano in grafite e grafite tenue, mai nel colore della serie.
+- **Niente verde, niente blu dell'inchiostro, niente colori di stato.** Il verde è solo "salvato", il blu notte è selezione e focus, errore e attenzione non entrano nei grafici.
+- **Esadecimali nel disegno.** Un SVG trasformato in immagine non legge le variabili CSS: i colori del grafico (compresi carta, grafite e righe) sono scritti in esadecimale e commentati con il token d'origine.
+
 ### Named Rules
 **La regola dell'unico inchiostro.** Il blu notte copre al massimo il 10% di una schermata: pulsante principale, selezione, focus. Se due elementi blu competono, uno dei due è sbagliato.
 
@@ -250,11 +272,13 @@ Decisi e grandi, pensati per il pollice.
 - **Do** scrivere numeri delle piante, valori, date, ore e codici in Geist Mono con cifre tabellari.
 - **Do** costruire le liste come righe di quaderno separate da linee di 1px, senza card.
 - **Do** dare a ogni stato anche un testo o un'icona, non solo un colore.
+- **Do** colorare le serie dei grafici solo con la tavolozza dei dati, seguendo il posto del trattamento, e dare a ognuna marcatore e voce di legenda.
 - **Do** mettere l'azione principale in una barra in basso, alta 52px, raggiungibile col pollice.
 - **Do** limitare il movimento a 150–200 ms con easing `cubic-bezier(0.22, 1, 0.36, 1)` e rispettare `prefers-reduced-motion`.
 
 ### Don't:
 - **Don't** fare un'app "startup" colorata: niente gradienti, illustrazioni, animazioni ovunque, emoji a profusione (le emoji sono ammesse solo come icona di uno strumento scelta dall'utente e come icone delle sezioni nella home dell'esperimento).
+- **Don't** usare i colori dei dati fuori dai grafici, né il verde o il blu dell'inchiostro dentro i grafici.
 - **Don't** fare l'app "verde ecologica" cliché: niente foglioline, niente verde acceso dappertutto, niente aria da sito di giardinaggio. Il verde è solo "salvato".
 - **Don't** somigliare a un gestionale aziendale: niente tabelle grigie, menu infiniti, barre di strumenti da software anni 2000.
 - **Don't** somigliare a un foglio Excel: niente griglie fitte di celle tutte uguali, niente bersagli sotto i 44px.

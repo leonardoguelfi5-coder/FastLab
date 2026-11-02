@@ -49,6 +49,7 @@
       { "name": "La regola dell'unico inchiostro", "body": "Il blu notte copre al massimo il 10% di una schermata: pulsante principale, selezione, focus.", "section": "colors" },
       { "name": "La regola del verde negato", "body": "Il verde esiste solo come esito salvato.", "section": "colors" },
       { "name": "La regola del non solo colore", "body": "Ogni stato comunicato dal colore ha anche testo, icona o forma.", "section": "colors" },
+      { "name": "La regola dei colori dei dati", "body": "Otto colori solo dentro i grafici, nell'ordine del trattamento nella configurazione (dal nono grafite tratteggiata): sempre con marcatore e legenda, mai verde né blu dell'inchiostro.", "section": "colors" },
       { "name": "La regola del dato in colonna", "body": "Ogni numero confrontabile usa Geist Mono con cifre tabellari.", "section": "typography" },
       { "name": "La regola del grande unico", "body": "In una schermata di campo c'è un solo testo grande: il numero della pianta.", "section": "typography" },
       { "name": "La regola della pagina piatta", "body": "Niente ombre su card, righe, pulsanti o campi.", "section": "elevation" }
