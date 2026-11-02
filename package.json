@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:db": "supabase test db"
+    "test:db": "supabase test db",
+    "test:bundle": "node scripts/controlla-bundle.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -19,6 +20,7 @@
     "@tanstack/react-query": "^5.105.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "exceljs": "4.4.0",
     "fflate": "^0.8.3",
     "lucide-react": "^1.14.0",
     "react": "^19.2.6",
