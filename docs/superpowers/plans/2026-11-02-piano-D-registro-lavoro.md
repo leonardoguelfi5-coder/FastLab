@@ -46,3 +46,9 @@ Ruling: accettate le deviazioni D5: oltre 8 piante cercate il grafico e la tabel
 Ruling (carry to collaudo): aspetto della barra sticky, dei pannelli e del selettore di data da verificare sul telefono - cost if wrong: small
 Task D5: complete (commits 45ca696..867a76d), revisione rimandata alla finale
 Task D6: dispatched implementer (opus), BASE 867a76d
+Task D6: implementatore (opus) DONE d1f635e - 2442 Vitest (137 nuovi), 11 mutazioni (una sopravvissuta, chiusa con un test); `src/domain/export/` (`scelte.ts` con `leggiSceltaExport` che non lancia e `sceltaDaRicerca` = `filtriDaRicerca` + `sceltaDaFiltri`; `scelte.casi.ts` che legge con `?raw` la tabella `casi` del pgTAP; `fogli.ts` con `costruisciCartella`; `riepilogo.ts` con `nomeFileExcel`); 18 000 misure in circa 0,4-0,8 s
+Ruling: accettate le deviazioni D6: testo sempre come stringa nel modello (lo scrittore non scrive mai formule; niente apice, che in .xlsx resterebbe visibile); caratteri illegali in .xlsx tolti e testi tagliati a 32 000; scelta non valida → `costruisciCartella` lancia; parametro omonimo di una colonna fissa → `Data (2)`; colonne di Dati fisse per gli strumenti scelti - cost if wrong: small
+Ruling (carry to fix finale): il test di prestazione del D6 (< 1000 ms) ha poco margine: alzarlo (es. 3000 ms) per non renderlo instabile - cost if wrong: un test instabile
+Ruling: D8 prima del D7 (la pagina collega l'orchestratore già pronto); la riga "la pagina mostra le fasi" passa al D7 - cost if wrong: none
+Task D6: complete (commits 4b59563..d1f635e), revisione rimandata alla finale
+Task D8: dispatched implementer (opus), BASE d1f635e
