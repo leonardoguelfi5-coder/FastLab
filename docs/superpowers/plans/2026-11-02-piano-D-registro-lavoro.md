@@ -1,0 +1,18 @@
+# Registro del Piano D: Dataset ed Esporta Excel
+
+Piano: `docs/superpowers/plans/2026-11-02-fastlab-v3-piano-D-dataset-esporta.md` (scritto dal controller dalla spec §5.5, §5.6, §6.1, §6.2, §6.3, §7 e dalla spec precedente §5.7 e §5.8, su richiesta dell'utente "Continua il piano B e quando finisci vai in ordine con gli altri piani").
+Branch: `claude/app-review-improvements-c26294`. Metodo come i Piani A, B e C (un implementatore alla volta, revisori su copia `git archive`, commit per percorsi, TDD). Opus per i Task D1 (database), D2 (statistica), D6 (fogli dell'export), D8 (file .xlsx) e per la revisione finale; Sonnet per il resto.
+
+## Decisioni del controller (nel piano, da verificare con l'utente)
+Ruling: grafici in SVG scritto a mano (geometria pura in `src/domain/grafico.ts`, un solo `GraficoSvg` per l'app e per l'immagine dell'Excel, PNG con SVG → canvas 2×); scartati Recharts (peso, PNG dal DOM) e uPlot (canvas con stile suo, plugin per barre e note) - cost if wrong: riscrivere il disegno con una libreria, la geometria resta.
+Ruling: tavolozza dei dati di 8 colori solo dentro i grafici (petrolio, arancio, viola, ocra, magenta, azzurro, rosso, lilla), senza verde né blu dell'inchiostro, validata con `validate_palette.js`; colore = posto del trattamento nella configurazione, dal nono grafite tratteggiata; sempre marcatore e legenda - cost if wrong: una sezione di DESIGN.md e una costante.
+Ruling: `exceljs` 4.4.0 con import dinamico in un chunk separato, importato solo da `src/lib/excel/scriviXlsx.ts`; `xlsx` 0.18.5 rimossa - cost if wrong: sostituire un solo modulo.
+Ruling: misure lette per strumento, a pagine keyset per id (`id > ultimo`, 1000 righe, fine solo alla pagina vuota), periodo e piante filtrati sul client; nessuna RPC né vista, solo l'indice `misure (esperimento_id, strumento_id, id)` - cost if wrong: una RPC in più se i dati crescono molto.
+Ruling: export salvati nella tabella nuova `export_salvati` (migration 0014), RLS `is_membro and creato_da = auth.uid()` per tutte le operazioni, scelte in un jsonb versione 1 validato da `scelte_export_valide` e da `leggiSceltaExport` con gli stessi casi; "Tutto l'esperimento" è una costante del client; periodo relativo salvato come relativo - cost if wrong: small.
+Ruling: filtri del Dataset nella URL (`s`, `p`, `t`, `f`, `per`, `cerca`); ricerca delle piante a corrispondenza esatta per pezzo (`3` non trova `13`) che vince su trattamenti e fattore; "ultime N settimane" da oggi, estremi compresi - cost if wrong: copy e una regola del filtro.
+Ruling: liste come numero di elementi, sì/no come percentuale di sì (ultima misura del giorno per pianta, senza barre d'errore), testo solo in tabella ed export; più letture = media delle letture non nulle (`valoreNumerico`), poi media delle misure del giorno - cost if wrong: small.
+Ruling: fogli `Dati`, `Medie` (formato largo), `Misure`, uno per lista, `Grafici`, `Diario`, `Info`; date e ore vere di Excel, numeri come numeri, sì/no booleani, `N_<parametro>` solo dove un giorno ha più misure, pianta come testo; file `FastLab_<esperimento>_<AAAA-MM-GG>.xlsx` - cost if wrong: cambia solo il modello dei fogli (Task D6), non lo scrittore.
+Ruling: riepilogo e file dallo stesso modello puro (`costruisciCartella`); al download i dati si rileggono freschi - cost if wrong: nessuno.
+Ruling: se il browser non disegna le immagini il file parte senza, e lo dicono il foglio `Grafici` e il toast - cost if wrong: nessuno.
+
+## Avanzamento
