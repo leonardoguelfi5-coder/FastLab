@@ -51,3 +51,26 @@ export function daQuanto(data: string, oggi: string): string {
   if (giorni === 1) return 'ieri'
   return `${giorni} giorni fa`
 }
+
+/**
+ * La data AAAA-MM-GG spostata di `giorni` giorni di calendario (negativo per tornare indietro). Si lavora in UTC sulla
+ * sola data, quindi l'ora legale non sposta niente. `setUTCFullYear` e non `Date.UTC`, che porterebbe gli anni sotto
+ * il 100 al Novecento.
+ */
+export function spostaGiorni(data: string, giorni: number): string {
+  const [anno, mese, giorno] = data.slice(0, 10).split('-').map(Number)
+  const d = new Date(0)
+  d.setUTCFullYear(anno, mese - 1, giorno + giorni)
+  return `${String(d.getUTCFullYear()).padStart(4, '0')}-${due(d.getUTCMonth() + 1)}-${due(d.getUTCDate())}`
+}
+
+const FORMA_DATA = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * Vero se il testo è una data vera AAAA-MM-GG, dall'anno 1 al 9999 (come accetta il database): `2026-02-30` no.
+ * Serve per le date che arrivano da fuori, come la URL.
+ */
+export function eDataValida(s: string): boolean {
+  if (!FORMA_DATA.test(s) || s.startsWith('0000')) return false
+  return spostaGiorni(s, 0) === s
+}

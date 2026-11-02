@@ -64,6 +64,59 @@ export function valoriGiornalieri(parametro: Parametro, misure: Misura[]): Map<s
 }
 
 /**
+ * Media, errore standard e numero di valori tra le piante (un valore per pianta, già media del giorno). L'errore
+ * standard è la deviazione standard campionaria (n-1) divisa per la radice di n; con un solo valore non c'è (`null`),
+ * con valori uguali è 0. Senza valori: `null`.
+ */
+export function mediaEsN(xs: number[]): { media: number; es: number | null; n: number } | null {
+  if (xs.length === 0) return null
+  const m = media(xs)
+  return { media: m, es: xs.length < 2 ? null : deviazioneStandard(xs, m) / Math.sqrt(xs.length), n: xs.length }
+}
+
+/**
+ * Per ogni pianta e data, il valore dell'ultima misura del giorno per `ora` che ne ha uno (`estrai` dà `undefined`
+ * per le misure che non contano). A parità di ora vince l'ultima ricevuta, come in `daSistemare`: una misura fatta
+ * dopo corregge quella di prima, mentre una media di sì/no o di testi non avrebbe senso.
+ */
+function ultimoDelGiorno<T>(misure: Misura[], estrai: (m: Misura) => T | undefined): Map<string, Map<string, T>> {
+  const migliori = new Map<string, Map<string, { ora: string; valore: T }>>()
+  for (const m of misure) {
+    const valore = estrai(m)
+    if (valore === undefined) continue
+    const perData = migliori.get(m.pianta_id) ?? new Map<string, { ora: string; valore: T }>()
+    const finora = perData.get(m.data_rilievo)
+    if (!finora || m.ora >= finora.ora) perData.set(m.data_rilievo, { ora: m.ora, valore })
+    migliori.set(m.pianta_id, perData)
+  }
+  return new Map([...migliori].map(([pianta, perData]) => [pianta, new Map([...perData].map(([data, x]) => [data, x.valore]))]))
+}
+
+/**
+ * Il valore giornaliero di un sì/no per pianta: pianta → data → sì o no, dall'ultima misura del giorno per ora. Un
+ * sì/no non scelto non conta (vale l'ultima misura che ha scelto). Un parametro che non è sì/no non dà niente.
+ */
+export function valoriGiornalieriSiNo(parametro: Parametro, misure: Misura[]): Map<string, Map<string, boolean>> {
+  if (parametro.tipo !== 'sino') return new Map()
+  return ultimoDelGiorno(misure, m => {
+    const v = m.valori[parametro.id]
+    return typeof v === 'boolean' ? v : undefined
+  })
+}
+
+/**
+ * Il testo del giorno per pianta: pianta → data → testo, dall'ultima misura del giorno per ora con un testo non bianco.
+ * Un parametro che non è testo non dà niente.
+ */
+export function ultimoTestoDelGiorno(parametro: Parametro, misure: Misura[]): Map<string, Map<string, string>> {
+  if (parametro.tipo !== 'testo') return new Map()
+  return ultimoDelGiorno(misure, m => {
+    const v = m.valori[parametro.id]
+    return eVuoto(parametro, v) ? undefined : (v as string)
+  })
+}
+
+/**
  * "Molto fuori dal gruppo": il valore di una pianta contro le ALTRE piante dello stesso trattamento nella stessa data
  * (leave-one-out). Fuori se lo scarto dalla loro media supera 5 deviazioni standard E il 20% della media, con
  * deviazione standard > 0. La soglia è prudente perché un falso allarme costa più di un errore non segnalato: con

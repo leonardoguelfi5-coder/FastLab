@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  avvisiMancanti, confrontoTrattamento, daSistemare, fuoriDalGruppo, mediaPerTrattamento, ultimiValoriPianta,
-  valoreNumerico, valoriGiornalieri,
+  avvisiMancanti, confrontoTrattamento, daSistemare, fuoriDalGruppo, mediaEsN, mediaPerTrattamento, ultimiValoriPianta,
+  ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo,
 } from './statistiche'
 import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, Trattamento, ValoriMisura } from './tipi'
 import { configDiEsempio, parametro } from './test-helpers'
@@ -366,3 +366,66 @@ describe('daSistemare', () => {
     expect(r.map(x => [x.parametroId, x.piantaId])).toEqual([[spad.id, 'p6'], [ciras.id, 'p6']])
   })
 })
+
+describe('mediaEsN', () => {
+  it('senza valori: null', () => expect(mediaEsN([])).toBeNull())
+  it('un valore solo: la media è lui, l\'errore standard non c\'è', () => expect(mediaEsN([40])).toEqual({ media: 40, es: null, n: 1 }))
+  it('due valori: ES = ds campionaria / radice di n, calcolato a mano', () => {
+    // 40 e 44: media 42, ds (n-1) = radice((4 + 4) / 1) = 2,8284; ES = 2,8284 / radice(2) = 2
+    const r = mediaEsN([40, 44])
+    expect(r?.media).toBe(42)
+    expect(r?.es).toBeCloseTo(2, 12)
+    expect(r?.n).toBe(2)
+  })
+  it('quattro valori: ES con n-1', () => {
+    // 10, 10, 12, 12: media 11, ds = 1,1547, ES = 1,1547 / 2 = 0,57735
+    const r = mediaEsN([10, 10, 12, 12])
+    expect(r?.media).toBe(11)
+    expect(r?.es).toBeCloseTo(0.57735, 5)
+    expect(r?.n).toBe(4)
+  })
+  it('valori uguali: ES 0, non null', () => expect(mediaEsN([5, 5, 5])?.es).toBe(0))
+})
+
+describe('valoriGiornalieriSiNo', () => {
+  const sino = (pianta: string, data: string, v: boolean | null, ora: string) => mis(pianta, sFeno, data, { [vigore.id]: v }, ora)
+  it('l\'ultima misura del giorno per ora, non l\'ultima ricevuta', () => {
+    const r = valoriGiornalieriSiNo(vigore, [sino('p1', '2026-10-28', true, '15:00'), sino('p1', '2026-10-28', false, '09:00')])
+    expect(r.get('p1')?.get('2026-10-28')).toBe(true)
+  })
+  it('a parità di ora vale l\'ultima ricevuta', () => {
+    const r = valoriGiornalieriSiNo(vigore, [sino('p1', '2026-10-28', true, '09:00'), sino('p1', '2026-10-28', false, '09:00')])
+    expect(r.get('p1')?.get('2026-10-28')).toBe(false)
+  })
+  it('un sì/no non scelto non conta: vale l\'ultima misura che ha scelto', () => {
+    const r = valoriGiornalieriSiNo(vigore, [sino('p1', '2026-10-28', false, '09:00'), sino('p1', '2026-10-28', null, '15:00'),
+      sino('p2', '2026-10-28', null, '09:00')])
+    expect(r.get('p1')?.get('2026-10-28')).toBe(false)
+    expect(r.has('p2')).toBe(false)
+  })
+  it('date e piante restano separate; un parametro che non è sì/no non dà niente', () => {
+    const r = valoriGiornalieriSiNo(vigore, [sino('p1', '2026-10-21', true, '09:00'), sino('p1', '2026-10-28', false, '09:00'),
+      sino('p2', '2026-10-28', true, '09:00')])
+    expect([...(r.get('p1') ?? [])]).toEqual([['2026-10-21', true], ['2026-10-28', false]])
+    expect(r.get('p2')?.get('2026-10-28')).toBe(true)
+    expect(valoriGiornalieriSiNo(spad, [spadMis('p1', '2026-10-28', 40)]).size).toBe(0)
+  })
+})
+
+describe('ultimoTestoDelGiorno', () => {
+  const testo = (pianta: string, data: string, v: string, ora: string) => mis(pianta, sFeno, data, { [note.id]: v }, ora)
+  it('l\'ultimo testo non vuoto del giorno per ora', () => {
+    const r = ultimoTestoDelGiorno(note, [testo('p1', '2026-10-28', 'sera', '18:00'), testo('p1', '2026-10-28', 'mattina', '08:00'),
+      testo('p1', '2026-10-28', '   ', '20:00')])
+    expect(r.get('p1')?.get('2026-10-28')).toBe('sera')
+  })
+  it('a parità di ora vale l\'ultimo ricevuto; solo testo bianco: niente', () => {
+    const r = ultimoTestoDelGiorno(note, [testo('p1', '2026-10-28', 'a', '09:00'), testo('p1', '2026-10-28', 'b', '09:00'),
+      testo('p2', '2026-10-28', '', '09:00')])
+    expect(r.get('p1')?.get('2026-10-28')).toBe('b')
+    expect(r.has('p2')).toBe(false)
+  })
+  it('un parametro che non è testo non dà niente', () =>
+    expect(ultimoTestoDelGiorno(vigore, [mis('p1', sFeno, '2026-10-28', { [vigore.id]: true })]).size).toBe(0))
+})
+
