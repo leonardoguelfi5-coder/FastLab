@@ -11,7 +11,7 @@ import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
-import { percorsoDiario, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
+import { percorsoDataset, percorsoDiario, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante, percorsoSezione } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -148,7 +148,7 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
           {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}
         </Voce>
         <Voce to={percorsoPiante(espId)} icona="🌿" nome="Piante" />
-        <Voce to={percorsoSezione(espId, 'dataset')} icona="📊" nome="Dataset" />
+        <Voce to={percorsoDataset(espId)} icona="📊" nome="Dataset" />
         <Voce to={percorsoSezione(espId, 'esporta')} icona="⬇️" nome="Esporta Excel" />
         <Voce to={percorsoDiario(espId)} icona="📒" nome="Diario" />
         <Voce to={percorsoGalleria(espId)} icona="📷" nome="Foto" />

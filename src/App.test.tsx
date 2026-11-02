@@ -41,6 +41,9 @@ vi.mock('@/pages/Oggi', () => ({
 vi.mock('@/pages/Diario', () => ({
   Diario: () => <h1>Diario (prova)</h1>,
 }))
+vi.mock('@/pages/Dataset', () => ({
+  Dataset: () => <h1>Dataset (prova)</h1>,
+}))
 vi.mock('@/pages/Foto', () => ({
   Foto: () => <h1>Foto (prova)</h1>,
 }))
@@ -140,13 +143,24 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Elenco delle piante (prova)' })).toBeInTheDocument()
   })
 
-  it.each([
-    ['dataset', 'Dataset'], ['esporta', 'Esporta Excel'],
-  ])('con la sessione /esperimenti/:espId/%s mostra il segnaposto «%s»', (sezione, titolo) => {
+  it('con la sessione /esperimenti/:espId/esporta mostra ancora il segnaposto «Esporta Excel»', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
-    vaiA(`/esperimenti/x/${sezione}`)
-    expect(screen.getByRole('heading', { level: 1, name: titolo })).toBeInTheDocument()
+    vaiA('/esperimenti/x/esporta')
+    expect(screen.getByRole('heading', { level: 1, name: 'Esporta Excel' })).toBeInTheDocument()
     expect(screen.getByText('Questa sezione arriva con il prossimo aggiornamento.')).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/dataset mostra il Dataset, non il segnaposto', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/dataset')
+    expect(screen.getByRole('heading', { level: 1, name: 'Dataset (prova)' })).toBeInTheDocument()
+    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
+  })
+
+  it('i filtri del Dataset nella URL non cambiano la rotta', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/dataset?per=4s&cerca=3')
+    expect(screen.getByRole('heading', { level: 1, name: 'Dataset (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/diario mostra il Diario, non il segnaposto', () => {

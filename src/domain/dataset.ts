@@ -2,7 +2,7 @@ import { eDataValida, spostaGiorni } from '@/lib/date'
 import { eUuid } from '@/lib/percorsi'
 import { trovaPianta } from './piante'
 import { mediaEsN, ultimoTestoDelGiorno, valoriGiornalieri, valoriGiornalieriSiNo } from './statistiche'
-import type { ConfigEsperimento, Esperimento, Misura, Nota, Parametro, Pianta, Trattamento } from './tipi'
+import type { ConfigEsperimento, Esperimento, Misura, Nota, Parametro, Pianta, Strumento, Trattamento } from './tipi'
 
 /**
  * Il dominio della sezione Dataset: periodo, filtri, ricerca delle piante, serie del grafico, righe di "Mostra i
@@ -85,6 +85,16 @@ export interface FiltriDataset {
   cercato: string
 }
 
+/** Vero se c'è un filtro diverso da quello di partenza: trattamenti, livelli, periodo o piante cercate (non strumento e parametro). */
+export function haFiltriAttivi(filtri: FiltriDataset): boolean {
+  return filtri.trattamentoIds.length > 0 || filtri.livelloIds.length > 0 || filtri.periodo.modo !== 'tutto' || filtri.cercato.trim() !== ''
+}
+
+/** I filtri di partenza (tutti i trattamenti, nessun livello, tutto il periodo, nessuna ricerca) con lo stesso strumento e parametro. */
+export function senzaFiltri(filtri: FiltriDataset): FiltriDataset {
+  return { ...filtri, trattamentoIds: [], livelloIds: [], periodo: { modo: 'tutto' }, cercato: '' }
+}
+
 /**
  * Le piante del grafico. Se la ricerca trova almeno una pianta valgono solo quelle (`modo: 'piante'`): trattamenti e
  * livelli restano visibili ma non contano, altrimenti cercare una pianta di un altro trattamento darebbe un grafico
@@ -103,6 +113,12 @@ export function pianteDelFiltro(
     .filter(t => (scelti.size === 0 || scelti.has(t.id)) && filtri.livelloIds.every(l => t.livello_ids.includes(l)))
     .map(t => t.id))
   return { piante: tutte.filter(p => passano.has(p.trattamento_id)), modo: 'trattamenti', nonTrovate }
+}
+
+/** Gli strumenti nell'ordine della configurazione, con gli archiviati in fondo (hanno ancora dati da guardare). */
+export function strumentiPerScelta(config: ConfigEsperimento): Strumento[] {
+  const tutti = ordinati(config.strumenti)
+  return [...tutti.filter(s => !s.archiviato), ...tutti.filter(s => s.archiviato)]
 }
 
 /** Come si disegna un parametro: il valore (numero), il numero di elementi (lista), la percentuale di sì (sì/no). */
@@ -285,6 +301,25 @@ export function noteDelGrafico(note: Nota[], piante: Pianta[], intervallo: Inter
   return [...perData.keys()].sort().map(data => ({ data, note: perData.get(data) ?? [] }))
 }
 
+/** Quanti caratteri e quanti pezzi (separati da virgola) di "Cerca piante" si leggono al più dalla URL. */
+export const MASSIMO_CARATTERI_CERCA = 2000
+export const MASSIMO_PEZZI_CERCA = 200
+
+/**
+ * Il testo di "Cerca piante" entro i limiti. Una URL condivisa o manomessa può portare un testo enorme, e ogni pezzo
+ * si confronta con tutte le piante a ogni disegno: oltre 200 pezzi o 2000 caratteri non si legge altro. Un pezzo
+ * tagliato a metà non resta: `12` tagliato in `1` cercherebbe un'altra pianta.
+ */
+export function limitaCerca(testo: string): string {
+  let limitato = testo
+  if (limitato.length > MASSIMO_CARATTERI_CERCA) {
+    const taglio = limitato.slice(0, MASSIMO_CARATTERI_CERCA)
+    limitato = limitato[MASSIMO_CARATTERI_CERCA] === ',' ? taglio : taglio.slice(0, Math.max(0, taglio.lastIndexOf(',')))
+  }
+  const pezzi = limitato.split(',')
+  return pezzi.length > MASSIMO_PEZZI_CERCA ? pezzi.slice(0, MASSIMO_PEZZI_CERCA).join(',') : limitato
+}
+
 const SETTIMANE_URL = /^(\d+)s$/
 const INTERVALLO_URL = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/
 
@@ -309,7 +344,7 @@ function idsDaRicerca(valore: string | null, esiste: (id: string) => boolean): s
 
 /**
  * I filtri del Dataset dalla URL: `s` strumento, `p` parametro, `t` trattamenti e `f` livelli (ids con virgola), `per`
- * periodo, `cerca` testo. Un id che non è un uuid o non c'è nella configurazione si scarta in silenzio (vale il
+ * periodo, `cerca` testo (entro i limiti di `limitaCerca`). Un id che non è un uuid o non c'è nella configurazione si scarta in silenzio (vale il
  * default); di due livelli dello stesso fattore vale il primo; `per` illeggibile vale "Tutto". Un parametro che non è
  * dello strumento (o manca) diventa il primo disegnabile, o il primo se nessuno lo è. Senza strumento valido
  * `strumentoId` e `parametroId` restano `null`: lo strumento di partenza lo sceglie la pagina.
@@ -334,7 +369,7 @@ export function filtriDaRicerca(params: URLSearchParams, config: ConfigEsperimen
     fattoriUsati.add(fattore)
     return true
   })
-  return { strumentoId, parametroId, trattamentoIds, livelloIds, periodo: periodoDaRicerca(params.get('per')), cercato: params.get('cerca') ?? '' }
+  return { strumentoId, parametroId, trattamentoIds, livelloIds, periodo: periodoDaRicerca(params.get('per')), cercato: limitaCerca(params.get('cerca') ?? '') }
 }
 
 /** I filtri come parametri della URL (vedi `filtriDaRicerca`). I valori di default non si scrivono. */

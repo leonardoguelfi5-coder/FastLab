@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   cercaPiante, fineDelleSettimane, filtriDaRicerca, intervalloDelPeriodo, nelPeriodo, noteDelGrafico, parametriDelloStrumento,
-  pianteDelFiltro, ricercaDaFiltri, righeTabella, righeTesto, seriePiante, serieTrattamenti,
+  haFiltriAttivi, limitaCerca, MASSIMO_CARATTERI_CERCA, MASSIMO_PEZZI_CERCA,
+  pianteDelFiltro, ricercaDaFiltri, righeTabella, righeTesto, senzaFiltri, seriePiante, serieTrattamenti,
   type FiltriDataset, type Intervallo, type SerieTrattamento,
 } from './dataset'
 import { configDiEsempio, parametro } from './test-helpers'
@@ -351,6 +352,49 @@ describe('filtri nella URL', () => {
     expect(leggi(`s=${sDiario.id}`).parametroId).toBe(note.id)
   })
   it('il testo cercato resta com\'è scritto', () => expect(leggi('cerca=3%2C%20').cercato).toBe('3, '))
+  it('una URL con una ricerca enorme viene limitata', () => {
+    const enorme = Array.from({ length: 5000 }, (_, i) => String(i)).join(',')
+    const letto = leggi(`cerca=${encodeURIComponent(enorme)}`).cercato
+    expect(letto.split(',').length).toBe(MASSIMO_PEZZI_CERCA)
+    expect(letto).toBe(enorme.split(',').slice(0, MASSIMO_PEZZI_CERCA).join(','))
+  })
+})
+
+describe('filtri attivi e azzeramento', () => {
+  it('strumento e parametro non sono filtri', () => expect(haFiltriAttivi(filtri())).toBe(false))
+  it.each<[string, Partial<FiltriDataset>]>([
+    ['un trattamento', { trattamentoIds: [tCN.id] }],
+    ['un livello', { livelloIds: [stress.livelli[1].id] }],
+    ['un periodo', { periodo: { modo: 'settimane', n: 4 } }],
+    ['una ricerca', { cercato: '3' }],
+  ])('%s è un filtro', (_nome, extra) => expect(haFiltriAttivi(filtri(extra))).toBe(true))
+  it('una ricerca di soli spazi non conta', () => expect(haFiltriAttivi(filtri({ cercato: '  ' }))).toBe(false))
+  it('senzaFiltri toglie i filtri e tiene strumento e parametro', () => {
+    const f = filtri({ trattamentoIds: [tCN.id], livelloIds: [stress.livelli[1].id], periodo: { modo: 'settimane', n: 2 }, cercato: '3' })
+    expect(senzaFiltri(f)).toEqual(filtri())
+  })
+})
+
+describe('limitaCerca', () => {
+  it('un testo corto resta com\'è', () => expect(limitaCerca('3, 12,  A4')).toBe('3, 12,  A4'))
+  it('al massimo 200 pezzi: i primi', () => {
+    const pezzi = Array.from({ length: MASSIMO_PEZZI_CERCA + 5 }, (_, i) => `P${i}`)
+    expect(limitaCerca(pezzi.join(','))).toBe(pezzi.slice(0, MASSIMO_PEZZI_CERCA).join(','))
+    expect(limitaCerca(pezzi.slice(0, MASSIMO_PEZZI_CERCA).join(','))).toBe(pezzi.slice(0, MASSIMO_PEZZI_CERCA).join(','))
+  })
+  it('al massimo 2000 caratteri, senza lasciare un pezzo tagliato a metà (cercherebbe un\'altra pianta)', () => {
+    const lungo = Array.from({ length: 100 }, () => 'x'.repeat(29)).join(',')
+    const limitato = limitaCerca(lungo)
+    expect(limitato.length).toBeLessThanOrEqual(MASSIMO_CARATTERI_CERCA)
+    expect(limitato.length).toBeGreaterThan(MASSIMO_CARATTERI_CERCA - 31)
+    expect(limitato.endsWith(',')).toBe(false)
+    expect(limitato.split(',').every(x => x === 'x'.repeat(29))).toBe(true)
+  })
+  it('un unico pezzo più lungo del limite non cerca niente', () => expect(limitaCerca('9'.repeat(MASSIMO_CARATTERI_CERCA + 1))).toBe(''))
+  it('un taglio che cade proprio su una virgola tiene il pezzo intero', () => {
+    const testo = `${'a'.repeat(MASSIMO_CARATTERI_CERCA)},b`
+    expect(limitaCerca(testo)).toBe('a'.repeat(MASSIMO_CARATTERI_CERCA))
+  })
 })
 
 describe('periodo da oggi e fine', () => {

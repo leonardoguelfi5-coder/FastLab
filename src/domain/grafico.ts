@@ -159,7 +159,7 @@ export interface StileSerie {
  * colore del loro trattamento e marcatori diversi fra loro, nell'ordine in cui compaiono. Le serie di riferimento
  * sono sottili, tratteggiate e al 40%.
  */
-function stili(serie: Serie[]): StileSerie[] {
+export function stili(serie: Serie[]): StileSerie[] {
   let senzaPosto = 0
   let piante = 0
   return serie.map(s => {
@@ -404,7 +404,7 @@ export interface VoceLettura { indice: number; etichetta: string; stile: StileSe
 export interface LetturaDelGiorno { data: string; voci: VoceLettura[]; note: Nota[] }
 
 /** Il valore di un punto come si scrive: `41,2 ± 0,8`, senza ± quando non c'è errore standard; `62,5%` per i sì/no. */
-function valoreScritto(punto: { media: number; es: number | null }, scala: ScalaGrafico): string {
+export function valoreScritto(punto: { media: number; es: number | null }, scala: ScalaGrafico): string {
   if (scala === 'percentuale') return `${formattaMedia(punto.media)}%`
   return punto.es === null ? formattaMedia(punto.media) : `${formattaMedia(punto.media)} ± ${formattaMedia(punto.es)}`
 }
