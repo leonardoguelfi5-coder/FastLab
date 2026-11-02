@@ -33,3 +33,6 @@ Ruling (carry to D3): misure ordinate in modo stabile dopo la lettura a pagine (
 Ruling (carry to D5): `cerca` dalla URL limitato (es. 200 pezzi o 2000 caratteri) - cost if wrong: small
 Ruling (carry to fix finale): tolleranza di `deviazioneStandard` relativa alla scala dei dati senza pavimento a 1; esportare `ordinati` da statistiche e riusarlo; test di sì/no sulla serie per pianta - cost if wrong: small
 Task D2: complete (commits 495a289..f681e3d)
+Task D3: implementatore (sonnet) DONE 7c36f36 - 2144 Vitest; `misureStrumento` keyset per id (fine alla pagina vuota, doppioni ignorati, errore se il cursore non avanza) e riordino finale per data, ora, `creato_il`, id; `exportSalvati.ts` (lista, upsert con `trim()`, elimina con `controllaRighe`); messaggi per 23505 e 23514; `useMisureStrumenti` (dati solo a letture tutte complete), `useUltimaData` (dalla stessa query di `useUltimeMisure`); `ModuloOggi` invalida anche `misureStrumento`; `src/lib/scaricaFile.ts` (spostato da archivioFoto)
+Task D3: verificato dal controller sul codice della paginazione, niente revisione separata (la finale lo ricontrolla); complete (commits 01ddb37..7c36f36)
+Task D4: dispatched implementer (sonnet), BASE 7c36f36
