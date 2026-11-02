@@ -28,3 +28,8 @@ Ruling: accettate le deviazioni D2: `intervalloDelPeriodo(periodo, fine)` con `f
 Ruling (carry to D3/D5): `ultimaData` = la data più recente con misure tra TUTTI gli strumenti dell'esperimento (stesso valore in Dataset ed Esporta; es. da `ultimaMisuraPerStrumento`); i segni delle note si limitano al dominio delle date delle serie (un promemoria futuro non allunga l'asse) - cost if wrong: small
 Ruling (carry to D6/D7): `per` nella URL solo `2s`/`4s`/`8s`; un export salvato con altre settimane si apre dalla lista degli export, non dalla URL - cost if wrong: small
 Task D2: dispatched reviewer (sonnet) su copia; Task D3 dispatched implementer (sonnet), BASE f681e3d
+Task D2: review (sonnet) → Approved (0 Critical/Important), 2089 Vitest su copia, 22 mutazioni (21 prese, 1 equivalente)
+Ruling (carry to D3): misure ordinate in modo stabile dopo la lettura a pagine (data, ora, creazione, id), perché "ultima del giorno" a parità di ora non dipenda dall'uuid (inviato all'implementatore D3) - cost if wrong: small
+Ruling (carry to D5): `cerca` dalla URL limitato (es. 200 pezzi o 2000 caratteri) - cost if wrong: small
+Ruling (carry to fix finale): tolleranza di `deviazioneStandard` relativa alla scala dei dati senza pavimento a 1; esportare `ordinati` da statistiche e riusarlo; test di sì/no sulla serie per pianta - cost if wrong: small
+Task D2: complete (commits 495a289..f681e3d)
