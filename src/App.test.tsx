@@ -44,6 +44,9 @@ vi.mock('@/pages/Diario', () => ({
 vi.mock('@/pages/Dataset', () => ({
   Dataset: () => <h1>Dataset (prova)</h1>,
 }))
+vi.mock('@/pages/Esporta', () => ({
+  Esporta: () => <h1>Esporta Excel (prova)</h1>,
+}))
 vi.mock('@/pages/Foto', () => ({
   Foto: () => <h1>Foto (prova)</h1>,
 }))
@@ -65,7 +68,7 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 const PERCORSI_PRIVATI = [
   '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/misura/s/p', '/esperimenti/x/misura/s/fine', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
-  '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/oggi', '/esperimenti/x/dataset',
+  '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/oggi', '/esperimenti/x/dataset', '/esperimenti/x/esporta',
   '/esperimenti/nuovo', '/admin/inviti', '/catalogo',
 ]
 
@@ -143,18 +146,22 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Elenco delle piante (prova)' })).toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/esporta mostra ancora il segnaposto «Esporta Excel»', () => {
+  it('con la sessione /esperimenti/:espId/esporta mostra Esporta Excel', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/esporta')
-    expect(screen.getByRole('heading', { level: 1, name: 'Esporta Excel' })).toBeInTheDocument()
-    expect(screen.getByText('Questa sezione arriva con il prossimo aggiornamento.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Esporta Excel (prova)' })).toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/dataset mostra il Dataset, non il segnaposto', () => {
+  it('le scelte iniziali di Esporta nella URL non cambiano la rotta', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/esporta?s=1&per=4s')
+    expect(screen.getByRole('heading', { level: 1, name: 'Esporta Excel (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/dataset mostra il Dataset', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/dataset')
     expect(screen.getByRole('heading', { level: 1, name: 'Dataset (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 
   it('i filtri del Dataset nella URL non cambiano la rotta', () => {
@@ -163,25 +170,22 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Dataset (prova)' })).toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/diario mostra il Diario, non il segnaposto', () => {
+  it('con la sessione /esperimenti/:espId/diario mostra il Diario', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/diario')
     expect(screen.getByRole('heading', { level: 1, name: 'Diario (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/foto mostra la galleria, non il segnaposto', () => {
+  it('con la sessione /esperimenti/:espId/foto mostra la galleria', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/foto')
     expect(screen.getByRole('heading', { level: 1, name: 'Foto (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 
-  it('con la sessione /esperimenti/:espId/oggi mostra la pagina Oggi, non il segnaposto', () => {
+  it('con la sessione /esperimenti/:espId/oggi mostra la pagina Oggi', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/oggi')
     expect(screen.getByRole('heading', { level: 1, name: 'Oggi (prova)' })).toBeInTheDocument()
-    expect(screen.queryByText('Questa sezione arriva con il prossimo aggiornamento.')).not.toBeInTheDocument()
   })
 
   it('con la sessione /esperimenti/:espId/piante/:piantaId mostra la scheda della pianta', () => {

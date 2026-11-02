@@ -25,12 +25,6 @@ export const percorsoFineGiro = (espId: string, strumentoId: string) =>
 /** Oggi: gli strumenti con il progresso del giorno e i valori da sistemare. */
 export const percorsoOggi = (espId: string) => `${percorsoHome(espId)}/oggi`
 
-/** Le sezioni della home che per ora sono segnaposto "In arrivo" (Esporta Excel, fino al Piano D7). */
-export type SezioneInArrivo = 'esporta'
-
-/** Una sezione della home dell'esperimento ancora segnaposto. */
-export const percorsoSezione = (espId: string, sezione: SezioneInArrivo) => `${percorsoHome(espId)}/${sezione}`
-
 /** I parametri di una vista (filtri del Dataset, scelte di Esporta) da mettere in coda a un percorso. */
 function coda(ricerca: string | URLSearchParams | undefined): string {
   const testo = (typeof ricerca === 'string' ? ricerca : ricerca?.toString() ?? '').replace(/^\?/, '')

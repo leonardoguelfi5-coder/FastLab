@@ -78,8 +78,11 @@ let inCorso: { promessa: Promise<EsitoExcel | null>; segnale?: AbortSignal } | n
 
 const eInterruzione = (e: unknown) => typeof e === 'object' && e !== null && (e as { name?: unknown }).name === 'AbortError'
 
-/** Gli ids degli strumenti da leggere: quelli scelti che ci sono ancora, o tutti (anche gli archiviati, che sono nel file). */
-function strumentiDaLeggere(scelta: SceltaExport, config: ConfigEsperimento): string[] {
+/**
+ * Gli ids degli strumenti da leggere: quelli scelti che ci sono ancora, o tutti (anche gli archiviati, che sono nel file).
+ * Esporta li legge con la stessa regola per il riepilogo, così il conto e il file partono dalle stesse misure.
+ */
+export function strumentiDaLeggere(scelta: SceltaExport, config: ConfigEsperimento): string[] {
   const { strumenti } = applicaAllaConfigurazione(scelta, config).scelta
   return strumenti.modo === 'tutti' ? strumentiPerScelta(config).map(s => s.id) : strumenti.ids
 }

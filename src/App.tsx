@@ -7,11 +7,11 @@ import { Dataset } from '@/pages/Dataset'
 import { Diario } from '@/pages/Diario'
 import { ElencoPiante } from '@/pages/ElencoPiante'
 import { Esperimenti } from '@/pages/Esperimenti'
+import { Esporta } from '@/pages/Esporta'
 import { FineGiro } from '@/pages/FineGiro'
 import { Foto } from '@/pages/Foto'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/Impostazioni'
-import { InArrivo } from '@/pages/InArrivo'
 import { MisuraPianta } from '@/pages/MisuraPianta'
 import { ModificaMisura } from '@/pages/ModificaMisura'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
@@ -41,7 +41,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/impostazioni" element={<Impostazioni />} />
         <Route path="/esperimenti/:espId/oggi" element={<Oggi />} />
         <Route path="/esperimenti/:espId/dataset" element={<Dataset />} />
-        <Route path="/esperimenti/:espId/esporta" element={<InArrivo titolo="Esporta Excel" />} />
+        <Route path="/esperimenti/:espId/esporta" element={<Esporta />} />
         <Route path="/esperimenti/:espId/diario" element={<Diario />} />
         <Route path="/esperimenti/:espId/foto" element={<Foto />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
