@@ -63,6 +63,14 @@ const strumento = (nome: string) => config.strumenti.find(s => s.nome === nome)!
 const par = (nome: string): Parametro => config.parametri.find(p => p.nome === nome)!
 const pianta = (etichetta: string | number) => config.piante.find(p => p.etichetta === String(etichetta))!
 
+/** Un parametro sì/no «Pianta vigorosa» in coda alla tabella fenologica (il modello non ne ha). */
+function aggiungiSiNo(): void {
+  const sino: Parametro = { ...par('Note'), id: 'par-vigore', nome: 'Pianta vigorosa', tipo: 'sino', ordine: 99 }
+  config.parametri.push(sino)
+  const feno = strumento('Tabella fenologica')
+  feno.parametri.push({ parametro_id: sino.id, obbligatorio: false, ordine: feno.parametri.length })
+}
+
 let contatore = 0
 /** Una misura della pianta `n` con uno strumento: `valori` per nome del parametro. */
 function misura(
@@ -124,6 +132,9 @@ const pronta = () => screen.findByRole('region', { name: 'Ultimi valori' })
 /** Le righe dei valori di uno strumento, nella sezione "Ultimi valori". */
 const righe = async (nomeStrumento: string) =>
   within(await screen.findByRole('list', { name: nomeStrumento })).getAllByRole('listitem')
+/** Il blocco di uno strumento nel riepilogo: intestazione, righe e media del trattamento. */
+const blocco = async (nomeStrumento: string) =>
+  (await screen.findByRole('list', { name: nomeStrumento })).closest('li') as HTMLElement
 /** Il testo di una riga, con il testo per i lettori di schermo. */
 const testo = (riga: HTMLElement) => riga.textContent
 
@@ -227,7 +238,7 @@ describe('SchedaPianta: intestazione', () => {
 })
 
 describe('SchedaPianta: ultimi valori', () => {
-  it('per ogni strumento l\'icona e il nome, poi i valori: "SPAD 41,2 · 3 giorni fa"', async () => {
+  it('per ogni strumento l\'icona e il nome con data e "fa", poi i valori: "SPAD 41,2"', async () => {
     archivio = [
       spad(35, 41.2, '2026-10-25'),
       misura(35, 'Termometro', { 'Temp aria': [24.5], 'Temp pianta': [25.1] }, OGGI),
@@ -238,9 +249,11 @@ describe('SchedaPianta: ultimi valori', () => {
     const gruppi = within(sezione).getAllByRole('heading', { level: 4 }).map(h => h.textContent)
     expect(gruppi).toEqual(['🌡Termometro', '💚SPAD'])
     const [tempAria, tempPianta] = await righe('Termometro')
-    expect(tempAria).toHaveTextContent('Temp aria 24,5 °C · oggi')
-    expect(tempPianta).toHaveTextContent('Temp pianta 25,1 °C · oggi')
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · 3 giorni fa')
+    expect(tempAria).toHaveTextContent('Temp aria 24,5 °C')
+    expect(tempPianta).toHaveTextContent('Temp pianta 25,1 °C')
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2')
+    expect(await blocco('Termometro')).toHaveTextContent('28/10 · oggi')
+    expect(await blocco('SPAD')).toHaveTextContent('25/10 · 3 g fa')
     // Lo strumento senza misure non compare.
     expect(within(sezione).queryByRole('heading', { name: /Metro/ })).not.toBeInTheDocument()
   })
@@ -253,9 +266,13 @@ describe('SchedaPianta: ultimi valori', () => {
     ]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · ieri')
-    expect((await righe('Metro'))[0]).toHaveTextContent('Altezza 80 cm · oggi')
-    expect((await righe('Termometro'))[0]).toHaveTextContent('Temp aria 20 °C · il 30/10')
+    expect(await blocco('SPAD')).toHaveTextContent('27/10 · 1 g fa')
+    expect(await blocco('Metro')).toHaveTextContent('28/10 · oggi')
+    // Una data futura (rilievo in anticipo): la sola data, senza un "fa".
+    const futuro = await blocco('Termometro')
+    expect(futuro).toHaveTextContent('30/10')
+    expect(futuro).not.toHaveTextContent(/30\/10 ·/)
+    expect((await righe('Metro'))[0]).toHaveTextContent('Altezza 80 cm')
   })
 
   it('"oggi" è la data locale e si aggiorna a mezzanotte', async () => {
@@ -263,7 +280,7 @@ describe('SchedaPianta: ultimi valori', () => {
     archivio = [spad(35, 41.2, '2026-10-27')]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · ieri')
+    expect(await blocco('SPAD')).toHaveTextContent('27/10 · 1 g fa')
 
     // Il telefono riaperto il mattino dopo: la pagina torna visibile e oggi è il 29.
     vi.setSystemTime(new Date(2026, 9, 29, 7, 30))
@@ -271,7 +288,7 @@ describe('SchedaPianta: ultimi valori', () => {
     act(() => { document.dispatchEvent(new Event('visibilitychange')) })
     Reflect.deleteProperty(document, 'visibilityState')
 
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · 2 giorni fa')
+    await waitFor(async () => expect(await blocco('SPAD')).toHaveTextContent('27/10 · 2 g fa'))
   })
 
   it('la freccia dice se il valore è salito o sceso rispetto alla misura precedente, anche a voce', async () => {
@@ -283,25 +300,29 @@ describe('SchedaPianta: ultimi valori', () => {
     apri('35')
     await pronta()
     const [su] = await righe('SPAD')
-    expect(within(su).getByText('in aumento rispetto al 20/10')).toBeInTheDocument()
+    expect(within(su).getByText('in aumento di 3,2 rispetto al 20/10')).toBeInTheDocument()
+    expect(within(su).getByText('▲ 3,2')).toBeInTheDocument()
     const [giu, uguale] = await righe('Termometro')
-    expect(within(giu).getByText('in calo rispetto al 20/10')).toBeInTheDocument()
-    // Uguale alla volta prima, o senza una volta prima: nessuna freccia.
-    expect(testo(uguale)).not.toMatch(/rispetto/)
+    expect(within(giu).getByText('in calo di 4 rispetto al 20/10')).toBeInTheDocument()
+    expect(within(giu).getByText('▼ 4')).toBeInTheDocument()
+    // Uguale alla volta prima: "=", a parole "uguale al 20/10".
+    expect(within(uguale).getByText('uguale al 20/10')).toBeInTheDocument()
+    expect(within(uguale).getByText('=')).toBeInTheDocument()
   })
 
   it('senza una misura precedente non c\'è freccia', async () => {
     archivio = [spad(35, 41.2, '2026-10-25')]
     apri('35')
     await pronta()
-    expect(testo((await righe('SPAD'))[0])).not.toMatch(/rispetto/)
+    expect(testo((await righe('SPAD'))[0])).not.toMatch(/rispetto|uguale|▲|▼|=/)
   })
 
   it('più misure nello stesso giorno diventano la media del giorno', async () => {
     archivio = [spad(35, 40, '2026-10-27', '09:00'), spad(35, 42, '2026-10-27', '15:00')]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41 · ieri')
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41')
+    expect(testo((await righe('SPAD'))[0])).not.toMatch(/SPAD 41,/)
   })
 
   it('le letture ripetute di una misura sono mediate', async () => {
@@ -309,10 +330,10 @@ describe('SchedaPianta: ultimi valori', () => {
     archivio = [misura(35, 'SPAD', { SPAD: [40, 41, null] }, '2026-10-27')]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 40,5 · ieri')
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 40,5')
   })
 
-  it('una lista mostra quanti elementi ha (i palchi), e testo e parametri archiviati non compaiono', async () => {
+  it('una lista mostra quanti elementi ha (i palchi), il testo c\'è, i parametri archiviati no', async () => {
     par('Temp pianta').archiviato = true
     archivio = [
       misura(35, 'Tabella fenologica', {
@@ -322,11 +343,91 @@ describe('SchedaPianta: ultimi valori', () => {
     ]
     apri('35')
     await pronta()
-    expect(await righe('Tabella fenologica')).toHaveLength(1)
-    expect((await righe('Tabella fenologica'))[0]).toHaveTextContent('Palchi 2 · ieri')
+    const fenologia = await righe('Tabella fenologica')
+    expect(fenologia).toHaveLength(2)
+    expect(fenologia[0]).toHaveTextContent('Palchi 2')
+    expect(fenologia[1]).toHaveTextContent('Note Prima fioritura')
     expect(await righe('Termometro')).toHaveLength(1)
     const sezione = screen.getByRole('region', { name: 'Ultimi valori' })
-    expect(within(sezione).queryByText(/Note|Prima fioritura|Temp pianta/)).not.toBeInTheDocument()
+    expect(within(sezione).queryByText(/Temp pianta/)).not.toBeInTheDocument()
+  })
+
+  it('la lista e il testo si aprono con "›" sui loro elementi; numeri e sì/no non hanno il tasto', async () => {
+    aggiungiSiNo()
+    archivio = [
+      misura(35, 'Tabella fenologica', {
+        Palchi: [{ n: 1, valori: { n_foglie: 5 } }, { n: 2, valori: { n_foglie: 7 } }], Note: 'Prima fioritura sul terzo palco',
+        'Pianta vigorosa': true,
+      }, '2026-10-27'),
+      spad(35, 41.2, '2026-10-27'),
+    ]
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    const [palchi, note, vigore] = await righe('Tabella fenologica')
+    expect(within(vigore).queryByRole('button')).not.toBeInTheDocument()
+    expect(within((await righe('SPAD'))[0]).queryByRole('button')).not.toBeInTheDocument()
+
+    const tastoPalchi = within(palchi).getByRole('button', { name: 'Palchi' })
+    expect(tastoPalchi).toHaveAttribute('aria-expanded', 'false')
+    expect(palchi).not.toHaveTextContent('2 (5, 7)')
+    await utente.click(tastoPalchi)
+    expect(tastoPalchi).toHaveAttribute('aria-expanded', 'true')
+    expect(palchi).toHaveTextContent('2 (5, 7)')
+
+    await utente.click(within(note).getByRole('button', { name: 'Note' }))
+    expect(note).toHaveTextContent('Prima fioritura sul terzo palco')
+    await utente.click(tastoPalchi)
+    expect(palchi).not.toHaveTextContent('2 (5, 7)')
+  })
+
+  it('sì/no e testo non hanno la freccia; il sì/no si legge Sì o No', async () => {
+    aggiungiSiNo()
+    archivio = [
+      misura(35, 'Tabella fenologica', { Note: 'Prima', 'Pianta vigorosa': false }, '2026-10-20'),
+      misura(35, 'Tabella fenologica', { Note: 'Seconda', 'Pianta vigorosa': true }, '2026-10-27'),
+    ]
+    apri('35')
+    await pronta()
+    const [note, vigore] = await righe('Tabella fenologica')
+    expect(vigore).toHaveTextContent('Pianta vigorosa Sì')
+    expect(testo(note)).not.toMatch(/rispetto|▲|▼|=/)
+    expect(testo(vigore)).not.toMatch(/rispetto|▲|▼|=/)
+  })
+
+  it('un valore più vecchio della data dello strumento porta la sua data', async () => {
+    archivio = [
+      misura(35, 'Tabella fenologica', { Note: 'Vecchia nota' }, '2026-10-20'),
+      misura(35, 'Tabella fenologica', { Palchi: [{ n: 1, valori: { n_foglie: 5 } }] }, '2026-10-27'),
+    ]
+    apri('35')
+    await pronta()
+    expect(await blocco('Tabella fenologica')).toHaveTextContent('27/10 · 1 g fa')
+    const [palchi, note] = await righe('Tabella fenologica')
+    expect(palchi).not.toHaveTextContent('20/10')
+    expect(note).toHaveTextContent('Note 20/10')
+  })
+
+  it('uno strumento archiviato non ha il blocco nel riepilogo', async () => {
+    strumento('SPAD').archiviato = true
+    archivio = [spad(35, 41.2, '2026-10-27'), misura(35, 'Metro', { Altezza: [80] }, OGGI)]
+    apri('35')
+    await pronta()
+    expect(await righe('Metro')).toHaveLength(1)
+    expect(screen.queryByRole('list', { name: 'SPAD' })).not.toBeInTheDocument()
+  })
+
+  it('l\'ordine: dati della pianta, riepilogo, "Misura questa pianta", storia', async () => {
+    archivio = [spad(35, 41.2, '2026-10-27')]
+    apri('35')
+    const riepilogo = await pronta()
+    const dati = screen.getByRole('region', { name: 'Dati della pianta' })
+    const misuraQui = pulsante('Misura questa pianta')
+    const storia = screen.getByRole('region', { name: 'Storia' })
+    const prima = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(prima(dati, riepilogo)).toBe(true)
+    expect(prima(riepilogo, misuraQui)).toBe(true)
+    expect(prima(misuraQui, storia)).toBe(true)
   })
 
   it('una pianta senza misure lo dice, e la storia anche', async () => {
@@ -343,13 +444,13 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     return [33, 34, 36, 37, 38].map((n, i) => spad(n, [40, 41, 39, 40, 40][i], data))
   }
 
-  it('sotto il valore c\'è la media del trattamento, piccola, e nessun segno se la pianta è nel gruppo', async () => {
+  it('sotto il blocco c\'è la media del trattamento, piccola, e nessun segno se la pianta è nel gruppo', async () => {
     archivio = [spad(35, 41.2, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
-    expect(riga).toHaveTextContent('SPAD 41,2 · ieri')
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40'))
+    expect(riga).toHaveTextContent('SPAD 41,2')
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 
@@ -358,9 +459,9 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, 49, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
+    const riga = await blocco('SPAD')
     expect(await within(riga).findByText('fuori dal gruppo')).toBeInTheDocument()
-    expect(riga).toHaveTextContent('media trattamento 40')
+    expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40')
   })
 
   it('oltre 5 deviazioni standard ma entro il 20% della media non è fuori', async () => {
@@ -368,8 +469,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, 44, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40'))
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 
@@ -381,8 +482,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, valore, '2026-10-27'), spad(33, 39, '2026-10-27'), spad(34, 40, '2026-10-27'), spad(36, 41, '2026-10-27')]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40'))
     if (fuori) expect(await within(riga).findByText('fuori dal gruppo')).toBeInTheDocument()
     else expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
@@ -395,8 +496,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, valore, '2026-10-27'), spad(33, 30, '2026-10-27'), spad(34, 40, '2026-10-27'), spad(36, 50, '2026-10-27')]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40'))
     if (fuori) expect(await within(riga).findByText('fuori dal gruppo')).toBeInTheDocument()
     else expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
@@ -405,8 +506,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, 100, '2026-10-27'), spad(33, 40, '2026-10-27'), spad(34, 41, '2026-10-27')]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40,5'))
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40,5'))
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 
@@ -414,10 +515,10 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, 41.2, '2026-10-27'), ...altreDellaW1('2026-10-26')]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
+    const riga = await blocco('SPAD')
     await waitFor(() => expect(misureDelGiorno).toHaveBeenCalledWith('E', '2026-10-27'))
     await act(async () => {})
-    expect(riga).not.toHaveTextContent('media trattamento')
+    expect(riga).not.toHaveTextContent('Media del trattamento')
   })
 
   it('contano solo le piante dello stesso trattamento', async () => {
@@ -428,8 +529,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     ]
     apri('35')
     await pronta()
-    const [riga] = await righe('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('media trattamento 40'))
+    const riga = await blocco('SPAD')
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40'))
   })
 
   it('il confronto usa le misure della data dell\'ultimo valore, una richiesta per data', async () => {
@@ -451,7 +552,7 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     await pronta()
     await act(async () => {})
     expect(misureDelGiorno).not.toHaveBeenCalled()
-    expect(screen.queryByText(/media trattamento/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Media del trattamento/)).not.toBeInTheDocument()
   })
 
   it('finché le misure del giorno non arrivano il valore c\'è e la media no: nessun numero falso', async () => {
@@ -459,9 +560,9 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     archivio = [spad(35, 41.2, '2026-10-27'), ...altreDellaW1()]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · ieri')
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2')
     await act(async () => {})
-    expect(screen.queryByText(/media trattamento/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Media del trattamento/)).not.toBeInTheDocument()
   })
 
   it('se le misure del giorno non si leggono il valore resta, senza confronto e senza allarmi', async () => {
@@ -471,8 +572,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     await pronta()
     await waitFor(() => expect(misureDelGiorno).toHaveBeenCalled())
     await act(async () => {})
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2 · ieri')
-    expect(screen.queryByText(/media trattamento/)).not.toBeInTheDocument()
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41,2')
+    expect(screen.queryByText(/Media del trattamento/)).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
@@ -555,10 +656,34 @@ describe('SchedaPianta: storia', () => {
     expect(giorni).toEqual(['28/10/2026', '21/10/2026'])
     const voci = within(storia).getAllByRole('link')
     expect(voci.map(r => r.getAttribute('href'))).toEqual([oggi, temp, vecchiaSpad].map(m => `/esperimenti/E/misure/${m.id}`))
-    expect(voci[0]).toHaveAccessibleName('09:12 · Termometro · Temp aria 24,5 °C')
-    expect(voci[1]).toHaveAccessibleName('08:30 · Termometro · Temp aria 22 °C')
-    expect(voci[2]).toHaveAccessibleName('09:00 · SPAD · SPAD (archiviato) 38,1')
+    expect(voci[0]).toHaveAccessibleName(/^09:12 · Termometro\s+Temp aria\s+24,5 °C$/)
+    expect(voci[1]).toHaveAccessibleName(/^08:30 · Termometro\s+Temp aria\s+22 °C$/)
+    expect(voci[2]).toHaveAccessibleName(/^09:00 · SPAD\s+SPAD \(archiviato\)\s+38,1$/)
+    // L'icona resta, ma è solo decorazione: il nome dello strumento è scritto.
     expect(voci[2]).toHaveTextContent('💚')
+    expect(within(voci[2]).getByText('💚')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('ogni misura ha il nome dello strumento scritto e i valori su due colonne: nome a sinistra, valore a destra', async () => {
+    archivio = [misura(35, 'Termometro', { 'Temp aria': [24.5], 'Temp pianta': [25.1] }, '2026-10-21', '09:12')]
+    apri('35')
+    const storia = within(await screen.findByRole('region', { name: 'Storia' }))
+    const link = storia.getByRole('link', { name: /09:12 · Termometro/ })
+    const nomi = within(link).getAllByRole('term')
+    const valori = within(link).getAllByRole('definition')
+    expect(nomi.map(n => n.textContent)).toEqual(['Temp aria', 'Temp pianta'])
+    expect(valori.map(v => v.textContent)).toEqual(['24,5 °C', '25,1 °C'])
+    // Le cifre stanno in colonna: a destra, nel font dei dati.
+    expect(valori[0]).toHaveClass('text-right', 'font-mono', 'tabular-nums')
+  })
+
+  it('uno strumento archiviato si vede nella storia, con "(archiviato)", ma non nel riepilogo', async () => {
+    strumento('SPAD').archiviato = true
+    archivio = [spad(35, 38.1, '2026-10-21', '09:00')]
+    apri('35')
+    const storia = within(await screen.findByRole('region', { name: 'Storia' }))
+    expect(await storia.findByRole('link', { name: /09:00 · SPAD \(archiviato\)/ })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'SPAD' })).not.toBeInTheDocument()
   })
 
   it('toccando una riga si apre la modifica della misura, sapendo di arrivare dalla scheda', async () => {
@@ -566,7 +691,7 @@ describe('SchedaPianta: storia', () => {
     archivio = [vecchia]
     const utente = userEvent.setup()
     apri('35')
-    await utente.click(await screen.findByRole('link', { name: '08:30 · Termometro · Temp aria 22 °C' }))
+    await utente.click(await screen.findByRole('link', { name: /08:30 · Termometro/ }))
 
     expect(posizione()).toBe(`/esperimenti/E/misure/${vecchia.id}`)
     expect(screen.getByTestId('arrivo')).toHaveTextContent('{"daScheda":true}')

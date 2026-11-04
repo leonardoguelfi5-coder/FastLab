@@ -53,6 +53,16 @@ export function daQuanto(data: string, oggi: string): string {
 }
 
 /**
+ * Come `daQuanto`, ma corto per le intestazioni che hanno già la data: "oggi", "1 g fa", "3 g fa". Per una data futura
+ * (rilievo in anticipo) non c'è un "fa" da dire: `null`, e resta la data.
+ */
+export function daQuantoBreve(data: string, oggi: string): string | null {
+  const giorni = giorniTra(data, oggi)
+  if (giorni < 0) return null
+  return giorni === 0 ? 'oggi' : `${giorni} g fa`
+}
+
+/**
  * La data AAAA-MM-GG spostata di `giorni` giorni di calendario (negativo per tornare indietro). Si lavora in UTC sulla
  * sola data, quindi l'ora legale non sposta niente. `setUTCFullYear` e non `Date.UTC`, che porterebbe gli anni sotto
  * il 100 al Novecento.

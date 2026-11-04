@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  avvisiMancanti, confrontoTrattamento, daSistemare, fuoriDalGruppo, mediaEsN, mediaPerTrattamento, ultimiValoriPianta,
+  avvisiMancanti, confrontoTrattamento, daSistemare, fuoriDalGruppo, mediaEsN, mediaPerTrattamento, riepilogoPianta, ultimiValoriPianta,
   ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo,
 } from './statistiche'
 import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, Trattamento, ValoriMisura } from './tipi'
@@ -254,6 +254,99 @@ describe('ultimiValoriPianta', () => {
       spadMis('p1', '2026-10-28', 40), mis('p1', sCiras, '2026-10-28', { [ciras.id]: [7, null, null] }),
     ])
     expect(r.map(x => x.strumento.nome)).toEqual(['Ciras', 'SPAD'])
+  })
+})
+
+describe('riepilogoPianta', () => {
+  const lista = (n: number) => Array.from({ length: n }, (_, i) => ({ n: i + 1, valori: {} }))
+
+  it('un blocco per strumento, nell\'ordine della configurazione, con la data dell\'ultima misura', () => {
+    const r = riepilogoPianta(config, [
+      spadMis('p1', '2026-10-21', 40), spadMis('p1', '2026-10-28', 41),
+      mis('p1', sCiras, '2026-10-25', { [ciras.id]: [7, null, null] }),
+    ])
+    expect(r.map(b => [b.strumento.nome, b.data])).toEqual([['SPAD', '2026-10-28'], ['Ciras', '2026-10-25']])
+  })
+
+  it('gli strumenti archiviati e quelli senza valori non hanno un blocco', () => {
+    const archiviato = { ...config, strumenti: [{ ...sSpad, archiviato: true }, sCiras, sFeno] }
+    const misure = [spadMis('p1', '2026-10-28', 40), mis('p1', sFeno, '2026-10-28', { [note.id]: '  ' })]
+    expect(riepilogoPianta(archiviato, misure)).toEqual([])
+    expect(riepilogoPianta(config, [])).toEqual([])
+  })
+
+  it('differenza e tendenza rispetto alla data precedente con un valore: su, giù, uguale, nessuna', () => {
+    const su = riepilogoPianta(config, [spadMis('p1', '2026-10-21', 40), spadMis('p1', '2026-10-28', 41.5)])[0].righe[0]
+    expect(su.tendenza).toBe('su')
+    expect(su.differenza).toBeCloseTo(1.5)
+    expect(su.dataPrecedente).toBe('2026-10-21')
+    expect(su.ultimo).toEqual({ data: '2026-10-28', valore: 41.5 })
+
+    const giu = riepilogoPianta(config, [spadMis('p1', '2026-10-21', 40), spadMis('p1', '2026-10-28', 39.2)])[0].righe[0]
+    expect(giu.tendenza).toBe('giu')
+    expect(giu.differenza).toBeCloseTo(-0.8)
+
+    const uguale = riepilogoPianta(config, [spadMis('p1', '2026-10-21', 40), spadMis('p1', '2026-10-28', 40)])[0].righe[0]
+    expect(uguale.tendenza).toBe('uguale')
+    expect(uguale.differenza).toBe(0)
+
+    const sola = riepilogoPianta(config, [spadMis('p1', '2026-10-28', 40)])[0].righe[0]
+    expect(sola.tendenza).toBeNull()
+    expect(sola.differenza).toBeNull()
+    expect(sola.dataPrecedente).toBeNull()
+  })
+
+  it('le liste hanno il conteggio e la differenza di elementi; n è il numero di elementi', () => {
+    const misure = [
+      mis('p1', sFeno, '2026-10-21', { [palchi.id]: lista(3) }),
+      mis('p1', sFeno, '2026-10-28', { [palchi.id]: lista(5) }),
+    ]
+    const riga = riepilogoPianta(config, misure)[0].righe[0]
+    expect(riga.parametro.nome).toBe('Palchi')
+    expect(riga.ultimo).toEqual({ data: '2026-10-28', valore: 5, n: 5 })
+    expect(riga.differenza).toBe(2)
+    expect(riga.tendenza).toBe('su')
+    expect(riga.dettaglio).toMatch(/^5 /)
+  })
+
+  it('testo e sì/no: l\'ultimo del giorno, senza differenza né freccia', () => {
+    const misure = [
+      mis('p1', sFeno, '2026-10-21', { [note.id]: 'prima fioritura', [vigore.id]: false }),
+      mis('p1', sFeno, '2026-10-28', { [note.id]: 'mattina', [vigore.id]: false }, '08:00'),
+      mis('p1', sFeno, '2026-10-28', { [note.id]: 'pomeriggio', [vigore.id]: true }, '15:00'),
+    ]
+    const [testo, sino] = riepilogoPianta(config, misure)[0].righe
+    expect(testo).toMatchObject({
+      ultimo: { data: '2026-10-28', valore: 'pomeriggio' }, differenza: null, tendenza: null, dettaglio: 'pomeriggio',
+    })
+    expect(sino).toMatchObject({ ultimo: { data: '2026-10-28', valore: true }, differenza: null, tendenza: null })
+    expect(sino.parametro.nome).toBe('Vigoroso')
+  })
+
+  it('i parametri seguono l\'ordine nello strumento, qualunque sia il loro tipo', () => {
+    const r = riepilogoPianta(config, [mis('p1', sFeno, '2026-10-28', { [vigore.id]: true, [note.id]: 'ok', [palchi.id]: lista(2) })])
+    expect(r[0].righe.map(x => x.parametro.nome)).toEqual(['Palchi', 'Note', 'Vigoroso'])
+  })
+
+  it('un valore più vecchio della data del blocco lo dice con dataPropria', () => {
+    const misure = [
+      mis('p1', sFeno, '2026-10-21', { [note.id]: 'vecchia nota', [palchi.id]: lista(2) }),
+      mis('p1', sFeno, '2026-10-28', { [palchi.id]: lista(4) }),
+    ]
+    const [r] = riepilogoPianta(config, misure)
+    expect(r.data).toBe('2026-10-28')
+    expect(r.righe.map(x => [x.parametro.nome, x.dataPropria])).toEqual([['Palchi', false], ['Note', true]])
+  })
+
+  it('i parametri archiviati e i valori di un altro strumento non entrano', () => {
+    const vecchioMis = mis('p1', sSpad, '2026-10-28', { [vecchio.id]: [9] })
+    expect(riepilogoPianta(config, [vecchioMis])).toEqual([])
+    expect(riepilogoPianta(config, [mis('p1', sCiras, '2026-10-28', { [spad.id]: [40] })])).toEqual([])
+  })
+
+  it('più misure nello stesso giorno: la media giornaliera dei numeri', () => {
+    const r = riepilogoPianta(config, [spadMis('p1', '2026-10-28', 40, '09:00'), spadMis('p1', '2026-10-28', 42, '15:00')])
+    expect(r[0].righe[0].ultimo.valore).toBe(41)
   })
 })
 

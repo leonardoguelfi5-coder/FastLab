@@ -1,4 +1,4 @@
-import { useId, useMemo } from 'react'
+import { Fragment, useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useFoto, useNote, useUrlFoto } from '@/api/query'
@@ -14,17 +14,34 @@ import { formattaData } from '@/lib/date'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDiario, percorsoModificaMisura, type ArrivoDiario, type ArrivoMisura } from '@/lib/percorsi'
 import { cn } from '@/lib/utils'
-import { VociMisura } from './VociMisura'
 import { vociMisura } from './voci'
 
-/** L'icona dello strumento scelto dall'utente; a chi non la vede si legge il nome. Senza icona, il nome in chiaro. */
+/** Il nome dello strumento sempre scritto (un archiviato lo dice); l'icona che l'utente ha scelto è solo decorazione. */
 function NomeStrumento({ strumento }: { strumento: Strumento }) {
-  if (!strumento.icona) return <span className="text-grafite-tenue">{strumento.nome}</span>
   return (
     <>
-      <span aria-hidden>{strumento.icona}</span>
-      <span className="sr-only">{strumento.nome}</span>
+      {strumento.icona && <><span aria-hidden>{strumento.icona}</span>{' '}</>}
+      <span>{strumento.archiviato ? `${strumento.nome} (archiviato)` : strumento.nome}</span>
     </>
+  )
+}
+
+/**
+ * I valori di una misura su due colonne, come un foglio: il nome del parametro a sinistra in grafite tenue, il valore
+ * a destra nel font dei dati con le cifre incolonnate. Ogni valore ha la sua riga, così niente si tronca a 360 px.
+ */
+function ValoriInColonna({ misura, config }: { misura: Misura; config: ConfigEsperimento }) {
+  const voci = vociMisura(misura, config.parametri)
+  if (voci.length === 0) return <p className="text-grafite-tenue">nessun valore</p>
+  return (
+    <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-0.5">
+      {voci.map(v => (
+        <Fragment key={v.id}>
+          <dt className="min-w-0 break-words text-grafite-tenue">{v.nome}</dt>
+          <dd className="max-w-[60vw] break-words text-right font-mono tabular-nums text-grafite">{v.valore}</dd>
+        </Fragment>
+      ))}
+    </dl>
   )
 }
 
@@ -70,9 +87,9 @@ interface StoriaPiantaProps {
 
 /**
  * La storia della pianta, in una sola linea del tempo: un gruppo per giorno, dal più recente, e dentro le righe di
- * quaderno delle misure ("09:12 · 🌡 · Temp aria 24,5 °C · …", che aprono la misura per correggerla), le note che la
- * riguardano (anche via trattamento ed esperimento, con il collegamento detto) e le miniature delle sue foto, che
- * aprono il visore. I parametri archiviati si vedono ancora, con " (archiviato)": il dato resta. Note e foto hanno
+ * quaderno delle misure (prima riga "09:12 · 🌡 Termometro", sotto i valori su due colonne; aprono la misura per
+ * correggerla), le note che la riguardano (anche via trattamento ed esperimento, con il collegamento detto) e le
+ * miniature delle sue foto, che aprono il visore. I parametri archiviati si vedono ancora, con " (archiviato)": il dato resta. Note e foto hanno
  * ognuna la sua lettura: se una non arriva lo dice, con «Riprova», e le misure restano. Quelle in attesa di eliminazione
  * (con «Annulla» ancora aperto) restano fuori anche se gli elenchi vengono riletti dal server.
  */
@@ -115,12 +132,13 @@ export function StoriaPianta({ espId, config, pianta, misure }: StoriaPiantaProp
                         state={arrivo}
                         className="flex min-h-11 items-center gap-3 py-3 text-dato transition-colors hover:bg-carta-ombra active:bg-carta-ombra"
                       >
-                        <span className="min-w-0 flex-1">
-                          <span className="font-mono text-grafite tabular-nums">{m.ora}</span>
-                          {strumento && <>{' · '}<NomeStrumento strumento={strumento} /></>}
-                          {' · '}
-                          <VociMisura voci={vociMisura(m, config.parametri)} />
-                        </span>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                          <p>
+                            <span className="font-mono text-grafite tabular-nums">{m.ora}</span>
+                            {strumento && <>{' · '}<NomeStrumento strumento={strumento} /></>}
+                          </p>
+                          <ValoriInColonna misura={m} config={config} />
+                        </div>
                         <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />
                       </Link>
                     </li>

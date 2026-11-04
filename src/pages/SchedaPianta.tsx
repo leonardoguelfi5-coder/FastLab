@@ -25,7 +25,7 @@ interface SchedaCaricataProps {
   misure: UseQueryResult<Misura[]>
 }
 
-/** La scheda a configurazione caricata: intestazione, ultimi valori e avvisi, storia, dati della pianta e l'azione. */
+/** La scheda a configurazione caricata: intestazione, dati della pianta, riepilogo e avvisi, l'azione, storia, nota e foto. */
 function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricataProps) {
   const pianta = config.piante.find(p => p.id === piantaId)
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
@@ -49,35 +49,20 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
         )}
       </div>
 
-      {/* Ultimi valori, avvisi e storia vengono dalle misure della pianta: senza, nessun numero (né finto, né vecchio). */}
+      {/* Non dipende dalle misure: si vede subito. */}
+      <DatiPianta config={config} pianta={pianta} />
+
+      {/* Riepilogo, avvisi e storia vengono dalle misure della pianta: senza, nessun numero (né finto, né vecchio). */}
       {misure.data === undefined ? (
         misure.isError
           ? <ErroreConRiprova errore={misure.error} onRiprova={() => void misure.refetch()} />
           : <Caricamento />
       ) : (
-        <>
-          <div className="flex flex-col gap-4">
-            <UltimiValori espId={espId} config={config} pianta={pianta} misure={misure.data} oggi={oggi} />
-            <AvvisiMancanti espId={espId} config={config} misure={misure.data} oggi={oggi} />
-          </div>
-          <StoriaPianta espId={espId} config={config} pianta={pianta} misure={misure.data} />
-        </>
+        <div className="flex flex-col gap-4">
+          <UltimiValori espId={espId} config={config} pianta={pianta} misure={misure.data} oggi={oggi} />
+          <AvvisiMancanti espId={espId} config={config} misure={misure.data} oggi={oggi} />
+        </div>
       )}
-
-      {/* Non dipende dalle misure: si può scrivere una nota anche se non si leggono. Porta all'editor del Diario già
-          collegato a questa pianta, e a nota salvata o annullata si torna qui. */}
-      <Link
-        to={percorsoDiario(espId)}
-        state={{ nuovaPerPianta: pianta.id, ritorno: percorsoPianta(espId, pianta.id) } satisfies ArrivoDiario}
-        className={buttonVariants({ variant: 'outline', className: 'self-start' })}
-      >
-        Aggiungi nota
-      </Link>
-
-      {/* Solo l'aggiunta: le foto della pianta stanno nella Storia. Non aspetta le misure. */}
-      <FotoPianta espId={espId} piantaId={pianta.id} />
-
-      <DatiPianta config={config} pianta={pianta} />
 
       {strumentiAttivi.length === 0 ? (
         <div className="flex flex-col items-start gap-2">
@@ -92,13 +77,28 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
       ) : (
         <MisuraQuestaPianta espId={espId} piantaId={pianta.id} strumenti={strumentiAttivi} />
       )}
+
+      {misure.data !== undefined && <StoriaPianta espId={espId} config={config} pianta={pianta} misure={misure.data} />}
+
+      {/* Non dipende dalle misure: si può scrivere una nota anche se non si leggono. Porta all'editor del Diario già
+          collegato a questa pianta, e a nota salvata o annullata si torna qui. */}
+      <Link
+        to={percorsoDiario(espId)}
+        state={{ nuovaPerPianta: pianta.id, ritorno: percorsoPianta(espId, pianta.id) } satisfies ArrivoDiario}
+        className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+      >
+        Aggiungi nota
+      </Link>
+
+      {/* Solo l'aggiunta: le foto della pianta stanno nella Storia. Non aspetta le misure. */}
+      <FotoPianta espId={espId} piantaId={pianta.id} />
     </>
   )
 }
 
 /**
- * Scheda della pianta, aperta dall'elenco delle piante: gli ultimi valori per strumento (con il confronto, discreto,
- * con il trattamento), gli avvisi di dati mancanti, la storia e i dati della pianta. Non si misura qui: "Misura questa
+ * Scheda della pianta, aperta dall'elenco delle piante: i dati della pianta, il riepilogo con un blocco per strumento
+ * (con il confronto, discreto, con il trattamento), gli avvisi di dati mancanti e la storia. Non si misura qui: "Misura questa
  * pianta" porta alla misura con lo strumento scelto. Vale anche per gli esperimenti conclusi: i dati restano
  * modificabili dalla storia.
  */

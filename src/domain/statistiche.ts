@@ -1,5 +1,5 @@
 import { giorniTra } from '@/lib/date'
-import { eVuoto } from './misure'
+import { eVuoto, formattaValore } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, ValoreParametro } from './tipi'
 
 /**
@@ -208,6 +208,91 @@ export function ultimiValoriPianta(config: ConfigEsperimento, misurePianta: Misu
     }
   }
   return risultato
+}
+
+export interface RigaRiepilogo {
+  parametro: Parametro
+  /** `n`: gli elementi di una lista (il valore è lo stesso conteggio). */
+  ultimo: { data: string; valore: number | string | boolean; n?: number }
+  /** ultimo meno precedente (numeri e liste); `null` senza una data precedente con un valore, e per testo e sì/no. */
+  differenza: number | null
+  tendenza: Tendenza | null
+  /** La data del valore precedente, per dire "rispetto al 31/10" a chi non vede la freccia. */
+  dataPrecedente: string | null
+  /** La data del valore è diversa da quella del blocco: la riga lo dice. */
+  dataPropria: boolean
+  /** Il testo intero (testo lungo) o gli elementi (lista) che la riga apre con "›"; `null` per numeri e sì/no. */
+  dettaglio: string | null
+}
+export interface BloccoRiepilogo { strumento: Strumento; data: string; righe: RigaRiepilogo[] }
+
+/** L'ultima misura di `data` (per ora; a parità l'ultima ricevuta) che ha un valore per il parametro. */
+function ultimaMisuraConValore(parametro: Parametro, misure: Misura[], data: string): Misura | undefined {
+  let trovata: Misura | undefined
+  for (const m of misure) {
+    if (m.data_rilievo !== data || eVuoto(parametro, m.valori[parametro.id])) continue
+    if (!trovata || m.ora >= trovata.ora) trovata = m
+  }
+  return trovata
+}
+
+/** L'ultima data (e il suo valore) della sola pianta di una mappa pianta → data → valore. */
+function ultimaVoce<T>(perPianta: Map<string, Map<string, T>>): { data: string; valore: T } | null {
+  const perData = [...perPianta.values()][0]
+  if (!perData || perData.size === 0) return null
+  const data = [...perData.keys()].reduce((a, b) => (a >= b ? a : b))
+  return { data, valore: perData.get(data) as T }
+}
+
+/**
+ * Il riepilogo della scheda della pianta: un blocco per strumento attivo, nell'ordine della configurazione, con una
+ * riga per ogni parametro attivo che ha un valore (numeri, liste, testo e sì/no, nell'ordine dello strumento). La data
+ * del blocco è quella dell'ultimo valore dello strumento; una riga con un valore più vecchio ha `dataPropria`. Numeri e
+ * liste portano la differenza dal valore della data precedente (`ultimiValoriPianta`); testo e sì/no solo l'ultimo
+ * del giorno, senza freccia. Gli strumenti senza valori non hanno un blocco. `misurePianta` sono di una sola pianta.
+ */
+export function riepilogoPianta(config: ConfigEsperimento, misurePianta: Misura[]): BloccoRiepilogo[] {
+  const numerici = new Map(ultimiValoriPianta(config, misurePianta).map(r => [`${r.strumento.id}/${r.parametro.id}`, r]))
+  const perId = new Map(config.parametri.map(p => [p.id, p]))
+  const blocchi: BloccoRiepilogo[] = []
+  for (const strumento of ordinati(config.strumenti.filter(s => !s.archiviato))) {
+    const misure = misurePianta.filter(m => m.strumento_id === strumento.id)
+    const righe: Omit<RigaRiepilogo, 'dataPropria'>[] = []
+    for (const sp of ordinati(strumento.parametri)) {
+      const parametro = perId.get(sp.parametro_id)
+      if (!parametro || parametro.archiviato) continue
+      if (parametro.tipo === 'numero' || parametro.tipo === 'lista') {
+        const r = numerici.get(`${strumento.id}/${parametro.id}`)
+        if (!r) continue
+        const differenza = r.precedente ? r.ultimo.valore - r.precedente.valore : null
+        const base = {
+          parametro, differenza, tendenza: r.tendenza, dataPrecedente: r.precedente?.data ?? null,
+        }
+        if (parametro.tipo === 'numero') {
+          righe.push({ ...base, ultimo: { data: r.ultimo.data, valore: r.ultimo.valore }, dettaglio: null })
+        } else {
+          const m = ultimaMisuraConValore(parametro, misure, r.ultimo.data)
+          righe.push({
+            ...base, ultimo: { data: r.ultimo.data, valore: r.ultimo.valore, n: r.ultimo.valore },
+            dettaglio: m ? formattaValore(parametro, m.valori[parametro.id]) : null,
+          })
+        }
+        continue
+      }
+      const ultima = parametro.tipo === 'testo'
+        ? ultimaVoce(ultimoTestoDelGiorno(parametro, misure))
+        : ultimaVoce(valoriGiornalieriSiNo(parametro, misure))
+      if (!ultima) continue
+      righe.push({
+        parametro, ultimo: { data: ultima.data, valore: ultima.valore }, differenza: null, tendenza: null,
+        dataPrecedente: null, dettaglio: parametro.tipo === 'testo' ? String(ultima.valore) : null,
+      })
+    }
+    if (righe.length === 0) continue
+    const data = righe.reduce((a, r) => (r.ultimo.data > a ? r.ultimo.data : a), '')
+    blocchi.push({ strumento, data, righe: righe.map(r => ({ ...r, dataPropria: r.ultimo.data !== data })) })
+  }
+  return blocchi
 }
 
 /**

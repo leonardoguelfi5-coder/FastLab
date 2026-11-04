@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  dataLocaleDa, oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra, daQuanto, spostaGiorni, eDataValida,
+  dataLocaleDa, oggiLocale, oraLocale, formattaData, formattaGiornoMese, giorniTra, daQuanto, daQuantoBreve, spostaGiorni, eDataValida,
 } from './date'
 
 describe('date', () => {
@@ -32,6 +32,13 @@ describe('date', () => {
   ])('daQuanto(%s) con oggi 28/10 = %s', (data, atteso) => expect(daQuanto(data, '2026-10-28')).toBe(atteso))
   it('daQuanto conta i giorni di calendario anche a cavallo dell\'ora legale', () =>
     expect(daQuanto('2026-10-24', '2026-10-27')).toBe('3 giorni fa'))
+})
+
+describe('daQuantoBreve', () => {
+  it.each([
+    ['2026-10-28', 'oggi'], ['2026-10-27', '1 g fa'], ['2026-10-25', '3 g fa'], ['2026-09-28', '30 g fa'],
+    ['2026-10-29', null],
+  ])('daQuantoBreve(%s) con oggi 28/10 = %s', (data, atteso) => expect(daQuantoBreve(data, '2026-10-28')).toBe(atteso))
 })
 
 describe('spostaGiorni', () => {

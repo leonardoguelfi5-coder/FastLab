@@ -1,27 +1,30 @@
-import { useId, useMemo } from 'react'
-import { ArrowDown, ArrowUp, TriangleAlert } from 'lucide-react'
+import { useId, useMemo, useState } from 'react'
+import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { useMisureGiorno } from '@/api/query'
 import { Badge } from '@/components/ui/badge'
-import { confrontoTrattamento, ultimiValoriPianta, type UltimoValorePianta } from '@/domain/statistiche'
-import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
-import { daQuanto, formattaGiornoMese } from '@/lib/date'
-import { formattaConUnita } from '@/lib/numeri'
+import { confrontoTrattamento, riepilogoPianta, type BloccoRiepilogo, type RigaRiepilogo } from '@/domain/statistiche'
+import type { ConfigEsperimento, Misura, Pianta } from '@/domain/tipi'
+import { daQuantoBreve, formattaGiornoMese } from '@/lib/date'
+import { formattaConUnita, formattaMedia } from '@/lib/numeri'
+import { cn } from '@/lib/utils'
 
 interface ConfrontoProps {
   espId: string
   config: ConfigEsperimento
   pianta: Pianta
-  riga: UltimoValorePianta
+  riga: RigaRiepilogo
+  /** Il nome del parametro in testa alla riga, quando il blocco ha più di un numero da confrontare. */
+  conNome: boolean
 }
 
 /**
- * Il confronto con il trattamento, molto discreto (spec §4, "Statistiche invadenti"): un numero piccolo in grafite
- * tenue, la media delle altre piante del trattamento nella data dell'ultimo valore; e un segno, a parole, solo se la
- * pianta è molto fuori dal gruppo. Servono le misure di quella data: finché non arrivano (o se non arrivano) non si
+ * Il confronto con il trattamento, molto discreto (spec §4, "Statistiche invadenti"): una riga in grafite tenue sotto
+ * il blocco, la media delle altre piante del trattamento nella data dell'ultimo valore; e un segno, a parole, solo se
+ * la pianta è molto fuori dal gruppo. Servono le misure di quella data: finché non arrivano (o se non arrivano) non si
  * mostra nulla, mai un numero finto. Un componente a parte perché la richiesta è una per riga, ma uguale per ogni riga
  * della stessa data (la cache di React Query la condivide).
  */
-function Confronto({ espId, config, pianta, riga }: ConfrontoProps) {
+function Confronto({ espId, config, pianta, riga, conNome }: ConfrontoProps) {
   const giorno = useMisureGiorno(espId, riga.ultimo.data)
   const confronto = useMemo(
     () => (giorno.data ? confrontoTrattamento(config, riga.parametro, giorno.data, pianta.id, riga.ultimo.data) : null),
@@ -29,10 +32,16 @@ function Confronto({ espId, config, pianta, riga }: ConfrontoProps) {
   )
   // Senza altre piante con un valore quel giorno non c'è nulla da confrontare.
   if (!confronto || confronto.media === null) return null
+  const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
+  const di = `${trattamento ? ` ${trattamento.etichetta}` : ''} il ${formattaGiornoMese(riga.ultimo.data)}`
 
   return (
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-label font-normal tabular-nums text-grafite-tenue">
-      <span>{`media trattamento ${formattaConUnita(confronto.media, riga.parametro.unita)}`}</span>
+      <span>
+        {conNome
+          ? `Media del trattamento${di}, ${riga.parametro.nome}: ${formattaConUnita(confronto.media, riga.parametro.unita)}`
+          : `Media del trattamento${di}: ${formattaConUnita(confronto.media, riga.parametro.unita)}`}
+      </span>
       {confronto.fuori && (
         <Badge variant="attenzione" className="font-sans">
           <TriangleAlert aria-hidden />
@@ -43,65 +52,136 @@ function Confronto({ espId, config, pianta, riga }: ConfrontoProps) {
   )
 }
 
-/** La freccia rispetto alla misura precedente; a chi non la vede si legge lo stesso, con la data di quella misura. */
-function Freccia({ riga }: { riga: UltimoValorePianta }) {
-  if ((riga.tendenza !== 'su' && riga.tendenza !== 'giu') || !riga.precedente) return null
-  const Icona = riga.tendenza === 'su' ? ArrowUp : ArrowDown
-  return (
-    <>
-      {' '}
-      <Icona aria-hidden className="inline size-4 align-text-bottom text-grafite-tenue" />
-      <span className="sr-only">
-        {`${riga.tendenza === 'su' ? 'in aumento' : 'in calo'} rispetto al ${formattaGiornoMese(riga.precedente.data)}`}
+/**
+ * La freccia rispetto al valore precedente, con la differenza: "▲ 1,1", "▼ 0,8", "=". A chi non la vede si legge a
+ * parole, con la data di quel valore. Senza un valore precedente (o per testo e sì/no) non c'è nulla.
+ */
+function Variazione({ riga }: { riga: RigaRiepilogo }) {
+  if (riga.tendenza === null || riga.differenza === null || riga.dataPrecedente === null) return <span />
+  const rispetto = formattaGiornoMese(riga.dataPrecedente)
+  if (riga.tendenza === 'uguale') {
+    return (
+      <span className="text-right font-mono tabular-nums text-grafite-tenue">
+        <span aria-hidden>=</span>
+        <span className="sr-only">{`uguale al ${rispetto}`}</span>
       </span>
-    </>
+    )
+  }
+  const su = riga.tendenza === 'su'
+  const quanto = formattaMedia(Math.abs(riga.differenza))
+  return (
+    <span className="text-right font-mono tabular-nums text-grafite-tenue">
+      <span aria-hidden>{`${su ? '▲' : '▼'} ${quanto}`}</span>
+      <span className="sr-only">{`${su ? 'in aumento' : 'in calo'} di ${quanto} rispetto al ${rispetto}`}</span>
+    </span>
   )
 }
 
-interface RigaValoreProps extends ConfrontoProps {
-  oggi: string
+/** Il valore come si legge nella colonna di destra: numero con l'unità, conteggio della lista, Sì o No, testo. */
+function testoValore(riga: RigaRiepilogo): string {
+  const { parametro, ultimo } = riga
+  switch (parametro.tipo) {
+    case 'numero': return formattaConUnita(ultimo.valore as number, parametro.unita)
+    case 'lista': return formattaMedia(ultimo.valore as number)
+    case 'sino': return ultimo.valore ? 'Sì' : 'No'
+    case 'testo': return String(ultimo.valore)
+  }
 }
 
-/** Una riga di quaderno: "SPAD 41,2 · 3 giorni fa", la freccia e, sotto, il confronto. */
-function RigaValore({ espId, config, pianta, riga, oggi }: RigaValoreProps) {
+/** Una riga di quaderno su tre colonne: parametro | valore a destra, in colonna | variazione. */
+function RigaValore({ riga }: { riga: RigaRiepilogo }) {
+  const idDettaglio = useId()
+  const [aperta, setAperta] = useState(false)
+  const nome = (
+    <>
+      {riga.parametro.nome}
+      {riga.dataPropria && (
+        <>
+          {' '}
+          <span className="font-mono text-label tabular-nums">{formattaGiornoMese(riga.ultimo.data)}</span>
+        </>
+      )}
+    </>
+  )
+
   return (
-    <li className="flex flex-col gap-0.5 border-b border-riga py-2.5">
-      <p className="text-dato font-sans text-grafite">
-        <span className="text-grafite-tenue">{riga.parametro.nome}</span>
+    <li className="border-b border-riga">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(4.5rem,auto)] items-center gap-x-3">
+        {riga.dettaglio === null ? (
+          <span className="py-2.5 text-dato text-grafite-tenue">{nome}</span>
+        ) : (
+          // Liste e testi si aprono: il nome è il tasto, da 44 px, così il valore resta incolonnato con gli altri.
+          <button
+            type="button"
+            aria-expanded={aperta}
+            aria-controls={idDettaglio}
+            onClick={() => setAperta(a => !a)}
+            className="flex min-h-11 items-center gap-1 text-left text-dato text-grafite-tenue"
+          >
+            <span className="min-w-0 break-words">{nome}</span>
+            <ChevronRight aria-hidden className={cn('size-4 shrink-0 transition-transform', aperta && 'rotate-90')} />
+          </button>
+        )}
         {' '}
-        <span className="font-mono font-medium tabular-nums">{formattaConUnita(riga.ultimo.valore, riga.parametro.unita)}</span>
-        {' · '}
-        <span className="text-grafite-tenue">{daQuanto(riga.ultimo.data, oggi)}</span>
-        <Freccia riga={riga} />
-      </p>
-      {/* Le liste (i palchi) sono un conteggio: non si confrontano con il trattamento. */}
-      {riga.parametro.tipo === 'numero' && <Confronto espId={espId} config={config} pianta={pianta} riga={riga} />}
+        <span
+          className={cn(
+            'min-w-0 text-right font-mono text-dato font-medium tabular-nums text-grafite',
+            riga.parametro.tipo === 'testo' && 'max-w-[10rem] truncate',
+          )}
+        >
+          {testoValore(riga)}
+        </span>
+        {' '}
+        <Variazione riga={riga} />
+      </div>
+      {riga.dettaglio !== null && aperta && (
+        <p id={idDettaglio} className="break-words whitespace-pre-line pb-2.5 font-mono text-dato tabular-nums text-grafite">
+          {riga.dettaglio}
+        </p>
+      )}
     </li>
   )
 }
 
-interface GruppoStrumentoProps {
+interface BloccoStrumentoProps {
   espId: string
   config: ConfigEsperimento
   pianta: Pianta
   oggi: string
-  strumento: Strumento
-  /** I valori di questo strumento, nell'ordine dei suoi parametri. */
-  righe: UltimoValorePianta[]
+  blocco: BloccoRiepilogo
 }
 
-/** Uno strumento con i suoi valori: icona e nome come intestazione, poi una riga per parametro. */
-function GruppoStrumento({ strumento, righe, ...resto }: GruppoStrumentoProps) {
+/**
+ * Uno strumento: icona e nome come intestazione con la data dell'ultimo valore e da quanto è, le righe dei suoi
+ * parametri e, a parte sotto, la media del trattamento dei numeri.
+ */
+function BloccoStrumento({ espId, config, pianta, oggi, blocco }: BloccoStrumentoProps) {
   const id = useId()
+  const { strumento } = blocco
+  const fa = daQuantoBreve(blocco.data, oggi)
+  // Le liste (i palchi) sono un conteggio: non si confrontano con il trattamento.
+  const numeri = blocco.righe.filter(r => r.parametro.tipo === 'numero')
   return (
     <li>
-      <h4 id={id} className="flex items-center gap-2 pb-1 text-title text-grafite">
-        {strumento.icona && <span aria-hidden>{strumento.icona}</span>}
-        <span className="min-w-0 truncate">{strumento.nome}</span>
-      </h4>
+      <div className="flex items-baseline justify-between gap-3 pb-1">
+        <h4 id={id} className="flex min-w-0 items-center gap-2 text-title text-grafite">
+          {strumento.icona && <span aria-hidden>{strumento.icona}</span>}
+          <span className="min-w-0 truncate">{strumento.nome}</span>
+        </h4>
+        <span className="shrink-0 font-mono text-label tabular-nums text-grafite-tenue">
+          {`${formattaGiornoMese(blocco.data)}${fa ? ` · ${fa}` : ''}`}
+        </span>
+      </div>
       <ul aria-labelledby={id} className="border-t border-riga">
-        {righe.map(riga => <RigaValore key={riga.parametro.id} {...resto} riga={riga} />)}
+        {blocco.righe.map(riga => <RigaValore key={riga.parametro.id} riga={riga} />)}
       </ul>
+      {numeri.length > 0 && (
+        <div className="flex flex-col gap-1 pt-2">
+          {numeri.map(riga => (
+            <Confronto key={riga.parametro.id} espId={espId} config={config} pianta={pianta} riga={riga} conNome={numeri.length > 1} />
+          ))}
+        </div>
+      )}
     </li>
   )
 }
@@ -112,36 +192,28 @@ interface UltimiValoriProps {
   pianta: Pianta
   /** Tutte le misure della pianta. */
   misure: Misura[]
-  /** La data di oggi (ora locale), per dire "3 giorni fa". */
+  /** La data di oggi (ora locale), per dire "3 g fa". */
   oggi: string
 }
 
 /**
- * Gli ultimi valori della pianta per strumento: per ogni parametro l'ultimo valore giornaliero, da quanto è, e se è
- * salito o sceso rispetto alla volta prima. Sono righe di quaderno, senza grafici. Mostra solo parametri attivi,
- * numerici o liste: testo e sì/no non hanno un valore da seguire nel tempo.
+ * Il riepilogo della pianta, un blocco per strumento: per ogni parametro l'ultimo valore, da quanto è, e se è salito o
+ * sceso rispetto alla volta prima (con la differenza). Sono righe di quaderno, senza grafici. Mostra i parametri attivi
+ * di tutti i tipi: numeri e liste con la freccia, testo e sì/no con il solo ultimo valore.
  */
 export function UltimiValori({ espId, config, pianta, misure, oggi }: UltimiValoriProps) {
   const id = useId()
-  const gruppi = useMemo(() => {
-    const risultato: { strumento: Strumento; righe: UltimoValorePianta[] }[] = []
-    for (const riga of ultimiValoriPianta(config, misure)) {
-      const ultimo = risultato[risultato.length - 1]
-      if (ultimo?.strumento.id === riga.strumento.id) ultimo.righe.push(riga)
-      else risultato.push({ strumento: riga.strumento, righe: [riga] })
-    }
-    return risultato
-  }, [config, misure])
+  const blocchi = useMemo(() => riepilogoPianta(config, misure), [config, misure])
 
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <h3 id={id} className="text-label text-grafite-tenue uppercase">Ultimi valori</h3>
-      {gruppi.length === 0 ? (
+      {blocchi.length === 0 ? (
         <p className="text-grafite-tenue">Ancora nessun valore da mostrare.</p>
       ) : (
         <ul className="flex flex-col gap-5">
-          {gruppi.map(g => (
-            <GruppoStrumento key={g.strumento.id} espId={espId} config={config} pianta={pianta} oggi={oggi} strumento={g.strumento} righe={g.righe} />
+          {blocchi.map(b => (
+            <BloccoStrumento key={b.strumento.id} espId={espId} config={config} pianta={pianta} oggi={oggi} blocco={b} />
           ))}
         </ul>
       )}
