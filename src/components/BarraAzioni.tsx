@@ -62,22 +62,31 @@ export function BarraAzioni({ children, className }: BarraAzioniProps) {
       if (elemento.hasAttribute('data-tastiera') && !aperta) chiusaAlle = Date.now()
       elemento.toggleAttribute('data-tastiera', aperta)
     }
-    // Fase di cattura: si ferma prima che il pulsante lo veda.
-    const fermaTocchiFantasma = (e: Event) => {
-      if (Date.now() - chiusaAlle >= ATTESA_DOPO_TASTIERA_MS) return
-      e.preventDefault()
-      e.stopPropagation()
+    // Fase di cattura: si ferma prima che il pulsante lo veda. Un tocco cominciato sulla barra con la tastiera ancora
+    // aperta (il caso normale: si tocca "Salva" mentre si scrive, e proprio quel tocco chiude la tastiera) è voluto:
+    // il suo clic arriva anche se la tastiera si è chiusa nel frattempo. Si fermano solo i tocchi che cominciano dopo.
+    let toccoValido = false
+    const inFinestra = () => Date.now() - chiusaAlle < ATTESA_DOPO_TASTIERA_MS
+    const ferma = (e: Event) => { e.preventDefault(); e.stopPropagation() }
+    const suPointerDown = (e: Event) => {
+      toccoValido = !inFinestra()
+      if (!toccoValido) ferma(e)
     }
-    elemento.addEventListener('pointerdown', fermaTocchiFantasma, true)
-    elemento.addEventListener('click', fermaTocchiFantasma, true)
+    const suClick = (e: Event) => {
+      const valido = toccoValido
+      toccoValido = false
+      if (!valido && inFinestra()) ferma(e)
+    }
+    elemento.addEventListener('pointerdown', suPointerDown, true)
+    elemento.addEventListener('click', suClick, true)
     seguiTastiera()
     vista?.addEventListener('resize', seguiTastiera)
     vista?.addEventListener('scroll', seguiTastiera)
 
     return () => {
       osservatore?.disconnect()
-      elemento.removeEventListener('pointerdown', fermaTocchiFantasma, true)
-      elemento.removeEventListener('click', fermaTocchiFantasma, true)
+      elemento.removeEventListener('pointerdown', suPointerDown, true)
+      elemento.removeEventListener('click', suClick, true)
       radice.style.removeProperty(ALTEZZA)
       radice.style.removeProperty(TASTIERA)
       vista?.removeEventListener('resize', seguiTastiera)

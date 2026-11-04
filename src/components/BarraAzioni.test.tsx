@@ -172,6 +172,28 @@ describe('BarraAzioni: tocchi fantasma dopo la chiusura della tastiera', () => {
     expect(spia).toHaveBeenCalledTimes(1)
   })
 
+  it('un tocco cominciato con la tastiera aperta (si tocca "Salva" mentre si scrive) arriva anche se la tastiera si chiude prima del clic', () => {
+    const spia = vi.fn()
+    render(<BarraAzioni><button onClick={spia}>Salva</button></BarraAzioni>)
+    act(() => { vista.imposta(500); vista.emetti('resize') })
+    const salva = screen.getByRole('button', { name: 'Salva' })
+    fireEvent.pointerDown(salva)
+    act(() => { vista.imposta(800); vista.emetti('resize') })
+    act(() => { vi.advanceTimersByTime(120) })
+    fireEvent.click(salva)
+    expect(spia).toHaveBeenCalledTimes(1)
+  })
+
+  it('un tocco cominciato dopo la chiusura, nella finestra, non arriva nemmeno con il suo pointerdown', () => {
+    const spia = vi.fn()
+    chiudiTastiera(spia)
+    act(() => { vi.advanceTimersByTime(100) })
+    const salva = screen.getByRole('button', { name: 'Salva' })
+    fireEvent.pointerDown(salva)
+    fireEvent.click(salva)
+    expect(spia).not.toHaveBeenCalled()
+  })
+
   it('anche il pointerdown si ferma nella finestra', () => {
     const spia = vi.fn()
     render(<BarraAzioni><button onPointerDown={spia}>Salva</button></BarraAzioni>)
