@@ -32,3 +32,7 @@ Task E1: implementatore (sonnet) DONE def989a - 2573 Vitest (14 nuovi); `src/com
 Task E1: correzione del controller (il blocco fermava anche il tocco voluto su "Salva" con la tastiera aperta: ora passa il tocco cominciato con la tastiera aperta), test rosso senza la correzione; 2575 Vitest, tsc e lint puliti
 Task E1: complete (commits 57ec4d1..HEAD), revisione rimandata alla finale; prova su telefono al collaudo
 Task E2: dispatched implementer (sonnet)
+Task E2: implementatore (sonnet) DONE_WITH_CONCERNS 49209c3 - 2578 Vitest; Atkinson Hyperlegible Next e Mono 5.3.0 (variabili 200-800) al posto di Geist, lockfile con `npx npm@11` (libc intatti); `fontDati()` al posto di `fontGeistMono` per il PNG dei grafici, `LARGHEZZA_CARATTERE` 6,95; DESIGN.md e design.json aggiornati, glifi di sistema (µ ✓ ▲ ▼ ≤ ≥) dichiarati
+Ruling (carry to collaudo): il Mono è circa il 5% più largo: controllare a 360 px "Salva e vai alla #36", chip, griglia, filtri del Dataset - cost if wrong: qualche testo a capo
+Task E2: complete (commits 48446ee..49209c3), revisione rimandata alla finale
+Task E3: dispatched implementer (sonnet)
