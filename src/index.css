@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 
 /*
- * FastLab, "Il quaderno di campo" (vedi DESIGN.md). I caratteri Geist e Geist Mono si importano in main.tsx:
+ * FastLab, "Il quaderno di campo" (vedi DESIGN.md). I caratteri Atkinson Hyperlegible Next (testo) e Mono (dati) si importano in main.tsx:
  * importati da qui, dentro Tailwind, i percorsi relativi dei file .woff2 non si risolverebbero.
  * Solo tema chiaro: nessun elemento ha la classe .dark, quindi le varianti dark: dei componenti
  * non si attivano mai, nemmeno con il sistema operativo in modalità scura.
@@ -118,8 +118,8 @@
 }
 
 @theme {
-  --font-sans: "Geist Variable", system-ui, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, Consolas, monospace;
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono Variable", ui-monospace, Consolas, monospace;
   --font-heading: var(--font-sans);
 
   /* Scala tipografica di DESIGN.md (text-base resta il Body: 1rem / 1.5). */

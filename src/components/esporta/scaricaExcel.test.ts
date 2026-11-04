@@ -5,7 +5,7 @@ vi.mock('@/lib/supabase', () => ({ supabase: {} }))
 vi.mock('@/api/esperimenti', () => ({ caricaConfig: vi.fn() }))
 vi.mock('@/api/misure', () => ({ misureStrumento: vi.fn(), ultimaMisuraPerStrumento: vi.fn() }))
 vi.mock('@/api/note', () => ({ listaNote: vi.fn(), eliminaNota: vi.fn() }))
-vi.mock('@/lib/graficoPng', () => ({ svgInPng: vi.fn(), fontGeistMono: vi.fn() }))
+vi.mock('@/lib/graficoPng', () => ({ svgInPng: vi.fn(), fontDati: vi.fn() }))
 vi.mock('@/lib/scaricaFile', () => ({ consegna: vi.fn() }))
 vi.mock('@/lib/excel/scriviXlsx', () => ({ scriviCartella: vi.fn(), LARGHEZZA_IMMAGINE: 800, ALTEZZA_IMMAGINE: 450 }))
 vi.mock('@/components/note/eliminaNotaConAnnulla', () => ({ senzaNoteInEliminazione: vi.fn((note: unknown[]) => note) }))
@@ -24,7 +24,7 @@ import { configExport, misura, nota, p1, p2, p3, pA, sCiras, sSpad, sMetro, spad
 import type { Misura } from '@/domain/tipi'
 import { ErroreApp, messaggioErrore } from '@/lib/errori'
 import { scriviCartella } from '@/lib/excel/scriviXlsx'
-import { fontGeistMono, svgInPng } from '@/lib/graficoPng'
+import { fontDati, svgInPng } from '@/lib/graficoPng'
 import { consegna } from '@/lib/scaricaFile'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { scaricaExcel, testoFase, type FaseExcel } from './scaricaExcel'
@@ -66,7 +66,7 @@ beforeEach(() => {
   vi.mocked(misureStrumento).mockImplementation(async (_e, id) => MISURE[id] ?? [])
   vi.mocked(listaNote).mockResolvedValue([nota(1, '2026-10-20', 'Irrigazione')])
   vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map([[sSpad.id, '2026-10-20']]))
-  vi.mocked(fontGeistMono).mockResolvedValue('data:font/woff2;base64,AAAA')
+  vi.mocked(fontDati).mockResolvedValue('data:font/woff2;base64,AAAA')
   let n = 0
   vi.mocked(svgInPng).mockImplementation(async () => PNG(++n))
   vi.mocked(scriviCartella).mockResolvedValue(new Blob(['xlsx']))
@@ -111,7 +111,7 @@ describe('scaricaExcel: le fasi', () => {
     await avvia({ scelta: { ...SCELTA_TUTTO, come: { ...SCELTA_TUTTO.come, grafici: false } } })
     expect(fasi).toEqual([{ fase: 'dati' }, { fase: 'file' }])
     expect(svgInPng).not.toHaveBeenCalled()
-    expect(fontGeistMono).not.toHaveBeenCalled()
+    expect(fontDati).not.toHaveBeenCalled()
   })
 })
 
@@ -206,7 +206,7 @@ describe('scaricaExcel: il toast finale', () => {
   })
 
   it('il font che non si legge non ferma i grafici (l\'immagine usa un monospazio di sistema)', async () => {
-    vi.mocked(fontGeistMono).mockResolvedValue(null)
+    vi.mocked(fontDati).mockResolvedValue(null)
     await avvia()
     expect(vi.mocked(svgInPng).mock.calls[0][0]).not.toContain('@font-face')
     expect(ultimeImmagini().size).toBe(ultimaCartella().grafici.length)

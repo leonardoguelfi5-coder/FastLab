@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 interface EspandibileProps {
   titolo: ReactNode
-  /** Testo, o testo con qualche numero in Geist Mono (es. la media di un trattamento). */
+  /** Testo, o testo con qualche numero nel font dei dati (es. la media di un trattamento). */
   riassunto: ReactNode
   /** Uno stato da notare anche a voce chiusa, es. "Modifiche non salvate": sotto il riassunto, in attenzione. */
   nota?: string

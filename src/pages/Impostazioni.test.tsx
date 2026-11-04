@@ -472,7 +472,7 @@ describe('Impostazioni: piante', () => {
 describe('Impostazioni: spazio delle foto', () => {
   const spazio = () => screen.findByRole('region', { name: 'Spazio delle foto' })
 
-  it('mostra lo spazio dell\'esperimento e il totale contro 1 GB, in MB e in Geist Mono', async () => {
+  it('mostra lo spazio dell\'esperimento e il totale contro 1 GB, in MB e nel font dei dati', async () => {
     apri()
     const dentro = within(await spazio())
     expect(await dentro.findByText('12,3 MB')).toHaveClass('font-mono')

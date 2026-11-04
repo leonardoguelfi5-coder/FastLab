@@ -108,7 +108,7 @@ describe('Catalogo: l\'elenco', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Catalogo strumenti' })).toBeInTheDocument()
     const riga = rigaVoce('Ciras')
     expect(riga).toHaveTextContent('🍃 Ciras')
-    // I valori sono dati: Geist Mono con cifre tabellari.
+    // I valori sono dati: il font dei dati con cifre tabellari.
     expect(within(riga).getByText(/^A µmol/)).toHaveClass('font-mono', 'tabular-nums')
     expect(riga).toHaveTextContent('A µmol m⁻² s⁻¹ · gs mol m⁻² s⁻¹ · E mmol m⁻² s⁻¹ · Ci µmol mol⁻¹')
     expect(riga).toHaveTextContent('Scambi gassosi della foglia.')

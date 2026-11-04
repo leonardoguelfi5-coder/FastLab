@@ -104,7 +104,7 @@ describe('FineGiro', () => {
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/misura')
   })
 
-  it('riepiloga "💚 SPAD: 54/56", con i numeri in Geist Mono, e dice quali mancano', async () => {
+  it('riepiloga "💚 SPAD: 54/56", con i numeri nel font dei dati, e dice quali mancano', async () => {
     vi.mocked(misureDelGiorno).mockImplementation(async () => spadTranne('12', '33'))
     vaiAllaPagina()
     const intestazione = await titolo('SPAD: 54/56')

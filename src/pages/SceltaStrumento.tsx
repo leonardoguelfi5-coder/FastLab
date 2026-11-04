@@ -20,7 +20,7 @@ import { useCampoStore } from '@/store/campo'
 const inCorso = (g: Giro | null): g is Giro => g !== null && g.cominciato && g.fatte < g.totale
 
 /**
- * La riga in Geist Mono sotto il nome. Mai un dato falso: finché le letture non arrivano "…", e se la prima fallisce
+ * La riga nel font dei dati sotto il nome. Mai un dato falso: finché le letture non arrivano "…", e se la prima fallisce
  * niente (la pagina si usa lo stesso); se fallisce una rilettura restano i dati già letti.
  *  - giro finito: "fatto ✓";
  *  - giro iniziato: "34/56 oggi", o "34/56 il 27/10" se la data di rilievo non è oggi;

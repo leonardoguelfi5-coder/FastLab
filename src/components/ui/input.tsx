@@ -15,7 +15,7 @@ const inputVariants = cva(
       variant: {
         /** Testo comune (email, nomi, note): Body. */
         default: "text-base",
-        /** Numeri ed etichette delle piante: Geist Mono con cifre tabellari. */
+        /** Numeri ed etichette delle piante: il font dei dati con cifre tabellari. */
         campo: "font-mono text-campo tabular-nums",
       },
     },

@@ -28,7 +28,7 @@ describe('SceltaDalCatalogo', () => {
     expect(screen.getByText('🍃 Ciras')).toBeInTheDocument()
     expect(riga('🌡 Termometro').getByText('Temp aria °C · Temp pianta °C')).toBeInTheDocument()
     expect(riga('🍃 Ciras').getByText(/^A µmol m⁻² s⁻¹ · gs mol m⁻² s⁻¹ · E /)).toBeInTheDocument()
-    // I valori sono dati: Geist Mono con cifre tabellari.
+    // I valori sono dati: il font dei dati con cifre tabellari.
     expect(riga('🌡 Termometro').getByText('Temp aria °C · Temp pianta °C')).toHaveClass('font-mono', 'tabular-nums')
     // Un valore senza unità è solo il nome.
     expect(riga('💚 SPAD').getByText('SPAD', { selector: 'p' })).toBeInTheDocument()

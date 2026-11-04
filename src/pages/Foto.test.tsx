@@ -123,7 +123,7 @@ describe('Foto: la galleria', () => {
     expect(await screen.findByText('Nessuna foto.')).toBeInTheDocument()
   })
 
-  it('raggruppa per giorno, dal più recente, con la data in Geist Mono e il numero di foto', async () => {
+  it('raggruppa per giorno, dal più recente, con la data nel font dei dati e il numero di foto', async () => {
     db = [
       foto('a', { data: '2026-10-30' }), foto('b', { data: '2026-10-28' }), foto('c', { data: '2026-10-28' }),
     ]

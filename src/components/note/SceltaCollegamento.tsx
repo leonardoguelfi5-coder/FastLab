@@ -30,7 +30,7 @@ const conOSenza = (ids: string[], id: string): string[] => (ids.includes(id) ? i
 /**
  * A cosa si collega una nota: a tutto l'esperimento, a uno o più trattamenti oppure a una o più piante. La scelta è
  * una sola (come per i chip degli strumenti: la selezionata è inchiostro pieno con il ✓). Le liste scelte restano
- * quando si cambia scelta, ma si salva solo quella attiva. Le etichette sono in Geist Mono.
+ * quando si cambia scelta, ma si salva solo quella attiva. Le etichette sono nel font dei dati.
  */
 export function SceltaCollegamento({ config, stato, onCambia }: SceltaCollegamentoProps) {
   const id = useId()

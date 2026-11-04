@@ -11,7 +11,7 @@ const p = (data: string, media: number): PuntoSerie => ({ data, media, es: null,
 const legendaDi = (s: SerieTrattamento[]) => impagina(s, [], { larghezza: 360, altezza: 260, scala: 'valore' }).legenda
 
 describe('Legenda', () => {
-  it('una voce per serie, con il marcatore e il nome in Geist Mono', () => {
+  it('una voce per serie, con il marcatore e il nome nel font dei dati', () => {
     render(<Legenda voci={legendaDi([serie('Controllo', 0, [p('2026-10-01', 1)]), serie('S1', 1, [p('2026-10-01', 2)])])} />)
     const lista = screen.getByRole('list', { name: 'Legenda' })
     const voci = within(lista).getAllByRole('listitem')

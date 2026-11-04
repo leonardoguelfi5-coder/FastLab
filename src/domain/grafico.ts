@@ -40,9 +40,9 @@ export const COLORI_GRAFICO = {
 } as const
 
 /** Il carattere dei numeri e delle etichette (src/index.css, `--font-mono`). */
-export const FONT_DATI = '"Geist Mono Variable", ui-monospace, Consolas, monospace'
+export const FONT_DATI = '"Atkinson Hyperlegible Mono Variable", ui-monospace, Consolas, monospace'
 /** La larghezza di un carattere monospazio a 11 px: serve a misurare etichette senza un DOM. */
-export const LARGHEZZA_CARATTERE = 6.6
+export const LARGHEZZA_CARATTERE = 6.95
 /** Il corpo del testo del grafico, in px. */
 export const CORPO_TESTO = 11
 

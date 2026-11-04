@@ -1,4 +1,4 @@
-import fileFont from '@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url'
+import fileFont from '@fontsource-variable/atkinson-hyperlegible-mono/files/atkinson-hyperlegible-mono-latin-wght-normal.woff2?url'
 import { COLORI_GRAFICO } from '@/domain/grafico'
 
 /**
@@ -13,12 +13,12 @@ const ATTESA_DECODIFICA_MS = 10_000
 let fontInCache: string | null = null
 
 /**
- * Il woff2 latino di Geist Mono (variabile) come data URL, da incorporare nell'SVG: un SVG usato come immagine non vede
- * i font della pagina. Il file è quello di `@fontsource-variable/geist-mono` servito dall'app stessa. Letto una volta
+ * Il woff2 latino di Atkinson Hyperlegible Mono (variabile) come data URL, da incorporare nell'SVG: un SVG usato come immagine non vede
+ * i font della pagina. Il file è quello di `@fontsource-variable/atkinson-hyperlegible-mono` servito dall'app stessa. Letto una volta
  * sola; se non si legge (offline senza cache, errore) dà `null` e l'immagine usa `ui-monospace`. Un fallimento non si
  * ricorda: al tentativo dopo si riprova.
  */
-export async function fontGeistMono(): Promise<string | null> {
+export async function fontDati(): Promise<string | null> {
   if (fontInCache) return fontInCache
   try {
     const risposta = await fetch(fileFont)

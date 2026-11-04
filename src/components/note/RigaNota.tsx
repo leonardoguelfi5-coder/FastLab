@@ -16,7 +16,7 @@ interface RigaNotaProps {
 }
 
 /**
- * Una nota del Diario come riga di quaderno: la data in Geist Mono, il testo (3 righe, tutto da aperta), a cosa è
+ * Una nota del Diario come riga di quaderno: la data nel font dei dati, il testo (3 righe, tutto da aperta), a cosa è
  * collegata. Un promemoria porta la parola "Promemoria" e la spunta (bersaglio di 44 px, fuori dal tocco che apre la
  * riga); fatto, resta barrato con "fatto il GG/MM" e si può riaprire.
  */

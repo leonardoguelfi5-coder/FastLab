@@ -39,7 +39,7 @@ interface TabellaValoriProps {
 
 /**
  * "Mostra i valori": esattamente i punti del grafico, in righe da quaderno raggruppate per data, dalla più recente.
- * Per ogni serie il marcatore e l'etichetta (la stessa della legenda), `41,2 ± 0,8` e `n 7` in Geist Mono; le serie
+ * Per ogni serie il marcatore e l'etichetta (la stessa della legenda), `41,2 ± 0,8` e `n 7` nel font dei dati; le serie
  * di riferimento (la media del trattamento accanto alle piante cercate) in grafite tenue. Nessuna griglia da foglio
  * di calcolo; è anche l'alternativa accessibile al disegno.
  */
@@ -72,7 +72,7 @@ export function TabellaValori({ serie, righe, scala, descrizione }: TabellaValor
                       <svg aria-hidden width={12} height={12} viewBox="-6 -6 12 12" className="shrink-0" opacity={s.tenue ? 0.4 : undefined}>
                         <path d={s.marcatore} fill={s.colore} />
                       </svg>
-                      {/* l'etichetta di una pianta è un identificativo: Geist Mono con cifre tabellari */}
+                      {/* l'etichetta di una pianta è un identificativo: il font dei dati con cifre tabellari */}
                       <span className={riga.serie.tipo === 'pianta' ? 'font-mono tabular-nums' : undefined}>{etichettaSerie(riga.serie)}</span>
                     </span>
                   </th>

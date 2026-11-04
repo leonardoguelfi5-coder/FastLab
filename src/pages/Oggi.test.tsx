@@ -482,7 +482,7 @@ describe('Oggi: i promemoria', () => {
     expect(screen.queryByRole('region', { name: 'Promemoria' })).not.toBeInTheDocument()
   })
 
-  it('ogni riga dice la data, il testo e a cosa è collegata, in Geist Mono', async () => {
+  it('ogni riga dice la data, il testo e a cosa è collegata, nel font dei dati', async () => {
     noteDb = [nota('a', { testo: 'Controllare le foglie', data: '2026-10-26', pianta_ids: [idPianta(3)] })]
     vaiAllaPagina()
     const riga = within(await sezione()).getByRole('listitem')

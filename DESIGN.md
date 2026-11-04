@@ -21,42 +21,42 @@ colors:
   errore-velato: "oklch(95.5% 0.025 28)"
 typography:
   numero-pianta:
-    fontFamily: "Geist Mono Variable, ui-monospace, Consolas, monospace"
+    fontFamily: "Atkinson Hyperlegible Mono Variable, ui-monospace, Consolas, monospace"
     fontSize: "2.25rem"
     fontWeight: 600
     lineHeight: 1.1
     letterSpacing: "-0.02em"
     fontFeature: "\"tnum\" 1"
   headline:
-    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontFamily: "Atkinson Hyperlegible Next Variable, system-ui, sans-serif"
     fontSize: "1.5rem"
     fontWeight: 650
     lineHeight: 1.2
     letterSpacing: "-0.015em"
   title:
-    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontFamily: "Atkinson Hyperlegible Next Variable, system-ui, sans-serif"
     fontSize: "1.125rem"
     fontWeight: 600
     lineHeight: 1.3
   body:
-    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontFamily: "Atkinson Hyperlegible Next Variable, system-ui, sans-serif"
     fontSize: "1rem"
     fontWeight: 400
     lineHeight: 1.5
   campo:
-    fontFamily: "Geist Mono Variable, ui-monospace, Consolas, monospace"
+    fontFamily: "Atkinson Hyperlegible Mono Variable, ui-monospace, Consolas, monospace"
     fontSize: "1.25rem"
     fontWeight: 500
     lineHeight: 1.3
     fontFeature: "\"tnum\" 1"
   label:
-    fontFamily: "Geist Variable, system-ui, sans-serif"
+    fontFamily: "Atkinson Hyperlegible Next Variable, system-ui, sans-serif"
     fontSize: "0.8125rem"
     fontWeight: 550
     lineHeight: 1.3
     letterSpacing: "0.04em"
   dato:
-    fontFamily: "Geist Mono Variable, ui-monospace, Consolas, monospace"
+    fontFamily: "Atkinson Hyperlegible Mono Variable, ui-monospace, Consolas, monospace"
     fontSize: "0.9375rem"
     fontWeight: 450
     lineHeight: 1.4
@@ -136,7 +136,7 @@ Il sistema rifiuta esplicitamente, con le parole di PRODUCT.md: l'**app "startup
 
 **Key Characteristics:**
 - Carta calda, testo grafite, un solo inchiostro blu notte come accento.
-- Dati, etichette delle piante e codici in Geist Mono con cifre tabellari.
+- Dati, etichette delle piante e codici in Atkinson Hyperlegible Mono con cifre tabellari.
 - Liste come righe di quaderno, non card.
 - Piatto: profondità data da toni di carta e linee, ombre solo per ciò che galleggia (menu, dialoghi, toast).
 - Bersagli grandi, azione principale in basso, raggiungibile col pollice.
@@ -195,22 +195,26 @@ Dentro i grafici (e nella loro legenda, e nell'immagine dell'Excel) otto trattam
 
 ## 3. Typography
 
-**Body Font:** Geist Variable (con system-ui, sans-serif)
-**Label/Mono Font:** Geist Mono Variable (con ui-monospace, Consolas, monospace)
+**Body Font:** Atkinson Hyperlegible Next Variable (con system-ui, sans-serif)
+**Label/Mono Font:** Atkinson Hyperlegible Mono Variable (con ui-monospace, Consolas, monospace)
+
+**Carattere:** disegnato per la leggibilità: ogni lettera e cifra ha una forma che non si confonde (Il1, 0O, 5S, 8B). Asse variabile del peso 200-800, quindi i pesi 450, 550 e 650 si usano così come sono. I file arrivano con l'app, niente CDN.
+
+**Glifi di sistema.** Mancano in entrambi i font e arrivano dal font di sistema: →, ✓, ≤, ≥, ⁻, ⋯, ✎, ▲, ▼ e la µ (le unità come µmol m⁻² s⁻¹ mostrano la µ di sistema).
 
 **Character:** Una sola famiglia sans per tutta l'interfaccia, sobria e moderna; la sua gemella monospaziata porta il tono da registro su ciò che è dato: numeri delle piante, valori, date, ore, codici invito. Il contrasto è tra prosa e dato, non tra stili decorativi.
 
 ### Hierarchy
-- **Numero pianta** (Geist Mono 600, 2.25rem, 1.1, cifre tabellari): l'etichetta della pianta in testa alla scheda e alla misura. È l'unico elemento grande di una schermata di campo.
-- **Headline** (Geist 650, 1.5rem, 1.2, −0.015em): titolo di pagina nella barra in alto e titoli dei passi della creazione guidata.
-- **Title** (Geist 600, 1.125rem, 1.3): titoli di sezione, nome dell'esperimento nelle righe della lista, testo dei pulsanti principali.
-- **Body** (Geist 400, 1rem, 1.5): testo corrente, descrizioni, messaggi. Righe di prosa entro 65ch.
-- **Campo** (Geist Mono 500, 1.25rem, 1.3, cifre tabellari): il testo digitato nei campi numerici e di etichetta.
-- **Dato** (Geist Mono 450, 0.9375rem, 1.4, cifre tabellari): valori nella storia della pianta, contatori, celle della griglia, date e ore.
-- **Label** (Geist 550, 0.8125rem, +0.04em, maiuscolo solo per le intestazioni di sezione come "STORIA" e "OGGI"): etichette dei campi (in tondo, non maiuscolo), unità, intestazioni di gruppo.
+- **Numero pianta** (Atkinson Hyperlegible Mono 600, 2.25rem, 1.1, cifre tabellari): l'etichetta della pianta in testa alla scheda e alla misura. È l'unico elemento grande di una schermata di campo.
+- **Headline** (Atkinson Hyperlegible Next 650, 1.5rem, 1.2, −0.015em): titolo di pagina nella barra in alto e titoli dei passi della creazione guidata.
+- **Title** (Atkinson Hyperlegible Next 600, 1.125rem, 1.3): titoli di sezione, nome dell'esperimento nelle righe della lista, testo dei pulsanti principali.
+- **Body** (Atkinson Hyperlegible Next 400, 1rem, 1.5): testo corrente, descrizioni, messaggi. Righe di prosa entro 65ch.
+- **Campo** (Atkinson Hyperlegible Mono 500, 1.25rem, 1.3, cifre tabellari): il testo digitato nei campi numerici e di etichetta.
+- **Dato** (Atkinson Hyperlegible Mono 450, 0.9375rem, 1.4, cifre tabellari): valori nella storia della pianta, contatori, celle della griglia, date e ore.
+- **Label** (Atkinson Hyperlegible Next 550, 0.8125rem, +0.04em, maiuscolo solo per le intestazioni di sezione come "STORIA" e "OGGI"): etichette dei campi (in tondo, non maiuscolo), unità, intestazioni di gruppo.
 
 ### Named Rules
-**La regola del dato in colonna.** Ogni numero che si confronta con altri numeri usa Geist Mono con `font-variant-numeric: tabular-nums`, così le cifre restano allineate da una riga all'altra.
+**La regola del dato in colonna.** Ogni numero che si confronta con altri numeri usa Atkinson Hyperlegible Mono con `font-variant-numeric: tabular-nums`, così le cifre restano allineate da una riga all'altra.
 
 **La regola del grande unico.** In una schermata di campo c'è un solo testo grande: il numero della pianta. Tutto il resto sta tra label e title.
 
@@ -247,7 +251,7 @@ Decisi e grandi, pensati per il pollice.
 - **Corner Style:** 14px per i pochi riquadri, 10px per campi e pulsanti, 6px per celle e badge.
 
 ### Inputs / Fields
-- **Style:** foglio, bordo riga controllo 1px, angoli 10px, altezza 52px, testo in Campo (Geist Mono 1.25rem) per numeri ed etichette; label sopra il campo in Label, unità a destra in grafite tenue.
+- **Style:** foglio, bordo riga controllo 1px, angoli 10px, altezza 52px, testo in Campo (Atkinson Hyperlegible Mono 1.25rem) per numeri ed etichette; label sopra il campo in Label, unità a destra in grafite tenue.
 - **Focus:** bordo inchiostro e anello di 3px inchiostro velato; nessun bagliore.
 - **Error:** bordo errore, messaggio sotto in errore con icona, `aria-invalid`.
 - **Warning (fuori intervallo):** bordo attenzione e messaggio in attenzione; non blocca.
@@ -269,7 +273,7 @@ Decisi e grandi, pensati per il pollice.
 ### Do:
 - **Do** usare carta (oklch(98.4% 0.006 85)) come fondo e grafite (oklch(23% 0.014 262)) per il testo; foglio (oklch(99.6% 0.003 85)) per i campi.
 - **Do** tenere l'inchiostro blu notte entro il 10% della schermata: pulsante principale, selezione, focus.
-- **Do** scrivere numeri delle piante, valori, date, ore e codici in Geist Mono con cifre tabellari.
+- **Do** scrivere numeri delle piante, valori, date, ore e codici in Atkinson Hyperlegible Mono con cifre tabellari.
 - **Do** costruire le liste come righe di quaderno separate da linee di 1px, senza card.
 - **Do** dare a ogni stato anche un testo o un'icona, non solo un colore.
 - **Do** colorare le serie dei grafici solo con la tavolozza dei dati, seguendo il posto del trattamento, e dare a ognuna marcatore e voce di legenda.

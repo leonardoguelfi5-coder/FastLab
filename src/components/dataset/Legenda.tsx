@@ -2,7 +2,7 @@ import type { VoceLegenda } from '@/domain/grafico'
 
 /**
  * La legenda sotto il grafico, in HTML: per ogni serie il campione (un pezzo di linea con il suo marcatore, nel suo
- * colore e con il suo tratteggio) e il nome in Geist Mono grafite, mai nel colore della serie. Mai solo colore: il
+ * colore e con il suo tratteggio) e il nome in grafite, nel font dei dati, mai nel colore della serie. Mai solo colore: il
  * marcatore e il nome ci sono sempre, anche con una serie sola.
  */
 export function Legenda({ voci }: { voci: VoceLegenda[] }) {

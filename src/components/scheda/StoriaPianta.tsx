@@ -31,7 +31,7 @@ function NomeStrumento({ strumento }: { strumento: Strumento }) {
 const arrivo: ArrivoMisura = { daScheda: true }
 
 /**
- * Una nota nella storia: sopra, in Geist Mono, che cosa è e a cosa è collegata ("Nota · Tutto l'esperimento",
+ * Una nota nella storia: sopra, nel font dei dati, che cosa è e a cosa è collegata ("Nota · Tutto l'esperimento",
  * "Promemoria · W1"); sotto il testo (3 righe, barrato se è un promemoria fatto). Il tocco la apre nel Diario.
  */
 function RigaNotaStoria({ espId, config, nota }: { espId: string; config: ConfigEsperimento; nota: Nota }) {

@@ -18,7 +18,7 @@ interface GraficoSvgProps {
   titolo: string
   /** Per l'immagine dell'Excel: fondo foglio, titolo e legenda dentro il disegno, e il font incorporato se c'è. */
   perImmagine?: boolean
-  /** Il woff2 di Geist Mono come data URL (`fontGeistMono`), solo per l'immagine; `null` = ripiego su un monospazio di sistema. */
+  /** Il woff2 del font dei dati come data URL (`fontDati`), solo per l'immagine; `null` = ripiego su un monospazio di sistema. */
   fontIncorporato?: string | null
   /** La data scelta con un tocco: una linea verticale sottile. */
   cursore?: string | null
@@ -29,7 +29,7 @@ interface GraficoSvgProps {
  * `renderToStaticMarkup` per l'immagine dell'Excel (lo stesso disegno per tutti e due). La geometria viene da
  * `impagina` (`domain/grafico.ts`). I colori sono esadecimali scritti nel disegno: un SVG trasformato in immagine non
  * legge le variabili CSS. Linee di 2 px, marcatori di circa 8 px con un anello color carta dove si sovrappongono,
- * griglia solo orizzontale, testi in Geist Mono grafite tenue (mai nel colore della serie).
+ * griglia solo orizzontale, testi nel font dei dati grafite tenue (mai nel colore della serie).
  */
 export function GraficoSvg({
   serie, note, scala, unita, larghezza, altezza, titolo, perImmagine = false, fontIncorporato = null, cursore = null,
@@ -53,7 +53,7 @@ export function GraficoSvg({
       style={perImmagine ? undefined : { display: 'block', maxWidth: '100%', height: 'auto' }}
     >
       {perImmagine && fontIncorporato && (
-        <style>{`@font-face{font-family:"Geist Mono Variable";src:url(${fontIncorporato}) format("woff2");font-weight:100 900;font-style:normal}`}</style>
+        <style>{`@font-face{font-family:"Atkinson Hyperlegible Mono Variable";src:url(${fontIncorporato}) format("woff2");font-weight:200 800;font-style:normal}`}</style>
       )}
       {perImmagine && <rect width={imp.larghezza} height={imp.altezza} fill={fondo} />}
       {perImmagine && imp.titolo && (

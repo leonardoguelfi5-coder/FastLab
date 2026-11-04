@@ -13,7 +13,7 @@ export type StatoRiepilogo =
 
 /**
  * «Il file conterrà:» (spec §5.6): i fogli e le righe che il file avrà, nelle parole di `testoRiepilogo`, calcolati sulla
- * stessa cartella che poi diventa il file. Fondo carta ombra, Geist Mono; l'area è «polite» perché i numeri cambiano a
+ * stessa cartella che poi diventa il file. Fondo carta ombra, font dei dati; l'area è «polite» perché i numeri cambiano a
  * ogni scelta e chi usa un lettore di schermo li senta senza essere interrotto.
  */
 export function Riepilogo({ stato }: { stato: StatoRiepilogo }) {

@@ -15,7 +15,7 @@ import type { ConfigEsperimento } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
 import { ErroreApp } from '@/lib/errori'
 import { ALTEZZA_IMMAGINE, LARGHEZZA_IMMAGINE, scriviCartella } from '@/lib/excel/scriviXlsx'
-import { fontGeistMono, svgInPng } from '@/lib/graficoPng'
+import { fontDati, svgInPng } from '@/lib/graficoPng'
 import { consegna } from '@/lib/scaricaFile'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 
@@ -103,7 +103,7 @@ async function preparaDisegno(): Promise<((g: GraficoDaDisegnare) => string) | n
   } catch {
     return null
   }
-  const font = await fontGeistMono()
+  const font = await fontDati()
   return g => render(createElement(GraficoSvg, {
     serie: g.serie, note: g.note, scala: g.scala, unita: g.unita, larghezza: LARGHEZZA_IMMAGINE, altezza: ALTEZZA_IMMAGINE,
     titolo: titoloImmagine(g), perImmagine: true, fontIncorporato: font,

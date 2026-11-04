@@ -54,10 +54,10 @@ describe('GraficoSvg', () => {
   it('barre d\'errore solo dove c\'è l\'errore standard', () => {
     expect(render().match(/data-barre="/g)).toHaveLength(2)
   })
-  it('il segno della nota e le tacche con i numeri in Geist Mono', () => {
+  it('il segno della nota e le tacche con i numeri nel font dei dati', () => {
     const html = render()
     expect(html).toContain('data-nota="2026-10-06"')
-    expect(html).toContain('Geist Mono Variable')
+    expect(html).toContain('Atkinson Hyperlegible Mono Variable')
     expect(html).toContain('01/10')
     expect(html).toContain('11/10')
     expect(html).toContain('46 SPAD')
@@ -79,6 +79,8 @@ describe('GraficoSvg', () => {
   it('incorpora il font quando è dato, senza chiamare nessuna rete', () => {
     const html = render({ perImmagine: true, fontIncorporato: 'data:font/woff2;base64,AAAA' })
     expect(html).toContain('@font-face')
+    expect(html).toContain('font-family:"Atkinson Hyperlegible Mono Variable"')
+    expect(html).toContain('font-weight:200 800')
     expect(html).toContain('data:font/woff2;base64,AAAA')
     expect(html).not.toMatch(/https?:\/\/(?!www\.w3\.org)/)
   })

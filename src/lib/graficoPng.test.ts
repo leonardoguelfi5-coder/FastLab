@@ -132,23 +132,31 @@ describe('svgInPng', () => {
   })
 })
 
-describe('fontGeistMono', () => {
+describe('fontDati', () => {
   beforeEach(() => { vi.resetModules() })
 
   it('legge il woff2 una volta e lo dà come data URL', async () => {
     const fetchFinto = vi.fn(async () => new Response(new Uint8Array([0, 1, 2, 250, 255]), { status: 200 }))
     vi.stubGlobal('fetch', fetchFinto)
-    const { fontGeistMono } = await import('./graficoPng')
-    const a = await fontGeistMono()
+    const { fontDati } = await import('./graficoPng')
+    const a = await fontDati()
     expect(a).toBe('data:font/woff2;base64,AAEC+v8=')
-    expect(await fontGeistMono()).toBe(a)
+    expect(await fontDati()).toBe(a)
     expect(fetchFinto).toHaveBeenCalledTimes(1)
+  })
+
+  it('legge il file di Atkinson Hyperlegible Mono', async () => {
+    const fetchFinto = vi.fn<(url: string) => Promise<Response>>(async () => new Response(new Uint8Array([1]), { status: 200 }))
+    vi.stubGlobal('fetch', fetchFinto)
+    const { fontDati } = await import('./graficoPng')
+    await fontDati()
+    expect(String(fetchFinto.mock.calls[0][0])).toContain('atkinson-hyperlegible-mono')
   })
 
   it('se la lettura fallisce dà null (l\'immagine ripiega su un monospazio di sistema)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline') }))
-    const { fontGeistMono } = await import('./graficoPng')
-    expect(await fontGeistMono()).toBeNull()
+    const { fontDati } = await import('./graficoPng')
+    expect(await fontDati()).toBeNull()
   })
 
   it('una risposta non riuscita dà null, e al tentativo dopo si riprova', async () => {
@@ -156,16 +164,16 @@ describe('fontGeistMono', () => {
       .mockResolvedValueOnce(new Response('no', { status: 404 }))
       .mockResolvedValueOnce(new Response(new Uint8Array([1]), { status: 200 }))
     vi.stubGlobal('fetch', fetchFinto)
-    const { fontGeistMono } = await import('./graficoPng')
-    expect(await fontGeistMono()).toBeNull()
-    expect(await fontGeistMono()).toBe('data:font/woff2;base64,AQ==')
+    const { fontDati } = await import('./graficoPng')
+    expect(await fontDati()).toBeNull()
+    expect(await fontDati()).toBe('data:font/woff2;base64,AQ==')
   })
 
   it('un file grande non rompe la conversione in base64', async () => {
     const grande = new Uint8Array(100_000).fill(65)
     vi.stubGlobal('fetch', vi.fn(async () => new Response(grande, { status: 200 })))
-    const { fontGeistMono } = await import('./graficoPng')
-    const url = await fontGeistMono()
+    const { fontDati } = await import('./graficoPng')
+    const url = await fontDati()
     expect(url?.startsWith('data:font/woff2;base64,')).toBe(true)
     expect(atob((url as string).split(',')[1])).toHaveLength(100_000)
   })

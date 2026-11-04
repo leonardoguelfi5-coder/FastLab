@@ -19,7 +19,7 @@ import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
 
 /**
- * La riga in Geist Mono sotto il nome di uno strumento. Mai un dato falso: finché le letture non arrivano "…", e se
+ * La riga nel font dei dati sotto il nome di uno strumento. Mai un dato falso: finché le letture non arrivano "…", e se
  * la prima fallisce niente (la pagina si usa lo stesso); se fallisce una rilettura restano i dati già letti.
  *  - giro finito oggi: "fatto ✓";
  *  - giro iniziato oggi: "34/56";

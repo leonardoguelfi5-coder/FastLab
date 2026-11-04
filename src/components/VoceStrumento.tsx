@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react'
 import type { Strumento } from '@/domain/tipi'
 
 /**
- * La riga di uno strumento: icona, nome e una riga in Geist Mono sotto (il progresso, o da quanto non si misura).
+ * La riga di uno strumento: icona, nome e una riga nel font dei dati sotto (il progresso, o da quanto non si misura).
  * Un tocco lo sceglie (`onScegli`). La riga di sotto è sempre presente, anche vuota: la riga non cambia altezza quando
  * i dati arrivano. Comune a "Nuova misura" e a Oggi.
  */

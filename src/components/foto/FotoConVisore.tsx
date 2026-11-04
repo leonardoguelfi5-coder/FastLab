@@ -15,7 +15,7 @@ interface MiniaturaProps {
 
 /**
  * Una miniatura quadrata che apre il visore. Il bersaglio è l'intera casella (mai sotto i 44 px). Una foto archiviata
- * non ha il file: segnaposto, e l'URL non si chiede. L'etichetta della pianta, se c'è, è in Geist Mono in un angolo.
+ * non ha il file: segnaposto, e l'URL non si chiede. L'etichetta della pianta, se c'è, è nel font dei dati in un angolo.
  */
 function Miniatura({ foto, config, url, onApri }: MiniaturaProps) {
   // L'URL che non si è caricato: un URL rinnovato riparte da capo (un file che prima non c'era può esserci ora).
@@ -52,7 +52,7 @@ interface FotoConVisoreProps {
   foto: Foto[]
   /** Gli URL firmati per percorso: undefined finché non sono letti. */
   urls: Map<string, string> | undefined
-  /** Un gruppo per giorno, con la data in Geist Mono (la galleria); senza, una sola griglia (scheda, nota). */
+  /** Un gruppo per giorno, con la data nel font dei dati (la galleria); senza, una sola griglia (scheda, nota). */
   perGiorno?: boolean
   /** Il nome della lista per chi non la vede. */
   nome: string

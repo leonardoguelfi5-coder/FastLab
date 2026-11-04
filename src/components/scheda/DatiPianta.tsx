@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { cn } from '@/lib/utils'
 import type { ConfigEsperimento, Pianta } from '@/domain/tipi'
 
-/** Una riga del registro: la voce a sinistra in grafite tenue, il valore a destra (`mono`: in Geist Mono, per le etichette). */
+/** Una riga del registro: la voce a sinistra in grafite tenue, il valore a destra (`mono`: nel font dei dati, per le etichette). */
 function Voce({ nome, children, mono }: { nome: string; children: string; mono?: boolean }) {
   return (
     <div className="flex min-h-11 items-center justify-between gap-4 border-b border-riga py-2">
