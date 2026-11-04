@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
-vi.mock('@/api/foto', () => ({ eliminaFoto: vi.fn(), listaFoto: vi.fn(), spazioFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
+vi.mock('@/api/foto', () => ({ eliminaFoto: vi.fn(), listaFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(() => 'id-toast'), { error: vi.fn(), dismiss: vi.fn(), warning: vi.fn() }) }))
 
 import { toast } from 'sonner'

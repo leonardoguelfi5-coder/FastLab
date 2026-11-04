@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
-vi.mock('@/api/foto', () => ({ caricaFoto: vi.fn(), listaFoto: vi.fn(), spazioFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
+vi.mock('@/api/foto', () => ({ caricaFoto: vi.fn(), listaFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 vi.mock('@/lib/immagini', () => ({ dataDiScatto: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn(), dismiss: vi.fn(), warning: vi.fn() }) }))

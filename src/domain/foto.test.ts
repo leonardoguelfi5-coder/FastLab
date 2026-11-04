@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  descriviFoto, filtraFoto, testoArchiviata, formattaMegabyte, fotoDellaNota, fotoDellaPianta, LIMITE_SPAZIO_BYTE, percorsoFoto, quotaSpazio,
+  descriviFoto, filtraFoto, testoArchiviata, formattaMegabyte, fotoDellaNota, fotoDellaPianta, LIMITE_SPAZIO_BYTE, percorsoFoto,
   raggruppaPerData, reinserisciFoto, senzaFoto,
 } from './foto'
 import type { ConfigEsperimento, Foto } from './tipi'
@@ -111,27 +111,6 @@ describe('formattaMegabyte', () => {
     expect(formattaMegabyte(12_340_000)).toBe('12,3 MB')
     expect(formattaMegabyte(1_000_000)).toBe('1 MB')
     expect(formattaMegabyte(LIMITE_SPAZIO_BYTE)).toBe('1000 MB')
-  })
-})
-
-describe('quotaSpazio', () => {
-  it('il limite del piano gratuito è 1 GB', () => {
-    expect(LIMITE_SPAZIO_BYTE).toBe(1_000_000_000)
-  })
-
-  it('dà la percentuale usata, arrotondata, e avvisa solo oltre l\'80%', () => {
-    expect(quotaSpazio(0)).toEqual({ percentuale: 0, oltreSoglia: false })
-    expect(quotaSpazio(456_700_000)).toEqual({ percentuale: 46, oltreSoglia: false })
-    // Esattamente l'80% non è "oltre".
-    expect(quotaSpazio(800_000_000)).toEqual({ percentuale: 80, oltreSoglia: false })
-    expect(quotaSpazio(800_000_001).oltreSoglia).toBe(true)
-    expect(quotaSpazio(950_000_000)).toEqual({ percentuale: 95, oltreSoglia: true })
-  })
-
-  it('oltre il limite la percentuale supera 100 (il numero è onesto) ma la barra si ferma a 100', () => {
-    const q = quotaSpazio(1_200_000_000)
-    expect(q.percentuale).toBe(120)
-    expect(q.oltreSoglia).toBe(true)
   })
 })
 

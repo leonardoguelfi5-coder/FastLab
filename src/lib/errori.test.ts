@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, ErroreApp, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
-  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, eNomeExportGiaUsato, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE,
+  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, eNomeExportGiaUsato, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE, STRUMENTO_CON_MISURE_ARRIVATE,
 } from './errori'
 
 afterEach(() => { vi.restoreAllMocks() })
@@ -168,6 +168,14 @@ describe('messaggioErrore', () => {
   it('il nome dell\'indice del catalogo senza 23505 non basta', () => {
     expect(messaggioErrore({ code: 'P0001', message: 'catalogo_strumenti_nome_unico' }))
       .not.toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
+  it('strumento eliminato mentre arrivavano le sue misure (23503 su misure_strumento_id_esperimento_id_fkey)', () => {
+    expect(messaggioErrore({
+      code: '23503',
+      message: 'update or delete on table "strumenti" violates foreign key constraint "misure_strumento_id_esperimento_id_fkey" on table "misure"',
+    })).toBe(STRUMENTO_CON_MISURE_ARRIVATE)
+    expect(STRUMENTO_CON_MISURE_ARRIVATE).toBe('Nel frattempo sono arrivate misure di questo strumento: si può solo archiviare.')
   })
 
   it('dati collegati (23503)', () => {

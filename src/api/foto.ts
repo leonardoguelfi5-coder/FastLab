@@ -163,35 +163,6 @@ export async function aggiornaFoto(
 }
 
 /**
- * I byte occupati dalle foto dell'esperimento e da tutto il progetto visibile (quelle di cui si è membri). Le foto
- * archiviate non contano: il loro file non c'è più. La somma si fa qui perché non c'è una RPC: si leggono solo id,
- * esperimento e peso, a pagine.
- */
-export async function spazioFoto(espId: string): Promise<{ esperimento: number; progetto: number }> {
-  const viste = new Set<string>()
-  let esperimento = 0
-  let progetto = 0
-  for (let da = 0; ; ) {
-    const { data, error } = await supabase
-      .from('foto')
-      .select('id, esperimento_id, byte')
-      .eq('archiviata', false)
-      .order('id')
-      .range(da, da + PAGINA - 1)
-    if (error) throw error
-    const righe = (data ?? []) as { id: string; esperimento_id: string; byte: number | null }[]
-    if (righe.length === 0) return { esperimento, progetto }
-    for (const r of righe) {
-      if (viste.has(r.id)) continue
-      viste.add(r.id)
-      progetto += r.byte ?? 0
-      if (r.esperimento_id === espId) esperimento += r.byte ?? 0
-    }
-    da += righe.length
-  }
-}
-
-/**
  * I nomi dei file delle foto nella cartella di un esperimento (`<uuid>.jpg`), letti a pagine. Contano solo i nomi
  * `<uuid>.jpg` (le foto): le sottocartelle (voci senza id) e altri file, come il segnaposto che il servizio può creare in
  * una cartella vuota, non sono nostri e non si toccano. Lancia se l'elenco fallisce.

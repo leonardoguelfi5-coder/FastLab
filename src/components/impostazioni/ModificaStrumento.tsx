@@ -4,6 +4,8 @@ import { Conferma } from '@/components/Conferma'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button } from '@/components/ui/button'
 import type { Parametro } from '@/domain/tipi'
+import { spiegaConMisure, testoConfermaElimina } from '@/domain/conteggi'
+import { AttesaMisure, NonEliminabile } from './EliminaStrumento'
 import type { BozzaStrumento, GestoreStrumenti } from './useStrumenti'
 
 interface ModificaStrumentoProps {
@@ -13,19 +15,21 @@ interface ModificaStrumentoProps {
   tabella?: boolean
 }
 
-type Chiede = 'archivia' | 'elimina' | { valore: Parametro } | null
+type Chiede = 'archivia' | 'elimina' | 'spiega' | { valore: Parametro } | null
 
 /**
- * Il corpo di una voce di strumento nelle impostazioni: l'editor con i suoi valori, i problemi, "Salva" e le azioni sullo
- * strumento. "Elimina" compare solo se si sa che non ha misure; "Archivia" è sempre possibile. Per un valore già salvato il
- * pulsante è "Archivia il valore" (con dati, o finché non si sa) oppure "Elimina il valore" (senza dati, con conferma).
+ * Il corpo di una voce di strumento nelle impostazioni: in alto le azioni sullo strumento salvato, poi l'editor con i suoi
+ * valori, i problemi e "Salva". "Archivia" e "Elimina" si vedono sempre. "Elimina" elimina solo uno strumento che si sa
+ * senza misure (con conferma); con misure spiega quante sono e offre "Archivia"; finché le misure non sono contate è
+ * spento e lo dice. Per un valore già salvato il pulsante è "Archivia il valore" (con dati, o finché non si sa) oppure
+ * "Elimina il valore" (senza dati, con conferma).
  */
 export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) {
   const [chiede, setChiede] = useState<Chiede>(null)
   const salvato = g.salvato(voce.id)
   const modificato = g.modificato(voce)
   const { dello, tutti } = g.problemi(voce)
-  const conMisure = g.conMisure(voce.id)
+  const misure = g.misure(voce.id)
   // I valori che sparirebbero con lo strumento: quelli salvati (i nuovi non esistono ancora).
   const suoi = salvato ? voce.parametri.filter(p => salvato.parametri.some(pp => pp.parametro_id === p.id)) : []
   const daEliminare = typeof chiede === 'object' && chiede !== null ? chiede.valore : null
@@ -60,8 +64,40 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
     )
   }
 
+  function tocca() {
+    if (misure.stato === 'nessuna') setChiede('elimina')
+    else if (misure.stato === 'alcune') setChiede('spiega')
+  }
+
+  // Dalla spiegazione: senza modifiche si archivia subito (si ripristina quando si vuole); con modifiche non salvate
+  // si passa dalla conferma di "Archivia", che avverte che andranno perse.
+  function archiviaDallaSpiegazione() {
+    if (modificato) { setChiede('archivia'); return }
+    setChiede(null)
+    if (salvato) void g.archivia(salvato)
+  }
+
   return (
     <>
+      {salvato !== undefined && (
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {!tabella && (
+              <Button variant="outline" size="sm" disabled={g.inCorso} onClick={() => setChiede('archivia')}>Archivia strumento</Button>
+            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={g.inCorso || misure.stato === 'contando' || misure.stato === 'errore'}
+              onClick={tocca}
+            >
+              {tabella ? 'Elimina la tabella fenologica' : 'Elimina strumento'}
+            </Button>
+          </div>
+          <AttesaMisure misure={misure} />
+        </div>
+      )}
+
       <EditorStrumento
         valore={{ strumento: voce.strumento, parametri: voce.parametri }}
         onChange={v => g.cambia(voce, { id: voce.id, ...v })}
@@ -85,21 +121,10 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
         )}
       </div>
 
-      {salvato === undefined ? (
+      {salvato === undefined && (
         <Button variant="destructive" size="sm" className="self-start" disabled={g.inCorso} onClick={() => g.scarta(voce)}>
           Scarta
         </Button>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2">
-          {!tabella && (
-            <Button variant="outline" size="sm" disabled={g.inCorso} onClick={() => setChiede('archivia')}>Archivia strumento</Button>
-          )}
-          {conMisure === false && g.valoriNoti && (
-            <Button variant="destructive" size="sm" disabled={g.inCorso} onClick={() => setChiede('elimina')}>
-              {tabella ? 'Elimina la tabella fenologica' : 'Elimina strumento'}
-            </Button>
-          )}
-        </div>
       )}
 
       <Conferma
@@ -117,15 +142,18 @@ export function ModificaStrumento({ g, voce, tabella }: ModificaStrumentoProps) 
       <Conferma
         aperta={chiede === 'elimina'}
         titolo={tabella ? 'Eliminare la tabella fenologica?' : `Eliminare lo strumento «${voce.strumento.nome}»?`}
-        testo={
-          `${tabella ? 'La tabella non ha misure.' : 'Lo strumento non ha misure.'} `
-          + (suoi.length > 0 ? `Si eliminano anche i suoi valori (${suoi.map(p => p.nome.trim()).join(', ')}): non hanno dati. ` : '')
-          + 'L\'operazione non si può annullare.'
-        }
+        testo={testoConfermaElimina(!!tabella, suoi.map(p => p.nome.trim()))}
         annulla="Annulla"
         conferma="Elimina"
         onAnnulla={() => setChiede(null)}
         onConferma={() => { setChiede(null); if (salvato) void g.elimina(salvato) }}
+      />
+      <NonEliminabile
+        aperta={chiede === 'spiega' && misure.stato === 'alcune'}
+        titolo={tabella ? 'La tabella fenologica non si può eliminare' : `Lo strumento «${voce.strumento.nome}» non si può eliminare`}
+        testo={misure.stato === 'alcune' ? spiegaConMisure(misure.conteggio, tabella ? 'tabella' : 'strumento') : ''}
+        onChiudi={() => setChiede(null)}
+        onArchivia={tabella ? undefined : archiviaDallaSpiegazione}
       />
       <Conferma
         aperta={daEliminare !== null}

@@ -9,7 +9,7 @@ import { simulaSupabase } from '@/test/supabase-mock'
 import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
 import type { Foto } from '@/domain/tipi'
 import {
-  aggiornaFoto, archiviaFileFoto, caricaFoto, eliminaFileEsperimento, fileFotoPresenti, eliminaFoto, listaFoto, spazioFoto, urlFoto,
+  aggiornaFoto, archiviaFileFoto, caricaFoto, eliminaFileEsperimento, fileFotoPresenti, eliminaFoto, listaFoto, urlFoto,
 } from './foto'
 
 const E = 'e0000000-0000-4000-8000-000000000001'
@@ -343,41 +343,6 @@ describe('aggiornaFoto', () => {
   it('una foto eliminata nel frattempo fa fallire l\'aggiornamento', async () => {
     mock.risponde('foto', { data: [] })
     await expect(aggiornaFoto(E, ID, { data: '2026-10-30' })).rejects.toThrow(ELEMENTO_NON_TROVATO)
-  })
-})
-
-describe('spazioFoto', () => {
-  let n = 0
-  const riga = (esp: string, byte: number | null) => ({ id: `r${n++}`, esperimento_id: esp, byte })
-
-  it('somma i byte delle foto dell\'esperimento e di tutto il progetto, a pagine', async () => {
-    const chiamate: unknown[][] = []
-    const pagine: unknown[][] = [[riga(E, 1000), riga('altro', 500)], [riga(E, null), riga('altro', 250)], []]
-    vi.mocked(supabase.from).mockImplementation((() => {
-      const pagina = pagine.shift() ?? []
-      const q: unknown = new Proxy({}, {
-        get: (_t, prop) => prop === 'then'
-          ? (ok: (v: unknown) => unknown) => Promise.resolve({ data: pagina, error: null }).then(ok)
-          : (...args: unknown[]) => { chiamate.push([prop, ...args]); return q },
-      })
-      return q
-    }) as never)
-
-    expect(await spazioFoto(E)).toEqual({ esperimento: 1000, progetto: 1750 })
-    // Le foto archiviate non occupano più spazio: non si contano.
-    expect(chiamate.slice(0, 4)).toEqual([
-      ['select', 'id, esperimento_id, byte'], ['eq', 'archiviata', false], ['order', 'id'], ['range', 0, 999],
-    ])
-  })
-
-  it('senza foto è zero', async () => {
-    mock.risponde('foto', { data: [] })
-    expect(await spazioFoto(E)).toEqual({ esperimento: 0, progetto: 0 })
-  })
-
-  it('un errore di lettura non si nasconde', async () => {
-    mock.risponde('foto', { error: errore })
-    await expect(spazioFoto(E)).rejects.toBe(errore)
   })
 })
 

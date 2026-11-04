@@ -1,12 +1,13 @@
 import { useCallback, useMemo } from 'react'
 import { keepPreviousData, QueryClient, queryOptions, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati, pianteNonEliminabili, strumentiConDati } from './configurazione'
+import { conteggiStrumenti, parametriConDati, pianteConDati, pianteNonEliminabili } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaExportSalvati } from './exportSalvati'
-import { listaFoto, spazioFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
+import { listaFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
+import { spazioProgetto } from './spazio'
 import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import type { Misura } from '@/domain/tipi'
 
@@ -18,7 +19,7 @@ export const chiavi = {
   parametriConDati: (espId: string) => ['config', espId, 'parametriConDati'] as const,
   pianteConDati: (espId: string) => ['config', espId, 'pianteConDati'] as const,
   pianteNonEliminabili: (espId: string) => ['config', espId, 'pianteNonEliminabili'] as const,
-  strumentiConDati: (espId: string) => ['config', espId, 'strumentiConDati'] as const,
+  conteggiStrumenti: (espId: string) => ['config', espId, 'conteggiStrumenti'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
   misura: (id: string) => ['misure', 'una', id] as const,
@@ -32,7 +33,8 @@ export const chiavi = {
   note: (espId: string) => ['note', espId] as const,
   /** Le foto di un esperimento: salvataggio, eliminazione e modifica la invalidano (con lo spazio, che sta sotto di lei). */
   foto: (espId: string) => ['foto', espId] as const,
-  spazioFoto: (espId: string) => ['foto', espId, 'spazio'] as const,
+  /** Lo spazio del progetto visto da un esperimento: sotto le foto, "Libera lo spazio" e ogni foto lo rileggono. */
+  spazio: (espId: string) => ['foto', espId, 'spazio'] as const,
   /** Gli URL firmati di un gruppo di percorsi: fuori dal prefisso `foto`, non si rileggono a ogni modifica di una foto. */
   urlFoto: (percorsi: readonly string[]) => ['urlFoto', [...percorsi].sort().join('|')] as const,
   /** Gli export salvati dell'utente in un esperimento: fuori dalle misure, si invalidano a ogni salvataggio o eliminazione. */
@@ -100,11 +102,14 @@ export function usePianteNonEliminabili(espId: string | undefined) {
   })
 }
 
-/** Gli id degli strumenti con almeno una misura: freschi a ogni apertura, da questo dipende se offrire "Elimina". */
-export function useStrumentiConDati(espId: string | undefined) {
+/**
+ * Quante misure ha ogni strumento (solo quelli che ne hanno), di quante piante e in che date: da questo dipende se
+ * "Elimina" elimina o spiega perché non si può. Fresco a ogni apertura, come `useParametriConDati`.
+ */
+export function useConteggiStrumenti(espId: string | undefined) {
   return useQuery({
-    queryKey: chiavi.strumentiConDati(espId ?? ''),
-    queryFn: () => strumentiConDati(espId as string),
+    queryKey: chiavi.conteggiStrumenti(espId ?? ''),
+    queryFn: () => conteggiStrumenti(espId as string),
     enabled: !!espId,
     staleTime: 0,
   })
@@ -285,11 +290,11 @@ export function useUrlFoto(percorsi: readonly string[]) {
   })
 }
 
-/** Lo spazio occupato dalle foto, dell'esperimento e del progetto (Impostazioni). Sempre fresco all'apertura. */
-export function useSpazioFoto(espId: string | undefined) {
+/** Lo spazio di tutto il progetto (database e foto) e i conteggi dell'esperimento (Impostazioni). Sempre fresco all'apertura. */
+export function useSpazioProgetto(espId: string | undefined) {
   return useQuery({
-    queryKey: chiavi.spazioFoto(espId ?? ''),
-    queryFn: () => spazioFoto(espId as string),
+    queryKey: chiavi.spazio(espId ?? ''),
+    queryFn: () => spazioProgetto(espId as string),
     enabled: !!espId,
     staleTime: 0,
   })

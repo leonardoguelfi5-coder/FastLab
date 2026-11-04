@@ -17,15 +17,16 @@ vi.mock('@/api/esperimenti', () => ({
   listaEsperimenti: vi.fn(), caricaConfig: vi.fn(), creaEsperimento: vi.fn(), aggiornaEsperimento: vi.fn(),
 }))
 vi.mock('@/api/configurazione', () => ({
-  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), strumentiConDati: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
+  salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), conteggiStrumenti: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
   archiviaParametro: vi.fn(), archiviaStrumento: vi.fn(),
   salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
   aggiornaTrattamento: vi.fn(),
 }))
 vi.mock('@/api/foto', () => ({
-  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(),
   archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
+vi.mock('@/api/spazio', () => ({ spazioProgetto: vi.fn() }))
 vi.mock('@/api/catalogo', () => ({
   listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
 }))
@@ -37,10 +38,11 @@ import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { aggiornaEsperimento, caricaConfig } from '@/api/esperimenti'
 import { listaCatalogo, salvaVoceCatalogo } from '@/api/catalogo'
-import { listaFoto, spazioFoto } from '@/api/foto'
+import { listaFoto } from '@/api/foto'
+import { spazioProgetto, type SpazioProgetto } from '@/api/spazio'
 import {
   aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro,
-  eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaParametro, salvaStrumento, strumentiConDati,
+  conteggiStrumenti, eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaParametro, salvaStrumento,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
@@ -50,6 +52,12 @@ import { toastSalvato } from '@/lib/toastSalvato'
 import { Impostazioni } from './Impostazioni'
 
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
+/** Le misure del Termometro, l'unico strumento che ne ha. */
+const MISURE_TERMOMETRO = { misure: 312, piante: 56, prima: '2026-10-14', ultima: '2026-11-03' }
+const SPAZIO: SpazioProgetto = {
+  database_byte: 38_400_000, foto_byte: 210_000_000,
+  esperimento: { misure: 3120, note: 14, foto: 85, dati_byte: 1_830_000, foto_byte: 29_000_000 },
+}
 
 /** La configurazione "nel database": le funzioni dell'API finta la leggono e la cambiano. */
 let config: ConfigEsperimento
@@ -110,10 +118,10 @@ beforeEach(() => {
   vi.mocked(pianteConDati).mockImplementation(async () => new Set([idPianta('1')]))
   // Nessuna nota o foto: non si può eliminare solo la pianta 1, quella con le misure.
   vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1')]))
-  vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 12_340_000, progetto: 456_700_000 })
+  vi.mocked(spazioProgetto).mockResolvedValue(SPAZIO)
   vi.mocked(listaFoto).mockResolvedValue([])
   // Le misure della pianta 1 sono col Termometro; gli altri strumenti non ne hanno.
-  vi.mocked(strumentiConDati).mockImplementation(async () => new Set([strum('Termometro').id]))
+  vi.mocked(conteggiStrumenti).mockImplementation(async () => new Map([[strum('Termometro').id, MISURE_TERMOMETRO]]))
   vi.mocked(listaCatalogo).mockResolvedValue(SEMI_CATALOGO)
   vi.mocked(salvaVoceCatalogo).mockResolvedValue(undefined)
 
@@ -197,14 +205,14 @@ describe('Impostazioni: dal piano', () => {
     expect(await screen.findByRole('button', { name: /^🍃 Ciras/ })).toHaveTextContent('A · gs · E · Ci')
   })
 
-  it('"Archivia" su uno strumento con misure lo archivia (nessun delete); "Elimina" compare solo senza misure', async () => {
+  it('"Archivia" su uno strumento con misure lo archivia (nessun delete); "Elimina" resta visibile anche con misure', async () => {
     const termometro = strum('Termometro').id
     const { utente } = apri()
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
     const termometroAperto = aperta(rigaStrumento('Termometro'))
-    expect(termometroAperto.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(termometroAperto.getByRole('button', { name: 'Elimina strumento' })).toBeEnabled()
     await utente.click(termometroAperto.getByRole('button', { name: 'Archivia strumento' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Termometro»?' })
     expect(archiviaStrumento).not.toHaveBeenCalled()
@@ -469,53 +477,77 @@ describe('Impostazioni: piante', () => {
   })
 })
 
-describe('Impostazioni: spazio delle foto', () => {
-  const spazio = () => screen.findByRole('region', { name: 'Spazio delle foto' })
+describe('Impostazioni: spazio', () => {
+  const spazio = () => screen.findByRole('region', { name: 'Spazio' })
+  const barra = (dentro: ReturnType<typeof within>, nome: string) => dentro.getByRole('progressbar', { name: nome })
 
-  it('mostra lo spazio dell\'esperimento e il totale contro 1 GB, in MB e nel font dei dati', async () => {
+  it('due barre per tutto il progetto, database su 500 MB e foto su 1000 MB, con le cifre nel font dei dati', async () => {
     apri()
     const dentro = within(await spazio())
-    expect(await dentro.findByText('12,3 MB')).toHaveClass('font-mono')
-    expect(dentro.getByText('456,7 MB')).toHaveClass('font-mono')
-    expect(dentro.getByText(/su 1000 MB/)).toBeInTheDocument()
-    expect(spazioFoto).toHaveBeenCalledWith('E')
+    const database = (await dentro.findByText('Database')).closest('div') as HTMLElement
+    expect(database).toHaveTextContent('Database38 / 500 MB')
+    expect(within(database).getByText('38 / 500 MB')).toHaveClass('font-mono', 'tabular-nums')
+    expect(dentro.getByText('210 / 1000 MB')).toHaveClass('font-mono')
+    expect(barra(dentro, 'Database del progetto')).toHaveAttribute('aria-valuenow', '8')
+    expect(barra(dentro, 'Foto del progetto')).toHaveAttribute('aria-valuenow', '21')
+    expect(spazioProgetto).toHaveBeenCalledWith('E')
   })
 
-  it('dice che il totale conta solo gli esperimenti di cui si è membri, mentre il limite è dell\'intero progetto', async () => {
+  it('il dettaglio di questo esperimento, e che i numeri sono di tutto il progetto', async () => {
     apri()
     const dentro = within(await spazio())
-    await dentro.findByText('12,3 MB')
-    expect(dentro.getByText(/solo gli esperimenti di cui sei membro/)).toBeInTheDocument()
-    expect(dentro.getByText(/limite.*intero progetto/i)).toBeInTheDocument()
+    expect(await dentro.findByText('Questo esperimento: 3.120 misure, 14 note, 85 foto · circa 31 MB')).toBeInTheDocument()
+    expect(dentro.getByText('Anche vuoto, il database occupa qualche decina di MB (tabelle e sistema di Supabase).')).toBeInTheDocument()
+    expect(dentro.getByText('I numeri sono di tutto il progetto, anche degli esperimenti di altri.')).toBeInTheDocument()
   })
 
-  it('sotto l\'80% non avvisa', async () => {
-    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 12_340_000, progetto: 800_000_000 })
+  it('sotto l\'80% non avvisa e le barre sono grafite, mai verdi', async () => {
+    vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 800_000_000 })
     apri()
     const dentro = within(await spazio())
-    await dentro.findByText('800 MB')
+    await dentro.findByText('800 / 1000 MB')
     expect(dentro.queryByText(/Oltre l'80%/)).not.toBeInTheDocument()
-    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '80')
+    expect(barra(dentro, 'Foto del progetto')).toHaveAttribute('aria-valuenow', '80')
+    expect((barra(dentro, 'Foto del progetto').firstElementChild as HTMLElement).className).toMatch(/bg-grafite-tenue/)
+    expect(barra(dentro, 'Foto del progetto').innerHTML).not.toMatch(/success|green|verde|salvato/)
   })
 
-  it('oltre l\'80% avvisa, in tono attenzione e mai verde, e la barra lo ripete', async () => {
-    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 300_000_000, progetto: 850_000_000 })
+  it('oltre l\'80% delle foto avvisa, in tono attenzione e mai verde, e la barra lo ripete', async () => {
+    vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 850_000_000 })
     apri()
     const dentro = within(await spazio())
-    const avviso = (await dentro.findByText(/Oltre l'80% dello spazio/)).closest('p') as HTMLElement
+    const avviso = (await dentro.findByText(/Oltre l'80% dello spazio delle foto/)).closest('p') as HTMLElement
     expect(avviso).toHaveAttribute('role', 'status')
     expect(avviso).toHaveClass('text-attenzione')
     expect(avviso.className).not.toMatch(/success|green|verde/)
-    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '85')
+    expect(barra(dentro, 'Foto del progetto')).toHaveAttribute('aria-valuenow', '85')
+    expect((barra(dentro, 'Foto del progetto').firstElementChild as HTMLElement).className).toMatch(/bg-attenzione/)
+    expect((barra(dentro, 'Database del progetto').firstElementChild as HTMLElement).className).not.toMatch(/bg-attenzione/)
+  })
+
+  it('oltre l\'80% del database avvisa a parte', async () => {
+    vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, database_byte: 420_000_000 })
+    apri()
+    const dentro = within(await spazio())
+    expect(await dentro.findByText(/Oltre l'80% del database/)).toBeInTheDocument()
+    expect(dentro.queryByText(/Oltre l'80% dello spazio delle foto/)).not.toBeInTheDocument()
+    expect((barra(dentro, 'Database del progetto').firstElementChild as HTMLElement).className).toMatch(/bg-attenzione/)
   })
 
   it('oltre il limite la barra si ferma al 100 ma il numero è quello vero', async () => {
-    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 300_000_000, progetto: 1_200_000_000 })
+    vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 1_200_000_000 })
     apri()
     const dentro = within(await spazio())
-    await dentro.findByText('1200 MB')
-    expect(dentro.getByRole('progressbar', { name: 'Spazio usato' })).toHaveAttribute('aria-valuenow', '100')
-    expect(dentro.getByText(/Oltre l'80%/)).toBeInTheDocument()
+    await dentro.findByText('1200 / 1000 MB')
+    expect(barra(dentro, 'Foto del progetto')).toHaveAttribute('aria-valuenow', '100')
+  })
+
+  it('senza i conteggi dell\'esperimento (non membro) i totali restano, il dettaglio no', async () => {
+    vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, esperimento: null })
+    apri()
+    const dentro = within(await spazio())
+    await dentro.findByText('38 / 500 MB')
+    expect(dentro.queryByText(/Questo esperimento:/)).not.toBeInTheDocument()
   })
 
   it('un esperimento in corso spiega che l\'archivio .zip si fa a esperimento concluso, e dove si conclude', async () => {
@@ -538,14 +570,14 @@ describe('Impostazioni: spazio delle foto', () => {
   })
 
   it('mentre calcola non dà numeri; se non riesce lo dice con «Riprova»', async () => {
-    vi.mocked(spazioFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    vi.mocked(spazioProgetto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
     const dentro = within(await spazio())
     expect(await dentro.findByRole('alert')).toHaveTextContent('Il server non risponde')
-    expect(dentro.queryByText('12,3 MB')).not.toBeInTheDocument()
+    expect(dentro.queryByText('38 / 500 MB')).not.toBeInTheDocument()
     expect(dentro.queryByRole('progressbar')).not.toBeInTheDocument()
     await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
-    expect(await dentro.findByText('12,3 MB')).toBeInTheDocument()
+    expect(await dentro.findByText('38 / 500 MB')).toBeInTheDocument()
   })
 })
 
@@ -811,7 +843,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
     expect(termometro.getByRole('button', { name: 'Salva' })).toBeDisabled()
   })
 
-  it('"Elimina strumento" non c\'è finché non si sa quali valori hanno dati, né se quella lettura fallisce', async () => {
+  it('"Elimina strumento" si vede ma resta spento se non si sa quali valori hanno dati (lettura fallita)', async () => {
     vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
@@ -819,7 +851,8 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
 
     await utente.click(rigaStrumento('SPAD'))
     const spad = aperta(rigaStrumento('SPAD'))
-    expect(spad.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(spad.getByRole('button', { name: 'Elimina strumento' })).toBeDisabled()
+    expect(spad.getByText(/Non so ancora se ha dati/)).toBeInTheDocument()
     expect(spad.getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
   })
 
@@ -854,6 +887,21 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
     await utente.click(metro.getByRole('button', { name: 'Archivia strumento' }))
     dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Metro lungo»?' })
     expect(within(dialogo).getByText(/Le modifiche non salvate di questo strumento andranno perse\./)).toBeInTheDocument()
+  })
+
+  it('"Archivia" dalla spiegazione di uno strumento con misure e modifiche non salvate passa dalla conferma che lo avverte', async () => {
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Termometro'))
+    const termometro = aperta(rigaStrumento('Termometro'))
+    await utente.type(termometro.getByLabelText('Nome dello strumento'), ' nuovo')
+    await utente.click(termometro.getByRole('button', { name: 'Elimina strumento' }))
+    await utente.click(within(await screen.findByRole('dialog', { name: /non si può eliminare/ })).getByRole('button', { name: 'Archivia' }))
+
+    const dialogo = await screen.findByRole('dialog', { name: 'Archiviare lo strumento «Termometro nuovo»?' })
+    expect(within(dialogo).getByText(/Le modifiche non salvate di questo strumento andranno perse\./)).toBeInTheDocument()
+    expect(archiviaStrumento).not.toHaveBeenCalled()
   })
 })
 
@@ -976,36 +1024,126 @@ describe('Impostazioni: strumenti', () => {
     await utente.click(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Elimina strumento' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Elimina' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/«SPAD» ha già delle misure.*archivi/i)))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Nel frattempo sono arrivate misure di questo strumento: si può solo archiviare.'))
     expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
     expect(rigaStrumento('SPAD')).toBeInTheDocument()
     expect(aperta(rigaStrumento('SPAD')).getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
   })
 
-  it('"Elimina strumento" non c\'è finché non si sa quali strumenti hanno misure, né se la lettura fallisce', async () => {
-    let rispondi!: (s: Set<string>) => void
-    vi.mocked(strumentiConDati).mockReturnValue(new Promise(r => { rispondi = r }))
+  it('finché le misure non sono contate "Elimina strumento" è spento e lo dice: «Conto le misure…»', async () => {
+    let rispondi!: (m: Map<string, typeof MISURE_TERMOMETRO>) => void
+    vi.mocked(conteggiStrumenti).mockReturnValue(new Promise(r => { rispondi = r }))
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
 
     await utente.click(rigaStrumento('SPAD'))
     const spad = aperta(rigaStrumento('SPAD'))
-    expect(spad.queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
+    expect(spad.getByRole('button', { name: 'Elimina strumento' })).toBeDisabled()
+    expect(spad.getByText('Conto le misure…')).toBeInTheDocument()
     expect(spad.getByRole('button', { name: 'Archivia strumento' })).toBeEnabled()
 
-    await act(async () => { rispondi(new Set()) })
-    expect(await spad.findByRole('button', { name: 'Elimina strumento' })).toBeEnabled()
+    await act(async () => { rispondi(new Map()) })
+    await waitFor(() => expect(spad.getByRole('button', { name: 'Elimina strumento' })).toBeEnabled())
+    expect(spad.queryByText('Conto le misure…')).not.toBeInTheDocument()
   })
 
-  it('con la lettura delle misure in errore non c\'è "Elimina" e c\'è "Riprova"', async () => {
-    vi.mocked(strumentiConDati).mockRejectedValue(new TypeError('Failed to fetch'))
+  it('con la lettura delle misure in errore "Elimina" è spento, lo dice e c\'è "Riprova", che la rifà', async () => {
+    vi.mocked(conteggiStrumenti).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
     await sezione('Strumenti').findByRole('alert')
 
     await utente.click(rigaStrumento('SPAD'))
-    expect(aperta(rigaStrumento('SPAD')).queryByRole('button', { name: 'Elimina strumento' })).not.toBeInTheDocument()
-    expect(sezione('Strumenti').getByRole('button', { name: 'Riprova' })).toBeInTheDocument()
+    const spad = aperta(rigaStrumento('SPAD'))
+    expect(spad.getByRole('button', { name: 'Elimina strumento' })).toBeDisabled()
+    expect(spad.getByText(/Non so ancora se ha misure/)).toBeInTheDocument()
+    await utente.click(spad.getByRole('button', { name: 'Riprova' }))
+    await waitFor(() => expect(spad.getByRole('button', { name: 'Elimina strumento' })).toBeEnabled())
+    expect(conteggiStrumenti).toHaveBeenCalledTimes(2)
+  })
+
+  it('le azioni dello strumento stanno in alto, prima del nome da modificare e dei valori', async () => {
+    const { utente } = apri()
+    await pronta()
+    await utente.click(rigaStrumento('SPAD'))
+    const spad = aperta(rigaStrumento('SPAD'))
+    const elimina = spad.getByRole('button', { name: 'Elimina strumento' })
+    expect(elimina.compareDocumentPosition(spad.getByLabelText('Nome dello strumento')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(spad.getByRole('button', { name: 'Archivia strumento' }).compareDocumentPosition(spad.getByRole('button', { name: 'Salva' }))
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('con misure "Elimina strumento" spiega quante, di quante piante e in che date, e offre "Archivia": mai un delete', async () => {
+    const termometro = strum('Termometro').id
+    const { utente } = apri()
+    await pronta()
+
+    await utente.click(rigaStrumento('Termometro'))
+    await utente.click(aperta(rigaStrumento('Termometro')).getByRole('button', { name: 'Elimina strumento' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Lo strumento «Termometro» non si può eliminare' })
+    expect(dialogo).toHaveTextContent(
+      'Ha 312 misure di 56 piante, dal 14/10 al 03/11: non si può eliminare. Puoi archiviarlo: le misure restano.',
+    )
+    expect(within(dialogo).queryByRole('button', { name: 'Elimina' })).not.toBeInTheDocument()
+
+    await utente.click(within(dialogo).getByRole('button', { name: 'Chiudi' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(archiviaStrumento).not.toHaveBeenCalled()
+
+    await utente.click(aperta(rigaStrumento('Termometro')).getByRole('button', { name: 'Elimina strumento' }))
+    await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archivia' }))
+    await waitFor(() => expect(archiviaStrumento).toHaveBeenCalledWith('E', termometro))
+    expect(eliminaStrumento).not.toHaveBeenCalled()
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Strumento «Termometro» archiviato.'))
+  })
+
+  it('un archiviato senza misure si elimina dall\'elenco degli archiviati, dopo una conferma', async () => {
+    strum('Metro').archiviato = true
+    const metro = strum('Metro').id
+    const { utente } = apri()
+    await pronta()
+
+    const strumenti = sezione('Strumenti')
+    await utente.click(strumenti.getByRole('button', { name: 'Strumenti archiviati (1)' }))
+    const riga = within(strumenti.getByText('📏 Metro', { selector: 'span' }).closest('li') as HTMLElement)
+    await utente.click(riga.getByRole('button', { name: 'Elimina' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Eliminare lo strumento «Metro»?' })
+    expect(eliminaStrumento).not.toHaveBeenCalled()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(eliminaStrumento).toHaveBeenCalledWith('E', metro))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Strumento eliminato.'))
+    await waitFor(() => expect(strumenti.queryByRole('button', { name: /Strumenti archiviati/ })).not.toBeInTheDocument())
+  })
+
+  it('un archiviato con misure non si elimina: "Elimina" spiega quante misure ha, e che restano', async () => {
+    strum('Termometro').archiviato = true
+    const { utente } = apri()
+    await pronta()
+
+    const strumenti = sezione('Strumenti')
+    await utente.click(strumenti.getByRole('button', { name: 'Strumenti archiviati (1)' }))
+    const riga = within(strumenti.getByText('🌡 Termometro', { selector: 'span' }).closest('li') as HTMLElement)
+    await utente.click(riga.getByRole('button', { name: 'Elimina' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'Lo strumento «Termometro» non si può eliminare' })
+    expect(dialogo).toHaveTextContent('Ha 312 misure di 56 piante, dal 14/10 al 03/11: non si può eliminare.')
+    expect(dialogo).toHaveTextContent(/archiviato.*le misure restano/i)
+    expect(within(dialogo).queryByRole('button', { name: /^(Elimina|Archivia)$/ })).not.toBeInTheDocument()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Chiudi' }))
+    expect(eliminaStrumento).not.toHaveBeenCalled()
+  })
+
+  it('negli archiviati "Elimina" è spento finché le misure non sono contate', async () => {
+    strum('Metro').archiviato = true
+    vi.mocked(conteggiStrumenti).mockReturnValue(new Promise(() => {}))
+    const { utente } = apri()
+    await screen.findByRole('region', { name: 'Generale' })
+
+    const strumenti = sezione('Strumenti')
+    await utente.click(strumenti.getByRole('button', { name: 'Strumenti archiviati (1)' }))
+    const riga = within(strumenti.getByText('📏 Metro', { selector: 'span' }).closest('li') as HTMLElement)
+    expect(riga.getByRole('button', { name: 'Elimina' })).toBeDisabled()
+    expect(riga.getByRole('button', { name: 'Ripristina' })).toBeEnabled()
   })
 
   it('un archiviato si ripristina con "Ripristina"', async () => {
@@ -1212,12 +1350,17 @@ describe('Impostazioni: tabella fenologica', () => {
     expect(eliminaOArchiviaParametro).not.toHaveBeenCalled()
   })
 
-  it('con misure la tabella non si elimina: i suoi valori con dati si archiviano', async () => {
-    vi.mocked(strumentiConDati).mockResolvedValue(new Set([strum('Tabella fenologica').id]))
-    apri()
+  it('con misure la tabella non si elimina: "Elimina" spiega quante misure ha, senza "Archivia"', async () => {
+    vi.mocked(conteggiStrumenti).mockResolvedValue(new Map([[strum('Tabella fenologica').id, { misure: 1, piante: 1, prima: '2026-10-07', ultima: '2026-10-07' }]]))
+    const { utente } = apri()
     await pronta()
-    expect(tabella().queryByRole('button', { name: 'Elimina la tabella fenologica' })).not.toBeInTheDocument()
     expect(tabella().queryByRole('button', { name: /^Archivia/ })).not.toBeInTheDocument()
+    await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
+    const dialogo = await screen.findByRole('dialog', { name: 'La tabella fenologica non si può eliminare' })
+    expect(dialogo).toHaveTextContent('Ha 1 misura di 1 pianta, il 07/10: non si può eliminare.')
+    expect(within(dialogo).queryByRole('button', { name: /^(Elimina|Archivia)$/ })).not.toBeInTheDocument()
+    await utente.click(within(dialogo).getByRole('button', { name: 'Chiudi' }))
+    expect(eliminaStrumento).not.toHaveBeenCalled()
   })
 
   it('se manca, "Crea la tabella fenologica" ne prepara una vuota che si salva con le sue voci', async () => {

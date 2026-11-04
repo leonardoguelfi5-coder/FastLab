@@ -9,7 +9,7 @@ import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
   aggiornaParametroDaCatalogo, aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento,
   collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, pianteNonEliminabili, parametriConDati, salvaParametro,
-  salvaStrumento, strumentiConDati,
+  salvaStrumento, conteggiStrumenti,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -267,40 +267,41 @@ describe('eliminaStrumento', () => {
   })
 })
 
-describe('strumentiConDati', () => {
-  it('legge gli strumenti delle misure dell\'esperimento, uno solo per strumento', async () => {
-    mock.risponde('misure', { data: [{ strumento_id: 'pa1' }, { strumento_id: 'pa2' }, { strumento_id: 'pa1' }] })
+describe('conteggiStrumenti', () => {
+  it('chiama la RPC conteggi_strumenti e dà per ogni strumento misure, piante, prima e ultima data', async () => {
+    mock.risponde('rpc:conteggi_strumenti', {
+      data: [
+        { strumento_id: 'pa1', misure: 312, piante: 56, prima: '2026-10-14', ultima: '2026-11-03' },
+        { strumento_id: 'pa2', misure: 1, piante: 1, prima: '2026-10-07', ultima: '2026-10-07' },
+      ],
+    })
 
-    expect(await strumentiConDati('E')).toEqual(new Set(['pa1', 'pa2']))
-    expect(mock.di('misure').map(c => [c.metodo, ...c.args])).toEqual([
-      ['select', 'strumento_id'], ['eq', 'esperimento_id', 'E'], ['order', 'id'], ['range', 0, 999],
-    ])
+    expect(await conteggiStrumenti('E')).toEqual(new Map([
+      ['pa1', { misure: 312, piante: 56, prima: '2026-10-14', ultima: '2026-11-03' }],
+      ['pa2', { misure: 1, piante: 1, prima: '2026-10-07', ultima: '2026-10-07' }],
+    ]))
+    expect(supabase.rpc).toHaveBeenCalledWith('conteggi_strumenti', { p_esperimento: 'E' })
+    // Una sola lettura: niente più misure scaricate a pagine.
+    expect(supabase.from).not.toHaveBeenCalled()
   })
 
-  it('senza misure restituisce un Set vuoto', async () => {
-    mock.risponde('misure', { data: [] })
-    expect((await strumentiConDati('E')).size).toBe(0)
+  it('legge i conteggi anche se arrivano come testo (bigint)', async () => {
+    mock.risponde('rpc:conteggi_strumenti', {
+      data: [{ strumento_id: 'pa1', misure: '3120', piante: '2', prima: '2026-10-14', ultima: '2026-11-03' }],
+    })
+    expect((await conteggiStrumenti('E')).get('pa1')).toEqual({ misure: 3120, piante: 2, prima: '2026-10-14', ultima: '2026-11-03' })
   })
 
-  it('continua pagina dopo pagina finché ce ne sono: il limite di righe di PostgREST non nasconde uno strumento', async () => {
-    const pagine = [Array.from({ length: 1000 }, () => ({ strumento_id: 'pa1' })), [{ strumento_id: 'pa2' }]]
-    const intervalli: unknown[][] = []
-    vi.mocked(supabase.from).mockImplementation((() => {
-      const query: Record<string, unknown> = {}
-      query.select = () => query
-      query.eq = () => query
-      query.order = () => query
-      query.range = (...args: unknown[]) => { intervalli.push(args); return Promise.resolve({ data: pagine[intervalli.length - 1], error: null }) }
-      return query
-    }) as never)
-
-    expect(await strumentiConDati('E')).toEqual(new Set(['pa1', 'pa2']))
-    expect(intervalli).toEqual([[0, 999], [1000, 1999]])
+  it('senza misure restituisce una mappa vuota: nessuno strumento ha misure', async () => {
+    mock.risponde('rpc:conteggi_strumenti', { data: [] })
+    expect((await conteggiStrumenti('E')).size).toBe(0)
+    mock.risponde('rpc:conteggi_strumenti', { data: null })
+    expect((await conteggiStrumenti('E')).size).toBe(0)
   })
 
   it('lancia l\'errore di Supabase', async () => {
-    mock.risponde('misure', { error: errore })
-    await expect(strumentiConDati('E')).rejects.toBe(errore)
+    mock.risponde('rpc:conteggi_strumenti', { error: errore })
+    await expect(conteggiStrumenti('E')).rejects.toBe(errore)
   })
 })
 

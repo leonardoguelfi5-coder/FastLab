@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { CampiCatalogo } from '@/domain/catalogo'
+import type { ConteggioStrumento } from '@/domain/conteggi'
 import type { Parametro, Strumento, StrumentoParametro, Pianta } from '@/domain/tipi'
 import { controllaRighe } from './righe'
 import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } from './mappers'
@@ -52,25 +53,20 @@ export async function pianteNonEliminabili(espId: string): Promise<Set<string>> 
   return new Set((data ?? []) as string[])
 }
 
-/** Le righe di misure che si leggono in una volta: il massimo che PostgREST restituisce di norma. */
-const PAGINA_MISURE = 1000
+interface RigaConteggio { strumento_id: string; misure: number | string; piante: number | string; prima: string; ultima: string }
 
 /**
- * Ids degli strumenti dell'esperimento che compaiono in almeno una misura: non si possono eliminare, solo archiviare.
- * Si leggono gli `strumento_id` di tutte le misure, a pagine (PostgREST ne dà al massimo mille per volta: in una sola
- * lettura uno strumento potrebbe non comparire) e si tolgono i doppioni qui. Va bene finché le misure di un esperimento
- * sono poche migliaia; la guardia vera resta il database (eliminare uno strumento con misure dà 23503).
+ * Per ogni strumento dell'esperimento con almeno una misura: quante misure, di quante piante, la prima e l'ultima data
+ * (RPC `conteggi_strumenti`, migration 0015: un `group by` sul database, una sola lettura). Uno strumento che non c'è
+ * non ha misure: si può eliminare. La guardia vera resta il database (eliminare uno strumento con misure dà 23503).
  */
-export async function strumentiConDati(espId: string): Promise<Set<string>> {
-  const ids = new Set<string>()
-  for (let da = 0; ; da += PAGINA_MISURE) {
-    const { data, error } = await supabase
-      .from('misure').select('strumento_id').eq('esperimento_id', espId).order('id').range(da, da + PAGINA_MISURE - 1)
-    if (error) throw error
-    const righe = (data ?? []) as { strumento_id: string }[]
-    for (const r of righe) ids.add(r.strumento_id)
-    if (righe.length < PAGINA_MISURE) return ids
-  }
+export async function conteggiStrumenti(espId: string): Promise<Map<string, ConteggioStrumento>> {
+  const { data, error } = await supabase.rpc('conteggi_strumenti', { p_esperimento: espId })
+  if (error) throw error
+  return new Map(((data ?? []) as RigaConteggio[]).map(r => [
+    r.strumento_id,
+    { misure: Number(r.misure), piante: Number(r.piante), prima: r.prima, ultima: r.ultima },
+  ]))
 }
 
 /**

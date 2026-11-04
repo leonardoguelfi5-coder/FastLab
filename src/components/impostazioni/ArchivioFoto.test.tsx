@@ -6,17 +6,19 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
 vi.mock('@/api/foto', () => ({
-  listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600,
+  listaFoto: vi.fn(), urlFoto: vi.fn(), archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
+vi.mock('@/api/spazio', () => ({ spazioProgetto: vi.fn() }))
 vi.mock('@/api/note', () => ({ listaNote: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 
-import { archiviaFileFoto, fileFotoPresenti, listaFoto, spazioFoto, urlFoto } from '@/api/foto'
+import { archiviaFileFoto, fileFotoPresenti, listaFoto, urlFoto } from '@/api/foto'
+import { spazioProgetto } from '@/api/spazio'
 import { listaNote } from '@/api/note'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useArchivioSessione } from './archivioSessione'
-import { SezioneSpazioFoto } from './SezioneSpazioFoto'
+import { SezioneSpazio } from './SezioneSpazio'
 
 const E = 'e0000000-0000-4000-8000-000000000001'
 const NOME = 'Hydrochar 2026'
@@ -38,12 +40,12 @@ function apri(stato: 'in_corso' | 'concluso' = 'concluso') {
   const invalida = vi.spyOn(client, 'invalidateQueries')
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter><SezioneSpazioFoto espId={E} config={config(stato)} /></MemoryRouter>
+      <MemoryRouter><SezioneSpazio espId={E} config={config(stato)} /></MemoryRouter>
     </QueryClientProvider>,
   )
   return { utente: userEvent.setup({ delay: null }), invalida }
 }
-const sezione = () => within(screen.getByRole('region', { name: 'Spazio delle foto' }))
+const sezione = () => within(screen.getByRole('region', { name: 'Spazio' }))
 const scarica = () => sezione().getByRole('button', { name: 'Scarica le foto (.zip)' })
 const libera = () => sezione().queryByRole('button', { name: 'Libera lo spazio' })
 const dialogo = () => within(screen.getByRole('dialog'))
@@ -56,7 +58,7 @@ beforeEach(() => {
   vi.mocked(listaFoto).mockImplementation(async () => structuredClone(db))
   vi.mocked(listaNote).mockResolvedValue([])
   vi.mocked(fileFotoPresenti).mockResolvedValue({ has: () => true } as unknown as Set<string>)
-  vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 6, progetto: 6 })
+  vi.mocked(spazioProgetto).mockResolvedValue({ database_byte: 30_000_000, foto_byte: 6, esperimento: { misure: 0, note: 0, foto: 2, dati_byte: 0, foto_byte: 6 } })
   vi.mocked(urlFoto).mockImplementation(async percorsi => new Map(percorsi.map(p => [p, `https://storage/${p}`])))
   vi.mocked(archiviaFileFoto).mockImplementation(async (_e, daArchiviare) => {
     db = db.map(f => (daArchiviare.some(d => d.id === f.id) ? { ...f, archiviata: true, archiviata_il: '2026-11-03T12:00:00Z' } : f))

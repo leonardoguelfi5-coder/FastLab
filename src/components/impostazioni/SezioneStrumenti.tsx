@@ -7,6 +7,7 @@ import { Espandibile } from '@/components/Espandibile'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { strumentoDaCatalogo } from '@/domain/catalogo'
+import type { ConteggioStrumento } from '@/domain/conteggi'
 import type { ConfigEsperimento, Parametro, Strumento, VoceCatalogo } from '@/domain/tipi'
 import { percorsoCatalogo } from '@/lib/percorsi'
 import { ModificaStrumento } from './ModificaStrumento'
@@ -21,7 +22,7 @@ interface SezioneStrumentiProps {
   espId: string
   config: ConfigEsperimento
   datiParametri: UseQueryResult<Set<string>>
-  datiStrumenti: UseQueryResult<Set<string>>
+  datiStrumenti: UseQueryResult<Map<string, ConteggioStrumento>>
   /** Il tocco su "Gestisci il catalogo": la pagina lo ferma se ci sono modifiche non salvate, e chiede prima. */
   onGestisciCatalogo?: (evento: MouseEvent<HTMLAnchorElement>) => void
 }
@@ -29,7 +30,7 @@ interface SezioneStrumentiProps {
 /**
  * Gli strumenti dell'esperimento, uno alla volta in un editor che si apre con i suoi valori e il proprio "Salva". Si
  * aggiungono dal catalogo o si creano nuovi (e allora entrano anche nel catalogo). Uno strumento con misure si archivia;
- * senza misure si può anche eliminare, con i valori che ha. La tabella fenologica ha la sua sezione.
+ * senza misure si può anche eliminare, con i valori che ha, anche da archiviato. La tabella fenologica ha la sua sezione.
  */
 export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti, onGestisciCatalogo }: SezioneStrumentiProps) {
   const g = useStrumenti({ espId, config, tipo: 'strumento', chiave: 'strumenti', datiParametri, datiStrumenti })
@@ -69,7 +70,7 @@ export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti, 
       <Spiegazione>
         Uno strumento raggruppa i valori che rilevi insieme in campo, e si modifica qui con i suoi valori. Un valore con
         dati non si elimina: si archivia, e i suoi dati restano nella storia e nell'export. Uno strumento con misure si
-        archivia; senza misure si può anche eliminare.
+        archivia; senza misure si può anche eliminare, anche da archiviato.
       </Spiegazione>
       <AvvisoDati letture={[datiParametri, datiStrumenti]} />
 
@@ -123,7 +124,10 @@ export function SezioneStrumenti({ espId, config, datiParametri, datiStrumenti, 
         onArchivia={p => void g.archiviaValore(null, p)}
       />
 
-      <StrumentiArchiviati archiviati={g.archiviati} parametri={config.parametri} inCorso={g.inCorso} onRipristina={g.ripristina} />
+      <StrumentiArchiviati
+        archiviati={g.archiviati} parametri={config.parametri} inCorso={g.inCorso} onRipristina={g.ripristina}
+        misure={g.misure} onElimina={s => void g.elimina(s)}
+      />
       <ParametriArchiviati archiviati={archiviati} strumenti={config.strumenti} inCorso={g.inCorso} onRipristina={g.ripristinaValore} />
     </Sezione>
   )

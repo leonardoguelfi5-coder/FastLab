@@ -42,6 +42,12 @@ export const FOTO_TROPPO_GRANDE = 'Foto troppo grande da elaborare sul telefono:
 export const FOTO_ESPERIMENTO_NON_RIMOSSE =
   'Non sono riuscito a eliminare le foto dell\'esperimento, quindi l\'esperimento non è stato eliminato. Riprova.'
 
+/**
+ * Uno strumento che si stava eliminando ha ricevuto misure nel frattempo: il database rifiuta (23503 sul vincolo
+ * `misure_strumento_id_esperimento_id_fkey`) e resta solo l'archiviazione.
+ */
+export const STRUMENTO_CON_MISURE_ARRIVATE = 'Nel frattempo sono arrivate misure di questo strumento: si può solo archiviare.'
+
 /** Una lettura che dipende da chi è l'utente (es. `copieDiProprieta`) senza una sessione attiva. */
 export const SENZA_SESSIONE = 'Sessione scaduta: accedi di nuovo.'
 
@@ -126,6 +132,7 @@ export function messaggioErrore(e: unknown): string {
   if (code === '23503' && messaggio.includes('strumenti_catalogo_id_fkey')) {
     return 'Questo strumento del catalogo non esiste più: ricarica la pagina e riprova.'
   }
+  if (code === '23503' && messaggio.includes('misure_strumento_id_esperimento_id_fkey')) return STRUMENTO_CON_MISURE_ARRIVATE
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
 
   return messaggio === '' ? 'Errore imprevisto.' : `Errore imprevisto: ${messaggio}`

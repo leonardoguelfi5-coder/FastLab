@@ -8,22 +8,24 @@ vi.mock('./esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn
 vi.mock('./misure', () => ({ misureDelGiorno: vi.fn(), misurePianta: vi.fn(), caricaMisura: vi.fn(), ultimaMisuraPerStrumento: vi.fn(), ultimeMisurePiante: vi.fn(), misureStrumento: vi.fn() }))
 vi.mock('./exportSalvati', () => ({ listaExportSalvati: vi.fn() }))
 vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
-vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), strumentiConDati: vi.fn() }))
+vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), conteggiStrumenti: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 vi.mock('./note', () => ({ listaNote: vi.fn() }))
-vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), spazioFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
+vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
+vi.mock('./spazio', () => ({ spazioProgetto: vi.fn() }))
 
 import { listaCatalogo } from './catalogo'
-import { parametriConDati, pianteConDati, pianteNonEliminabili, strumentiConDati } from './configurazione'
+import { conteggiStrumenti, parametriConDati, pianteConDati, pianteNonEliminabili } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
-import { listaFoto, spazioFoto, urlFoto } from './foto'
+import { listaFoto, urlFoto } from './foto'
+import { spazioProgetto } from './spazio'
 import { listaExportSalvati } from './exportSalvati'
 import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
-  useFoto, useNote, useParametriConDati, usePianteNonEliminabili, useSpazioFoto, useUrlFoto, usePianteConDati, useSonoAdmin, useStrumentiConDati, useUltimeMisure, useUltimeMisurePiante,
+  useFoto, useNote, useParametriConDati, usePianteNonEliminabili, useSpazioProgetto, useUrlFoto, usePianteConDati, useSonoAdmin, useConteggiStrumenti, useUltimeMisure, useUltimeMisurePiante,
   useExportSalvati, useMisureStrumenti, useMisureStrumento, useUltimaData, ultimaDataConMisure,
 } from './query'
 
@@ -37,7 +39,8 @@ beforeEach(() => { vi.clearAllMocks() })
 describe('chiavi delle foto', () => {
   it('l\'elenco e lo spazio stanno sotto lo stesso prefisso, per invalidarli insieme; gli URL fuori', () => {
     expect(chiavi.foto('E')).toEqual(['foto', 'E'])
-    expect(chiavi.spazioFoto('E').slice(0, 2)).toEqual(chiavi.foto('E'))
+    // Lo spazio sta sotto le foto: "Libera lo spazio" e ogni foto nuova o eliminata lo rileggono.
+    expect(chiavi.spazio('E').slice(0, 2)).toEqual(chiavi.foto('E'))
     expect(chiavi.urlFoto(['a'])[0]).not.toBe('foto')
   })
   it('la chiave degli URL non dipende dall\'ordine dei percorsi, ma dal loro insieme', () => {
@@ -85,9 +88,9 @@ describe('chiavi', () => {
   it('i parametri e le piante con dati stanno sotto la configurazione: si invalidano con lei', () => {
     expect(chiavi.parametriConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.pianteConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
-    expect(chiavi.strumentiConDati('E').slice(0, 2)).toEqual(chiavi.config('E'))
+    expect(chiavi.conteggiStrumenti('E').slice(0, 2)).toEqual(chiavi.config('E'))
     expect(chiavi.parametriConDati('E')).not.toEqual(chiavi.pianteConDati('E'))
-    expect(chiavi.strumentiConDati('E')).not.toEqual(chiavi.parametriConDati('E'))
+    expect(chiavi.conteggiStrumenti('E')).not.toEqual(chiavi.parametriConDati('E'))
   })
 
   it('le note hanno una chiave per esperimento, fuori dal prefisso delle misure e della configurazione', () => {
@@ -271,11 +274,17 @@ describe('hook di lettura', () => {
     expect(osservatore?.options.refetchInterval).toBe(50 * 60 * 1000)
   })
 
-  it('useSpazioFoto legge lo spazio occupato', async () => {
-    vi.mocked(spazioFoto).mockResolvedValue({ esperimento: 10, progetto: 30 })
-    const { result } = renderHook(() => useSpazioFoto('E'), { wrapper: wrapper() })
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(result.current.data).toEqual({ esperimento: 10, progetto: 30 })
+  it('useSpazioProgetto legge lo spazio del progetto e si rilegge a ogni apertura', async () => {
+    const spazio = { database_byte: 30, foto_byte: 20, esperimento: null }
+    vi.mocked(spazioProgetto).mockResolvedValue(spazio)
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
+    const conClient = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const prima = renderHook(() => useSpazioProgetto('E'), { wrapper: conClient })
+    await waitFor(() => expect(prima.result.current.data).toEqual(spazio))
+    expect(spazioProgetto).toHaveBeenCalledWith('E')
+    prima.unmount()
+    renderHook(() => useSpazioProgetto('E'), { wrapper: conClient })
+    await waitFor(() => expect(spazioProgetto).toHaveBeenCalledTimes(2))
   })
 
   it('useSonoAdmin legge il ruolo', async () => {
@@ -311,23 +320,26 @@ describe('parametri e piante con dati', () => {
     await waitFor(() => expect(dopo.result.current.isFetching).toBe(false))
   })
 
-  it('useStrumentiConDati legge gli id degli strumenti con misure e si rilegge a ogni apertura', async () => {
-    vi.mocked(strumentiConDati).mockResolvedValue(new Set(['pa1']))
+  it('useConteggiStrumenti legge i conteggi degli strumenti con misure e si rilegge a ogni apertura', async () => {
+    const conteggi = new Map([['pa1', { misure: 3, piante: 2, prima: '2026-10-14', ultima: '2026-11-03' }]])
+    vi.mocked(conteggiStrumenti).mockResolvedValue(conteggi)
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 30_000 } } })
     const conClient = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
-    const prima = renderHook(() => useStrumentiConDati('E'), { wrapper: conClient })
-    await waitFor(() => expect(prima.result.current.data).toEqual(new Set(['pa1'])))
-    expect(strumentiConDati).toHaveBeenCalledWith('E')
+    const prima = renderHook(() => useConteggiStrumenti('E'), { wrapper: conClient })
+    await waitFor(() => expect(prima.result.current.data).toEqual(conteggi))
+    expect(conteggiStrumenti).toHaveBeenCalledWith('E')
     prima.unmount()
-    renderHook(() => useStrumentiConDati('E'), { wrapper: conClient })
-    await waitFor(() => expect(strumentiConDati).toHaveBeenCalledTimes(2))
+    renderHook(() => useConteggiStrumenti('E'), { wrapper: conClient })
+    await waitFor(() => expect(conteggiStrumenti).toHaveBeenCalledTimes(2))
   })
 
   it('senza esperimento non interrogano il database', () => {
     renderHook(() => useParametriConDati(undefined), { wrapper: wrapper() })
     renderHook(() => usePianteConDati(undefined), { wrapper: wrapper() })
-    renderHook(() => useStrumentiConDati(undefined), { wrapper: wrapper() })
-    expect(strumentiConDati).not.toHaveBeenCalled()
+    renderHook(() => useConteggiStrumenti(undefined), { wrapper: wrapper() })
+    renderHook(() => useSpazioProgetto(undefined), { wrapper: wrapper() })
+    expect(conteggiStrumenti).not.toHaveBeenCalled()
+    expect(spazioProgetto).not.toHaveBeenCalled()
     expect(parametriConDati).not.toHaveBeenCalled()
     expect(pianteConDati).not.toHaveBeenCalled()
   })

@@ -24,7 +24,7 @@ export function ControlloDati() {
 }
 
 /** Le letture dei dati (quali valori, quali strumenti hanno misure) non ancora arrivate: in corso, o in errore con "Riprova". */
-export function AvvisoDati({ letture }: { letture: UseQueryResult<Set<string>>[] }) {
+export function AvvisoDati({ letture }: { letture: UseQueryResult<unknown>[] }) {
   const mancanti = letture.filter(l => l.data === undefined)
   return (
     <>

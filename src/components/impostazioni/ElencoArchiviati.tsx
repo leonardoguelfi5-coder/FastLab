@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,10 +17,12 @@ interface ElencoArchiviatiProps {
   voci: VoceArchiviata[]
   inCorso: boolean
   onRipristina: (id: string) => void
+  /** Altre azioni di una voce, prima di "Ripristina" (es. "Elimina" per gli strumenti). */
+  altreAzioni?: (id: string) => ReactNode
 }
 
-/** Gli archiviati di una sezione, a parte e chiusi finché non si aprono, ognuno con "Ripristina". */
-export function ElencoArchiviati({ titolo, spiegazione, voci, inCorso, onRipristina }: ElencoArchiviatiProps) {
+/** Gli archiviati di una sezione, a parte e chiusi finché non si aprono, ognuno con "Ripristina" (e le altre azioni, se ce ne sono). */
+export function ElencoArchiviati({ titolo, spiegazione, voci, inCorso, onRipristina, altreAzioni }: ElencoArchiviatiProps) {
   const id = useId()
   const [aperti, setAperti] = useState(false)
   if (voci.length === 0) return null
@@ -47,6 +49,7 @@ export function ElencoArchiviati({ titolo, spiegazione, voci, inCorso, onRiprist
                   <span className="block truncate font-semibold text-grafite">{v.nome}</span>
                   <span className="block text-sm text-grafite-tenue">{v.dettaglio}</span>
                 </span>
+                {altreAzioni?.(v.id)}
                 <Button variant="outline" size="sm" disabled={inCorso} onClick={() => onRipristina(v.id)}>Ripristina</Button>
               </li>
             ))}

@@ -7,7 +7,9 @@ import { chiavi } from '@/api/query'
 import {
   nuovaTabellaFenologica, ordineStrumentoSuccessivo, parametriDello, problemiParametro, problemiStrumento, pulisciParametro,
 } from '@/domain/bozza'
+import type { ConteggioStrumento } from '@/domain/conteggi'
 import type { ConfigEsperimento, Parametro, Strumento, TipoStrumento } from '@/domain/tipi'
+import { STRUMENTO_CON_MISURE_ARRIVATE } from '@/lib/errori'
 import { ErroreDaMostrare, useAzione } from './azione'
 import { uguali, useBozze, useSegnalaModifiche } from './modifiche'
 
@@ -45,8 +47,20 @@ interface Opzioni {
   /** Come la sezione dice alla pagina che ha modifiche non salvate. */
   chiave: string
   datiParametri: UseQueryResult<Set<string>>
-  datiStrumenti: UseQueryResult<Set<string>>
+  datiStrumenti: UseQueryResult<Map<string, ConteggioStrumento>>
 }
+
+/**
+ * Che cosa si sa delle misure di uno strumento salvato, per decidere che cosa fa "Elimina": `contando` finché le letture
+ * non sono arrivate, `errore` se una è fallita (con il modo di rifarla), `nessuna` (si può eliminare, con conferma) o
+ * `alcune` (non si elimina: si spiega e si offre l'archiviazione). Per eliminare serve sapere anche quali valori hanno
+ * dati; con misure basta il conteggio.
+ */
+export type MisureStrumento =
+  | { stato: 'contando' }
+  | { stato: 'errore'; cosa: 'misure' | 'dati'; riprova: () => void }
+  | { stato: 'nessuna' }
+  | { stato: 'alcune'; conteggio: ConteggioStrumento }
 
 /**
  * Tutto quel che serve a una sezione delle impostazioni per modificare i suoi strumenti, ognuno con i suoi valori e il
@@ -78,8 +92,22 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
   }
   useSegnalaModifiche(chiave, voci.some(modificato))
 
-  /** Lo strumento ha misure? `undefined` finché non si sa (o se la lettura è fallita). */
-  const conMisure = (id: string): boolean | undefined => datiStrumenti.data?.has(id)
+  /** Le misure dello strumento, per "Elimina": mai `nessuna` finché non si sa davvero. */
+  function misure(id: string): MisureStrumento {
+    if (datiStrumenti.data === undefined) {
+      return datiStrumenti.isError
+        ? { stato: 'errore', cosa: 'misure', riprova: () => void datiStrumenti.refetch() }
+        : { stato: 'contando' }
+    }
+    const conteggio = datiStrumenti.data.get(id)
+    if (conteggio) return { stato: 'alcune', conteggio }
+    if (datiParametri.data === undefined) {
+      return datiParametri.isError
+        ? { stato: 'errore', cosa: 'dati', riprova: () => void datiParametri.refetch() }
+        : { stato: 'contando' }
+    }
+    return { stato: 'nessuna' }
+  }
 
   const valoreSalvato = (id: string) => config.parametri.some(p => p.id === id)
   /** Il valore ha dati? `undefined` finché non si sa (o se la lettura è fallita). */
@@ -252,10 +280,11 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
       try {
         await eliminaStrumento(espId, s.id)
       } catch (e) {
+        // L'unico vincolo che ferma l'eliminazione di uno strumento sono le sue misure (il resto va via a cascata).
         if (eVincolo(e)) {
           throw new ErroreDaMostrare(s.tipo === 'fenologico'
             ? 'La tabella fenologica ha già delle misure: non si può eliminare. Le sue voci con dati si archiviano.'
-            : `Lo strumento «${s.nome}» ha già delle misure: non si può eliminare. Archivialo: sparisce dalla scelta in misura e le sue misure restano.`)
+            : STRUMENTO_CON_MISURE_ARRIVATE)
         }
         throw e
       }
@@ -343,11 +372,9 @@ export function useStrumenti({ espId, config, tipo, chiave, datiParametri, datiS
 
   return {
     inCorso, voci, archiviati, aperta, setAperta,
-    modificato, conMisure, valoreSalvato, valoreConDati, bloccoTipo, problemiExtra, altriParametri, problemi,
+    modificato, misure, valoreSalvato, valoreConDati, bloccoTipo, problemiExtra, altriParametri, problemi,
     cambia, salva, scarta, aggiungi, preparaTabella, archivia, ripristina, elimina,
     archiviaValore, eliminaValore, ripristinaValore,
-    /** Si sa quali valori hanno dati? Senza, "Elimina strumento" non si offre. */
-    valoriNoti: datiParametri.data !== undefined,
     salvato: (id: string) => config.strumenti.find(s => s.id === id),
   }
 }

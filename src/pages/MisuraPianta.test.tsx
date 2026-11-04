@@ -22,7 +22,7 @@ vi.mock('@/api/misure', () => ({
   ultimaMisuraPerStrumento: vi.fn(),
 }))
 vi.mock('@/api/foto', () => ({
-  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(), spazioFoto: vi.fn(),
+  listaFoto: vi.fn(), urlFoto: vi.fn(), caricaFoto: vi.fn(), eliminaFoto: vi.fn(), aggiornaFoto: vi.fn(),
   VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/lib/immagini', () => ({ dataDiScatto: vi.fn() }))

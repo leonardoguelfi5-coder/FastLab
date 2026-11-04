@@ -1,5 +1,6 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
+import type { ConteggioStrumento } from '@/domain/conteggi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { ModificaStrumento } from './ModificaStrumento'
 import { AvvisoDati, Sezione, Spiegazione } from './Sezione'
@@ -9,7 +10,7 @@ interface SezioneFenologicaProps {
   espId: string
   config: ConfigEsperimento
   datiParametri: UseQueryResult<Set<string>>
-  datiStrumenti: UseQueryResult<Set<string>>
+  datiStrumenti: UseQueryResult<Map<string, ConteggioStrumento>>
 }
 
 /**
