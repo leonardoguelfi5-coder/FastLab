@@ -27,3 +27,4 @@ Ruling: Diario con ricerca, filtri (promemoria, pianta o trattamento, periodo) e
 Ruling: basse: "scarto" = massimo meno minimo; elimina esperimento solo per il proprietario con il nome da scrivere (chiude il Ruling del Piano C su `eliminaEsperimento`); conclusi in una sezione chiusa; "Elimina misura" con Annulla (in coda: tolta dalla coda); `inputMode` numerico con etichette numeriche; catalogo con "Archiviati" e "Ripristina" e l'email di chi ha creato e modificato (`modificato_da` nella 0016); `caricaConfig` con le piante a pagine keyset; nessuna rilettura delle misure del giorno dopo un salvataggio - cost if wrong: small.
 
 ## Avanzamento
+Task E1: dispatched implementer (sonnet), BASE 1f8d07b
