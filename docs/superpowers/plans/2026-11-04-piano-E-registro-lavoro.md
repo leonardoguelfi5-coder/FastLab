@@ -36,3 +36,7 @@ Task E2: implementatore (sonnet) DONE_WITH_CONCERNS 49209c3 - 2578 Vitest; Atkin
 Ruling (carry to collaudo): il Mono è circa il 5% più largo: controllare a 360 px "Salva e vai alla #36", chip, griglia, filtri del Dataset - cost if wrong: qualche testo a capo
 Task E2: complete (commits 48446ee..49209c3), revisione rimandata alla finale
 Task E3: dispatched implementer (sonnet)
+Task E3: implementatore (sonnet) DONE_WITH_CONCERNS 4651552 - 2599 Vitest (21 nuovi, rosso verificato); `riepilogoPianta` (un blocco per strumento, tutte le righe, data per blocco e `dataPropria` per righe più vecchie), `daQuantoBreve`; `UltimiValori` con intestazione "<icona> Nome · 03/11 · 1 g fa", tre colonne con freccia e testo per chi non vede, media del trattamento sotto il blocco, liste e testi con ›; storia con "09:12 · 💚 SPAD" e valori in due colonne; ordine della scheda: dati, riepilogo, misura, storia, nota, foto
+Ruling: accettate le deviazioni E3 (una coppia per riga nella storia, mai troncare; media del trattamento per parametro con più numeri; nome "Ultimi valori" tenuto) - cost if wrong: small
+Task E3: complete (commits e09aa11..4651552), revisione rimandata alla finale; impaginazione a 360 px al collaudo
+Task E4: dispatched implementer (opus)
