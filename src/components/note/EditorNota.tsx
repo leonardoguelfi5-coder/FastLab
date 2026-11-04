@@ -6,6 +6,7 @@ import type { ConfigEsperimento } from '@/domain/tipi'
 import { FotoNota } from './FotoNota'
 import { SceltaCollegamento } from './SceltaCollegamento'
 import { conData, conPromemoria, type StatoNota } from './statoNota'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface EditorNotaProps {
   espId: string
@@ -34,7 +35,7 @@ interface EditorNotaProps {
 export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria, notaSalvataId, nuova, ripresa, problemi, disabilitato }: EditorNotaProps) {
   const id = useId()
   return (
-    <div className="flex flex-col gap-6">
+    <ModuloCampi className="flex flex-col gap-6">
       {ripresa && (
         <p role="status" className="text-sm text-grafite-tenue">Bozza ripresa: la nota non era stata salvata.</p>
       )}
@@ -89,6 +90,6 @@ export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria
           {problemi.map(p => <p key={p} className="text-sm text-grafite-tenue">{p}</p>)}
         </div>
       )}
-    </div>
+    </ModuloCampi>
   )
 }

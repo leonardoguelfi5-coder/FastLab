@@ -2,6 +2,7 @@ import type { BozzaEsperimento, Esperimento } from '@/domain/tipi'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface PassoGeneraleProps {
   bozza: BozzaEsperimento
@@ -14,7 +15,7 @@ export function PassoGenerale({ bozza, onChange }: PassoGeneraleProps) {
   const cambia = (modifica: Partial<Esperimento>) => onChange({ ...bozza, esperimento: { ...e, ...modifica } })
 
   return (
-    <div className="flex flex-col gap-5">
+    <ModuloCampi className="flex flex-col gap-5">
       <p className="max-w-[65ch] text-grafite-tenue">Dai un nome all'esperimento. Data di inizio e note sono facoltative.</p>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="esp-nome">Nome</Label>
@@ -45,6 +46,6 @@ export function PassoGenerale({ bozza, onChange }: PassoGeneraleProps) {
           onChange={(ev) => cambia({ note: ev.target.value })}
         />
       </div>
-    </div>
+    </ModuloCampi>
   )
 }

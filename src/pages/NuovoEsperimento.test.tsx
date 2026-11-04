@@ -129,6 +129,15 @@ describe('NuovoEsperimento: inizio', () => {
     expect(screen.getByLabelText('Nome')).toHaveValue('Hydrochar × Cuore di Bue')
   })
 
+  it('Invio nel Nome (tasto Avanti della tastiera) non passa al passo seguente', async () => {
+    const utente = userEvent.setup({ delay: null })
+    vaiAllaPagina('/esperimenti/nuovo')
+    await utente.click(screen.getByRole('button', { name: /Parti da zero/ }))
+    await utente.type(screen.getByLabelText('Nome'), 'Prova concime{Enter}')
+    expect(titoloPasso()).toHaveTextContent('Generale')
+    expect(screen.getByLabelText('Nome')).toHaveValue('Prova concime')
+  })
+
   it('Avanti e Passo precedente passano da un passo all\'altro e i dati restano', async () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo')

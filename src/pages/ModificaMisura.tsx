@@ -24,6 +24,7 @@ import { formattaData } from '@/lib/date'
 import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { eUuid, percorsoHome, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
@@ -236,6 +237,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
 
       <section aria-label="Valori della misura" className="rounded-lg bg-carta-ombra p-4">
         {/* Mentre l'operazione è partita il modulo non si tocca: quel che si scrive adesso andrebbe perso. */}
+        <ModuloCampi>
         <div inert={occupato} className="flex flex-col gap-6">
           {/* Affiancati se ci stanno; su un telefono stretto l'ora va sotto la data. */}
           <div className="flex flex-wrap gap-3">
@@ -268,6 +270,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
             <p className="text-grafite-tenue">Questa misura non ha valori da correggere.</p>
           )}
         </div>
+        </ModuloCampi>
       </section>
 
       {/* Lontano da "Salva", che sta in basso: l'eliminazione non si tocca per sbaglio con il pollice. */}

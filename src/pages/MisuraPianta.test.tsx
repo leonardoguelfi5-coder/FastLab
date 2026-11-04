@@ -272,6 +272,20 @@ describe('MisuraPianta: il giro', () => {
     expect(screen.queryByText(/aggiungerne una nuova/)).not.toBeInTheDocument()
   })
 
+  it('il tasto Avanti della tastiera (Invio) non salva né cambia pianta: porta al campo seguente o chiude la tastiera', async () => {
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '41,2')
+    await utente.keyboard('{Enter}')
+    await utente.keyboard('{Enter}')
+    await utente.keyboard('{Enter}')
+    await utente.keyboard('{Enter}')
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(posizione()).toBe(percorso('SPAD', '1'))
+    expect(campo('SPAD')).toHaveValue('41,2')
+  })
+
   it('c\'è anche "Salva", che resta sulla pianta', async () => {
     const utente = userEvent.setup()
     apri('1')

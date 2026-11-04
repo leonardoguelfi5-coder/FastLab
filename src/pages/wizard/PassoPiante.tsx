@@ -11,6 +11,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero } from '@/lib/numeri'
 import { Conferma } from '@/components/Conferma'
 import { MAX_PIANTE, nPiante, rigeneraRighe, trattamentiInclusi, type RigaTrattamento } from './righeTrattamenti'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface PassoPianteProps {
   bozza: BozzaEsperimento
@@ -210,7 +211,7 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
   }
 
   return (
-    <div className="flex flex-col gap-10">
+    <ModuloCampi className="flex flex-col gap-10">
       <p className="max-w-[65ch] text-grafite-tenue">
         Un fattore è ciò che fai variare (es. Stress: Controllo, S1, W1). I trattamenti sono le combinazioni dei livelli
         dei fattori; per ognuno scegli quante piante ha.
@@ -292,6 +293,6 @@ export function PassoPiante({ bozza, righe, onChange }: PassoPianteProps) {
         onAnnulla={() => setConferma(false)}
         onConferma={() => { setConferma(false); generaOra() }}
       />
-    </div>
+    </ModuloCampi>
   )
 }

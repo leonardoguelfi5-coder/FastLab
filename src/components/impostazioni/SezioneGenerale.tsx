@@ -10,6 +10,7 @@ import type { Esperimento } from '@/domain/tipi'
 import { useAzione } from './azione'
 import { uguali, useSegnalaModifiche } from './modifiche'
 import { Sezione } from './Sezione'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 /** Nome, data di inizio, note e stato dell'esperimento, con un solo "Salva". */
 export function SezioneGenerale({ espId, esperimento }: { espId: string; esperimento: Esperimento }) {
@@ -38,6 +39,7 @@ export function SezioneGenerale({ espId, esperimento }: { espId: string; esperim
 
   return (
     <Sezione titolo="Generale">
+      <ModuloCampi className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-nome`}>Nome</Label>
         <Input
@@ -77,6 +79,7 @@ export function SezioneGenerale({ espId, esperimento }: { espId: string; esperim
           <Button variant="ghost" disabled={inCorso} onClick={() => setBozza(null)}>Annulla le modifiche</Button>
         )}
       </div>
+      </ModuloCampi>
     </Sezione>
   )
 }

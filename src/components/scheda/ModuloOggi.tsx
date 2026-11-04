@@ -18,6 +18,7 @@ import { CampoOra } from './CampoOra'
 import { ElencoOggi } from './ElencoOggi'
 import { ErroreSalvataggio, EsitoControllo, type Controllo } from './MessaggiSalvataggio'
 import { ATTESA_CONFERMA_MS, istante, OPZIONI_ERRORE_TARDIVO } from './salvataggio'
+import { SELETTORE_CAMPI, ModuloCampi } from '@/components/ModuloCampi'
 
 /** Quel che la pagina deve sapere del modulo aperto per non farne perdere i valori: se è cambiato e come scartarlo. */
 export interface StatoModulo { modificato: boolean; scarta: () => void }
@@ -200,7 +201,7 @@ export function ModuloOggi({
   // compilata, si scrive Temp pianta). Se il browser non apre la tastiera da solo, pazienza.
   useEffect(() => {
     if (!primoCampo || !campi.current) return
-    const elenco = [...campi.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input:not([type="hidden"]):not([type="checkbox"]), textarea')]
+    const elenco = [...campi.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(SELETTORE_CAMPI)]
     ;(elenco.find(c => c.value === '') ?? elenco[0])?.focus()
   }, [primoCampo])
 
@@ -364,6 +365,7 @@ export function ModuloOggi({
           </div>
         )}
 
+        <ModuloCampi>
         <div ref={campi}>
           {parametri.length > 0 ? (
             <FormMisura
@@ -380,6 +382,7 @@ export function ModuloOggi({
             <p className="text-grafite-tenue">Questo strumento non ha parametri da compilare: aggiungili dalle impostazioni.</p>
           )}
         </div>
+        </ModuloCampi>
       </div>
 
       <BarraAzioni>

@@ -10,6 +10,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { leggiIntero, parseNumero } from '@/lib/numeri'
 import { CampoNumero } from './CampoNumero'
 import { Interruttore } from './Interruttore'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface EditorParametroProps {
   valore: Parametro
@@ -120,7 +121,7 @@ export function EditorParametro({
   const cambia = (modifica: Partial<Parametro>) => onChange({ ...p, ...modifica })
 
   return (
-    <div className="flex flex-col gap-5">
+    <ModuloCampi className="flex flex-col gap-5">
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-nome`}>Nome</Label>
         <Input
@@ -190,6 +191,6 @@ export function EditorParametro({
           onCheckedChange={(v) => cambia({ progressivo: v })}
         />
       )}
-    </div>
+    </ModuloCampi>
   )
 }

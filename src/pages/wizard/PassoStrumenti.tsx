@@ -15,6 +15,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { eNomeGiaNelCatalogo, messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
 import type { ModificaBozza } from './bozzaSalvata'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface PassoStrumentiProps {
   bozza: BozzaEsperimento
@@ -106,7 +107,7 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <ModuloCampi className="flex flex-col gap-6">
       <p className="max-w-[65ch] text-grafite-tenue">
         Uno strumento è quello che usi in campo, es. 🌡 Termometro con la temperatura dell'aria e della pianta. Scegli dal
         catalogo o creane uno nuovo: finisce nel catalogo, per tutti. Un valore sta in un solo strumento.
@@ -191,6 +192,6 @@ export function PassoStrumenti({ bozza, onChange }: PassoStrumentiProps) {
           </div>
         </section>
       )}
-    </div>
+    </ModuloCampi>
   )
 }

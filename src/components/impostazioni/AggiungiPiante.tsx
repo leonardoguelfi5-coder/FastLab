@@ -12,6 +12,7 @@ import type { ConfigEsperimento, Pianta } from '@/domain/tipi'
 import { leggiIntero } from '@/lib/numeri'
 import type { useAzione } from './azione'
 import { Spiegazione } from './Sezione'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 const MAX = 200
 const leggiQuante = (t: string) => (t.trim() === '' ? null : (leggiIntero(t, 1, MAX) ?? NaN))
@@ -84,7 +85,7 @@ export function AggiungiPiante({ espId, config, azione }: AggiungiPianteProps) {
 
   const ultima = n === null ? null : prossima + n - 1
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-carta-ombra p-4">
+    <ModuloCampi className="flex flex-col gap-3 rounded-lg bg-carta-ombra p-4">
       <h3 className="text-title text-grafite">Aggiungi piante</h3>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-trattamento`}>Trattamento delle nuove piante</Label>
@@ -111,6 +112,6 @@ export function AggiungiPiante({ espId, config, azione }: AggiungiPianteProps) {
           ? `Aggiungi piante a «${trattamento.etichetta}»`
           : `Aggiungi ${n === 1 ? '1 pianta' : `${n} piante`} a «${trattamento.etichetta}»`}
       </Button>
-    </div>
+    </ModuloCampi>
   )
 }

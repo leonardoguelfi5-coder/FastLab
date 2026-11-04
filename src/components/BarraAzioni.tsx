@@ -20,6 +20,12 @@ const TASTIERA = '--tastiera-coperta'
 const TASTIERA_MIN = 120
 
 /**
+ * Dopo che la tastiera si chiude la barra scende sotto il dito che stava ancora toccando: quel tocco (o il suo
+ * clic) cadrebbe sul pulsante principale e salverebbe senza volerlo. Per questi millisecondi i tocchi nella barra si fermano.
+ */
+export const ATTESA_DOPO_TASTIERA_MS = 400
+
+/**
  * Barra d'azione fissa in basso (DESIGN.md §5, Navigation): fondo carta, linea riga sopra,
  * padding 12px più l'area sicura del telefono; il contenuto sta nella colonna centrale.
  *
@@ -46,19 +52,32 @@ export function BarraAzioni({ children, className }: BarraAzioniProps) {
 
     // Senza visualViewport (browser molto vecchi) la barra resta in fondo alla pagina, come prima.
     const vista = window.visualViewport
+    let chiusaAlle = -Infinity
     const seguiTastiera = () => {
       if (!vista) return
       const coperto = Math.max(0, window.innerHeight - vista.height - vista.offsetTop)
       elemento.style.bottom = `${coperto}px`
       radice.style.setProperty(TASTIERA, `${coperto}px`)
-      elemento.toggleAttribute('data-tastiera', coperto >= TASTIERA_MIN)
+      const aperta = coperto >= TASTIERA_MIN
+      if (elemento.hasAttribute('data-tastiera') && !aperta) chiusaAlle = Date.now()
+      elemento.toggleAttribute('data-tastiera', aperta)
     }
+    // Fase di cattura: si ferma prima che il pulsante lo veda.
+    const fermaTocchiFantasma = (e: Event) => {
+      if (Date.now() - chiusaAlle >= ATTESA_DOPO_TASTIERA_MS) return
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    elemento.addEventListener('pointerdown', fermaTocchiFantasma, true)
+    elemento.addEventListener('click', fermaTocchiFantasma, true)
     seguiTastiera()
     vista?.addEventListener('resize', seguiTastiera)
     vista?.addEventListener('scroll', seguiTastiera)
 
     return () => {
       osservatore?.disconnect()
+      elemento.removeEventListener('pointerdown', fermaTocchiFantasma, true)
+      elemento.removeEventListener('click', fermaTocchiFantasma, true)
       radice.style.removeProperty(ALTEZZA)
       radice.style.removeProperty(TASTIERA)
       vista?.removeEventListener('resize', seguiTastiera)

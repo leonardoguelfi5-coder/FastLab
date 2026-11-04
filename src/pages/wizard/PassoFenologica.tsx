@@ -7,6 +7,7 @@ import { EditorStrumento, type StrumentoConValori } from '@/components/config/Ed
 import { Button } from '@/components/ui/button'
 import { Conferma } from '@/components/Conferma'
 import { TestoErrore } from '@/components/TestoErrore'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 interface PassoFenologicaProps {
   bozza: BozzaEsperimento
@@ -53,7 +54,7 @@ export function PassoFenologica({ bozza, onChange, onSalta }: PassoFenologicaPro
   const problemi = problemiStrumento(tabella, bozza.strumenti)
   const suoi = new Set(valori.map(p => p.id))
   return (
-    <div className="flex flex-col gap-4">
+    <ModuloCampi className="flex flex-col gap-4">
       <p className="max-w-[65ch] text-grafite-tenue">
         Le voci della tabella fenologica: per ognuna scegli il tipo. Le conte che crescono nel tempo (es. il numero di
         palchi) si possono rendere progressive.
@@ -84,6 +85,6 @@ export function PassoFenologica({ bozza, onChange, onSalta }: PassoFenologicaPro
         onAnnulla={() => setConferma(false)}
         onConferma={() => { setConferma(false); onChange(senzaStrumento(bozza, tabella.id)) }}
       />
-    </div>
+    </ModuloCampi>
   )
 }

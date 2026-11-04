@@ -10,6 +10,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { EditorParametro } from './EditorParametro'
 import { Interruttore } from './Interruttore'
 import { riassuntoParametro } from './riassunti'
+import { ModuloCampi } from '@/components/ModuloCampi'
 
 /** Uno strumento con i suoi valori: i parametri che si misurano con lui, nell'ordine del modulo. */
 export interface StrumentoConValori {
@@ -95,7 +96,7 @@ export function EditorStrumento({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <ModuloCampi className="flex flex-col gap-5">
       <div className="grid grid-cols-[1fr_6rem] gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${id}-nome`}>Nome dello strumento</Label>
@@ -192,6 +193,6 @@ export function EditorStrumento({
         </ul>
         <Button variant="outline" onClick={aggiungi} className="self-start">Aggiungi valore</Button>
       </div>
-    </div>
+    </ModuloCampi>
   )
 }

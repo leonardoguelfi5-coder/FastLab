@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { BarraAzioni } from './BarraAzioni'
 
 /** Una `visualViewport` finta: l'area di pagina visibile, che la tastiera a schermo restringe. */
@@ -134,5 +134,50 @@ describe('BarraAzioni: altezza pubblicata', () => {
     expect(radice.style.getPropertyValue('--altezza-barra-azioni')).toBe('0px')
     unmount()
     expect(radice.style.getPropertyValue('--altezza-barra-azioni')).toBe('')
+  })
+})
+
+describe('BarraAzioni: tocchi fantasma dopo la chiusura della tastiera', () => {
+  beforeEach(() => { vi.useFakeTimers() })
+  afterEach(() => { vi.useRealTimers() })
+
+  function chiudiTastiera(spia: () => void) {
+    render(<BarraAzioni><button onClick={spia}>Salva</button></BarraAzioni>)
+    act(() => { vista.imposta(500); vista.emetti('resize') })
+    expect(barra()).toHaveAttribute('data-tastiera')
+    act(() => { vista.imposta(800); vista.emetti('resize') })
+    expect(barra()).not.toHaveAttribute('data-tastiera')
+  }
+
+  it('un clic 100 ms dopo la chiusura non arriva al pulsante', () => {
+    const spia = vi.fn()
+    chiudiTastiera(spia)
+    act(() => { vi.advanceTimersByTime(100) })
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }))
+    expect(spia).not.toHaveBeenCalled()
+  })
+
+  it('dopo 450 ms il clic arriva', () => {
+    const spia = vi.fn()
+    chiudiTastiera(spia)
+    act(() => { vi.advanceTimersByTime(450) })
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }))
+    expect(spia).toHaveBeenCalledTimes(1)
+  })
+
+  it('senza tastiera aperta prima, il clic arriva subito', () => {
+    const spia = vi.fn()
+    render(<BarraAzioni><button onClick={spia}>Salva</button></BarraAzioni>)
+    fireEvent.click(screen.getByRole('button', { name: 'Salva' }))
+    expect(spia).toHaveBeenCalledTimes(1)
+  })
+
+  it('anche il pointerdown si ferma nella finestra', () => {
+    const spia = vi.fn()
+    render(<BarraAzioni><button onPointerDown={spia}>Salva</button></BarraAzioni>)
+    act(() => { vista.imposta(500); vista.emetti('resize') })
+    act(() => { vista.imposta(800); vista.emetti('resize') })
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Salva' }))
+    expect(spia).not.toHaveBeenCalled()
   })
 })
