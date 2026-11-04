@@ -28,3 +28,7 @@ Ruling: basse: "scarto" = massimo meno minimo; elimina esperimento solo per il p
 
 ## Avanzamento
 Task E1: dispatched implementer (sonnet), BASE 1f8d07b
+Task E1: implementatore (sonnet) DONE def989a - 2573 Vitest (14 nuovi); `src/components/ModuloCampi.tsx` (form che non invia mai, Invio = campo seguente saltando le date, ultimo = chiude la tastiera, enterkeyhint next/done) in misura, modifica, wizard, editor di strumento e parametro, impostazioni generali, editor della nota; BarraAzioni ferma i tocchi per 400 ms dopo la chiusura della tastiera
+Task E1: correzione del controller (il blocco fermava anche il tocco voluto su "Salva" con la tastiera aperta: ora passa il tocco cominciato con la tastiera aperta), test rosso senza la correzione; 2575 Vitest, tsc e lint puliti
+Task E1: complete (commits 57ec4d1..HEAD), revisione rimandata alla finale; prova su telefono al collaudo
+Task E2: dispatched implementer (sonnet)
