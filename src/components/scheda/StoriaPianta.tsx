@@ -2,6 +2,7 @@ import { Fragment, useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useFoto, useNote, useUrlFoto } from '@/api/query'
+import { SegnoCoda } from '@/components/coda/SegnoCoda'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { chiaveEliminazioneFoto } from '@/components/foto/eliminaFotoConAnnulla'
 import { FotoConVisore } from '@/components/foto/FotoConVisore'
@@ -11,6 +12,7 @@ import { descriviCollegamento, noteDellaPianta } from '@/domain/note'
 import { storiaPianta } from '@/domain/storia'
 import type { ConfigEsperimento, Misura, Nota, Pianta, Strumento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
+import { useStatiInCoda } from '@/lib/coda/useCoda'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDiario, percorsoModificaMisura, type ArrivoDiario, type ArrivoMisura } from '@/lib/percorsi'
 import { cn } from '@/lib/utils'
@@ -105,6 +107,8 @@ export function StoriaPianta({ espId, config, pianta, misure }: StoriaPiantaProp
   const urls = useUrlFoto(fotoDella.filter(f => !f.archiviata).map(f => f.percorso)).data
   const giorni = storiaPianta(misure, dellaPianta, fotoDella)
   const strumenti = useMemo(() => new Map(config.strumenti.map(p => [p.id, p])), [config.strumenti])
+  // Le misure ancora in coda d'invio lo dicono nella riga ("da inviare"): si vedono, ma il server non le ha ancora.
+  const inCoda = useStatiInCoda()
 
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
@@ -136,6 +140,7 @@ export function StoriaPianta({ espId, config, pianta, misure }: StoriaPiantaProp
                           <p>
                             <span className="font-mono text-grafite tabular-nums">{m.ora}</span>
                             {strumento && <>{' · '}<NomeStrumento strumento={strumento} /></>}
+                            {inCoda.has(m.id) && <>{' · '}<SegnoCoda stato={inCoda.get(m.id)} /></>}
                           </p>
                           <ValoriInColonna misura={m} config={config} />
                         </div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 import { assegnaBozze } from '@/components/scheda/bozza'
+import { impostaUtenteCoda } from '@/lib/coda/codaMisure'
 import { supabase } from '@/lib/supabase'
 
 export async function accedi(email: string, password: string): Promise<void> {
@@ -68,7 +69,9 @@ export function useSessione(): { sessione: Session | null; caricamento: boolean 
  * senza, il nuovo utente vedrebbe per un po' i dati del precedente. Un rinnovo del token dello stesso
  * utente non la tocca. Le bozze della scheda pianta (valori scritti e non salvati) seguono un'altra regola: restano
  * a chi le ha scritte anche a sessione finita (scaduta, uscita da un'altra scheda) e si cancellano solo quando accede
- * un utente diverso (vedi `assegnaBozze`). Restituisce la funzione che toglie l'ascolto.
+ * un utente diverso (vedi `assegnaBozze`). La coda d'invio delle misure segue l'utente della sessione
+ * (`impostaUtenteCoda`): si vedono e si inviano solo le sue voci, e quelle di un altro restano al loro posto finché non
+ * rientra lui. Restituisce la funzione che toglie l'ascolto.
  */
 export function svuotaCacheAlCambioUtente(queryClient: QueryClient): () => void {
   // undefined = ancora non si sa chi c'è: il primo evento (INITIAL_SESSION) fissa il punto di partenza.
@@ -78,6 +81,7 @@ export function svuotaCacheAlCambioUtente(queryClient: QueryClient): () => void 
     const id = sessione?.user.id ?? null
     if (idPrecedente !== undefined && id !== idPrecedente) queryClient.clear()
     if (id !== null) assegnaBozze(id)
+    impostaUtenteCoda(id)
     idPrecedente = id
   })
 

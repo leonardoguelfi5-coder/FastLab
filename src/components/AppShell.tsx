@@ -4,6 +4,9 @@ import { ArrowLeft, BookOpen, CircleUser, LogOut, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
+import { IndicatoreCoda } from '@/components/coda/IndicatoreCoda'
+import { Conferma } from '@/components/Conferma'
+import { useVociCoda } from '@/lib/coda/useCoda'
 import { messaggioErrore } from '@/lib/errori'
 import { percorsoCatalogo } from '@/lib/percorsi'
 import { buttonVariants } from '@/components/ui/button'
@@ -30,6 +33,8 @@ const VOCE_MENU = 'flex h-11 w-full items-center gap-2.5 rounded-sm px-3 text-le
 export function AppShell({ titolo, indietro, onIndietro, azioni, children }: AppShellProps) {
   const { sessione } = useSessione()
   const { data: amministratore } = useSonoAdmin()
+  const inCoda = useVociCoda().length
+  const [confermaUscita, setConfermaUscita] = useState(false)
 
   const [aperto, setAperto] = useState(false)
   const radiceMenu = useRef<HTMLDivElement>(null)
@@ -58,8 +63,17 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
 
   // Dopo l'uscita ci pensano gli altri pezzi, come per ogni altra fine di sessione:
   // RequireAuth rimanda a /accedi e svuotaCacheAlCambioUtente (main.tsx) svuota la cache.
+  // Con misure ancora in coda si chiede prima: restano su questo telefono e partono al prossimo accesso dello stesso
+  // utente (la coda è per utente: chi accede dopo non le vede e non le invia).
+  function chiediUscita() {
+    setAperto(false)
+    if (inCoda > 0) setConfermaUscita(true)
+    else void uscire()
+  }
+
   async function uscire() {
     setAperto(false)
+    setConfermaUscita(false)
     try {
       await esci()
     } catch (e) {
@@ -82,6 +96,7 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
             </Link>
           )}
           <h1 className={cn('min-w-0 flex-1 truncate text-headline text-grafite', !indietro && 'pl-2')}>{titolo}</h1>
+          <IndicatoreCoda />
           {azioni}
           <div ref={radiceMenu} className="relative">
             <button
@@ -111,7 +126,7 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
                     Inviti
                   </Link>
                 )}
-                <button type="button" onClick={uscire} className={VOCE_MENU}>
+                <button type="button" onClick={chiediUscita} className={VOCE_MENU}>
                   <LogOut aria-hidden />
                   Esci
                 </button>
@@ -123,6 +138,17 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(var(--altezza-barra-azioni,0px)+2.5rem)]">
         {children}
       </main>
+      <Conferma
+        aperta={confermaUscita}
+        titolo="Uscire con misure da inviare?"
+        testo={inCoda === 1
+          ? 'C\'è 1 misura da inviare: partirà al tuo prossimo accesso su questo telefono.'
+          : `Ci sono ${inCoda} misure da inviare: partiranno al tuo prossimo accesso su questo telefono.`}
+        annulla="Resta"
+        conferma="Esci comunque"
+        onAnnulla={() => setConfermaUscita(false)}
+        onConferma={() => void uscire()}
+      />
     </div>
   )
 }

@@ -3,7 +3,7 @@ import type { supabase } from '@/lib/supabase'
 
 type Client = typeof supabase
 
-export interface Risultato { data?: unknown; error?: unknown }
+export interface Risultato { data?: unknown; error?: unknown; status?: number }
 /** Una risposta fissa, oppure calcolata dai metodi già chiamati su quella stessa query (es. fallire solo su `upsert`). */
 export type Risposta = Risultato | ((metodi: string[]) => Risultato)
 export interface Chiamata { sorgente: string; metodo: string; args: unknown[] }

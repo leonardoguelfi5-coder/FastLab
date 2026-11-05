@@ -1,5 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import { keepPreviousData, QueryClient, queryOptions, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import type { VoceCoda } from '@/lib/coda/codaMisure'
+import { conCoda, perOraCrescente, piuRecentiPrima } from '@/lib/coda/sovrapponi'
+import { useVociCoda } from '@/lib/coda/useCoda'
 import { listaCatalogo } from './catalogo'
 import { conteggiStrumenti, parametriConDati, pianteConDati, pianteNonEliminabili } from './configurazione'
 import { caricaConfig, listaEsperimenti } from './esperimenti'
@@ -115,11 +118,28 @@ export function useConteggiStrumenti(espId: string | undefined) {
   })
 }
 
+/** Le voci in coda di un esperimento, con un riferimento che cambia solo quando cambiano loro. */
+function useVociDi(espId: string | undefined): VoceCoda[] {
+  const voci = useVociCoda()
+  return useMemo(() => voci.filter(v => v.espId === espId), [voci, espId])
+}
+
+/**
+ * Le misure del giorno, con sopra quelle ancora in coda d'invio (Piano E, Task E6: `conCoda`): una misura salvata senza
+ * rete si vede subito come fatta, e una rilettura del server che non l'ha ancora non la toglie. La cache tiene solo i
+ * dati del server; la sovrapposizione la fa `select`, che si rifà quando la coda cambia.
+ */
 export function useMisureGiorno(espId: string | undefined, data: string) {
+  const voci = useVociDi(espId)
+  const select = useCallback(
+    (misure: Misura[]) => conCoda(misure, voci, m => m.data_rilievo === data, perOraCrescente),
+    [voci, data],
+  )
   return useQuery({
     queryKey: chiavi.misureGiorno(espId ?? '', data),
     queryFn: () => misureDelGiorno(espId as string, data),
     enabled: !!espId,
+    select,
   })
 }
 
@@ -237,8 +257,14 @@ export function opzioniMisurePianta(piantaId: string) {
   return queryOptions({ queryKey: chiavi.misurePianta(piantaId), queryFn: () => misurePianta(piantaId) })
 }
 
+/** Le misure di una pianta con sopra quelle ancora in coda, come `useMisureGiorno`. */
 export function useMisurePianta(piantaId: string | undefined) {
-  return useQuery({ ...opzioniMisurePianta(piantaId ?? ''), enabled: !!piantaId })
+  const voci = useVociCoda()
+  const select = useCallback(
+    (misure: Misura[]) => conCoda(misure, voci, m => m.pianta_id === piantaId, piuRecentiPrima),
+    [voci, piantaId],
+  )
+  return useQuery({ ...opzioniMisurePianta(piantaId ?? ''), enabled: !!piantaId, select })
 }
 
 /**
@@ -246,13 +272,16 @@ export function useMisurePianta(piantaId: string | undefined) {
  * valori letti all'apertura, e una copia vecchia (rimasta dopo una correzione fatta dalla scheda) li farebbe
  * partire sbagliati, con il rischio di riscrivere sopra una modifica appena fatta.
  */
-export function useMisura(id: string | undefined) {
-  return useQuery({
+export function useMisura(id: string | undefined): UseQueryResult<Misura> {
+  const query = useQuery({
     queryKey: chiavi.misura(id ?? ''),
     queryFn: () => caricaMisura(id as string),
     enabled: !!id,
     gcTime: 0,
   })
+  // Una misura ancora in coda si apre dalla coda (è la sua versione più recente), anche se il server non l'ha ancora.
+  const inCoda = useVociCoda().find(v => v.misura.id === id)?.misura
+  return inCoda ? ({ ...query, data: inCoda } as UseQueryResult<Misura>) : query
 }
 
 /** Le note dell'esperimento (Diario, promemoria di Oggi, storia della pianta), dalla data più recente. */

@@ -1,5 +1,7 @@
 import { Pencil } from 'lucide-react'
+import { SegnoCoda } from '@/components/coda/SegnoCoda'
 import type { Misura, Parametro } from '@/domain/tipi'
+import { useStatiInCoda } from '@/lib/coda/useCoda'
 import { VociMisura } from './VociMisura'
 import { vociMisura } from './voci'
 
@@ -11,8 +13,12 @@ interface ElencoOggiProps {
   onCorreggi: (m: Misura) => void
 }
 
-/** Le misure già fatte oggi con questo strumento, come righe di quaderno: toccandone una la si corregge. */
+/**
+ * Le misure già fatte oggi con questo strumento, come righe di quaderno: toccandone una la si corregge. Una misura
+ * ancora in coda d'invio porta "da inviare" (o "non inviata").
+ */
 export function ElencoOggi({ misure, parametri, attivaId, onCorreggi }: ElencoOggiProps) {
+  const inCoda = useStatiInCoda()
   return (
     <ul aria-label="Misure già registrate" className="-mx-2 border-y border-riga">
       {misure.map(m => {
@@ -29,6 +35,7 @@ export function ElencoOggi({ misure, parametri, attivaId, onCorreggi }: ElencoOg
                 <span className="font-mono text-grafite tabular-nums">{m.ora}</span>
                 {' · '}
                 <VociMisura voci={vociMisura(m, parametri)} />
+                {inCoda.has(m.id) && <>{' · '}<SegnoCoda stato={inCoda.get(m.id)} /></>}
               </span>
               {attiva ? (
                 <span aria-hidden className="shrink-0 text-label text-inchiostro">in modifica</span>

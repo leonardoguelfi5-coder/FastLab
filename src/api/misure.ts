@@ -89,8 +89,10 @@ export async function caricaMisura(id: string): Promise<Misura> {
  * doppio tocco o un nuovo tentativo dopo un timeout aggiornano la stessa riga invece di duplicarla.
  */
 export async function salvaMisura(espId: string, m: Misura): Promise<void> {
-  const { error } = await supabase.from('misure').upsert(aRigaMisura(espId, m), { onConflict: 'id' })
-  if (error) throw error
+  const { error, status } = await supabase.from('misure').upsert(aRigaMisura(espId, m), { onConflict: 'id' })
+  // L'errore di PostgREST non porta lo stato HTTP (sta nella risposta): la coda d'invio ne ha bisogno per sapere se
+  // ritentare (un 503 sì, un 400 no). Lo stesso oggetto, con lo stato in più.
+  if (error) throw typeof status === 'number' && !('status' in error) ? Object.assign(error, { status }) : error
 }
 
 export async function eliminaMisura(id: string): Promise<void> {

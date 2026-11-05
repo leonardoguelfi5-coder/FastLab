@@ -32,6 +32,8 @@ import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza, scriviAperto, scriv
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro } from '@/domain/tipi'
+import { accoda, aggiornaVoce, impostaUtenteCoda, vociDi } from '@/lib/coda/codaMisure'
+import { ErroreRete } from '@/lib/rete'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
 import { ModificaMisura } from './ModificaMisura'
@@ -850,3 +852,115 @@ describe('ModificaMisura: casi limite', () => {
     expect(campo('Temp aria')).toHaveValue('30')
   })
 })
+
+describe('ModificaMisura: misure in coda d\'invio (Piano E, Task E6)', () => {
+  const DATI = { etichetta: '35', strumento: '🌡 Termometro', sulServer: false }
+  beforeEach(() => impostaUtenteCoda('u1'))
+  afterEach(() => impostaUtenteCoda(null))
+
+  it('una misura ancora in coda (mai arrivata) si apre dalla coda, e "Salva" la riaccoda con lo stesso id', async () => {
+    archivio = []
+    const inCoda = { ...m, valori: { [par('Temp aria').id]: [24.5] } }
+    accoda('u1', 'E', inCoda, DATI)
+    vi.mocked(salvaMisura).mockRejectedValue(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    expect(campo('Temp aria')).toHaveValue('24,5')
+
+    await utente.clear(campo('Temp aria'))
+    await utente.type(campo('Temp aria'), '26,2')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    const voci = vociDi('u1')
+    expect(voci).toHaveLength(1)
+    expect(voci[0].misura.id).toBe(m.id)
+    expect(voci[0].misura.valori[par('Temp aria').id]).toEqual([26.2])
+    expect(voci[0].forseSulServer).toBe(true)
+    expect(toastSalvato).not.toHaveBeenCalled()
+  })
+
+  it('la correzione di una misura del server passa dalla coda: si torna subito alla scheda e il verde arriva con il server', async () => {
+    let arriva!: () => void
+    vi.mocked(salvaMisura).mockImplementationOnce((_e, x) => new Promise<void>(r => { arriva = () => { archivio = [x]; r() } }))
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.clear(campo('Temp aria'))
+    await utente.type(campo('Temp aria'), '26,2')
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(vociDi('u1')[0].forseSulServer).toBe(true)
+    expect(toastSalvato).not.toHaveBeenCalled()
+    await act(async () => arriva())
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
+    expect(vociDi('u1')).toEqual([])
+  })
+
+  it('"Elimina" di una misura solo in coda la toglie dalla coda, senza chiedere nulla al server', async () => {
+    archivio = []
+    accoda('u1', 'E', m, DATI)
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(vociDi('u1')).toEqual([])
+    expect(eliminaMisura).not.toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith('Misura eliminata.')
+  })
+
+  it('"Elimina" di una correzione in coda di una misura del server: tolta dalla coda ed eliminata online', async () => {
+    accoda('u1', 'E', m, { ...DATI, sulServer: true })
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    expect(eliminaMisura).toHaveBeenCalledWith(m.id)
+    expect(vociDi('u1')).toEqual([])
+    expect(archivio).toEqual([])
+  })
+
+  it('se l\'eliminazione online non riesce, la misura torna in coda: niente si perde', async () => {
+    accoda('u1', 'E', m, { ...DATI, sulServer: true })
+    vi.mocked(eliminaMisura).mockRejectedValueOnce(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+
+    const errore = await screen.findByRole('alert')
+    expect(errore).toHaveTextContent('Misura non eliminata.')
+    expect(vociDi('u1').map(v => v.misura.id)).toEqual([m.id])
+    expect(posizione()).toBe(`/esperimenti/E/misure/${m.id}`)
+  })
+
+  it('"Elimina" di una misura che sta partendo aspetta la fine dell\'invio, poi la elimina online', async () => {
+    archivio = []
+    accoda('u1', 'E', m, DATI)
+    const [v] = vociDi('u1')
+    aggiornaVoce('u1', m.id, v.revisione, x => ({ ...x, stato: 'invio', forseSulServer: true }))
+    const utente = userEvent.setup()
+    apri()
+    await pronta()
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    // Prima l'invio rimasto a metà arriva, poi l'eliminazione lo toglie: sul server non resta.
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    expect(eliminaMisura).toHaveBeenCalledWith(m.id)
+    expect(vi.mocked(salvaMisura).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(eliminaMisura).mock.invocationCallOrder[0])
+    expect(archivio).toEqual([])
+    expect(vociDi('u1')).toEqual([])
+  })
+})
+

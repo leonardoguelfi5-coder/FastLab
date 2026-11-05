@@ -20,8 +20,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { parametriDiUnaMisura, validaMisura, valoriDaSalvare, valoriDeiParametri } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Strumento, Pianta, Trattamento, ValoriMisura } from '@/domain/tipi'
+import { accoda, ErroreCoda, rimetti, togli, utenteCoda, vociDi } from '@/lib/coda/codaMisure'
+import { inviaCoda } from '@/lib/coda/invio'
 import { formattaData } from '@/lib/date'
-import { eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
+import { ErroreApp, eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { eUuid, percorsoHome, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { ModuloCampi } from '@/components/ModuloCampi'
@@ -162,6 +164,15 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
 
     inCorso.current = true
     setControllo(null)
+    // Come nel giro (Piano E, Task E6): la correzione va nella coda d'invio, scritta subito sul telefono, e si torna alla
+    // scheda; il verde lo dà l'invio quando il server risponde. Senza la coda si salva direttamente, aspettando il server.
+    const utente = utenteCoda()
+    if (utente && accodata(utente, daSalvare)) {
+      cancellaBozzaCorrezione(espId, misura)
+      if (montato.current) esci()
+      void inviaCoda(utente, queryClient)
+      return
+    }
     setStato({ tipo: 'in_corso', azione: 'salva' })
     try {
       await salvaMisura(espId, daSalvare)
@@ -185,13 +196,56 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
     if (montato.current) esci()
   }
 
+  /** Mette la correzione nella coda d'invio; falso se il localStorage non si può scrivere. */
+  function accodata(utente: string, m: Misura): boolean {
+    try {
+      accoda(utente, espId, m, {
+        etichetta: pianta.etichetta,
+        strumento: strumento.icona ? `${strumento.icona} ${strumento.nome}` : strumento.nome,
+        // La misura aperta qui è sul server (o, se è ancora in coda, la coda sa se lo è già: vale la sua voce).
+        sulServer: true,
+      })
+      return true
+    } catch (e) {
+      if (e instanceof ErroreCoda) return false
+      throw e
+    }
+  }
+
+  /**
+   * Elimina la misura, anche se è ancora nella coda d'invio:
+   * - se sta partendo, prima si aspetta che l'invio finisca (altrimenti arriverebbe dopo l'eliminazione e la ricreerebbe);
+   * - in coda e mai partita (non può essere sul server): basta toglierla dalla coda;
+   * - in coda ma forse già sul server (una correzione, o un invio partito): tolta dalla coda ed eliminata online; se
+   *   l'eliminazione online non riesce torna in coda com'era, e lo si dice: niente si perde;
+   * - non in coda: eliminata online, come sempre.
+   */
+  async function eliminaOvunque(): Promise<void> {
+    const utente = utenteCoda()
+    if (!utente) return eliminaMisura(misura.id)
+    const inCoda = () => vociDi(utente).find(v => v.misura.id === misura.id)
+    if (inCoda()?.stato === 'invio') await inviaCoda(utente, queryClient, { forza: true })
+    const voce = inCoda()
+    if (!voce) return eliminaMisura(misura.id)
+    // Tolta dalla coda, la pagina deve continuare a vederla finché si chiude (il server può non averla).
+    queryClient.setQueryData(chiavi.misura(misura.id), voce.misura)
+    if (togli(utente, misura.id) === 'in_invio') throw new ErroreApp('La misura sta partendo proprio adesso: riprova tra poco.')
+    if (!voce.forseSulServer) return
+    try {
+      await eliminaMisura(misura.id)
+    } catch (e) {
+      rimetti(voce)
+      throw e
+    }
+  }
+
   async function elimina() {
     if (inCorso.current) return
     inCorso.current = true
     setControllo(null)
     setStato({ tipo: 'in_corso', azione: 'elimina' })
     try {
-      await eliminaMisura(misura.id)
+      await eliminaOvunque()
     } catch (e) {
       inCorso.current = false
       if (montato.current) {

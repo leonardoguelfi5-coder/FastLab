@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { Misura } from '@/domain/tipi'
@@ -29,12 +29,73 @@ import {
   useExportSalvati, useMisureStrumenti, useMisureStrumento, useUltimaData, ultimaDataConMisure,
 } from './query'
 
+import { accoda, impostaUtenteCoda } from '@/lib/coda/codaMisure'
+
 function wrapper() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
 
 beforeEach(() => { vi.clearAllMocks() })
+
+describe('misure in coda sovrapposte alle letture (Piano E, Task E6)', () => {
+  const m = (id: string, extra: Partial<Misura> = {}): Misura => ({
+    id, pianta_id: 'p1', strumento_id: 's1', data_rilievo: '2026-10-28', ora: '09:00', valori: {}, ...extra,
+  })
+  const DATI = { etichetta: '1', strumento: 'SPAD', sulServer: false }
+  beforeEach(() => {
+    localStorage.clear()
+    impostaUtenteCoda('u1')
+  })
+  afterEach(() => impostaUtenteCoda(null))
+
+  it('useMisureGiorno: la misura in coda c\'è anche se il server non l\'ha ancora; vince la coda sullo stesso id', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue([m('a', { ora: '08:00' }), m('b', { valori: { v: [1] } })])
+    accoda('u1', 'E', m('b', { valori: { v: [2] } }), DATI)
+    accoda('u1', 'E', m('c', { ora: '10:00' }), DATI)
+    accoda('u1', 'F', m('d'), DATI)
+    accoda('u1', 'E', m('e', { data_rilievo: '2026-10-27' }), DATI)
+    const { result } = renderHook(() => useMisureGiorno('E', '2026-10-28'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.map(x => x.id)).toEqual(['a', 'b', 'c'])
+    expect(result.current.data?.[1].valori).toEqual({ v: [2] })
+  })
+
+  it('useMisureGiorno: si aggiorna appena una misura entra in coda, senza rileggere il server', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue([])
+    const { result } = renderHook(() => useMisureGiorno('E', '2026-10-28'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    act(() => accoda('u1', 'E', m('c'), DATI))
+    expect(result.current.data?.map(x => x.id)).toEqual(['c'])
+    expect(misureDelGiorno).toHaveBeenCalledTimes(1)
+  })
+
+  it('le voci di un altro utente non si vedono', async () => {
+    vi.mocked(misureDelGiorno).mockResolvedValue([])
+    accoda('u2', 'E', m('c'), DATI)
+    const { result } = renderHook(() => useMisureGiorno('E', '2026-10-28'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data).toEqual([])
+  })
+
+  it('useMisurePianta: le misure in coda della pianta, dalla più recente', async () => {
+    vi.mocked(misurePianta).mockResolvedValue([m('a', { data_rilievo: '2026-10-27' })])
+    accoda('u1', 'E', m('c'), DATI)
+    accoda('u1', 'E', m('x', { pianta_id: 'p2' }), DATI)
+    const { result } = renderHook(() => useMisurePianta('p1'), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(result.current.data?.map(x => x.id)).toEqual(['c', 'a'])
+  })
+
+  it('useMisura: una misura in coda si apre dalla coda, anche se il server non la trova', async () => {
+    vi.mocked(caricaMisura).mockRejectedValue(new Error('Misura non trovata.'))
+    accoda('u1', 'E', m('c', { valori: { v: [3] } }), DATI)
+    const { result } = renderHook(() => useMisura('c'), { wrapper: wrapper() })
+    expect(result.current.data).toEqual(m('c', { valori: { v: [3] } }))
+    await waitFor(() => expect(caricaMisura).toHaveBeenCalled())
+    expect(result.current.data).toEqual(m('c', { valori: { v: [3] } }))
+  })
+})
 
 describe('chiavi delle foto', () => {
   it('l\'elenco e lo spazio stanno sotto lo stesso prefisso, per invalidarli insieme; gli URL fuori', () => {

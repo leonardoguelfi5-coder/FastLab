@@ -42,6 +42,7 @@ import { misureDelGiorno, misurePianta, salvaMisura, ultimaMisuraPerStrumento } 
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Foto, Misura, Nota, Parametro, ValoriMisura } from '@/domain/tipi'
+import { accoda, aggiornaVoce, impostaUtenteCoda, vociDi } from '@/lib/coda/codaMisure'
 import { dataDiScatto } from '@/lib/immagini'
 import { useCampoStore } from '@/store/campo'
 import { MisuraPianta } from './MisuraPianta'
@@ -643,6 +644,31 @@ describe('SchedaPianta: avvisi di dati mancanti', () => {
 })
 
 describe('SchedaPianta: storia', () => {
+  it('una misura ancora in coda d\'invio c\'è, con "da inviare"; una rifiutata con "non inviata"', async () => {
+    impostaUtenteCoda('u1')
+    try {
+      const dalServer = misura(35, 'Termometro', { 'Temp aria': [22] }, '2026-10-21', '08:30')
+      archivio = [dalServer]
+      const inCoda = misura(35, 'Termometro', { 'Temp aria': [24.5] }, OGGI, '09:12')
+      const rifiutata = misura(35, 'SPAD', { SPAD: [38.1] }, OGGI, '09:40')
+      const dati = { etichetta: '35', strumento: 'Termometro', sulServer: false }
+      accoda('u1', 'E', inCoda, dati)
+      accoda('u1', 'E', rifiutata, dati)
+      const v = vociDi('u1')[1]
+      aggiornaVoce('u1', rifiutata.id, v.revisione, x => ({ ...x, stato: 'rifiutata', errore: 'No.' }))
+      apri('35')
+      const storia = await screen.findByRole('region', { name: 'Storia' })
+      const voci = within(storia).getAllByRole('link')
+      // Dentro il giorno per ora, come quelle del server.
+      expect(voci.map(r => r.getAttribute('href'))).toEqual([inCoda, rifiutata, dalServer].map(m => `/esperimenti/E/misure/${m.id}`))
+      expect(voci[0]).toHaveTextContent('da inviare')
+      expect(voci[1]).toHaveTextContent('non inviata')
+      expect(voci[2]).not.toHaveTextContent('inviare')
+    } finally {
+      impostaUtenteCoda(null)
+    }
+  })
+
   it('elenca le misure per giorno (dal più recente), con l\'icona dello strumento e i parametri archiviati', async () => {
     par('SPAD').archiviato = true
     const oggi = misura(35, 'Termometro', { 'Temp aria': [24.5], 'Temp pianta': [null] }, OGGI, '09:12')

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { Session } from '@supabase/supabase-js'
 import { QueryClient } from '@tanstack/react-query'
@@ -16,6 +16,7 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 import { chiaveAperto, chiaveBozza } from '@/components/scheda/bozza'
+import { accoda, impostaUtenteCoda, utenteCoda, vociDi } from '@/lib/coda/codaMisure'
 import { supabase } from '@/lib/supabase'
 import { accedi, esci, registrati, svuotaCacheAlCambioUtente, useSessione } from './auth'
 
@@ -217,6 +218,30 @@ describe('svuotaCacheAlCambioUtente', () => {
     riempi()
     notifica('SIGNED_IN', utenteA)
     expect(vuota()).toBe(true)
+  })
+
+  describe('la coda d\'invio delle misure (Piano E, Task E6)', () => {
+    beforeEach(() => localStorage.clear())
+    afterEach(() => impostaUtenteCoda(null))
+
+    it('segue l\'utente della sessione: solo le sue voci si vedono e si inviano', () => {
+      const { notifica } = avvia(utenteA)
+      expect(utenteCoda()).toBe('A')
+      notifica('SIGNED_OUT', null)
+      expect(utenteCoda()).toBeNull()
+      notifica('SIGNED_IN', utenteB)
+      expect(utenteCoda()).toBe('B')
+    })
+
+    it('le voci di A restano quando accede B: partiranno al prossimo accesso di A', () => {
+      const { notifica } = avvia(utenteA)
+      accoda('A', 'E', { id: 'm1', pianta_id: 'p', strumento_id: 's', data_rilievo: '2026-10-28', ora: '09:00', valori: {} },
+        { etichetta: '1', strumento: 'SPAD', sulServer: false })
+      notifica('SIGNED_OUT', null)
+      notifica('SIGNED_IN', utenteB)
+      expect(vociDi('A')).toHaveLength(1)
+      expect(vociDi('B')).toEqual([])
+    })
   })
 
   describe('le bozze della scheda pianta', () => {

@@ -42,6 +42,11 @@ describe('salvaMisura', () => {
     mock.risponde('misure', { error: errore })
     await expect(salvaMisura('E', misura)).rejects.toBe(errore)
   })
+
+  it('l\'errore porta lo stato HTTP della risposta: la coda d\'invio decide da lì se ritentare', async () => {
+    mock.risponde('misure', { error: { code: '42501', message: 'row-level security', details: '', hint: '' }, status: 403 })
+    await expect(salvaMisura('E', misura)).rejects.toMatchObject({ code: '42501', status: 403 })
+  })
 })
 
 describe('misureDelGiorno', () => {

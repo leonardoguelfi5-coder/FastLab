@@ -42,6 +42,9 @@ import { strumentoDaCatalogo } from '@/domain/catalogo'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro, ValoriMisura } from '@/domain/tipi'
+import { impostaUtenteCoda, PREFISSO_CODA, vociDi } from '@/lib/coda/codaMisure'
+import { avviaInvioAutomatico } from '@/lib/coda/invio'
+import { ErroreRete } from '@/lib/rete'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
 import { FineGiro } from './FineGiro'
@@ -1032,9 +1035,9 @@ describe('MisuraPianta: salvataggio', () => {
     expect(salvaMisura).not.toHaveBeenCalled()
   })
 
-  it('se riesce: toast "Pianta #35 salvata ✓" e invalidazione di misure della pianta, del giorno, "ultima volta", ultime delle piante ed esperimenti', async () => {
+  it('se riesce: toast "Pianta #35 salvata ✓" e invalidazione di misure della pianta, "ultima volta", ultime delle piante ed esperimenti', async () => {
     const utente = userEvent.setup()
-    const { invalida } = apriT('35')
+    const { client, invalida } = apriT('35')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
     await utente.click(pulsante('Salva e vai alla #36'))
@@ -1042,7 +1045,9 @@ describe('MisuraPianta: salvataggio', () => {
     await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
     expect(toastSalvato).toHaveBeenCalledTimes(1)
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misurePianta(idPianta('35')) })
-    expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', OGGI) })
+    // Le misure del giorno non si rileggono (Piano E, bassa 15): la misura è già nella cache.
+    expect(invalida).not.toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', OGGI) })
+    expect(client.getQueryData<Misura[]>(chiavi.misureGiorno('E', OGGI))?.map(m => m.pianta_id)).toEqual([idPianta('35')])
     // "ultima volta" nella scelta dello strumento: questa misura può essere la più recente del suo strumento.
     expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.ultimeMisure('E') })
     // l'elenco Piante mostra gli ultimi valori di ogni pianta: non deve restare indietro fino alla scadenza della cache
@@ -1055,7 +1060,7 @@ describe('MisuraPianta: salvataggio', () => {
   it('con la data di rilievo di ieri la misura si salva con quella data', async () => {
     useCampoStore.getState().setData('E', IERI)
     const utente = userEvent.setup()
-    const { invalida } = apriT('35')
+    const { client, invalida } = apriT('35')
     await pronta()
     expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '27/10/2026 · 🌡 Termometro' })).toBeInTheDocument()
@@ -1065,7 +1070,9 @@ describe('MisuraPianta: salvataggio', () => {
 
     await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
     expect(salvate()[0].data_rilievo).toBe(IERI)
-    await waitFor(() => expect(invalida).toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', IERI) }))
+    // Entra nella cache del giorno di ieri senza rileggerla.
+    await waitFor(() => expect(client.getQueryData<Misura[]>(chiavi.misureGiorno('E', IERI))?.map(m => m.data_rilievo)).toEqual([IERI]))
+    expect(invalida).not.toHaveBeenCalledWith({ queryKey: chiavi.misureGiorno('E', IERI) })
   })
 
   it('"Salva" resta sulla pianta: la misura compare tra quelle di oggi e il modulo ricomincia con un id nuovo', async () => {
@@ -2296,3 +2303,138 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ piantaId: idPianta('36') })
   })
 })
+
+describe('MisuraPianta: coda d\'invio con poco segnale (Piano E, Task E6)', () => {
+  let ferma: () => void = () => {}
+  beforeEach(() => impostaUtenteCoda('u1'))
+  afterEach(() => {
+    ferma()
+    ferma = () => {}
+    impostaUtenteCoda(null)
+    vi.restoreAllMocks()
+  })
+
+  it('"Salva e vai" senza rete passa subito alla pianta dopo, l\'intestazione dice "1 misura da inviare" e niente verde', async () => {
+    vi.mocked(salvaMisura).mockRejectedValue(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await waitFor(() => expect(posizione()).toBe(percorso('Termometro', '36')))
+    expect(await screen.findByRole('button', { name: '1 misura da inviare' })).toBeInTheDocument()
+    // La misura è nel localStorage prima ancora che la richiesta finisca: un'app chiusa adesso non la perde.
+    expect(vociDi('u1')).toHaveLength(1)
+    expect(vociDi('u1')[0].misura).toMatchObject({ pianta_id: idPianta('35'), valori: { [par('Temp aria').id]: [24.5] } })
+    expect(toastSalvato).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    // La bozza della #35 non serve più: i valori sono in coda.
+    expect(bozzeSalvate().filter(k => k.includes(idPianta('35')))).toEqual([])
+  })
+
+  it('al ritorno della rete la misura parte da sola e solo allora compare il verde', async () => {
+    ferma = avviaInvioAutomatico(new QueryClient())
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('button', { name: '1 misura da inviare' })
+    await waitFor(() => expect(vociDi('u1')[0]?.tentativi).toBe(1))
+    expect(toastSalvato).not.toHaveBeenCalled()
+
+    act(() => { window.dispatchEvent(new Event('online')) })
+
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
+    expect(archivio.map(m => m.pianta_id)).toEqual([idPianta('35')])
+    await waitFor(() => expect(screen.queryByRole('button', { name: /da inviare/ })).not.toBeInTheDocument())
+  })
+
+  it('con la rete "Salva e vai" non aspetta il server, e il verde arriva quando il server risponde', async () => {
+    let arriva!: () => void
+    vi.mocked(salvaMisura).mockImplementationOnce((_e, m) => new Promise<void>(r => { arriva = () => { archivio.push(m); r() } }))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    expect(toastSalvato).not.toHaveBeenCalled()
+    await act(async () => arriva())
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
+    expect(vociDi('u1')).toEqual([])
+  })
+
+  it('una misura in coda conta come fatta: la #35 si salta anche se il server riletto non l\'ha ancora', async () => {
+    vi.mocked(salvaMisura).mockRejectedValue(new ErroreRete('limite'))
+    const utente = userEvent.setup()
+    const { client } = apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+
+    // Il server riletto non ha la misura (non è arrivata).
+    await act(() => client.refetchQueries({ queryKey: chiavi.misureGiorno('E', OGGI) }))
+    const delGiorno = client.getQueryData<Misura[]>(chiavi.misureGiorno('E', OGGI))
+    expect(delGiorno).toEqual([])
+    await pronta()
+    expect(pulsante('Salva e vai alla #37')).toBeInTheDocument()
+  })
+
+  it('"Salva" resta sulla pianta: la misura compare tra quelle di oggi con "da inviare"', async () => {
+    vi.mocked(salvaMisura).mockRejectedValue(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva'))
+
+    const elenco = await screen.findByRole('list', { name: 'Misure già registrate' })
+    expect(within(elenco).getByText('da inviare')).toBeInTheDocument()
+    expect(posizione()).toBe(percorso('Termometro', '35'))
+  })
+
+  it('dopo il salvataggio le misure del giorno non si rileggono: la cache è già giusta', async () => {
+    const utente = userEvent.setup()
+    const { invalida } = apriT('35')
+    await pronta()
+    const letture = vi.mocked(misureDelGiorno).mock.calls.length
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓'))
+    await screen.findByRole('heading', { name: 'Pianta #36' })
+    expect(invalida).not.toHaveBeenCalledWith(expect.objectContaining({ queryKey: chiavi.misureGiorno('E', OGGI), refetchType: undefined }))
+    expect(vi.mocked(misureDelGiorno).mock.calls.length).toBe(letture)
+  })
+
+  it('senza localStorage per la coda si salva come prima: "Salvataggio…", l\'errore e "Riprova"', async () => {
+    const setItem = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, chiave: string, valore: string) {
+      if (chiave.startsWith(PREFISSO_CODA)) throw new DOMException('pieno', 'QuotaExceededError')
+      setItem.call(this, chiave, valore)
+    })
+    vi.mocked(salvaMisura).mockRejectedValueOnce(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.click(pulsante('Salva e vai alla #36'))
+
+    const errore = await screen.findByRole('alert')
+    expect(errore).toHaveTextContent('Pianta #35 non salvata.')
+    expect(errore).toHaveTextContent('Rete debole')
+    expect(posizione()).toBe(percorso('Termometro', '35'))
+    await utente.click(within(errore).getByRole('button', { name: 'Riprova' }))
+    await waitFor(() => expect(posizione()).toBe(percorso('Termometro', '36')))
+    expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓')
+    expect(vociDi('u1')).toEqual([])
+  })
+})
+

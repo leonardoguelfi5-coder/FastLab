@@ -1,10 +1,11 @@
 import type { ReactElement } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 
+vi.mock('@/lib/supabase', () => ({ supabase: {} }))
 vi.mock('@/api/auth', () => ({
   accedi: vi.fn(), registrati: vi.fn(), esci: vi.fn(), useSessione: vi.fn(),
 }))
@@ -14,6 +15,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
+import { accoda, impostaUtenteCoda } from '@/lib/coda/codaMisure'
 import { AppShell } from './AppShell'
 
 type Utente = ReturnType<typeof userEvent.setup>
@@ -139,5 +141,61 @@ describe('AppShell', () => {
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledOnce())
     expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Rete debole/)
     expect(screen.getByText('Corpo')).toBeInTheDocument()
+  })
+
+  describe('con misure in coda d\'invio (Piano E, Task E6)', () => {
+    const misura = (id: string) => ({ id, pianta_id: 'p', strumento_id: 's', data_rilievo: '2026-10-28', ora: '09:12', valori: {} })
+    const metti = (utente: string, id: string) => accoda(utente, 'E', misura(id), { etichetta: '35', strumento: 'SPAD', sulServer: false })
+    beforeEach(() => {
+      localStorage.clear()
+      impostaUtenteCoda('u1')
+    })
+    afterEach(() => impostaUtenteCoda(null))
+
+    it('l\'intestazione dice quante misure sono da inviare', () => {
+      metti('u1', 'm1')
+      metti('u1', 'm2')
+      metti('u1', 'm3')
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+      expect(screen.getByRole('button', { name: '3 misure da inviare' })).toBeInTheDocument()
+    })
+
+    it('un altro utente non vede la coda del primo', () => {
+      metti('u2', 'm1')
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+      expect(screen.queryByRole('button', { name: /da inviare/ })).not.toBeInTheDocument()
+    })
+
+    it('"Esci" con misure in coda chiede conferma e dice quando partiranno', async () => {
+      vi.mocked(esci).mockResolvedValue(undefined)
+      metti('u1', 'm1')
+      metti('u1', 'm2')
+      metti('u1', 'm3')
+      const utente = userEvent.setup({ delay: null })
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+
+      await apriMenu(utente)
+      await utente.click(screen.getByRole('button', { name: 'Esci' }))
+      const dialogo = await screen.findByRole('dialog', { name: 'Uscire con misure da inviare?' })
+      expect(dialogo).toHaveTextContent('Ci sono 3 misure da inviare: partiranno al tuo prossimo accesso su questo telefono.')
+      expect(esci).not.toHaveBeenCalled()
+
+      await utente.click(screen.getByRole('button', { name: 'Resta' }))
+      expect(esci).not.toHaveBeenCalled()
+
+      await apriMenu(utente)
+      await utente.click(screen.getByRole('button', { name: 'Esci' }))
+      await utente.click(await screen.findByRole('button', { name: 'Esci comunque' }))
+      expect(esci).toHaveBeenCalledOnce()
+    })
+
+    it('con una misura sola la frase è al singolare', async () => {
+      metti('u1', 'm1')
+      const utente = userEvent.setup({ delay: null })
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+      await apriMenu(utente)
+      await utente.click(screen.getByRole('button', { name: 'Esci' }))
+      expect(await screen.findByRole('dialog')).toHaveTextContent('C\'è 1 misura da inviare: partirà al tuo prossimo accesso su questo telefono.')
+    })
   })
 })

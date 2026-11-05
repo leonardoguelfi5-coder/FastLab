@@ -9,6 +9,8 @@ import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
 import { eVuoto, mantenibile, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
+import { accoda, ErroreCoda, utenteCoda } from '@/lib/coda/codaMisure'
+import { inviaCoda } from '@/lib/coda/invio'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -41,7 +43,7 @@ type Stato =
   | { tipo: 'errore'; azione: Azione; errore: unknown }
 
 /**
- * Il messaggio di un salvataggio fallito quando chi rileva è già uscito dalla scheda. Dice se i valori sono rimasti
+ * Il messaggio di un salvataggio diretto (senza la coda d'invio) fallito quando chi rileva è già uscito dalla scheda. Dice se i valori sono rimasti
  * (in una bozza) e, se la misura non è di oggi, con quale data riaprire la pianta: riaprendola si vede il giorno scelto.
  */
 function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: string, valoriRimasti: boolean): string {
@@ -261,7 +263,20 @@ export function ModuloOggi({
       valori: valoriDaSalvare(misura?.valori ?? null, valori),
     }
 
+    // La via di sempre: la misura va in coda (scritta subito sul telefono, Piano E, Task E6), si passa alla pianta dopo
+    // e l'invio parte in background; il verde lo dà l'invio quando il server risponde. Senza la coda (nessun utente
+    // della sessione, localStorage assente o pieno) si salva direttamente, come prima: si aspetta il server.
+    // Il blocco resta alzato anche dopo l'accodamento: il modulo si chiude, un secondo tocco non accoda di nuovo.
     inCorso.current = true
+    if (accodata(daSalvare)) {
+      setOra(oraMisura)
+      setControllo(null)
+      salvata(daSalvare, azione, false)
+      const utente = utenteCoda()
+      if (utente) void inviaCoda(utente, queryClient)
+      return
+    }
+
     setOra(oraMisura)
     setControllo(null)
     setStato({ tipo: 'salvando', azione })
@@ -287,30 +302,56 @@ export function ModuloOggi({
       return
     }
     inCorso.current = false
-    salvata(daSalvare, azione)
+    salvata(daSalvare, azione, true)
   }
 
-  function salvata(m: Misura, azione: Azione) {
+  /** Mette la misura nella coda d'invio; falso se la coda non c'è (nessun utente) o non si può scrivere. */
+  function accodata(m: Misura): boolean {
+    const utente = utenteCoda()
+    if (!utente) return false
+    try {
+      accoda(utente, espId, m, {
+        etichetta: pianta.etichetta,
+        strumento: strumento.icona ? `${strumento.icona} ${strumento.nome}` : strumento.nome,
+        // Una correzione: la misura è (o può essere) già sul server.
+        sulServer: misura !== null,
+      })
+      return true
+    } catch (e) {
+      if (e instanceof ErroreCoda) return false
+      throw e
+    }
+  }
+
+  /**
+   * Il modulo si chiude e si va avanti. `confermata`: il server ha già risposto (salvataggio diretto, senza coda), quindi
+   * il verde si dà qui e la misura entra nella cache delle letture; dalla coda invece si vede già (le letture le
+   * sovrappongono) e il verde lo dà l'invio quando arriva.
+   */
+  function salvata(m: Misura, azione: Azione, confermata: boolean) {
     chiuso.current = true
     cancellaTutto()
-    toastSalvato(`Pianta #${pianta.etichetta} salvata ✓`)
+    if (confermata) toastSalvato(`Pianta #${pianta.etichetta} salvata ✓`)
     // Solo una misura nuova è "l'ultima inserita": correggere quella del mattino non cambia la Temp aria del pomeriggio.
     // Se le spunte non sono più per questo strumento e questa data (la scheda è stata riaperta altrove), non si toccano.
     if (!misura && useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)) aggiornaMantenuti(espId, valori)
-    // La misura entra subito nella cache: l'elenco di oggi la mostra senza aspettare il ricaricamento.
-    queryClient.setQueryData<Misura[]>(chiavi.misurePianta(pianta.id), prima => [m, ...(prima ?? []).filter(x => x.id !== m.id)])
-    // Anche tra quelle del giorno, se sono già state lette: il giro (la pianta dopo, la fine del giro) non deve
-    // vedere per un attimo questa pianta come ancora da misurare. Se non sono state lette, le leggerà chi le usa.
-    queryClient.setQueryData<Misura[]>(chiavi.misureGiorno(espId, m.data_rilievo), prima => prima && [m, ...prima.filter(x => x.id !== m.id)])
-    void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
-    void queryClient.invalidateQueries({ queryKey: chiavi.misureGiorno(espId, m.data_rilievo) })
-    // "ultima volta" nella scelta dello strumento: questa può essere la misura più recente del suo strumento.
-    void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisure(espId) })
-    // Gli ultimi valori di ogni pianta (elenco Piante): senza questa resterebbero quelli di prima fino alla scadenza della cache.
-    void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId) })
-    void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
-    // Dataset ed Esporta leggono tutte le misure di ogni strumento: senza questa resterebbero indietro di un giro.
-    void queryClient.invalidateQueries({ queryKey: chiavi.misureStrumento(espId, m.strumento_id) })
+    if (confermata) {
+      // La misura entra subito nella cache: l'elenco di oggi la mostra senza aspettare il ricaricamento.
+      queryClient.setQueryData<Misura[]>(chiavi.misurePianta(pianta.id), prima => [m, ...(prima ?? []).filter(x => x.id !== m.id)])
+      // Anche tra quelle del giorno, se sono già state lette: il giro (la pianta dopo, la fine del giro) non deve
+      // vedere per un attimo questa pianta come ancora da misurare. Se non sono state lette, le leggerà chi le usa.
+      // Non si rileggono (Piano E, bassa 15): con la misura dentro la cache è già giusta, e con poco segnale una
+      // lettura in più è solo attesa.
+      queryClient.setQueryData<Misura[]>(chiavi.misureGiorno(espId, m.data_rilievo), prima => prima && [m, ...prima.filter(x => x.id !== m.id)])
+      void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
+      // "ultima volta" nella scelta dello strumento: questa può essere la misura più recente del suo strumento.
+      void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisure(espId) })
+      // Gli ultimi valori di ogni pianta (elenco Piante): senza questa resterebbero quelli di prima fino alla scadenza della cache.
+      void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId) })
+      void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
+      // Dataset ed Esporta leggono tutte le misure di ogni strumento: senza questa resterebbero indietro di un giro.
+      void queryClient.invalidateQueries({ queryKey: chiavi.misureStrumento(espId, m.strumento_id) })
+    }
     // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
     if (!montato.current) return
     if (azione === 'vai' && avanti) {
