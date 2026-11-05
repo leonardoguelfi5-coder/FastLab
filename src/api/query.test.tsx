@@ -453,6 +453,41 @@ describe('creaQueryClient', () => {
   })
 })
 
+describe('letture della copia sul telefono (Piano E, Task E7)', () => {
+  afterEach(() => vi.useRealTimers())
+
+  /** Monta l'hook, aspetta la lettura, lo smonta e lascia passare 10 minuti: la lettura c'è ancora? */
+  async function restaDopoDieciMinuti(usa: () => unknown, chiave: readonly unknown[]): Promise<boolean> {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const avvolgi = ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    const { unmount } = renderHook(usa, { wrapper: avvolgi })
+    await waitFor(() => expect(client.getQueryState(chiave)?.status).toBe('success'))
+    unmount()
+    act(() => { vi.advanceTimersByTime(10 * 60 * 1000) })
+    return client.getQueryData(chiave) !== undefined
+  }
+
+  it('esperimenti, configurazione, giorno, pianta e ultime misure restano in memoria senza una pagina (la copia è fatta di quello che c\'è)', async () => {
+    vi.mocked(listaEsperimenti).mockResolvedValue([])
+    vi.mocked(caricaConfig).mockResolvedValue({} as never)
+    vi.mocked(misureDelGiorno).mockResolvedValue([])
+    vi.mocked(misurePianta).mockResolvedValue([])
+    vi.mocked(ultimaMisuraPerStrumento).mockResolvedValue(new Map())
+    expect(await restaDopoDieciMinuti(() => useEsperimenti(), chiavi.esperimenti)).toBe(true)
+    expect(await restaDopoDieciMinuti(() => useConfig('E'), chiavi.config('E'))).toBe(true)
+    expect(await restaDopoDieciMinuti(() => useMisureGiorno('E', '2026-11-04'), chiavi.misureGiorno('E', '2026-11-04'))).toBe(true)
+    expect(await restaDopoDieciMinuti(() => useMisurePianta('p1'), chiavi.misurePianta('p1'))).toBe(true)
+    expect(await restaDopoDieciMinuti(() => useUltimeMisure('E'), chiavi.ultimeMisure('E'))).toBe(true)
+    expect(await restaDopoDieciMinuti(() => useUltimaData('E'), chiavi.ultimeMisure('E'))).toBe(true)
+  })
+
+  it('le altre letture no: dopo 5 minuti senza una pagina spariscono, come sempre', async () => {
+    vi.mocked(listaNote).mockResolvedValue([])
+    expect(await restaDopoDieciMinuti(() => useNote('E'), chiavi.note('E'))).toBe(false)
+  })
+})
+
 describe('ultimaDataConMisure', () => {
   it('è la data più recente tra tutti gli strumenti', () => {
     expect(ultimaDataConMisure(new Map([['s1', '2026-10-21'], ['s2', '2026-11-03'], ['s3', '2026-09-30']]))).toBe('2026-11-03')

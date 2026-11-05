@@ -2,6 +2,7 @@ import { useId, useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useConfig, useMisureGiorno, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { VoceStrumento } from '@/components/VoceStrumento'
@@ -137,7 +138,7 @@ export function SceltaStrumento() {
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : (
         <SceltaCaricata espId={espId} config={dati} />
       )}

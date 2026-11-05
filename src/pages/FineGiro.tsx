@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useConfig, useMisureGiorno } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { BannerData } from '@/components/BannerData'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
@@ -15,8 +16,6 @@ import type { ConfigEsperimento, Misura, Strumento } from '@/domain/tipi'
 import { percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
-
-const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
 /** Il riepilogo del giro, a misure del giorno arrivate: senza, ogni pianta risulterebbe da fare. */
 function Riepilogo({ espId, config, strumento, misure }: { espId: string; config: ConfigEsperimento; strumento: Strumento; misure: Misura[] }) {

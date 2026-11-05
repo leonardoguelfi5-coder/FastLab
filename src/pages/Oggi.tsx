@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { useConfig, useMisureGiorno, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { VoceStrumento } from '@/components/VoceStrumento'
@@ -136,7 +137,7 @@ function DaSistemare({ espId, config, oggi }: { espId: string; config: ConfigEsp
       {dati === undefined ? (
         misure.isError
           ? <ErroreConRiprova errore={misure.error} onRiprova={() => void misure.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : voci.length === 0 ? (
         <p className="text-grafite-tenue">Nessun valore da controllare.</p>
       ) : (
@@ -210,7 +211,7 @@ export function Oggi() {
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : (
         <OggiCaricato espId={espId} config={dati} />
       )}

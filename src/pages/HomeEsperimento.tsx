@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useConfig, useMisureGiorno, useNote } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { senzaNoteInEliminazione } from '@/components/note/eliminaNotaConAnnulla'
 import { chiaveSpuntaPromemoria } from '@/components/note/spuntaPromemoriaConAnnulla'
@@ -169,7 +170,7 @@ export function HomeEsperimento() {
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : (
         <HomeCaricata espId={espId} config={dati} />
       )}

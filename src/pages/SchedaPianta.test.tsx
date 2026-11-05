@@ -238,6 +238,26 @@ describe('SchedaPianta: intestazione', () => {
   })
 })
 
+describe('SchedaPianta: senza rete (Piano E, Task E7)', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('una pianta mai letta su questo telefono lo dice, e i dati della pianta (dalla configurazione) ci sono', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    vi.mocked(misurePianta).mockImplementation(() => new Promise(() => {}))
+    apri('35')
+    expect(await screen.findByText('Senza rete: questa pianta non è ancora stata letta su questo telefono.')).toBeInTheDocument()
+    expect(screen.queryByText('Caricamento…')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' })).toBeInTheDocument()
+  })
+
+  it('un esperimento mai letto lo dice', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    vi.mocked(caricaConfig).mockImplementation(() => new Promise(() => {}))
+    apri('35')
+    expect(await screen.findByText('Senza rete: questo esperimento non è ancora stato letto su questo telefono.')).toBeInTheDocument()
+  })
+})
+
 describe('SchedaPianta: ultimi valori', () => {
   it('per ogni strumento l\'icona e il nome con data e "fa", poi i valori: "SPAD 41,2"', async () => {
     archivio = [

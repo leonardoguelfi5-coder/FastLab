@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
-import type { Session } from '@supabase/supabase-js'
+import { AuthApiError, AuthRetryableFetchError, type Session } from '@supabase/supabase-js'
 import { QueryClient } from '@tanstack/react-query'
 
 vi.mock('@/lib/supabase', () => ({
@@ -16,15 +16,28 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 import { chiaveAperto, chiaveBozza } from '@/components/scheda/bozza'
+import { CHIAVE_CACHE } from '@/lib/cachePersistente'
 import { accoda, impostaUtenteCoda, utenteCoda, vociDi } from '@/lib/coda/codaMisure'
+import { ErroreRete } from '@/lib/rete'
 import { supabase } from '@/lib/supabase'
-import { accedi, esci, registrati, svuotaCacheAlCambioUtente, useSessione } from './auth'
+import { accedi, esci, registrati, sessioneSalvata, svuotaCacheAlCambioUtente, useSessione } from './auth'
+
+/** La chiave con cui supabase-js salva la sessione nel localStorage (`sb-<progetto>-auth-token`). */
+const CHIAVE_SESSIONE = 'sb-progetto-auth-token'
+/** Una sessione salvata da supabase-js, con il token già scaduto (il telefono riaperto il mattino dopo). */
+const salvata = (id: string) => ({
+  access_token: `t-${id}`, refresh_token: `r-${id}`, expires_at: 1, expires_in: 3600, token_type: 'bearer',
+  user: { id, email: `${id}@b.it` },
+})
+const salvaSessione = (id: string) => localStorage.setItem(CHIAVE_SESSIONE, JSON.stringify(salvata(id)))
 
 const auth = vi.mocked(supabase.auth)
 const errore = { name: 'AuthApiError', message: 'Invalid login credentials', status: 400 }
 
 beforeEach(() => {
   for (const f of Object.values(auth)) vi.mocked(f).mockReset()
+  // Una sessione salvata lasciata da un test cambierebbe il punto di partenza degli altri.
+  localStorage.clear()
 })
 
 describe('accedi', () => {
@@ -73,7 +86,43 @@ describe('registrati', () => {
   })
 })
 
+describe('sessioneSalvata', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('legge la sessione che supabase-js ha salvato nel localStorage, anche col token scaduto', () => {
+    salvaSessione('A')
+    expect(sessioneSalvata()?.user.id).toBe('A')
+  })
+
+  it('senza sessione salvata, o con una illeggibile o senza utente, è null', () => {
+    expect(sessioneSalvata()).toBeNull()
+    localStorage.setItem(CHIAVE_SESSIONE, '{rotto')
+    expect(sessioneSalvata()).toBeNull()
+    localStorage.setItem(CHIAVE_SESSIONE, JSON.stringify({ ...salvata('A'), user: null }))
+    expect(sessioneSalvata()).toBeNull()
+  })
+
+  it('non confonde le altre chiavi di supabase-js (il verificatore PKCE, l\'utente a parte)', () => {
+    localStorage.setItem(`${CHIAVE_SESSIONE}-code-verifier`, JSON.stringify(salvata('A')))
+    localStorage.setItem(`${CHIAVE_SESSIONE}-user`, JSON.stringify(salvata('A')))
+    expect(sessioneSalvata()).toBeNull()
+  })
+})
+
 describe('esci', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('toglie la copia delle letture dal telefono, solo se l\'uscita riesce', async () => {
+    localStorage.setItem(CHIAVE_CACHE, '{}')
+    auth.signOut.mockResolvedValue({ error: errore } as never)
+    await expect(esci()).rejects.toBe(errore)
+    expect(localStorage.getItem(CHIAVE_CACHE)).toBe('{}')
+
+    auth.signOut.mockResolvedValue({ error: null } as never)
+    await esci()
+    expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+  })
+
   it('chiama signOut solo per questo dispositivo', async () => {
     auth.signOut.mockResolvedValue({ error: null } as never)
     await esci()
@@ -127,6 +176,69 @@ describe('useSessione', () => {
 
     await waitFor(() => expect(result.current.caricamento).toBe(false))
     expect(result.current.sessione).toBeNull()
+  })
+
+  describe('senza rete (Piano E, Task E7)', () => {
+    beforeEach(() => localStorage.clear())
+    const sospesa = () => new Promise<never>(() => {})
+
+    it('con una sessione salvata l\'app si apre subito, senza aspettare il rinnovo del token', () => {
+      simulaAuth(null)
+      auth.getSession.mockImplementation(sospesa as never)
+      salvaSessione('A')
+      const { result } = renderHook(() => useSessione())
+      expect(result.current.caricamento).toBe(false)
+      expect(result.current.sessione?.user.id).toBe('A')
+    })
+
+    it('un errore di rete nel rinnovo (AuthRetryableFetchError) tiene la sessione salvata: niente "Accedi"', async () => {
+      simulaAuth(null)
+      salvaSessione('A')
+      auth.getSession.mockResolvedValue({ data: { session: null }, error: new AuthRetryableFetchError('Rete debole', 0) } as never)
+      const { result } = renderHook(() => useSessione())
+      await waitFor(() => expect(auth.getSession).toHaveBeenCalled())
+      await act(async () => {})
+      expect(result.current).toMatchObject({ caricamento: false, sessione: { user: { id: 'A' } } })
+    })
+
+    it('anche se getSession lancia un errore di rete (ErroreRete, TypeError)', async () => {
+      simulaAuth(null)
+      salvaSessione('A')
+      auth.getSession.mockRejectedValue(new ErroreRete('rete'))
+      const { result } = renderHook(() => useSessione())
+      await act(async () => {})
+      expect(result.current.sessione?.user.id).toBe('A')
+    })
+
+    it('INITIAL_SESSION vuota con la sessione ancora salvata (rinnovo fallito per la rete) non è un\'uscita', () => {
+      const { notifica } = simulaAuth(null)
+      auth.getSession.mockImplementation(sospesa as never)
+      salvaSessione('A')
+      const { result } = renderHook(() => useSessione())
+      act(() => notifica('INITIAL_SESSION', null))
+      expect(result.current.sessione?.user.id).toBe('A')
+    })
+
+    it('una sessione rifiutata dal server (supabase-js la toglie) porta ad "Accedi"', async () => {
+      simulaAuth(null)
+      salvaSessione('A')
+      auth.getSession.mockImplementation((async () => {
+        localStorage.removeItem(CHIAVE_SESSIONE)
+        return { data: { session: null }, error: new AuthApiError('Invalid Refresh Token', 400, 'refresh_token_not_found') }
+      }) as never)
+      const { result } = renderHook(() => useSessione())
+      await waitFor(() => expect(result.current.sessione).toBeNull())
+      expect(result.current.caricamento).toBe(false)
+    })
+
+    it('SIGNED_OUT è sempre un\'uscita', () => {
+      const { notifica } = simulaAuth(null)
+      auth.getSession.mockImplementation(sospesa as never)
+      salvaSessione('A')
+      const { result } = renderHook(() => useSessione())
+      act(() => notifica('SIGNED_OUT', null))
+      expect(result.current.sessione).toBeNull()
+    })
   })
 
   it('segue login e logout, e si disiscrive allo smontaggio', async () => {
@@ -218,6 +330,56 @@ describe('svuotaCacheAlCambioUtente', () => {
     riempi()
     notifica('SIGNED_IN', utenteA)
     expect(vuota()).toBe(true)
+  })
+
+  describe('senza rete e la copia delle letture (Piano E, Task E7)', () => {
+    beforeEach(() => localStorage.clear())
+    afterEach(() => impostaUtenteCoda(null))
+
+    it('la coda è subito dell\'utente della sessione salvata, prima che il rinnovo del token finisca', () => {
+      salvaSessione('A')
+      auth.onAuthStateChange.mockReturnValue({ data: { subscription: { unsubscribe: vi.fn() } } } as never)
+      svuotaCacheAlCambioUtente(new QueryClient())
+      expect(utenteCoda()).toBe('A')
+    })
+
+    it('INITIAL_SESSION vuota per un errore di rete (sessione ancora salvata): la coda e i dati ripristinati restano', () => {
+      salvaSessione('A')
+      const { client, notifica } = avvia(null)
+      client.setQueryData(['esperimenti'], [{ id: 'e1' }])
+      notifica('INITIAL_SESSION', null)
+      expect(utenteCoda()).toBe('A')
+      expect(client.getQueryData(['esperimenti'])).toEqual([{ id: 'e1' }])
+    })
+
+    it('con i dati di A ripristinati, se la sessione è di un altro (o non c\'è più) si svuota tutto, copia compresa', () => {
+      salvaSessione('A')
+      const client = new QueryClient()
+      client.setQueryData(['esperimenti'], [{ id: 'di-A' }])
+      localStorage.setItem(CHIAVE_CACHE, '{}')
+      let notifica: (evento: string, s: Session | null) => void = () => {}
+      auth.onAuthStateChange.mockImplementation(((cb: typeof notifica) => {
+        notifica = cb
+        return { data: { subscription: { unsubscribe: vi.fn() } } }
+      }) as never)
+      svuotaCacheAlCambioUtente(client)
+      localStorage.removeItem(CHIAVE_SESSIONE)
+      notifica('INITIAL_SESSION', utenteB)
+      expect(client.getQueryData(['esperimenti'])).toBeUndefined()
+      expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+    })
+
+    it('alla fine della sessione e al cambio di utente la copia delle letture si toglie; al rinnovo del token no', () => {
+      const { notifica } = avvia(utenteA)
+      localStorage.setItem(CHIAVE_CACHE, '{}')
+      notifica('TOKEN_REFRESHED', { ...utenteA, access_token: 'nuovo' })
+      expect(localStorage.getItem(CHIAVE_CACHE)).toBe('{}')
+      notifica('SIGNED_OUT', null)
+      expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+      localStorage.setItem(CHIAVE_CACHE, '{}')
+      notifica('SIGNED_IN', utenteB)
+      expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+    })
   })
 
   describe('la coda d\'invio delle misure (Piano E, Task E6)', () => {

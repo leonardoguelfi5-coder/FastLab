@@ -1,4 +1,5 @@
 import type { Misura } from '@/domain/tipi'
+import { CHIAVE_CACHE, cancellaCache } from '@/lib/cachePersistente'
 import { nuovoId } from '@/lib/id'
 
 /**
@@ -172,8 +173,21 @@ export function accoda(utente: string, espId: string, misura: Misura, dati: Dati
   try {
     scrivi(utente, nuove)
   } catch (e) {
-    throw e instanceof ErroreCoda ? e : new ErroreCoda({ cause: e })
+    if (e instanceof ErroreCoda) throw e
+    // Il localStorage è pieno: la copia delle letture (Piano E, Task E7) è solo una copia, la misura no. Si toglie
+    // quella e si riprova una volta.
+    if (!copiaDelleLetturePresente()) throw new ErroreCoda({ cause: e })
+    cancellaCache()
+    try {
+      scrivi(utente, nuove)
+    } catch (ancora) {
+      throw ancora instanceof ErroreCoda ? ancora : new ErroreCoda({ cause: ancora })
+    }
   }
+}
+
+function copiaDelleLetturePresente(): boolean {
+  try { return localStorage.getItem(CHIAVE_CACHE) !== null } catch { return false }
 }
 
 /** Scrive una modifica fatta dall'invio; se il localStorage non la prende, la voce resta com'era (si ripeterà l'invio). */

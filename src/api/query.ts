@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { keepPreviousData, QueryClient, queryOptions, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { DURATA_IN_MEMORIA_MS } from '@/lib/cachePersistente'
 import type { VoceCoda } from '@/lib/coda/codaMisure'
 import { conCoda, perOraCrescente, piuRecentiPrima } from '@/lib/coda/sovrapponi'
 import { useVociCoda } from '@/lib/coda/useCoda'
@@ -53,8 +54,15 @@ export function creaQueryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } })
 }
 
+/*
+ * Le letture dell'elenco chiuso della copia sul telefono (`src/lib/cachePersistente.ts`: esperimenti, configurazione,
+ * misure del giorno e della pianta, ultime misure per strumento) restano in memoria un giorno anche senza una pagina
+ * che le usa (`gcTime: DURATA_IN_MEMORIA_MS`), non 5 minuti: la copia è fatta di quello che c'è in memoria, e una
+ * pianta letta all'inizio del giro deve esserci ancora alla fine, anche senza rete.
+ */
+
 export function useEsperimenti() {
-  return useQuery({ queryKey: chiavi.esperimenti, queryFn: listaEsperimenti })
+  return useQuery({ queryKey: chiavi.esperimenti, queryFn: listaEsperimenti, gcTime: DURATA_IN_MEMORIA_MS })
 }
 
 export function useConfig(espId: string | undefined) {
@@ -62,6 +70,7 @@ export function useConfig(espId: string | undefined) {
     queryKey: chiavi.config(espId ?? ''),
     queryFn: () => caricaConfig(espId as string),
     enabled: !!espId,
+    gcTime: DURATA_IN_MEMORIA_MS,
   })
 }
 
@@ -139,6 +148,7 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
     queryKey: chiavi.misureGiorno(espId ?? '', data),
     queryFn: () => misureDelGiorno(espId as string, data),
     enabled: !!espId,
+    gcTime: DURATA_IN_MEMORIA_MS,
     select,
   })
 }
@@ -153,6 +163,7 @@ export function useUltimeMisure(espId: string | undefined) {
     queryKey: chiavi.ultimeMisure(espId ?? ''),
     queryFn: () => ultimaMisuraPerStrumento(espId as string),
     enabled: !!espId,
+    gcTime: DURATA_IN_MEMORIA_MS,
   })
 }
 
@@ -177,6 +188,7 @@ export function useUltimaData(espId: string | undefined) {
     queryKey: chiavi.ultimeMisure(espId ?? ''),
     queryFn: () => ultimaMisuraPerStrumento(espId as string),
     enabled: !!espId,
+    gcTime: DURATA_IN_MEMORIA_MS,
     select: ultimaDataConMisure,
   })
 }
@@ -254,7 +266,7 @@ export function useMisureStrumenti(espId: string | undefined, strumentoIds: read
 
 /** Chiave e lettura delle misure di una pianta: le stesse per `useMisurePianta` e per caricarle in anticipo. */
 export function opzioniMisurePianta(piantaId: string) {
-  return queryOptions({ queryKey: chiavi.misurePianta(piantaId), queryFn: () => misurePianta(piantaId) })
+  return queryOptions({ queryKey: chiavi.misurePianta(piantaId), queryFn: () => misurePianta(piantaId), gcTime: DURATA_IN_MEMORIA_MS })
 }
 
 /** Le misure di una pianta con sopra quelle ancora in coda, come `useMisureGiorno`. */

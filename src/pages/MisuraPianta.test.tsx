@@ -193,6 +193,57 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('MisuraPianta: senza rete (Piano E, Task E7)', () => {
+  afterEach(() => vi.restoreAllMocks())
+  const senzaRete = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const mai = () => new Promise<never>(() => {})
+
+  it('una pianta mai letta su questo telefono lo dice, invece di un caricamento senza fine', async () => {
+    senzaRete()
+    vi.mocked(misurePianta).mockImplementation(mai)
+    apri('1')
+    expect(await screen.findByText('Senza rete: questa pianta non è ancora stata letta su questo telefono.')).toBeInTheDocument()
+    expect(screen.queryByText('Caricamento…')).not.toBeInTheDocument()
+  })
+
+  it('lo dice anche quando la lettura è finita in errore', async () => {
+    senzaRete()
+    vi.mocked(misurePianta).mockRejectedValue(new ErroreRete('rete'))
+    apri('1')
+    expect(await screen.findByText('Senza rete: questa pianta non è ancora stata letta su questo telefono.')).toBeInTheDocument()
+  })
+
+  it('le misure del giorno mai lette: lo dice per il giorno', async () => {
+    senzaRete()
+    vi.mocked(misureDelGiorno).mockImplementation(mai)
+    apri('1')
+    expect(await screen.findByText('Senza rete: le misure di questo giorno non sono ancora state lette su questo telefono.')).toBeInTheDocument()
+  })
+
+  it('un esperimento mai letto: lo dice per l\'esperimento', async () => {
+    senzaRete()
+    vi.mocked(caricaConfig).mockImplementation(mai)
+    apri('1')
+    expect(await screen.findByText('Senza rete: questo esperimento non è ancora stato letto su questo telefono.')).toBeInTheDocument()
+  })
+
+  it('con la rete, mentre legge, resta "Caricamento…"', async () => {
+    vi.mocked(misurePianta).mockImplementation(mai)
+    apri('1')
+    expect(await screen.findByText('Caricamento…')).toBeInTheDocument()
+  })
+
+  it('al ritorno della rete il messaggio lascia il posto al caricamento', async () => {
+    const rete = senzaRete()
+    vi.mocked(misurePianta).mockImplementation(mai)
+    apri('1')
+    await screen.findByText('Senza rete: questa pianta non è ancora stata letta su questo telefono.')
+    rete.mockReturnValue(true)
+    act(() => { window.dispatchEvent(new Event('online')) })
+    expect(await screen.findByText('Caricamento…')).toBeInTheDocument()
+  })
+})
+
 describe('MisuraPianta: intestazione', () => {
   it('ha lo strumento come titolo, la freccia verso la scelta, "Pianta #1" con il trattamento e i soli campi dello strumento', async () => {
     apri('1')

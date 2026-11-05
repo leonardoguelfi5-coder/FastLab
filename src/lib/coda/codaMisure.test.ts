@@ -3,6 +3,7 @@ import type { Misura } from '@/domain/tipi'
 import {
   accoda, aggiornaVoce, chiaveCoda, ErroreCoda, impostaUtenteCoda, iscriviti, rimetti, togli, utenteCoda, vociDi,
 } from './codaMisure'
+import { CHIAVE_CACHE } from '@/lib/cachePersistente'
 
 const misura = (id: string, extra: Partial<Misura> = {}): Misura => ({
   id, pianta_id: 'p35', strumento_id: 'spad', data_rilievo: '2026-10-28', ora: '09:12', valori: { spad: [38.1] }, ...extra,
@@ -69,6 +70,19 @@ describe('accoda e vociDi', () => {
   it('senza localStorage utilizzabile lancia ErroreCoda (il modulo salva come prima)', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('pieno', 'QuotaExceededError') })
     expect(() => accoda('u1', 'E', misura('m1'), DATI)).toThrow(ErroreCoda)
+  })
+
+  it('con il localStorage pieno la copia delle letture cede il posto: si toglie e la misura entra in coda (Piano E, Task E7)', () => {
+    localStorage.setItem(CHIAVE_CACHE, 'x'.repeat(1000))
+    const vero = Storage.prototype.setItem
+    // Pieno finché c'è la copia delle letture.
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, chiave: string, valore: string) {
+      if (this.getItem(CHIAVE_CACHE) !== null) throw new DOMException('pieno', 'QuotaExceededError')
+      vero.call(this, chiave, valore)
+    })
+    accoda('u1', 'E', misura('m1'), DATI)
+    expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+    expect(vociDi('u1').map(v => v.misura.id)).toEqual(['m1'])
   })
 
   it('un valore che il JSON non sa scrivere (NaN) non entra in coda: lancia ErroreCoda', () => {

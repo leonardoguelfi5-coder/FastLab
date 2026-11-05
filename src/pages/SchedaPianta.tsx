@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { useConfig, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento, RigaStato, SENZA_RETE_ESPERIMENTO, SENZA_RETE_PIANTA } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { AvvisiMancanti } from '@/components/scheda/AvvisiMancanti'
 import { DatiPianta } from '@/components/scheda/DatiPianta'
@@ -14,8 +15,7 @@ import { buttonVariants } from '@/components/ui/button'
 import type { ConfigEsperimento, Misura } from '@/domain/tipi'
 import { percorsoDiario, percorsoImpostazioni, percorsoPianta, percorsoPiante, type ArrivoDiario } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
-
-const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
+import { useSenzaRete } from '@/lib/useSenzaRete'
 
 interface SchedaCaricataProps {
   espId: string
@@ -27,6 +27,7 @@ interface SchedaCaricataProps {
 
 /** La scheda a configurazione caricata: intestazione, dati della pianta, riepilogo e avvisi, l'azione, storia, nota e foto. */
 function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricataProps) {
+  const senzaRete = useSenzaRete()
   const pianta = config.piante.find(p => p.id === piantaId)
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
 
@@ -54,9 +55,12 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
 
       {/* Riepilogo, avvisi e storia vengono dalle misure della pianta: senza, nessun numero (né finto, né vecchio). */}
       {misure.data === undefined ? (
-        misure.isError
-          ? <ErroreConRiprova errore={misure.error} onRiprova={() => void misure.refetch()} />
-          : <Caricamento />
+        // Senza rete (Piano E, Task E7) una pianta che non è nella copia sul telefono non arriverà: lo si dice.
+        senzaRete
+          ? <RigaStato testo={SENZA_RETE_PIANTA} />
+          : misure.isError
+            ? <ErroreConRiprova errore={misure.error} onRiprova={() => void misure.refetch()} />
+            : <Caricamento />
       ) : (
         <div className="flex flex-col gap-4">
           <UltimiValori espId={espId} config={config} pianta={pianta} misure={misure.data} oggi={oggi} />
@@ -109,14 +113,17 @@ export function SchedaPianta() {
   const misure = useMisurePianta(piantaId)
   // "Da quanto" conta dal giorno di calendario di oggi (ora locale), che cambia a mezzanotte.
   const oggi = useOggi()
+  const senzaRete = useSenzaRete()
 
   const dati = config.data
   return (
     <AppShell titolo={dati?.esperimento.nome ?? 'Esperimento'} indietro={percorsoPiante(espId)}>
       {dati === undefined ? (
-        config.isError
-          ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <Caricamento />
+        senzaRete
+          ? <RigaStato testo={SENZA_RETE_ESPERIMENTO} />
+          : config.isError
+            ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
+            : <Caricamento />
       ) : (
         <SchedaCaricata key={piantaId} espId={espId} config={dati} piantaId={piantaId} oggi={oggi} misure={misure} />
       )}

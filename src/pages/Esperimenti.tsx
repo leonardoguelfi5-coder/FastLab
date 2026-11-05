@@ -4,6 +4,7 @@ import { Copy, Ellipsis } from 'lucide-react'
 import type { RiepilogoEsperimento } from '@/api/esperimenti'
 import { useEsperimenti } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { buttonVariants } from '@/components/ui/button'
@@ -135,7 +136,7 @@ export function Esperimenti() {
       {elenco === undefined ? (
         esperimenti.isError
           ? <ErroreConRiprova errore={esperimenti.error} onRiprova={() => void esperimenti.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : elenco.length === 0 ? (
         <NessunEsperimento />
       ) : (

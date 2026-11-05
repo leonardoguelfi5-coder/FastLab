@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { eliminaMisura, salvaMisura } from '@/api/misure'
 import { chiavi, useConfig, useMisura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { Conferma } from '@/components/Conferma'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
@@ -27,8 +28,6 @@ import { ErroreApp, eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { eUuid, percorsoHome, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { ModuloCampi } from '@/components/ModuloCampi'
-
-const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
 function NonTrovata({ espId }: { espId: string }) {
   return (

@@ -5,7 +5,8 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-v2-64.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#fcf9f5" />
-    <!-- Installabile dalla schermata Home (Android e iPhone). Niente service worker: l'app è sempre online. -->
+    <!-- Installabile dalla schermata Home (Android e iPhone). Il service worker (registrato da src/main.tsx) tiene l'app
+         in cache: si apre anche senza rete. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

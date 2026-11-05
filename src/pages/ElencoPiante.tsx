@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useConfig, useUltimeMisurePiante } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
+import { Caricamento } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { Espandibile } from '@/components/Espandibile'
 import { Scelta } from '@/components/Scelta'
@@ -198,7 +199,7 @@ export function ElencoPiante() {
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <p role="status" className="text-grafite-tenue">Caricamento…</p>
+          : <Caricamento />
       ) : (
         <ElencoCaricato espId={espId} config={dati} />
       )}

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, BookOpen, CircleUser, LogOut, UserPlus } from 'lucide-react'
+import { ArrowLeft, BookOpen, CircleUser, LogOut, RefreshCw, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
 import { IndicatoreCoda } from '@/components/coda/IndicatoreCoda'
 import { Conferma } from '@/components/Conferma'
+import { RigaSenzaRete } from '@/components/RigaSenzaRete'
+import { applicaAggiornamento, useAggiornamentoPronto } from '@/lib/aggiornamento'
 import { useVociCoda } from '@/lib/coda/useCoda'
 import { messaggioErrore } from '@/lib/errori'
 import { percorsoCatalogo } from '@/lib/percorsi'
@@ -35,6 +37,9 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
   const { data: amministratore } = useSonoAdmin()
   const inCoda = useVociCoda().length
   const [confermaUscita, setConfermaUscita] = useState(false)
+  // Una versione nuova dell'app aspetta (Piano E, Task E7): si attiva solo da qui o alla prossima apertura.
+  const aggiornamentoPronto = useAggiornamentoPronto()
+  const [confermaAggiornamento, setConfermaAggiornamento] = useState(false)
 
   const [aperto, setAperto] = useState(false)
   const radiceMenu = useRef<HTMLDivElement>(null)
@@ -69,6 +74,12 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
     setAperto(false)
     if (inCoda > 0) setConfermaUscita(true)
     else void uscire()
+  }
+
+  // Con modifiche non salvate (un modulo aperto, una foto in viaggio, un'eliminazione con "Annulla") si chiede prima.
+  function aggiorna() {
+    setAperto(false)
+    if (applicaAggiornamento() === 'modifiche') setConfermaAggiornamento(true)
   }
 
   async function uscire() {
@@ -126,6 +137,12 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
                     Inviti
                   </Link>
                 )}
+                {aggiornamentoPronto && (
+                  <button type="button" onClick={aggiorna} className={VOCE_MENU}>
+                    <RefreshCw aria-hidden />
+                    Nuova versione · Aggiorna
+                  </button>
+                )}
                 <button type="button" onClick={chiediUscita} className={VOCE_MENU}>
                   <LogOut aria-hidden />
                   Esci
@@ -134,6 +151,7 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
             )}
           </div>
         </div>
+        <RigaSenzaRete />
       </header>
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(var(--altezza-barra-azioni,0px)+2.5rem)]">
         {children}
@@ -148,6 +166,18 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
         conferma="Esci comunque"
         onAnnulla={() => setConfermaUscita(false)}
         onConferma={() => void uscire()}
+      />
+      <Conferma
+        aperta={confermaAggiornamento}
+        titolo="Aggiornare con modifiche non salvate?"
+        testo="Ci sono modifiche non salvate: aggiornando l'app andranno perse."
+        annulla="Continua a modificare"
+        conferma="Aggiorna comunque"
+        onAnnulla={() => setConfermaAggiornamento(false)}
+        onConferma={() => {
+          setConfermaAggiornamento(false)
+          applicaAggiornamento({ scartaModifiche: true })
+        }}
       />
     </div>
   )

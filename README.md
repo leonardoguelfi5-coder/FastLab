@@ -32,6 +32,7 @@ Comandi utili:
 | `npm run lint` | Controllo del codice (ESLint) |
 | `npm run build` | Controllo dei tipi e build di produzione in `dist/` |
 | `npm run test:bundle` | Controlla che exceljs e `react-dom/server` restino fuori dal chunk principale (vedi sotto) |
+| `npm run test:sw` | Dopo `npm run build`: controlla il service worker in `dist/sw.js` (vedi sotto) |
 
 ### Test del database
 
@@ -56,6 +57,10 @@ Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
 ### Il bundle: `npm run test:bundle`
 
 exceljs (circa 930 kB, 256 kB gzip) e `react-dom/server` servono solo a "Scarica Excel" e si caricano con un `import()` dinamico, al tocco del pulsante: devono restare fuori dal chunk che il browser scarica all'apertura dell'app. `npm run test:bundle` fa una build di produzione in memoria (non scrive `dist/`), chiede a Vite in quali chunk è finito ciascun modulo e stampa le dimensioni; esce con errore se uno dei due è nel chunk principale, e altrimenti scrive "caricato a richiesta". Non cerca parole nel codice minificato: il principale contiene comunque il nome del file del chunk di exceljs, per l'import dinamico. Per questo legge il grafo dei moduli: in questo ambiente la build emette un chunk principale incompleto, e un controllo sul testo dei file in `dist/assets` non sarebbe affidabile.
+
+### Il service worker: `npm run test:sw`
+
+Il service worker (`vite-plugin-pwa` 1.3.0, strategia `generateSW`) tiene in cache tutta la build: l'app si apre anche senza rete, e una pagina aperta durante un deploy resta coerente con la sua versione ("Scarica Excel" compreso). `npm run test:sw` (cioè `node scripts/controlla-sw.mjs`, dopo `npm run build`) verifica che ogni file di `dist/assets` (js, css, woff2) e `index.html` siano nel precache di `dist/sw.js`, che il service worker non abbia regole a runtime (nessuna strategia di cache, nessun indirizzo di Supabase: database, autenticazione e Storage passano sempre dalla rete), che la versione nuova si attivi solo su richiesta (`skipWaiting` solo dal messaggio `SKIP_WAITING`, niente `clientsClaim`) e che `vercel.json` serva `sw.js` senza cache e risponda 404 per un file mancante sotto `/assets/`. Esce con errore altrimenti.
 
 #### Senza Docker (ambienti cloud)
 
@@ -207,8 +212,13 @@ La via più breve, senza riga di comando, è in [`docs/GUIDA-TELEFONO.md`](docs/
 5. Pubblica l'app su un hosting per siti statici (per esempio Vercel). Imposta le variabili `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (le trovi in Dashboard → Project Settings → API; la chiave è quella pubblica, `anon` o `publishable`, mai la `service_role` né una chiave segreta) e il comando di build `npm run build` con cartella di uscita `dist`. Ogni indirizzo dell'app (per esempio `/accedi` o `/esperimenti/…`) deve aprire comunque `index.html`: senza questa regola, ricaricando una pagina si vede un errore 404. Su Vercel la regola è nel file `vercel.json` nella cartella principale del repository (già presente su questo ramo):
 
    ```json
-   { "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
+   {
+     "headers": [{ "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }],
+     "rewrites": [{ "source": "/((?!assets/).*)", "destination": "/index.html" }]
+   }
    ```
+
+   La riscrittura lascia fuori `/assets/`: un file che manca lì risponde 404 (non `index.html`, che il browser leggerebbe come un modulo rotto), e `sw.js` si rilegge sempre, così una versione nuova arriva ai telefoni.
 
    Le variabili `VITE_*` entrano nell'app al momento della build: se le cambi, rifai il deploy.
 6. Crea il primo amministratore come descritto sopra, questa volta nell'editor SQL del Dashboard.

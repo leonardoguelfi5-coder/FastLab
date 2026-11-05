@@ -4,6 +4,7 @@ import type { UseQueryResult } from '@tanstack/react-query'
 import { useConfig, useMisureGiorno, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
+import { Caricamento, RigaStato, SENZA_RETE_ESPERIMENTO, SENZA_RETE_GIORNO, SENZA_RETE_PIANTA } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { PulsanteAggiungiFoto, StatoCaricamentoFoto } from '@/components/foto/AggiungiFoto'
 import { useCaricaFoto } from '@/components/foto/useCaricaFoto'
@@ -24,9 +25,8 @@ import { misureStrumentoNelGiorno } from '@/domain/misure'
 import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
 import { percorsoFineGiro, percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
+import { useSenzaRete } from '@/lib/useSenzaRete'
 import { useCampoStore } from '@/store/campo'
-
-const Caricamento = () => <p role="status" className="text-grafite-tenue">Caricamento…</p>
 
 /**
  * "Vai alla pianta": si salta a qualsiasi pianta scrivendone l'etichetta, restando nel giro dello strumento. Prende il
@@ -184,6 +184,7 @@ function MisuraCaricata({
 }: MisuraCaricataProps) {
   // Le foto di questa pianta: un caricamento a parte, che non passa dal modulo e continua anche passando alla pianta dopo.
   const carica = useCaricaFoto(espId, { piantaId })
+  const senzaRete = useSenzaRete()
   const pianta = config.piante.find(p => p.id === piantaId)
   if (!pianta) {
     // Lo strumento c'è: si torna a scegliere da dove ripartire, non "un altro" strumento.
@@ -193,6 +194,9 @@ function MisuraCaricata({
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
   // Il modulo aspetta le misure della pianta (i progressivi, la domanda all'arrivo) e quelle del giorno (la pianta dopo).
   const inErrore = misure.isError ? misure : misureGiorno.isError ? misureGiorno : null
+  // Senza rete (Piano E, Task E7), le misure che non sono nella copia sul telefono non arriveranno: lo si dice, anche
+  // dopo un errore (il motivo vero è quello), invece di un caricamento senza fine.
+  const mancano = misure.data === undefined ? SENZA_RETE_PIANTA : SENZA_RETE_GIORNO
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -218,9 +222,11 @@ function MisuraCaricata({
       </div>
 
       {misure.data === undefined || misureGiorno.data === undefined ? (
-        inErrore
-          ? <ErroreConRiprova errore={inErrore.error} onRiprova={() => void inErrore.refetch()} />
-          : <Caricamento />
+        senzaRete
+          ? <RigaStato testo={mancano} />
+          : inErrore
+            ? <ErroreConRiprova errore={inErrore.error} onRiprova={() => void inErrore.refetch()} />
+            : <Caricamento />
       ) : (
         // Una data diversa è un riquadro nuovo (e una domanda nuova): una misura in correzione non passa a un altro giorno.
         <ArrivoPianta
@@ -259,6 +265,7 @@ export function MisuraPianta() {
   const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
   const misureGiorno = useMisureGiorno(espId, dataRilievo)
   const setStrumento = useCampoStore(s => s.setStrumento)
+  const senzaRete = useSenzaRete()
 
   const dati = config.data
   const strumento = dati?.strumenti.find(s => s.id === strumentoId)
@@ -279,9 +286,11 @@ export function MisuraPianta() {
       onIndietro={onIndietro(verso)}
     >
       {dati === undefined ? (
-        config.isError
-          ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
-          : <Caricamento />
+        senzaRete
+          ? <RigaStato testo={SENZA_RETE_ESPERIMENTO} />
+          : config.isError
+            ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
+            : <Caricamento />
       ) : !strumento ? (
         <AvvisoGiro espId={espId} testo="Questo strumento non esiste in questo esperimento." />
       ) : !attivo ? (
