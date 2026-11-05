@@ -45,3 +45,4 @@ Ruling: accettato il ripiego automatico di `spazio_progetto` (il maggiore tra St
 Messa online: migration 0015 applicata al progetto FastLab; provata come utente autenticato: database 12,9 MB, foto 1,4 MB, 4 strumenti con misure, dettaglio dell'esperimento presente
 Task E4: complete (commits cc76e52..7209450), revisione rimandata alla finale
 Prima pubblicazione del Piano E (E1-E4)
+Task E5: dispatched implementer (opus), BASE bb73fca
