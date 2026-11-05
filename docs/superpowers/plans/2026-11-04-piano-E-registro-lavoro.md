@@ -51,3 +51,7 @@ Ruling: accettate le deviazioni E5 (spostamento delle bozze legato al proprietar
 Ruling (carry to E6/E7): postgrest-js ritenta le GET fino a 3 volte (1, 2, 4 s): una lettura senza rete mostra l'errore dopo circa 55 s; valutare di limitare i ritentativi o di rispondere dalla cache; il wizard tiene la bozza in sessionStorage - cost if wrong: attesa lunga sulle letture
 Task E5: complete (commits 9e6674c..9589ed7), revisione rimandata alla finale
 Task E6: dispatched implementer (opus)
+Task E6: implementatore (opus) DONE_WITH_CONCERNS e3aec96 - 2776 Vitest (94 nuovi); `src/lib/coda/` (coda per utente in localStorage, invio con errori definitivi o di passaggio, attese 2-60 s, `navigator.locks`, verde solo a conferma del server), `conCoda` sovrapposta a misure del giorno, della pianta e alla singola misura; ModuloOggi accoda e passa subito alla pianta dopo; ModificaMisura riaccoda ed elimina anche in coda; `IndicatoreCoda` e `PannelloCoda` nell'AppShell; "Esci" con misure in coda chiede conferma
+Ruling: accettate le deviazioni E6 (revisione e forseSulServer nella voce; stato HTTP sull'errore; eliminare una misura forse già inviata passa anche dal server; errori ignoti ritentati; 401 sempre di passaggio) - cost if wrong: small
+Ruling (carry): `ultimeMisurePiante` non sovrappone la coda (l'elenco Piante vede la misura solo all'arrivo al server) - cost if wrong: small
+Task E6: dispatched reviewer (opus) su copia (task delicato: dati persi e doppioni); Task E7 dispatched implementer (opus)
