@@ -64,3 +64,7 @@ Task E6 fix round 1: dispatched (implementatore E6); poi E7 fix round 1 (impleme
 Task E6: fix round 1 implemented 69fa44f (2862 Vitest due volte, test:sw ok; ogni correzione tolta fa diventare rosso il suo test): `fermaLettureVecchie` prima di aggiornare la cache (anche nel salvataggio diretto); `inViaggio` nella voce, `togli` e "Elimina" aspettano l'upsert in viaggio, nessun ritorno in cache né verde per una voce eliminata; controllo di utente e sessione prima di ogni invio (la voce resta, mai scartata); doppio tocco e id nuovo con la coda attiva; testo di "Esci" con le rifiutate a parte; `upsert().select('id')`
 Task E6: fix round 1/5; complete (commits 1cda4db..69fa44f)
 Task E7 fix round 1: dispatched (implementatore E7): versione dei dati a mano, lettura in anticipo del giro
+Task E7: fix round 1 implemented 37c4a8a (2878 Vitest due volte, test:sw ok): `VERSIONE_DATI_CACHE = 1` al posto della build (un deploy non scarta più i dati conservati) con `formaValida` che scarta le letture di forma sbagliata; `leggiInAnticipo` in Home e Scelta dello strumento (con la rete: misure del giorno e delle piante del giro, 4 insieme, al massimo ogni 30 minuti, prime 300 piante)
+Ruling (carry to E12 e a ogni cambio della forma dei dati): portare `VERSIONE_DATI_CACHE` a 2 quando si aggiungono `decimali` e `solo_interi` ai parametri - cost if wrong: campi undefined senza rete fino alla prima rilettura
+Task E7: fix round 1/5; complete (commits 70fe352..37c4a8a)
+Seconda pubblicazione del Piano E (E5-E7): deploy da 37c4a8a+; Task E8 dispatched implementer (sonnet)
