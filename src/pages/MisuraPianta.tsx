@@ -1,14 +1,15 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
+import { LayoutGrid } from 'lucide-react'
 import { useConfig, useMisureGiorno, useMisurePianta } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BannerData } from '@/components/BannerData'
 import { Caricamento, RigaStato, SENZA_RETE_ESPERIMENTO, SENZA_RETE_GIORNO, SENZA_RETE_PIANTA } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { FoglioPiante } from '@/components/giro/FoglioPiante'
 import { PulsanteAggiungiFoto, StatoCaricamentoFoto } from '@/components/foto/AggiungiFoto'
 import { useCaricaFoto } from '@/components/foto/useCaricaFoto'
-import { TestoErrore } from '@/components/TestoErrore'
 import { AvvisoGiro } from '@/components/scheda/AvvisoGiro'
 import type { Avanti, StatoModulo } from '@/components/scheda/ModuloOggi'
 import { RiquadroOggi, type ModuloIniziale } from '@/components/scheda/RiquadroOggi'
@@ -16,83 +17,13 @@ import { SceltaArrivo } from '@/components/scheda/SceltaArrivo'
 import { bozzaDaRiprendere } from '@/components/scheda/bozza'
 import { titoloRiquadro } from '@/components/scheda/titolo'
 import { useModuloProtetto } from '@/components/scheda/useModuloProtetto'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { prossimaDaMisurare, statiPiante } from '@/domain/giro'
+import { celleGriglia, prossimaDaMisurare, riepilogoGiro, statiPiante } from '@/domain/giro'
 import { misureStrumentoNelGiorno } from '@/domain/misure'
-import { etichetteNumeriche, trovaPianta } from '@/domain/piante'
 import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
 import { percorsoFineGiro, percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { useCampoStore } from '@/store/campo'
-
-/**
- * "Vai alla pianta": si salta a qualsiasi pianta scrivendone l'etichetta, restando nel giro dello strumento. Prende il
- * posto della pianta attuale come "Salva e vai" (il gesto indietro esce dal giro), e con valori non salvati chiede
- * prima se scartarli. La pianta attuale non è un salto: il campo si svuota e i valori scritti restano (scartarli
- * cancellerebbe la bozza lasciandoli a schermo). Non è un testo grande: in questa schermata il grande è il numero
- * della pianta.
- */
-function VaiAllaPianta({ espId, config, strumentoId, piantaId, conferma }: {
-  espId: string; config: ConfigEsperimento; strumentoId: string; piantaId: string; conferma: (azione: () => void) => void
-}) {
-  const navigate = useNavigate()
-  const idCampo = useId()
-  const idErrore = useId()
-  const campo = useRef<HTMLInputElement>(null)
-  const [testo, setTesto] = useState('')
-  const [errore, setErrore] = useState<string | null>(null)
-  const numeriche = useMemo(() => etichetteNumeriche(config.piante), [config.piante])
-
-  function vai(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault()
-    const cercata = testo.trim()
-    if (cercata === '') return
-    const pianta = trovaPianta(config.piante, cercata)
-    if (pianta?.id === piantaId) {
-      setTesto('')
-      return
-    }
-    if (pianta) {
-      conferma(() => navigate(percorsoMisuraPianta(espId, strumentoId, pianta.id), { replace: true }))
-      return
-    }
-    setErrore(`Nessuna pianta con etichetta «${cercata}» in questo esperimento.`)
-    // Il testo resta selezionato: la prossima cifra lo sostituisce.
-    campo.current?.focus()
-    campo.current?.select()
-  }
-
-  return (
-    <form onSubmit={vai} noValidate className="flex flex-col gap-1.5">
-      <Label htmlFor={idCampo}>Vai alla pianta</Label>
-      {/* Le tastiere numeriche non hanno sempre il tasto Invio: "Vai" è accanto al campo. */}
-      <div className="flex gap-2">
-        <Input
-          ref={campo}
-          id={idCampo}
-          type="text"
-          variant="campo"
-          className="min-w-0 flex-1"
-          inputMode={numeriche ? 'numeric' : 'text'}
-          enterKeyHint="go"
-          autoComplete="off"
-          autoCorrect="off"
-          autoCapitalize="off"
-          spellCheck={false}
-          value={testo}
-          aria-invalid={errore ? true : undefined}
-          aria-describedby={errore ? idErrore : undefined}
-          onChange={e => { setTesto(e.target.value); setErrore(null) }}
-        />
-        <Button type="submit" variant="outline" size="lg" disabled={testo.trim() === ''}>Vai</Button>
-      </div>
-      {errore && <TestoErrore id={idErrore} role="alert">{errore}</TestoErrore>}
-    </form>
-  )
-}
 
 interface ArrivoPiantaProps {
   espId: string
@@ -178,14 +109,36 @@ interface MisuraCaricataProps {
   onModifiche: (stato: StatoModulo | null) => void
 }
 
-/** La pagina a configurazione caricata: intestazione della pianta, "Vai alla pianta" e il riquadro della misura. */
+/** La pagina a configurazione caricata: intestazione della pianta (con l'icona della griglia) e il riquadro della misura. */
 function MisuraCaricata({
   espId, config, strumento, piantaId, dataRilievo, oggi, misure, misureGiorno, conferma, onModifiche,
 }: MisuraCaricataProps) {
   // Le foto di questa pianta: un caricamento a parte, che non passa dal modulo e continua anche passando alla pianta dopo.
   const carica = useCaricaFoto(espId, { piantaId })
   const senzaRete = useSenzaRete()
+  const navigate = useNavigate()
+  const [foglio, setFoglio] = useState(false)
+  // Le misure di oggi arrivano già con quelle in coda d'invio sovrapposte (`useMisureGiorno`): una pianta appena
+  // misurata senza rete è "fatta" anche qui. Senza le misure gli stati non si inventano.
+  const datiGiorno = misureGiorno.data
+  const stati = useMemo(
+    () => (datiGiorno ? statiPiante(strumento, config.parametri, datiGiorno, config.piante) : null),
+    [datiGiorno, strumento, config],
+  )
+  const celle = useMemo(() => (stati ? celleGriglia(config.piante, stati, piantaId) : null), [stati, config.piante, piantaId])
+  const progresso = useMemo(() => {
+    if (!stati) return null
+    const { fatte, totale } = riepilogoGiro(config.piante, stati)
+    return { fatte, totale }
+  }, [stati, config.piante])
   const pianta = config.piante.find(p => p.id === piantaId)
+  // Prende il posto della pianta attuale come "Salva e vai" (il gesto indietro esce dal giro), e con valori non salvati
+  // chiede prima se scartarli. La pianta attuale non è un salto: il foglio si chiude e i valori scritti restano
+  // (scartarli cancellerebbe la bozza lasciandoli a schermo).
+  const vaiA = (scelta: Pianta) => {
+    if (scelta.id === piantaId) return
+    conferma(() => navigate(percorsoMisuraPianta(espId, strumento.id, scelta.id), { replace: true }))
+  }
   if (!pianta) {
     // Lo strumento c'è: si torna a scegliere da dove ripartire, non "un altro" strumento.
     return <AvvisoGiro espId={espId} testo="Questa pianta non esiste in questo esperimento." azione="Torna alla scelta dello strumento" />
@@ -200,26 +153,45 @@ function MisuraCaricata({
   return (
     <>
       <div className="flex flex-col gap-3">
-        {/* Il numero della pianta è l'unico testo grande della schermata (DESIGN.md, "regola del grande unico"). */}
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="flex min-w-0 flex-col">
-            <span className="text-label text-grafite-tenue">Pianta</span>{' '}
-            <span className="truncate font-mono text-numero text-grafite tabular-nums">{`#${pianta.etichetta}`}</span>
-          </h2>
-          <div className="flex shrink-0 items-center gap-1">
-            {trattamento && (
-              <p>
-                <span className="sr-only">Trattamento: </span>
-                <Badge variant="secondary" className="h-7 px-2.5 text-sm">{trattamento.etichetta}</Badge>
-              </p>
-            )}
-            {/* Nell'intestazione, non nella barra delle azioni: non tocca il modulo, le bozze né la conferma di uscita. */}
+        {/* Una riga sola: lascia ai campi lo spazio che prima prendeva il campo "Vai alla pianta". Il numero della
+            pianta è l'unico testo grande della schermata (DESIGN.md, "regola del grande unico"); il resto è dato. */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h2 className="shrink-0">
+              <span className="sr-only">Pianta</span>{' '}
+              <span className="font-mono text-numero text-grafite tabular-nums">{`#${pianta.etichetta}`}</span>
+            </h2>
+            <p className="flex min-w-0 items-baseline gap-1.5 font-mono text-dato text-grafite-tenue tabular-nums">
+              {trattamento && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="sr-only">Trattamento:</span>{' '}
+                  <span className="truncate">{trattamento.etichetta}</span>
+                </>
+              )}
+              {progresso && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="shrink-0">{`${progresso.fatte}/${progresso.totale}`}</span>
+                  {' '}<span className="sr-only">piante fatte</span>
+                </>
+              )}
+            </p>
+          </div>
+          {/* Nell'intestazione, non nella barra delle azioni: non tocca il modulo, le bozze né la conferma di uscita. */}
+          <div className="flex shrink-0 items-center">
+            <Button
+              type="button" variant="quiet" size="icon" aria-label="Vai alla pianta" aria-haspopup="dialog"
+              onClick={() => setFoglio(true)}
+            >
+              <LayoutGrid aria-hidden />
+            </Button>
             <PulsanteAggiungiFoto carica={carica} variante="icona" nome="Aggiungi foto a questa pianta" />
           </div>
         </div>
-        <VaiAllaPianta espId={espId} config={config} strumentoId={strumento.id} piantaId={pianta.id} conferma={conferma} />
         <BannerData espId={espId} conferma={conferma} />
       </div>
+      <FoglioPiante aperto={foglio} onOpenChange={setFoglio} piante={config.piante} celle={celle} onScegli={vaiA} />
 
       {misure.data === undefined || misureGiorno.data === undefined ? (
         senzaRete

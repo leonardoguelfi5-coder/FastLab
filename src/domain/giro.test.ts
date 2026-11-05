@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, righeStrumenti, type StatoPianta } from './giro'
+import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, righeStrumenti, celleGriglia, valoriDiOggi, type StatoPianta } from './giro'
 import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, ValoriMisura } from './tipi'
 import { parametro, piante as creaPiante } from './test-helpers'
 
@@ -262,5 +262,69 @@ describe('righeStrumenti', () => {
     const righe = righeStrumenti(config, ps.map(p => mis(p.id, spad, { [stadio.id]: [2] })))
     expect(righe[1].giro).toEqual({ fatte: 3, totale: 3, cominciato: true })
     expect(righe[1].prossima).toBeNull()
+  })
+})
+
+describe('celleGriglia', () => {
+  const ps = creaPiante(['1', '2', '10'])
+  // L'ordine del giro è quello di `ordine`, non quello dell'array.
+  const rimescolate = [ps[2], ps[0], ps[1]]
+
+  it('una cella per pianta nell\'ordine del giro, con lo stato (da fare se manca) e la pianta attuale', () => {
+    const stati = new Map<string, StatoPianta>([[ps[0].id, 'fatta'], [ps[1].id, 'incompleta']])
+    const celle = celleGriglia(rimescolate, stati, ps[1].id)
+    expect(celle.map(c => c.pianta.etichetta)).toEqual(['1', '2', '10'])
+    expect(celle.map(c => c.stato)).toEqual(['fatta', 'incompleta', 'da_fare'])
+    expect(celle.map(c => c.attuale)).toEqual([false, true, false])
+  })
+
+  it('senza pianta attuale nessuna cella lo è', () => {
+    expect(celleGriglia(ps, new Map(), null).some(c => c.attuale)).toBe(false)
+  })
+})
+
+describe('valoriDiOggi', () => {
+  const trattW1 = { id: 't1', etichetta: 'W1', ordine: 0, livello_ids: [] }
+  const trattW2 = { id: 't2', etichetta: 'W2', ordine: 1, livello_ids: [] }
+  const ps = [
+    ...creaPiante(['1', '2', '3'], 't1'),
+    ...creaPiante(['4', '5'], 't2'),
+  ]
+  const spadN = parametro('SPAD')
+  const lista = parametro('Palchi', { tipo: 'lista' })
+  const spadStr = strumento('SPAD', [[spadN, false], [lista, false], [vecchio, false]])
+  const config = {
+    strumenti: [spadStr], parametri: [spadN, lista, vecchio], piante: ps, trattamenti: [trattW1, trattW2],
+  } as unknown as ConfigEsperimento
+
+  it('media, ES e n per trattamento, solo per i parametri numerici attivi dello strumento', () => {
+    const misure = [
+      mis(ps[0].id, spadStr, { [spadN.id]: [40] }),
+      mis(ps[1].id, spadStr, { [spadN.id]: [42] }),
+      mis(ps[2].id, spadStr, { [spadN.id]: [44] }),
+      mis(ps[3].id, spadStr, { [spadN.id]: [30] }),
+    ]
+    const r = valoriDiOggi(config, spadStr, misure, D)
+    expect(r).toHaveLength(1)
+    expect(r[0].parametro.nome).toBe('SPAD')
+    expect(r[0].righe.map(x => x.trattamento.etichetta)).toEqual(['W1', 'W2'])
+    expect(r[0].righe[0]).toMatchObject({ media: 42, n: 3 })
+    expect(r[0].righe[0].es).toBeCloseTo(2 / Math.sqrt(3), 10)
+    expect(r[0].righe[1]).toMatchObject({ media: 30, es: null, n: 1 })
+  })
+
+  it('conta solo la data, lo strumento e i trattamenti con almeno un valore', () => {
+    const altro = strumento('Altro', [[spadN, false]])
+    const misure = [
+      mis(ps[0].id, spadStr, { [spadN.id]: [40] }),
+      mis(ps[1].id, spadStr, { [spadN.id]: [90] }, { data_rilievo: '2026-10-28' }),
+      mis(ps[2].id, altro, { [spadN.id]: [99] }),
+    ]
+    const r = valoriDiOggi(config, spadStr, misure, D)
+    expect(r[0].righe.map(x => [x.trattamento.etichetta, x.media, x.n])).toEqual([['W1', 40, 1]])
+  })
+
+  it('senza misure: nessuna riga per il parametro', () => {
+    expect(valoriDiOggi(config, spadStr, [], D)).toEqual([{ parametro: spadN, righe: [] }])
   })
 })

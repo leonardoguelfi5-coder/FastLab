@@ -157,6 +157,9 @@ async function scegli(utente: ReturnType<typeof userEvent.setup>, nome: string) 
   await utente.click(scelta)
   piuTardi()
 }
+/** Il campo del foglio "Vai alla pianta": si apre dall'icona dell'intestazione. */
+const campoVai = () => screen.getByLabelText('Etichetta della pianta') as HTMLInputElement
+const apriFoglio = (utente: ReturnType<typeof userEvent.setup>) => utente.click(pulsante('Vai alla pianta'))
 const pianta = (etichetta: string) => screen.findByRole('heading', { level: 2, name: `Pianta #${etichetta}` })
 /** Come se alla pianta di prima si fosse spuntato "Mantieni" su Temp aria (Termometro, oggi) con quel valore. */
 function mantenutaTempAria(valore: number, data = OGGI) {
@@ -256,6 +259,9 @@ describe('MisuraPianta: intestazione', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Pianta #1' })).toBeInTheDocument()
     const trattamento = config.trattamenti.find(t => t.id === config.piante[0].trattamento_id)!
     expect(screen.getByText(trattamento.etichetta)).toBeInTheDocument()
+    // Niente più campo "Vai alla pianta" nella pagina: è nel foglio dell'icona.
+    expect(screen.queryByRole('textbox', { name: 'Vai alla pianta' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Etichetta della pianta')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Oggi · 💚 SPAD' })).toBeInTheDocument()
     expect(campo('SPAD')).toBeInTheDocument()
     expect(screen.queryByLabelText('Temp aria')).not.toBeInTheDocument()
@@ -263,11 +269,32 @@ describe('MisuraPianta: intestazione', () => {
     expect(screen.queryByRole('region', { name: 'Storia' })).not.toBeInTheDocument()
   })
 
-  it('il numero della pianta è l\'unico testo grande: il campo "Vai alla pianta" no', async () => {
+  it('il numero della pianta è l\'unico testo grande: trattamento e progresso sono dato, nel font dei dati', async () => {
+    archivio = [misura('2'), misura('3')]
     apri('1')
     await pronta()
-    expect(campo('Vai alla pianta').className).not.toContain('text-numero')
-    expect(campo('Vai alla pianta').className).toContain('font-mono')
+    const riga = screen.getByRole('heading', { level: 2, name: 'Pianta #1' })
+    expect(within(riga).getByText('#1').className).toContain('text-numero')
+    const dati = screen.getByText('2/56')
+    expect(dati.parentElement!.className).toContain('font-mono')
+    expect(dati.parentElement!.className).toContain('text-dato')
+    expect(dati.parentElement!.className).not.toContain('text-numero')
+  })
+
+  it('una riga sola: "#1 · W1 · 2/56" (fatte su totale del giro)', async () => {
+    archivio = [misura('2'), misura('3')]
+    apri('1')
+    await pronta()
+    const trattamento = config.trattamenti.find(t => t.id === config.piante[0].trattamento_id)!
+    const intestazione = screen.getByRole('heading', { level: 2, name: 'Pianta #1' }).parentElement!
+    expect(intestazione.textContent).toMatch(new RegExp(`#1\\s*·\\s*Trattamento:\\s*${trattamento.etichetta}\\s*·\\s*2/56`))
+  })
+
+  it('le icone della griglia e delle foto sono bersagli da 44 px nell\'intestazione', async () => {
+    apri('1')
+    await pronta()
+    expect(pulsante('Vai alla pianta').className).toMatch(/size-11/)
+    expect(pulsante('Vai alla pianta').closest('[data-slot="barra-azioni"]')).toBeNull()
   })
 
   it('lo strumento della pagina diventa quello scelto: la home e la scelta riprendono da qui', async () => {
@@ -365,7 +392,7 @@ describe('MisuraPianta: il giro', () => {
     expect(posizione()).toBe('/esperimenti/E/misura')
   })
 
-  it('sull\'ultima pianta da misurare "Salva e termina" porta alla fine del giro: "SPAD: 54/56", mancano 12 e 33', async () => {
+  it('sull\'ultima pianta da misurare "Salva e termina" porta alla fine del giro: fine giro 54/56, mancano 12 e 33', async () => {
     archivio = config.piante.filter(p => !['12', '33', '56'].includes(p.etichetta)).map(p => misura(p.etichetta))
     const utente = userEvent.setup()
     apri('56')
@@ -377,8 +404,9 @@ describe('MisuraPianta: il giro', () => {
     await utente.click(pulsante('Salva e termina'))
 
     await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${idStrumento('SPAD')}/fine`))
-    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD: 54/56' })).toBeInTheDocument()
-    expect(screen.getByText('Mancano 12, 33')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD · fine giro 54/56' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pianta #12, da fare' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pianta #33, da fare' })).toBeInTheDocument()
     expect(salvate()).toHaveLength(1)
   })
 
@@ -413,7 +441,7 @@ describe('MisuraPianta: il giro', () => {
     await utente.type(campo('SPAD'), '40')
     await utente.click(pulsante('Salva e termina'))
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD: 56/56' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD · fine giro 56/56' })).toBeInTheDocument()
     expect(screen.queryByText(/^Mancano/)).not.toBeInTheDocument()
   })
 
@@ -442,7 +470,7 @@ describe('MisuraPianta: il giro', () => {
     await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${idStrumento('SPAD')}/fine`))
     const [primo, secondo] = salvate()
     expect(secondo.id).toBe(primo.id)
-    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD: 56/56' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'SPAD · fine giro 56/56' })).toBeInTheDocument()
   })
 
   it('il doppio tocco su "Salva e vai" crea una sola misura e non salta due piante', async () => {
@@ -485,7 +513,8 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     const utente = userEvent.setup()
     apri('1')
     await pronta()
-    await utente.type(campo('Vai alla pianta'), '2{Enter}')
+    await apriFoglio(utente)
+    await utente.type(campoVai(), '2{Enter}')
 
     await pianta('2')
     expect(await screen.findByText(UNA)).toBeInTheDocument()
@@ -626,7 +655,7 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     ]
     const utente = userEvent.setup()
     apri('', 'Ciras', `/esperimenti/E/misura/${idStrumento('Ciras')}/fine`)
-    expect(await screen.findByRole('heading', { level: 2, name: 'Ciras: 55/56' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Ciras · fine giro 55/56' })).toBeInTheDocument()
     piuTardi()
     await utente.click(pulsante('Vai alle mancanti'))
 
@@ -754,13 +783,16 @@ describe('MisuraPianta: valori non salvati e bozze', () => {
     apri('1')
     await pronta()
     await utente.type(campo('SPAD'), '41')
-    await utente.type(campo('Vai alla pianta'), '5{Enter}')
+    await apriFoglio(utente)
+    await utente.type(campoVai(), '5{Enter}')
 
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Continua a modificare' }))
     await chiudiDialogo()
     expect(posizione()).toBe(percorso('SPAD', '1'))
+    expect(campo('SPAD')).toHaveValue('41')
 
-    await utente.click(pulsante('Vai'))
+    await apriFoglio(utente)
+    await utente.click(screen.getByRole('button', { name: /^Pianta #5, / }))
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
     await waitFor(() => expect(posizione()).toBe(percorso('SPAD', '5')))
     expect(salvaMisura).not.toHaveBeenCalled()
@@ -768,52 +800,112 @@ describe('MisuraPianta: valori non salvati e bozze', () => {
 })
 
 describe('MisuraPianta: vai alla pianta', () => {
-  it('"Vai alla pianta" sulla pianta attuale non chiede e non tocca i valori scritti: svuota solo il campo', async () => {
+  it('l\'icona apre un foglio dal basso "Vai alla pianta" con il campo e la griglia delle piante di oggi', async () => {
+    archivio = [misura('2'), misura('3')]
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await apriFoglio(utente)
+    const foglio = screen.getByRole('dialog', { name: 'Vai alla pianta' })
+    expect(within(foglio).getAllByRole('button', { name: /^Pianta #/ })).toHaveLength(56)
+    expect(within(foglio).getByRole('button', { name: 'Pianta #2, fatta' })).toBeInTheDocument()
+    expect(within(foglio).getByRole('button', { name: 'Pianta #1, da fare' })).toHaveAttribute('aria-current', 'true')
+    expect(within(foglio).getByText('✓ fatta · ½ incompleta · □ da fare')).toBeInTheDocument()
+  })
+
+  it('una pianta incompleta (Ciras con solo A e gs) è distinta dalle fatte e dalle da fare', async () => {
+    aggiungiCiras()
+    const tutti = Object.fromEntries(['A', 'gs', 'E', 'Ci'].map(n => [par(n).id, [1]]))
+    archivio = [
+      misura('2', { strumento_id: idStrumento('Ciras'), valori: tutti }),
+      misura('3', { strumento_id: idStrumento('Ciras'), valori: { [par('A').id]: [12.3], [par('gs').id]: [0.2] } }),
+    ]
+    const utente = userEvent.setup()
+    apri('1', 'Ciras')
+    await pronta()
+    await apriFoglio(utente)
+    expect(screen.getByRole('button', { name: 'Pianta #2, fatta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pianta #3, incompleta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pianta #4, da fare' })).toBeInTheDocument()
+  })
+
+  it('il tocco su una cella porta a quella pianta (sostituendo la voce, come "Salva e vai")', async () => {
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await apriFoglio(utente)
+    await utente.click(screen.getByRole('button', { name: 'Pianta #7, da fare' }))
+    await waitFor(() => expect(posizione()).toBe(percorso('SPAD', '7')))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await pianta('7')
+    // Il gesto indietro esce dal giro, non torna alla pianta di prima.
+    await utente.click(screen.getByRole('button', { name: 'Indietro di sistema' }))
+    await waitFor(() => expect(posizione()).toBe('/esperimenti/E/misura'))
+  })
+
+  it('"Vai alla pianta" sulla pianta attuale non chiede e non tocca i valori scritti: chiude solo il foglio', async () => {
     const utente = userEvent.setup()
     apri('1')
     await pronta()
     await utente.type(campo('SPAD'), '41')
-    await utente.type(campo('Vai alla pianta'), '01{Enter}')
+    await apriFoglio(utente)
+    await utente.type(campoVai(), '01{Enter}')
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(campo('Vai alla pianta')).toHaveValue('')
     expect(campo('SPAD')).toHaveValue('41')
     expect(posizione()).toBe(percorso('SPAD', '1'))
+  })
+
+  it('toccare la cella della pianta attuale non cambia niente', async () => {
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '41')
+    await apriFoglio(utente)
+    await utente.click(screen.getByRole('button', { name: 'Pianta #1, da fare' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(campo('SPAD')).toHaveValue('41')
   })
 
   it('" 01 " apre la pianta 1', async () => {
     const utente = userEvent.setup()
     apri('5')
     await pronta()
-    await utente.type(campo('Vai alla pianta'), ' 01 ')
+    await apriFoglio(utente)
+    await utente.type(campoVai(), ' 01 ')
     await utente.click(pulsante('Vai'))
     await waitFor(() => expect(posizione()).toBe(percorso('SPAD', '1')))
     await pianta('1')
   })
 
   it('con etichette numeriche la tastiera è numerica, con il tasto "Vai"', async () => {
-    apri('1')
-    await pronta()
-    expect(campo('Vai alla pianta')).toHaveAttribute('inputmode', 'numeric')
-    expect(campo('Vai alla pianta')).toHaveAttribute('enterkeyhint', 'go')
-  })
-
-  it('una pianta che non c\'è: resta qui e lo dice, con il testo selezionato', async () => {
     const utente = userEvent.setup()
     apri('1')
     await pronta()
-    await utente.type(campo('Vai alla pianta'), ' 999 {Enter}')
+    await apriFoglio(utente)
+    expect(campoVai()).toHaveAttribute('inputmode', 'numeric')
+    expect(campoVai()).toHaveAttribute('enterkeyhint', 'go')
+  })
+
+  it('una pianta che non c\'è: il foglio resta aperto e lo dice, con il testo selezionato', async () => {
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await apriFoglio(utente)
+    await utente.type(campoVai(), ' 999 {Enter}')
     expect(screen.getByRole('alert')).toHaveTextContent('Nessuna pianta con etichetta «999» in questo esperimento.')
-    expect(campo('Vai alla pianta')).toHaveAttribute('aria-invalid', 'true')
+    expect(campoVai()).toHaveAttribute('aria-invalid', 'true')
     expect(posizione()).toBe(percorso('SPAD', '1'))
     await utente.keyboard('7')
-    expect(campo('Vai alla pianta')).toHaveValue('7')
+    expect(campoVai()).toHaveValue('7')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('a campo vuoto "Vai" è spento', async () => {
+    const utente = userEvent.setup()
     apri('1')
     await pronta()
+    await apriFoglio(utente)
     expect(pulsante('Vai')).toBeDisabled()
   })
 })
@@ -2220,7 +2312,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     expect(foto().closest('[data-slot="barra-azioni"]')).toBeNull()
     expect(foto().closest('form')).toBeNull()
     expect(foto()).toHaveAttribute('type', 'button')
-    expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' }).parentElement).toContainElement(foto())
+    expect(screen.getByRole('heading', { level: 2, name: 'Pianta #35' }).parentElement!.parentElement).toContainElement(foto())
     // Un bersaglio da almeno 44 px.
     expect(foto().className).toMatch(/size-11/)
   })
@@ -2533,6 +2625,22 @@ describe('MisuraPianta: coda d\'invio con poco segnale (Piano E, Task E6)', () =
     await waitFor(() => expect(posizione()).toBe(percorso('Termometro', '36')))
     expect(toastSalvato).toHaveBeenCalledWith('Pianta #35 salvata ✓')
     expect(vociDi('u1')).toEqual([])
+  })
+
+  it('la griglia e il progresso contano come "fatta" una pianta con la misura ancora in coda d\'invio', async () => {
+    vi.mocked(salvaMisura).mockRejectedValue(new ErroreRete('rete'))
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '41')
+    await utente.click(pulsante('Salva e vai alla #2'))
+    await pianta('2')
+    expect(vociDi('u1')).toHaveLength(1)
+    // Il server non ha ancora la misura: i 56 del totale e la cella vengono dalla coda sovrapposta alle letture.
+    expect(await screen.findByText('1/56')).toBeInTheDocument()
+    await apriFoglio(utente)
+    expect(screen.getByRole('button', { name: 'Pianta #1, fatta' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pianta #2, da fare' })).toHaveAttribute('aria-current', 'true')
   })
 })
 

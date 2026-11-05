@@ -48,6 +48,11 @@ export function intervalloDelPeriodo(periodo: Periodo, fine: string): Intervallo
   }
 }
 
+/** L'intervallo di un solo giorno (estremi inclusi). */
+export function intervalloDelGiorno(data: string): Intervallo {
+  return { da: data, a: data }
+}
+
 /** Vero se la data è nel periodo, estremi compresi. */
 export function nelPeriodo(data: string, intervallo: Intervallo): boolean {
   return (intervallo.da === null || data >= intervallo.da) && (intervallo.a === null || data <= intervallo.a)

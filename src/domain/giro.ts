@@ -1,5 +1,6 @@
+import { intervalloDelGiorno, parametriDelloStrumento, serieTrattamenti } from './dataset'
 import { eVuoto } from './misure'
-import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento } from './tipi'
+import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, Trattamento } from './tipi'
 
 /** Stato di una pianta in un giro di misura: mai misurata, misurata a metà, completa. */
 export type StatoPianta = 'da_fare' | 'incompleta' | 'fatta'
@@ -122,4 +123,41 @@ export function righeStrumenti(config: ConfigEsperimento, misure: Misura[] | und
       const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
       return { strumento, giro: { fatte, totale, cominciato }, prossima: prossimaDaMisurare(config.piante, stati, null) }
     })
+}
+
+/** Una cella della griglia delle piante: la pianta, il suo stato nel giro e se è quella che si sta misurando. */
+export interface CellaGriglia { pianta: Pianta; stato: StatoPianta; attuale: boolean }
+
+/**
+ * Le celle della griglia delle piante, nell'ordine del giro. `stati` viene dalle misure del giorno che già
+ * comprendono quelle in coda d'invio (una misura appena salvata senza rete fa la pianta `fatta`); una pianta senza
+ * stato vale `da_fare`. `attualeId` è la pianta aperta (`null` nel fine giro, dove non ce n'è una).
+ */
+export function celleGriglia(piante: Pianta[], stati: Map<string, StatoPianta>, attualeId: string | null): CellaGriglia[] {
+  return inOrdine(piante).map(pianta => ({ pianta, stato: stati.get(pianta.id) ?? 'da_fare', attuale: pianta.id === attualeId }))
+}
+
+/** Media, errore standard (`null` con una sola pianta) e numero di piante di un trattamento, in un giorno. */
+export interface RigaValoriOggi { trattamento: Trattamento; media: number; es: number | null; n: number }
+
+export interface ValoriOggiParametro { parametro: Parametro; righe: RigaValoriOggi[] }
+
+/**
+ * "Valori di oggi" del fine giro: per ogni parametro numerico attivo dello strumento, una riga per trattamento con
+ * media, ES e n. Sono i numeri del Dataset (`serieTrattamenti` con l'intervallo di un solo giorno), non un calcolo
+ * a parte: i due posti non possono dare cifre diverse. Contano solo le misure di quello strumento; un trattamento
+ * senza valori quel giorno non ha riga.
+ */
+export function valoriDiOggi(config: ConfigEsperimento, strumento: Strumento, misure: Misura[], data: string): ValoriOggiParametro[] {
+  const sue = misure.filter(m => m.strumento_id === strumento.id)
+  return parametriDelloStrumento(config, strumento.id)
+    .map(x => x.parametro)
+    .filter(p => p.tipo === 'numero' && !p.archiviato)
+    .map(parametro => ({
+      parametro,
+      righe: serieTrattamenti(config, parametro, sue, config.piante, intervalloDelGiorno(data)).flatMap((serie): RigaValoriOggi[] => {
+        const punto = serie.punti.find(x => x.data === data)
+        return punto ? [{ trattamento: serie.trattamento, media: punto.media, es: punto.es, n: punto.n }] : []
+      }),
+    }))
 }

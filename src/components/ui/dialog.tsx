@@ -42,9 +42,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  posizione = "centro",
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  /** "basso": un foglio dal basso a tutta larghezza (la griglia delle piante), al posto del dialogo al centro. */
+  posizione?: "centro" | "basso"
 }) {
   return (
     <DialogPortal>
@@ -52,7 +55,10 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-5 rounded-lg bg-foglio p-5 text-base text-grafite shadow-dialogo duration-200 ease-out-quint outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+          "fixed z-50 grid gap-5 bg-foglio p-5 text-base text-grafite shadow-dialogo duration-200 ease-out-quint outline-none data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+          posizione === "basso"
+            ? "inset-x-0 bottom-0 max-h-[85dvh] w-full content-start overflow-y-auto rounded-t-lg pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:inset-x-auto sm:left-1/2 sm:max-w-md sm:-translate-x-1/2"
+            : "top-1/2 left-1/2 w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg sm:max-w-sm",
           className
         )}
         {...props}
