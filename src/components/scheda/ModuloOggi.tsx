@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { eVuoto, mantenibile, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
 import { accoda, ErroreCoda, utenteCoda } from '@/lib/coda/codaMisure'
-import { inviaCoda } from '@/lib/coda/invio'
+import { fermaLettureVecchie, inviaCoda } from '@/lib/coda/invio'
 import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { toastSalvato } from '@/lib/toastSalvato'
@@ -301,6 +301,9 @@ export function ModuloOggi({
       }
       return
     }
+    // Una lettura della pianta o del giorno partita prima del salvataggio, arrivando dopo, toglierebbe la misura dalla
+    // cache appena messa: si ferma prima di metterla.
+    await fermaLettureVecchie(queryClient, espId, pianta.id)
     inCorso.current = false
     salvata(daSalvare, azione, true)
   }

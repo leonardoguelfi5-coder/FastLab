@@ -6,7 +6,10 @@ import { MemoryRouter, Route, Routes, useLocation, useNavigate, useNavigationTyp
 import type { Session } from '@supabase/supabase-js'
 
 // Come SchedaPianta.test: veri hook e vera cache di React Query, livello API finto, client Supabase mai raggiunto.
-vi.mock('@/lib/supabase', () => ({ supabase: {} }))
+vi.mock('@/lib/supabase', () => ({
+  // La sessione con cui partono gli invii della coda d'invio: dell'utente u1 dei test.
+  supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } }, error: null }) } },
+}))
 vi.mock('@/api/auth', () => ({
   accedi: vi.fn(), registrati: vi.fn(), esci: vi.fn(), useSessione: vi.fn(),
 }))
@@ -33,6 +36,7 @@ import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Parametro } from '@/domain/tipi'
 import { accoda, aggiornaVoce, impostaUtenteCoda, vociDi } from '@/lib/coda/codaMisure'
+import { inviaCoda } from '@/lib/coda/invio'
 import { ErroreRete } from '@/lib/rete'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { useCampoStore } from '@/store/campo'
@@ -941,6 +945,31 @@ describe('ModificaMisura: misure in coda d\'invio (Piano E, Task E6)', () => {
     expect(errore).toHaveTextContent('Misura non eliminata.')
     expect(vociDi('u1').map(v => v.misura.id)).toEqual([m.id])
     expect(posizione()).toBe(`/esperimenti/E/misure/${m.id}`)
+  })
+
+  it('"Elimina" mentre la versione di prima è in viaggio e la correzione aspetta: l\'eliminazione online arriva per ultima', async () => {
+    archivio = []
+    accoda('u1', 'E', m, DATI)
+    let arriva!: () => void
+    vi.mocked(salvaMisura).mockImplementationOnce((_e, x) => new Promise<void>(r => { arriva = () => { archivio = [x]; r() } }))
+    const utente = userEvent.setup()
+    const { client } = apri()
+    await pronta()
+    void inviaCoda('u1', client)
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    // Una correzione accodata mentre la prima versione viaggia: la voce torna "in attesa", ma il viaggio c'è ancora.
+    accoda('u1', 'E', { ...m, valori: { [par('Temp aria').id]: [30] } }, DATI)
+
+    await utente.click(pulsante('Elimina misura'))
+    await utente.click(within(await dialogo('Eliminare la misura?')).getByRole('button', { name: 'Elimina' }))
+    expect(eliminaMisura).not.toHaveBeenCalled()
+
+    await act(async () => arriva())
+    await waitFor(() => expect(posizione()).toBe(SCHEDA()))
+    const ultimoSalva = Math.max(...vi.mocked(salvaMisura).mock.invocationCallOrder)
+    expect(vi.mocked(eliminaMisura).mock.invocationCallOrder[0]).toBeGreaterThan(ultimoSalva)
+    expect(archivio).toEqual([])
+    expect(vociDi('u1')).toEqual([])
   })
 
   it('"Elimina" di una misura che sta partendo aspetta la fine dell\'invio, poi la elimina online', async () => {

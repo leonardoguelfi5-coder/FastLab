@@ -5,6 +5,8 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
 import type { Misura } from '@/domain/tipi'
+import { eDefinitivo } from '@/lib/coda/invio'
+import { ErroreApp, messaggioErrore } from '@/lib/errori'
 import { aRigaMisura } from './mappers'
 import { caricaMisura, eliminaMisura, misureDelGiorno, misurePianta, misureStrumento, salvaMisura, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 
@@ -23,13 +25,28 @@ beforeEach(() => {
 })
 
 describe('salvaMisura', () => {
-  it('fa upsert sulla tabella misure con onConflict id (un doppio salvataggio non duplica)', async () => {
+  // La risposta di un upsert riuscito: la riga scritta (`select('id')`).
+  beforeEach(() => mock.risponde('misure', { data: [{ id: misura.id }] }))
+
+  it('fa upsert sulla tabella misure con onConflict id (un doppio salvataggio non duplica) e chiede indietro la riga', async () => {
     await salvaMisura('E', misura)
 
     expect(supabase.from).toHaveBeenCalledWith('misure')
     expect(mock.di('misure')).toEqual([
       { sorgente: 'misure', metodo: 'upsert', args: [aRigaMisura('E', misura), { onConflict: 'id' }] },
+      { sorgente: 'misure', metodo: 'select', args: ['id'] },
     ])
+  })
+
+  it.each([
+    ['senza righe', []],
+    ['senza dati', null],
+  ])('una risposta riuscita %s non vale come arrivo: lancia un errore che la coda ritenta', async (_nome, data) => {
+    mock.risponde('misure', { data })
+    const e = await salvaMisura('E', misura).then(() => null, (x: unknown) => x)
+    expect(e).toBeInstanceOf(ErroreApp)
+    expect(eDefinitivo(e)).toBe(false)
+    expect(messaggioErrore(e)).toBe('Il server non ha confermato il salvataggio della misura: riprova.')
   })
 
   it('non manda mai creato_da', async () => {

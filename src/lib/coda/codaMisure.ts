@@ -18,6 +18,9 @@ import { nuovoId } from '@/lib/id'
  *   fatta mentre partiva la versione di prima resta in coda e parte dopo.
  * - `forseSulServer`: la misura può essere già sul server (è la correzione di una misura salvata, o un invio è già
  *   partito una volta e forse è arrivato anche se la risposta no). Eliminarla dalla coda non basta: va tolta anche online.
+ * - `inViaggio`: la revisione il cui invio è partito e non ha ancora avuto risposta, o `null`. Resta anche se nel
+ *   frattempo la voce è stata corretta (revisione nuova, di nuovo `attesa`): finché c'è, la voce non si toglie
+ *   (`togli` dice `in_invio`) e chi elimina aspetta, altrimenti l'upsert in viaggio arriverebbe dopo l'eliminazione.
  * - `etichetta` e `strumento`: per dire quale misura è ("Pianta #35 salvata ✓", "#35 · 💚 SPAD · 09:12") anche senza la
  *   configurazione in memoria.
  */
@@ -35,6 +38,7 @@ export interface VoceCoda {
   errore: string | null
   revisione: string
   forseSulServer: boolean
+  inViaggio: string | null
   etichetta: string
   strumento: string
 }
@@ -87,6 +91,7 @@ function voceValida(v: unknown, utente: string): VoceCoda | null {
     revisione: v.revisione,
     // Nel dubbio sì: eliminare online una misura che non c'è non fa danni, lasciarla sì.
     forseSulServer: v.forseSulServer !== false,
+    inViaggio: eTesto(v.inViaggio) ? v.inViaggio : null,
     etichetta: eTesto(v.etichetta) ? v.etichetta : '?',
     strumento: eTesto(v.strumento) ? v.strumento : '',
   }
@@ -166,6 +171,8 @@ export function accoda(utente: string, espId: string, misura: Misura, dati: Dati
     revisione: nuovoId(),
     // Se c'era già una voce, vale quel che si sapeva di lei: una misura solo in coda resta tale anche corretta.
     forseSulServer: prima ? prima.forseSulServer : dati.sulServer,
+    // L'invio della versione di prima, se è in viaggio, resta in viaggio: la correzione non lo ferma.
+    inViaggio: prima?.inViaggio ?? null,
     etichetta: dati.etichetta,
     strumento: dati.strumento,
   }
@@ -213,14 +220,25 @@ export function aggiornaVoce(utente: string, id: string, revisione: string, modi
 }
 
 /**
- * Toglie dalla coda la misura con quell'id (scartata, o eliminata prima dell'invio). Una voce che sta partendo non si
- * tocca (`in_invio`): l'invio è già in viaggio, chi elimina aspetta che finisca.
+ * L'invio della revisione `revisione` ha avuto risposta (o è finito male): la voce con quell'id non è più in viaggio,
+ * anche se nel frattempo è stata corretta.
+ */
+export function fineViaggio(utente: string, id: string, revisione: string): void {
+  const voci = vociDi(utente)
+  const voce = voci.find(v => v.misura.id === id)
+  if (!voce || voce.inViaggio !== revisione) return
+  scriviSePuoi(utente, voci.map(v => (v === voce ? { ...v, inViaggio: null } : v)))
+}
+
+/**
+ * Toglie dalla coda la misura con quell'id (scartata, o eliminata prima dell'invio). Una voce che sta partendo, o la
+ * cui versione di prima è ancora in viaggio, non si tocca (`in_invio`): chi elimina aspetta che l'invio finisca.
  */
 export function togli(utente: string, id: string): 'tolta' | 'in_invio' | 'assente' {
   const voci = vociDi(utente)
   const voce = voci.find(v => v.misura.id === id)
   if (!voce) return 'assente'
-  if (voce.stato === 'invio') return 'in_invio'
+  if (voce.stato === 'invio' || voce.inViaggio !== null) return 'in_invio'
   scriviSePuoi(utente, voci.filter(v => v !== voce))
   return 'tolta'
 }

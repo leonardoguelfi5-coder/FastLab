@@ -10,7 +10,7 @@ const misura = (id: string, extra: Partial<Misura> = {}): Misura => ({
 })
 const voce = (m: Misura, extra: Partial<VoceCoda> = {}): VoceCoda => ({
   misura: m, espId: 'E', utente: 'u1', accodataIl: '2026-10-28T09:00:00Z', tentativi: 0, prossimoTentativo: null,
-  stato: 'attesa', errore: null, revisione: 'r', forseSulServer: false, etichetta: '1', strumento: 'SPAD', ...extra,
+  stato: 'attesa', errore: null, revisione: 'r', forseSulServer: false, inViaggio: null, etichetta: '1', strumento: 'SPAD', ...extra,
 })
 const delGiorno = (m: Misura) => m.data_rilievo === '2026-10-28'
 

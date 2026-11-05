@@ -213,7 +213,8 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
 
   /**
    * Elimina la misura, anche se è ancora nella coda d'invio:
-   * - se sta partendo, prima si aspetta che l'invio finisca (altrimenti arriverebbe dopo l'eliminazione e la ricreerebbe);
+   * - se sta partendo (anche una sua versione di prima, poi corretta), prima si aspetta che l'invio finisca: altrimenti
+ *   l'upsert arriverebbe dopo l'eliminazione e la ricreerebbe;
    * - in coda e mai partita (non può essere sul server): basta toglierla dalla coda;
    * - in coda ma forse già sul server (una correzione, o un invio partito): tolta dalla coda ed eliminata online; se
    *   l'eliminazione online non riesce torna in coda com'era, e lo si dice: niente si perde;
@@ -223,7 +224,11 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
     const utente = utenteCoda()
     if (!utente) return eliminaMisura(misura.id)
     const inCoda = () => vociDi(utente).find(v => v.misura.id === misura.id)
-    if (inCoda()?.stato === 'invio') await inviaCoda(utente, queryClient, { forza: true })
+    // In viaggio anche quando la voce è già stata corretta e aspetta di nuovo (`inViaggio`): si aspetta che il giro
+    // d'invio finisca (lui chiude il viaggio, o lo riparte se era rimasto a metà da un'app chiusa). Poche volte al
+    // massimo: un'altra scheda che invia senza fine non deve tenere ferma questa.
+    const inViaggio = () => { const v = inCoda(); return v !== undefined && (v.stato === 'invio' || v.inViaggio !== null) }
+    for (let volte = 0; volte < 3 && inViaggio(); volte++) await inviaCoda(utente, queryClient, { forza: true })
     const voce = inCoda()
     if (!voce) return eliminaMisura(misura.id)
     // Tolta dalla coda, la pagina deve continuare a vederla finché si chiude (il server può non averla).

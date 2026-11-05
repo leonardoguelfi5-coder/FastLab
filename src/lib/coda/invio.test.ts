@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
-vi.mock('@/lib/supabase', () => ({ supabase: {} }))
+vi.mock('@/lib/supabase', () => ({ supabase: { auth: { getSession: vi.fn() } } }))
 vi.mock('@/api/misure', () => ({ salvaMisura: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }))
 
 import { toast } from 'sonner'
 import { salvaMisura } from '@/api/misure'
+import { supabase } from '@/lib/supabase'
 import { chiavi } from '@/api/query'
 import type { Misura } from '@/domain/tipi'
 import { ErroreRete } from '@/lib/rete'
 import { toastSalvato } from '@/lib/toastSalvato'
-import { accoda, aggiornaVoce, impostaUtenteCoda, vociDi } from './codaMisure'
+import { accoda, aggiornaVoce, chiaveCoda, impostaUtenteCoda, vociDi } from './codaMisure'
 import { attesaDopo, avviaInvioAutomatico, eDefinitivo, inviaCoda } from './invio'
 
 const OGGI = '2026-10-28'
@@ -35,8 +36,16 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   arrivate = []
   vi.mocked(salvaMisura).mockImplementation(async (_esp, m) => { arrivate.push(m) })
+  sessioneDi('u1')
   impostaUtenteCoda('u1')
 })
+
+/** La sessione salvata da supabase-js, con cui partono le richieste: di `id`, o nessuna. */
+function sessioneDi(id: string | null) {
+  vi.mocked(supabase.auth.getSession).mockResolvedValue(
+    { data: { session: id ? { user: { id } } : null }, error: null } as never,
+  )
+}
 afterEach(() => {
   impostaUtenteCoda(null)
   vi.useRealTimers()
@@ -221,6 +230,74 @@ describe('inviaCoda', () => {
     await vi.waitFor(() => expect(arrivate).toHaveLength(2))
     expect(arrivate[1].valori).toEqual({ spad: [40] })
     expect(vociDi('u1')).toEqual([])
+  })
+
+  it('una lettura del giorno partita prima dell\'invio e arrivata dopo non cancella la misura appena arrivata', async () => {
+    client.setQueryData<Misura[]>(chiavi.misureGiorno('E', OGGI), [])
+    client.setQueryData<Misura[]>(chiavi.misurePianta('p-m1'), [])
+    // Le letture partono prima che la misura arrivi al server: risponderanno senza di lei.
+    const risposte: ((v: Misura[]) => void)[] = []
+    const lenta = () => new Promise<Misura[]>(r => { risposte.push(r) })
+    const letture = [
+      client.fetchQuery({ queryKey: chiavi.misureGiorno('E', OGGI), queryFn: lenta, staleTime: 0 }).catch(() => undefined),
+      client.fetchQuery({ queryKey: chiavi.misurePianta('p-m1'), queryFn: lenta, staleTime: 0 }).catch(() => undefined),
+    ]
+    metti('m1')
+    await inviaCoda('u1', client)
+    for (const r of risposte) r([])
+    await Promise.all(letture)
+
+    expect(vociDi('u1')).toEqual([])
+    expect(client.getQueryData(chiavi.misureGiorno('E', OGGI))).toEqual([misura('m1')])
+    expect(client.getQueryData(chiavi.misurePianta('p-m1'))).toEqual([misura('m1')])
+  })
+
+  it('una voce tolta mentre era in viaggio (da un\'altra scheda) non torna nella cache e non ha verde', async () => {
+    client.setQueryData<Misura[]>(chiavi.misureGiorno('E', OGGI), [])
+    metti('m1')
+    vi.mocked(salvaMisura).mockImplementationOnce(async () => { localStorage.removeItem(chiaveCoda('u1')) })
+    await inviaCoda('u1', client)
+    expect(client.getQueryData(chiavi.misureGiorno('E', OGGI))).toEqual([])
+    expect(toastSalvato).not.toHaveBeenCalled()
+  })
+
+  it('l\'utente cambia durante l\'invio della prima voce: la seconda non parte', async () => {
+    metti('m1')
+    metti('m2')
+    vi.mocked(salvaMisura).mockImplementationOnce(async (_e, m) => {
+      arrivate.push(m)
+      impostaUtenteCoda('u2')
+    })
+    await inviaCoda('u1', client)
+    expect(arrivate.map(m => m.id)).toEqual(['m1'])
+    expect(vociDi('u1').map(v => v.misura.id)).toEqual(['m2'])
+  })
+
+  it.each([
+    ['di un altro utente', () => sessioneDi('u2')],
+    ['assente (senza rete con il token scaduto)', () => sessioneDi(null)],
+    ['che non si legge', () => vi.mocked(supabase.auth.getSession).mockRejectedValue(new ErroreRete('rete'))],
+  ])('con la sessione salvata %s non invia, e la voce resta com\'è', async (_nome, imposta) => {
+    metti('m1')
+    imposta()
+    await inviaCoda('u1', client, { forza: true })
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(vociDi('u1')[0]).toMatchObject({ stato: 'attesa', tentativi: 0, errore: null, inViaggio: null })
+  })
+
+  it('una correzione accodata mentre parte la versione di prima: in viaggio finché l\'invio non risponde', async () => {
+    metti('m1')
+    let arriva: () => void = () => {}
+    vi.mocked(salvaMisura).mockImplementationOnce((_e, m) => new Promise(ok => { arriva = () => { arrivate.push(m); ok() } }))
+    const giro = inviaCoda('u1', client)
+    await vi.waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    const { revisione } = vociDi('u1')[0]
+    accoda('u1', 'E', misura('m1', { valori: { spad: [40] } }), { etichetta: '1', strumento: 'SPAD', sulServer: false })
+    expect(vociDi('u1')[0]).toMatchObject({ stato: 'attesa', inViaggio: revisione })
+    arriva()
+    await giro
+    expect(vociDi('u1')).toEqual([])
+    expect(arrivate.map(m => m.valori.spad)).toEqual([[38.1], [40]])
   })
 
   it('non invia a nome di un altro utente: solo le voci dell\'utente con la sessione', async () => {

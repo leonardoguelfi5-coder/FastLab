@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
 import { avviaAggiornamento, fermaAggiornamento, type OpzioniRegistrazione } from '@/lib/aggiornamento'
-import { accoda, impostaUtenteCoda } from '@/lib/coda/codaMisure'
+import { accoda, aggiornaVoce, impostaUtenteCoda, vociDi } from '@/lib/coda/codaMisure'
 import { AppShell } from './AppShell'
 
 type Utente = ReturnType<typeof userEvent.setup>
@@ -285,6 +285,33 @@ describe('AppShell', () => {
       await utente.click(screen.getByRole('button', { name: 'Esci' }))
       await utente.click(await screen.findByRole('button', { name: 'Esci comunque' }))
       expect(esci).toHaveBeenCalledOnce()
+    })
+
+    it('le misure rifiutate si dicono a parte: non partono da sole', async () => {
+      metti('u1', 'm1')
+      metti('u1', 'm2')
+      const v = vociDi('u1')[1]
+      aggiornaVoce('u1', 'm2', v.revisione, x => ({ ...x, stato: 'rifiutata', errore: 'No.' }))
+      const utente = userEvent.setup({ delay: null })
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+      await apriMenu(utente)
+      await utente.click(screen.getByRole('button', { name: 'Esci' }))
+      const dialogo = await screen.findByRole('dialog')
+      expect(dialogo).toHaveTextContent('C\'è 1 misura da inviare: partirà al tuo prossimo accesso su questo telefono.')
+      expect(dialogo).toHaveTextContent('C\'è 1 misura non inviata: il server l\'ha rifiutata e non partirà da sola.')
+    })
+
+    it('solo misure rifiutate: niente "partiranno"', async () => {
+      metti('u1', 'm1')
+      metti('u1', 'm2')
+      for (const v of vociDi('u1')) aggiornaVoce('u1', v.misura.id, v.revisione, x => ({ ...x, stato: 'rifiutata', errore: 'No.' }))
+      const utente = userEvent.setup({ delay: null })
+      mostra(<AppShell titolo="Campo"><p>Corpo</p></AppShell>)
+      await apriMenu(utente)
+      await utente.click(screen.getByRole('button', { name: 'Esci' }))
+      const dialogo = await screen.findByRole('dialog')
+      expect(dialogo).toHaveTextContent('Ci sono 2 misure non inviate: il server le ha rifiutate e non partiranno da sole.')
+      expect(dialogo).not.toHaveTextContent('da inviare:')
     })
 
     it('con una misura sola la frase è al singolare', async () => {

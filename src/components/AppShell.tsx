@@ -28,6 +28,22 @@ interface AppShellProps {
 const VOCE_MENU = 'flex h-11 w-full items-center gap-2.5 rounded-sm px-3 text-left text-base text-grafite transition-colors hover:bg-carta-ombra active:bg-carta-ombra [&_svg]:size-5 [&_svg]:shrink-0 [&_svg]:text-grafite-tenue'
 
 /**
+ * La domanda prima di uscire con misure ancora sul telefono. Quelle da inviare partono da sole al prossimo accesso;
+ * quelle rifiutate dal server no (vanno corrette o scartate): lo si dice a parte.
+ */
+function testoUscita(daInviare: number, rifiutate: number): string {
+  const frasi: string[] = []
+  if (daInviare === 1) frasi.push('C\'è 1 misura da inviare: partirà al tuo prossimo accesso su questo telefono.')
+  else if (daInviare > 1) frasi.push(`Ci sono ${daInviare} misure da inviare: partiranno al tuo prossimo accesso su questo telefono.`)
+  if (rifiutate === 1) {
+    frasi.push('C\'è 1 misura non inviata: il server l\'ha rifiutata e non partirà da sola. Resta su questo telefono e la ritrovi al tuo prossimo accesso.')
+  } else if (rifiutate > 1) {
+    frasi.push(`Ci sono ${rifiutate} misure non inviate: il server le ha rifiutate e non partiranno da sole. Restano su questo telefono e le ritrovi al tuo prossimo accesso.`)
+  }
+  return frasi.join(' ')
+}
+
+/**
  * Intestazione e menu dell'utente comuni a tutte le pagine dopo l'accesso. La barra in alto è alta 56px
  * (fondo carta, linea riga sotto) e resta ferma mentre si scorre; il contenuto sta in una colonna centrale.
  * Se la pagina ha una BarraAzioni, sotto il contenuto resta lo spazio per non esserne coperto.
@@ -35,7 +51,9 @@ const VOCE_MENU = 'flex h-11 w-full items-center gap-2.5 rounded-sm px-3 text-le
 export function AppShell({ titolo, indietro, onIndietro, azioni, children }: AppShellProps) {
   const { sessione } = useSessione()
   const { data: amministratore } = useSonoAdmin()
-  const inCoda = useVociCoda().length
+  const voci = useVociCoda()
+  const inCoda = voci.length
+  const rifiutate = voci.filter(v => v.stato === 'rifiutata').length
   const [confermaUscita, setConfermaUscita] = useState(false)
   // Una versione nuova dell'app aspetta (Piano E, Task E7): si attiva solo da qui o alla prossima apertura.
   const aggiornamentoPronto = useAggiornamentoPronto()
@@ -159,9 +177,7 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
       <Conferma
         aperta={confermaUscita}
         titolo="Uscire con misure da inviare?"
-        testo={inCoda === 1
-          ? 'C\'è 1 misura da inviare: partirà al tuo prossimo accesso su questo telefono.'
-          : `Ci sono ${inCoda} misure da inviare: partiranno al tuo prossimo accesso su questo telefono.`}
+        testo={testoUscita(inCoda - rifiutate, rifiutate)}
         annulla="Resta"
         conferma="Esci comunque"
         onAnnulla={() => setConfermaUscita(false)}

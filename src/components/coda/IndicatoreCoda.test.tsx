@@ -4,7 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
-vi.mock('@/lib/supabase', () => ({ supabase: {} }))
+vi.mock('@/lib/supabase', () => ({
+  // La sessione con cui partono gli invii della coda d'invio: dell'utente u1 dei test.
+  supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } }, error: null }) } },
+}))
 vi.mock('@/api/misure', () => ({ salvaMisura: vi.fn() }))
 vi.mock('@/lib/toastSalvato', () => ({ toastSalvato: vi.fn() }))
 vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: vi.fn(), success: vi.fn() }) }))

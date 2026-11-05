@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/react-query'
+import type { QueryClient, QueryFilters } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { salvaMisura } from '@/api/misure'
 import { chiavi } from '@/api/query'
@@ -7,7 +7,8 @@ import { messaggioErrore } from '@/lib/errori'
 import { ErroreRete } from '@/lib/rete'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 import { toastSalvato } from '@/lib/toastSalvato'
-import { aggiornaVoce, iscriviti, utenteCoda, vociDi, type VoceCoda } from './codaMisure'
+import { supabase } from '@/lib/supabase'
+import { aggiornaVoce, fineViaggio, iscriviti, utenteCoda, vociDi, type VoceCoda } from './codaMisure'
 import { perOraCrescente, piuRecentiPrima } from './sovrapponi'
 
 /**
@@ -85,12 +86,27 @@ const conMisura = (prima: Misura[], m: Misura, ordine: (a: Misura, b: Misura) =>
   [...prima.filter(x => x.id !== m.id), m].sort(ordine)
 
 /**
+ * Prima di mettere nella cache una misura appena arrivata al server: una lettura delle misure della pianta o del giorno
+ * partita prima che arrivasse risponderebbe senza di lei e, arrivando dopo, la cancellerebbe dalla cache (la pianta
+ * tornerebbe "da fare"). Si fermano (la cache torna a com'era prima della lettura); quelle che non avevano ancora
+ * dati ripartono subito, perché adesso il server la misura ce l'ha. Usata anche dal salvataggio diretto del modulo.
+ */
+export async function fermaLettureVecchie(queryClient: QueryClient, espId: string, piantaId: string): Promise<void> {
+  const filtri: QueryFilters[] = [{ queryKey: chiavi.misurePianta(piantaId), exact: true }, { queryKey: ['misure', 'giorno', espId] }]
+  await Promise.all(filtri.map(f => queryClient.cancelQueries(f)))
+  for (const f of filtri) {
+    void queryClient.refetchQueries({ ...f, type: 'active', predicate: q => q.state.data === undefined })
+  }
+}
+
+/**
  * La misura è arrivata: entra nelle letture della pianta e del giorno già in cache (così, tolta dalla coda, non sparisce
  * e la pianta resta fatta), esce dai giorni in cui non è più (una correzione che cambia la data). Le altre letture che
  * dipendono dalle misure diventano vecchie senza rileggerle adesso: con poco segnale sarebbero altre richieste, e si
  * rileggono la prossima volta che servono.
  */
-function aggiornaCacheDopoInvio(queryClient: QueryClient, espId: string, m: Misura): void {
+async function aggiornaCacheDopoInvio(queryClient: QueryClient, espId: string, m: Misura): Promise<void> {
+  await fermaLettureVecchie(queryClient, espId, m.pianta_id)
   queryClient.setQueryData<Misura[]>(chiavi.misurePianta(m.pianta_id), prima => prima && conMisura(prima, m, piuRecentiPrima))
   for (const [chiave, prima] of queryClient.getQueriesData<Misura[]>({ queryKey: ['misure', 'giorno', espId] })) {
     if (!prima) continue
@@ -104,6 +120,16 @@ function aggiornaCacheDopoInvio(queryClient: QueryClient, espId: string, m: Misu
   void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId), refetchType: 'none' })
   void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti, refetchType: 'none' })
   void queryClient.invalidateQueries({ queryKey: chiavi.misureStrumento(espId, m.strumento_id), refetchType: 'none' })
+}
+
+/** Vero se la sessione salvata da supabase-js è di `utente`; falso senza sessione o se non si legge. */
+async function sessioneDi(utente: string): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.user.id === utente
+  } catch {
+    return false
+  }
 }
 
 /** Il toast di fine giro: uno solo, verde solo per quel che il server ha confermato. */
@@ -128,7 +154,9 @@ async function giro(utente: string, queryClient: QueryClient, richiesta: Richies
   // Dentro il blocco nessun'altra scheda invia: una voce rimasta "in invio" è di un invio interrotto (app chiusa a
   // metà, scheda ricaricata) e riparte.
   for (const v of vociDi(utente)) {
-    if (v.stato === 'invio') aggiornaVoce(utente, v.misura.id, v.revisione, x => ({ ...x, stato: 'attesa' }))
+    if (v.stato === 'invio' || v.inViaggio !== null) {
+      aggiornaVoce(utente, v.misura.id, v.revisione, x => ({ ...x, stato: x.stato === 'invio' ? 'attesa' : x.stato, inViaggio: null }))
+    }
   }
   const inviate: VoceCoda[] = []
   const rifiutate: VoceCoda[] = []
@@ -137,8 +165,6 @@ async function giro(utente: string, queryClient: QueryClient, richiesta: Richies
   let fermato = false
   try {
     for (;;) {
-      // Solo le voci di chi ha la sessione: se nel frattempo è uscito (o è entrato un altro), ci si ferma.
-      if (utenteCoda() !== utente) break
       const adesso = Date.now()
       const voce = fermato ? undefined : vociDi(utente).find(v =>
         v.stato === 'attesa' && !provate.has(v.revisione) &&
@@ -153,11 +179,16 @@ async function giro(utente: string, queryClient: QueryClient, richiesta: Richies
       }
       provate.add(voce.revisione)
       const { misura, revisione } = voce
+      // Mai a nome di un altro, prima di ogni voce: l'utente della coda deve essere ancora quello della sessione (se nel
+      // frattempo è uscito o è entrato un altro ci si ferma), e la sessione con cui partirebbe la richiesta deve essere
+      // la sua. Senza sessione leggibile (senza rete con il token scaduto) non si invia: la voce aspetta com'è.
+      if (!(await sessioneDi(utente)) || utenteCoda() !== utente) break
       // Da qui la misura può arrivare al server anche se la risposta si perde.
-      aggiornaVoce(utente, misura.id, revisione, v => ({ ...v, stato: 'invio', forseSulServer: true }))
+      aggiornaVoce(utente, misura.id, revisione, v => ({ ...v, stato: 'invio', forseSulServer: true, inViaggio: revisione }))
       try {
         await salvaMisura(voce.espId, misura)
       } catch (e) {
+        fineViaggio(utente, misura.id, revisione)
         const tentativi = voce.tentativi + 1
         if (utenteCoda() !== utente) {
           // Un rifiuto arrivato mentre la sessione finiva è della sessione, non del dato: la voce aspetta il prossimo accesso.
@@ -177,10 +208,15 @@ async function giro(utente: string, queryClient: QueryClient, richiesta: Richies
         fermato = true
         continue
       }
-      // Arrivata. Se nel frattempo è stata corretta (revisione nuova), la correzione resta in coda e parte dopo.
-      aggiornaVoce(utente, misura.id, revisione, () => null)
-      aggiornaCacheDopoInvio(queryClient, voce.espId, misura)
-      inviate.push(voce)
+      // Arrivata. Se nel frattempo la voce è stata tolta (un'eliminazione), la misura non torna nella cache e non c'è
+      // verde: chi l'ha tolta se ne occupa. Prima la cache, poi la voce esce dalla coda: la misura non sparisce un attimo.
+      // Se nel frattempo è stata corretta (revisione nuova), la correzione resta in coda e parte dopo.
+      if (vociDi(utente).some(v => v.misura.id === misura.id)) {
+        await aggiornaCacheDopoInvio(queryClient, voce.espId, misura)
+        aggiornaVoce(utente, misura.id, revisione, () => null)
+        inviate.push(voce)
+      }
+      fineViaggio(utente, misura.id, revisione)
     }
   } finally {
     // Nello stesso passo in cui si è vista la coda finita: una chiamata da qui in poi apre un giro nuovo.

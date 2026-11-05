@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Misura } from '@/domain/tipi'
-import { MISURA_NON_TROVATA } from '@/lib/errori'
+import { ErroreApp, MISURA_NON_TROVATA } from '@/lib/errori'
 import { aRigaMisura, daRigaMisura, type RigaMisura } from './mappers'
 
 /** Misure di un esperimento in una data (AAAA-MM-GG), dalla più vecchia alla più recente. */
@@ -14,6 +14,9 @@ export async function misureDelGiorno(espId: string, data: string): Promise<Misu
   if (error) throw error
   return (righe ?? []).map(daRigaMisura)
 }
+
+/** `salvaMisura` ha avuto una risposta riuscita ma senza la riga: non si sa se la misura è arrivata. */
+const MISURA_NON_CONFERMATA = 'Il server non ha confermato il salvataggio della misura: riprova.'
 
 /** Le righe di misure che si chiedono in una volta (PostgREST può darne di meno: `max_rows`). */
 const PAGINA_MISURE = 1000
@@ -89,10 +92,13 @@ export async function caricaMisura(id: string): Promise<Misura> {
  * doppio tocco o un nuovo tentativo dopo un timeout aggiornano la stessa riga invece di duplicarla.
  */
 export async function salvaMisura(espId: string, m: Misura): Promise<void> {
-  const { error, status } = await supabase.from('misure').upsert(aRigaMisura(espId, m), { onConflict: 'id' })
+  const { data, error, status } = await supabase.from('misure').upsert(aRigaMisura(espId, m), { onConflict: 'id' }).select('id')
   // L'errore di PostgREST non porta lo stato HTTP (sta nella risposta): la coda d'invio ne ha bisogno per sapere se
   // ritentare (un 503 sì, un 400 no). Lo stesso oggetto, con lo stato in più.
   if (error) throw typeof status === 'number' && !('status' in error) ? Object.assign(error, { status }) : error
+  // Una risposta riuscita deve riportare la riga scritta: senza (un proxy, una risposta troncata) la misura non si dà
+  // per arrivata. Senza codice né stato, la coda d'invio la ritenta (upsert per id: ripetere è sicuro).
+  if (!data || data.length === 0) throw new ErroreApp(MISURA_NON_CONFERMATA)
 }
 
 export async function eliminaMisura(id: string): Promise<void> {

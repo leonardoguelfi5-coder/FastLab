@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Misura } from '@/domain/tipi'
 import {
-  accoda, aggiornaVoce, chiaveCoda, ErroreCoda, impostaUtenteCoda, iscriviti, rimetti, togli, utenteCoda, vociDi,
+  accoda, aggiornaVoce, chiaveCoda, ErroreCoda, fineViaggio, impostaUtenteCoda, iscriviti, rimetti, togli, utenteCoda, vociDi,
 } from './codaMisure'
 import { CHIAVE_CACHE } from '@/lib/cachePersistente'
 
@@ -131,6 +131,21 @@ describe('togli e rimetti', () => {
     expect(togli('u1', 'm2')).toBe('in_invio')
     expect(vociDi('u1').map(v => v.misura.id)).toEqual(['m2'])
     expect(togli('u2', 'm2')).toBe('assente')
+  })
+
+  it('una correzione accodata mentre la versione di prima è in viaggio non si può togliere finché il viaggio non finisce', () => {
+    accoda('u1', 'E', misura('m1'), DATI)
+    const prima = vociDi('u1')[0]
+    aggiornaVoce('u1', 'm1', prima.revisione, v => ({ ...v, stato: 'invio', inViaggio: prima.revisione }))
+    accoda('u1', 'E', misura('m1', { valori: { spad: [40] } }), DATI)
+    expect(vociDi('u1')[0]).toMatchObject({ stato: 'attesa', inViaggio: prima.revisione })
+    expect(togli('u1', 'm1')).toBe('in_invio')
+
+    fineViaggio('u1', 'm1', 'un\'altra')
+    expect(togli('u1', 'm1')).toBe('in_invio')
+    fineViaggio('u1', 'm1', prima.revisione)
+    expect(vociDi('u1')[0].inViaggio).toBeNull()
+    expect(togli('u1', 'm1')).toBe('tolta')
   })
 
   it('rimetti riporta una voce tolta al suo posto nell\'ordine di accodamento', () => {

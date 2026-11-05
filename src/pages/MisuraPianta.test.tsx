@@ -7,7 +7,10 @@ import type { Session } from '@supabase/supabase-js'
 
 // Si prova la pagina con i veri hook e la vera cache di React Query: si finge il livello API (le misure stanno in un
 // "database" in memoria, `archivio`), e il client Supabase non si raggiunge mai.
-vi.mock('@/lib/supabase', () => ({ supabase: {} }))
+vi.mock('@/lib/supabase', () => ({
+  // La sessione con cui partono gli invii della coda d'invio: dell'utente u1 dei test.
+  supabase: { auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } }, error: null }) } },
+}))
 vi.mock('@/api/auth', () => ({
   accedi: vi.fn(), registrati: vi.fn(), esci: vi.fn(), useSessione: vi.fn(),
 }))
@@ -2437,6 +2440,50 @@ describe('MisuraPianta: coda d\'invio con poco segnale (Piano E, Task E6)', () =
     expect(delGiorno).toEqual([])
     await pronta()
     expect(pulsante('Salva e vai alla #37')).toBeInTheDocument()
+  })
+
+  it('"Salva e vai" con due tocchi rapidi accoda una volta sola e invia una volta sola, poi apre la #36', async () => {
+    let arriva!: () => void
+    vi.mocked(salvaMisura).mockImplementationOnce((_e, m) => new Promise<void>(r => { arriva = () => { archivio.push(m); r() } }))
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    const vai = pulsante('Salva e vai alla #36')
+    act(() => {
+      fireEvent.click(vai)
+      fireEvent.click(vai)
+    })
+
+    expect(vociDi('u1')).toHaveLength(1)
+    await waitFor(() => expect(posizione()).toBe(percorso('Termometro', '36')))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    await act(async () => arriva())
+    await waitFor(() => expect(toastSalvato).toHaveBeenCalledTimes(1))
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    expect(vociDi('u1')).toEqual([])
+  })
+
+  it('"Salva" resta sulla pianta e il modulo ricomincia con un id nuovo: due misure, due id', async () => {
+    const utente = userEvent.setup()
+    apriT('35')
+    await pronta()
+    await utente.type(campo('Temp aria'), '24,5')
+    await utente.type(campo('Temp pianta'), '25,1')
+    await utente.click(pulsante('Salva'))
+    expect(await screen.findByRole('button', { name: /^10:00 · Temp aria 24,5 °C · Temp pianta 25,1 °C/ })).toBeInTheDocument()
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
+
+    await utente.type(campo('Temp aria'), '26')
+    piuTardi()
+    await utente.click(pulsante('Salva'))
+
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(2))
+    const [prima, seconda] = salvate()
+    expect(seconda.id).toMatch(UUID)
+    expect(seconda.id).not.toBe(prima.id)
+    await waitFor(() => expect(vociDi('u1')).toEqual([]))
+    expect(archivio.map(m => m.id).sort()).toEqual([prima.id, seconda.id].sort())
   })
 
   it('"Salva" resta sulla pianta: la misura compare tra quelle di oggi con "da inviare"', async () => {
