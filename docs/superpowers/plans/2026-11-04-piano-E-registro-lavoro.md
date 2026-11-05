@@ -68,3 +68,9 @@ Task E7: fix round 1 implemented 37c4a8a (2878 Vitest due volte, test:sw ok): `V
 Ruling (carry to E12 e a ogni cambio della forma dei dati): portare `VERSIONE_DATI_CACHE` a 2 quando si aggiungono `decimali` e `solo_interi` ai parametri - cost if wrong: campi undefined senza rete fino alla prima rilettura
 Task E7: fix round 1/5; complete (commits 70fe352..37c4a8a)
 Seconda pubblicazione del Piano E (E5-E7): deploy da 37c4a8a+; Task E8 dispatched implementer (sonnet)
+Seconda pubblicazione del Piano E: due create_deployment scaduti per timeout del server MCP dopo il riavvio del contenitore, promozione dell'anteprima rifiutata (422); terzo tentativo riuscito: dpl_H5id7yC27fxbsjDGFWrGkCqpa2Zi da 882a3e8
+Task E8: implementatore (sonnet) DONE_WITH_CONCERNS 165fdf8 - 2907 Vitest; `celleGriglia`, `valoriDiOggi` (stesse cifre del Dataset con `intervalloDelGiorno`), `GrigliaPiante` (celle da 44 px, ✓ fatta, ½ incompleta, □ da fare, mai verde), `FoglioPiante` dal basso; MisuraPianta con intestazione "#35 · W1 · 34/56" e icona della griglia; FineGiro con griglia, "Valori di oggi" e "Da controllare"; le piante con misura in coda contano come fatte
+Ruling: accettate le deviazioni E8 (tocco su ogni cella nel fine giro, che sulle fatte chiede Correggi/Nuova misura; ES vuoto con testo per lettori di schermo) - cost if wrong: small
+Task E8: complete (commits 882a3e8..165fdf8), revisione rimandata alla finale
+Ruling: E9 (ruoli) aspetta la risposta dell'utente sui permessi; intanto si anticipa E11 (il giro), che non dipende dai ruoli - cost if wrong: none
+Task E11: dispatched implementer (sonnet)
