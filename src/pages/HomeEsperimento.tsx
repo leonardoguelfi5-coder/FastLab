@@ -13,6 +13,7 @@ import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDataset, percorsoDiario, percorsoEsporta, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante } from '@/lib/percorsi'
+import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
 import { useOggi } from '@/lib/useOggi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
@@ -164,6 +165,11 @@ export function HomeEsperimento() {
   const { espId = '' } = useParams()
   const config = useConfig(espId)
   const dati = config.data
+  // Con la rete si leggono in anticipo il giorno di rilievo e le piante (Piano E, Task E7): più tardi, senza rete, il giro
+  // funziona anche sulle piante non aperte prima.
+  const oggi = useOggi()
+  const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
+  useLetturaInAnticipo(espId, dati, dataRilievo)
 
   return (
     <AppShell titolo={dati?.esperimento.nome ?? 'Esperimento'} indietro="/">

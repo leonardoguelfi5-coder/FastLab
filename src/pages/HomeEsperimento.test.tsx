@@ -26,13 +26,14 @@ vi.mock('@/api/note', () => ({
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
-import { misureDelGiorno } from '@/api/misure'
+import { misureDelGiorno, misurePianta } from '@/api/misure'
 import { listaNote } from '@/api/note'
 import { eliminaNotaConAnnulla } from '@/components/note/eliminaNotaConAnnulla'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, Nota } from '@/domain/tipi'
 import { ESPERIMENTO_NON_TROVATO } from '@/lib/errori'
+import { dimenticaLettureInAnticipo } from '@/lib/letturaInAnticipo'
 import { useCampoStore } from '@/store/campo'
 import { HomeEsperimento } from './HomeEsperimento'
 
@@ -122,6 +123,30 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('HomeEsperimento: lettura in anticipo del giro (Piano E, Task E7)', () => {
+  beforeEach(() => {
+    dimenticaLettureInAnticipo()
+    vi.mocked(misurePianta).mockResolvedValue([])
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('con la rete legge in anticipo le misure del giorno di rilievo e quelle di ogni pianta', async () => {
+    const client = vaiAllaPagina()
+    await aspettaLaHome()
+    await vi.waitFor(() => expect(misurePianta).toHaveBeenCalledTimes(56))
+    expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
+    expect(client.getQueryData(['misure', 'pianta', idPianta(35)])).toEqual([])
+  })
+
+  it('senza rete non legge nulla in anticipo, e nessun messaggio', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    vaiAllaPagina()
+    await aspettaLaHome()
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    expect(misurePianta).not.toHaveBeenCalled()
+  })
 })
 
 describe('HomeEsperimento: intestazione e riepilogo', () => {
@@ -252,13 +277,15 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     expect(striscia()).toHaveTextContent('SPAD in corso · 34/56')
   })
 
-  it('senza uno strumento nello store la striscia non legge le misure della data di rilievo: resta solo la lettura di oggi per il numerino', async () => {
+  it('senza uno strumento nello store la striscia non usa le misure della data di rilievo (le legge solo la lettura in anticipo del giro)', async () => {
     useCampoStore.getState().setData('E', IERI)
+    vi.mocked(misureDelGiorno).mockImplementation(async (_e, data) => (data === IERI ? misureSpad(10).map(m => ({ ...m, data_rilievo: IERI })) : []))
     vaiAllaPagina()
     await aspettaLaHome()
     await misureLette()
-    expect(misureDelGiorno).toHaveBeenCalledTimes(1)
     expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
+    // Una volta sola: è la lettura in anticipo (Piano E, Task E7), per il giro senza rete.
+    expect(vi.mocked(misureDelGiorno).mock.calls.filter(([, d]) => d === IERI)).toHaveLength(1)
     expect(striscia()).toHaveAccessibleName('Nuova misura')
   })
 

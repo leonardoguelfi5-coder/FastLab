@@ -14,6 +14,7 @@ import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
 import { percorsoHome, percorsoImpostazioni } from '@/lib/percorsi'
 import { useAvviaMisura } from '@/lib/useAvviaMisura'
+import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
 
@@ -132,6 +133,11 @@ export function SceltaStrumento() {
   const { espId = '' } = useParams()
   const config = useConfig(espId)
   const dati = config.data
+  // Con la rete si leggono in anticipo il giorno di rilievo e le piante (Piano E, Task E7): più tardi, senza rete, il giro
+  // funziona anche sulle piante non aperte prima.
+  const oggi = useOggi()
+  const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
+  useLetturaInAnticipo(espId, dati, dataRilievo)
 
   return (
     <AppShell titolo="Nuova misura" indietro={percorsoHome(espId)}>

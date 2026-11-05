@@ -144,12 +144,15 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
     (misure: Misura[]) => conCoda(misure, voci, m => m.data_rilievo === data, perOraCrescente),
     [voci, data],
   )
-  return useQuery({
-    queryKey: chiavi.misureGiorno(espId ?? '', data),
-    queryFn: () => misureDelGiorno(espId as string, data),
-    enabled: !!espId,
+  return useQuery({ ...opzioniMisureGiorno(espId ?? '', data), enabled: !!espId, select })
+}
+
+/** Chiave e lettura delle misure del giorno: le stesse per `useMisureGiorno` e per leggerle in anticipo. */
+export function opzioniMisureGiorno(espId: string, data: string) {
+  return queryOptions({
+    queryKey: chiavi.misureGiorno(espId, data),
+    queryFn: () => misureDelGiorno(espId, data),
     gcTime: DURATA_IN_MEMORIA_MS,
-    select,
   })
 }
 

@@ -17,15 +17,16 @@ import { Toaster } from '@/components/ui/sonner'
 
 const queryClient = creaQueryClient()
 // La copia delle letture sul telefono (Piano E, Task E7), prima del primo disegno: senza rete la configurazione e il
-// giro si vedono subito. Solo se è dell'utente della sessione salvata e di questa versione dell'app.
+// giro si vedono subito. Solo se è dell'utente della sessione salvata e della stessa versione dei dati (non della build:
+// dopo un aggiornamento la prima apertura senza rete ha ancora i dati).
 const utenteSalvato = sessioneSalvata()?.user.id
-if (utenteSalvato) ripristinaCache(queryClient, utenteSalvato, __VERSIONE__, Date.now())
+if (utenteSalvato) ripristinaCache(queryClient, utenteSalvato, Date.now())
 // Prima di sapere chi c'è: l'invio della coda delle misure parte appena la sessione salvata dice l'utente (Piano E,
 // Task E6), poi al ritorno della rete, quando l'app torna visibile e dopo l'attesa di un errore.
 avviaInvioAutomatico(queryClient)
 svuotaCacheAlCambioUtente(queryClient)
 // La copia si riscrive per l'utente della sessione (lo stesso della coda): senza nessuno non si scrive.
-avviaCachePersistente(queryClient, { utente: utenteCoda, versione: __VERSIONE__ })
+avviaCachePersistente(queryClient, { utente: utenteCoda, build: __VERSIONE__ })
 // Le bozze stanno nel localStorage (Piano E, Task E5): prima si portano lì quelle lasciate nel sessionStorage dalla
 // versione di prima, poi si tolgono quelle non toccate da 14 giorni.
 spostaBozzeDallaSessione()

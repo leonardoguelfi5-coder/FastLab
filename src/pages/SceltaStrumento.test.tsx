@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -24,7 +24,8 @@ vi.mock('@/api/misure', () => ({
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { caricaConfig } from '@/api/esperimenti'
-import { misureDelGiorno, ultimaMisuraPerStrumento } from '@/api/misure'
+import { misureDelGiorno, misurePianta, ultimaMisuraPerStrumento } from '@/api/misure'
+import { dimenticaLettureInAnticipo } from '@/lib/letturaInAnticipo'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura } from '@/domain/tipi'
@@ -122,6 +123,35 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('SceltaStrumento: lettura in anticipo del giro (Piano E, Task E7)', () => {
+  beforeEach(() => {
+    dimenticaLettureInAnticipo()
+    vi.mocked(misurePianta).mockResolvedValue([])
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  it('con la rete legge in anticipo la data di rilievo scelta e le piante, una volta sola entro la finestra', async () => {
+    useCampoStore.getState().setData('E', '2026-10-27')
+    vaiAllaPagina()
+    await aspettaElenco()
+    await vi.waitFor(() => expect(misurePianta).toHaveBeenCalledTimes(config.piante.length))
+    expect(misureDelGiorno).toHaveBeenCalledWith('E', '2026-10-27')
+    cleanup()
+    vaiAllaPagina()
+    await aspettaElenco()
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    expect(misurePianta).toHaveBeenCalledTimes(config.piante.length)
+  })
+
+  it('senza rete no', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    vaiAllaPagina()
+    await aspettaElenco()
+    await act(async () => { await new Promise(r => setTimeout(r, 20)) })
+    expect(misurePianta).not.toHaveBeenCalled()
+  })
 })
 
 describe('SceltaStrumento: intestazione', () => {

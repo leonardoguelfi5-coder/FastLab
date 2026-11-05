@@ -7,7 +7,7 @@ import { chiavi } from '@/api/query'
 import type { Misura } from '@/domain/tipi'
 import {
   avviaCachePersistente, cancellaCache, CHIAVE_CACHE, DURATA_IN_MEMORIA_MS, ePersistente, LIMITE_CACHE, ripristinaCache,
-  salvaCache, VALIDITA_CACHE_MS,
+  salvaCache, VALIDITA_CACHE_MS, VERSIONE_DATI_CACHE,
 } from './cachePersistente'
 
 const ADESSO = Date.parse('2026-11-04T09:12:00')
@@ -65,7 +65,7 @@ describe('l\'elenco chiuso', () => {
     expect(testo).not.toContain('segreto')
 
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
     expect(nuovo.getQueryCache().getAll()).toHaveLength(1)
   })
@@ -76,7 +76,7 @@ describe('l\'elenco chiuso', () => {
     void client.prefetchQuery({ queryKey: chiavi.config('F'), queryFn: () => new Promise(() => {}) })
     salvaCache(client, 'u1', 'v1', ADESSO)
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryCache().getAll().map(q => q.queryKey)).toEqual([chiavi.esperimenti])
   })
 })
@@ -93,7 +93,7 @@ describe('salvaCache e ripristinaCache', () => {
     salvaCache(client, 'u1', 'v1', ADESSO)
 
     const nuovo = new QueryClient()
-    expect(ripristinaCache(nuovo, 'u1', 'v1', ADESSO)).toEqual({ letteIl: ADESSO - ORA })
+    expect(ripristinaCache(nuovo, 'u1', ADESSO)).toEqual({ letteIl: ADESSO - ORA })
     expect(nuovo.getQueryData(chiavi.esperimenti)).toEqual([{ id: 'E', nome: 'Pomodori' }])
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
     expect(nuovo.getQueryData(chiavi.misureGiorno('E', '2026-11-04'))).toEqual([misura('m1')])
@@ -106,7 +106,7 @@ describe('salvaCache e ripristinaCache', () => {
   it('i dati ripristinati restano quelli letti allora e sono vecchi: si rileggono appena servono', () => {
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]], ADESSO - 5_000), 'u1', 'v1', ADESSO)
     const nuovo = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } })
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     const query = nuovo.getQueryCache().find({ queryKey: chiavi.config('E'), exact: true })
     expect(query?.state.dataUpdatedAt).toBe(ADESSO - 5_000)
     expect(query?.state.isInvalidated).toBe(true)
@@ -116,22 +116,60 @@ describe('salvaCache e ripristinaCache', () => {
   it('un dato già in memoria più recente non si sovrascrive', () => {
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]], ADESSO - ORA), 'u1', 'v1', ADESSO)
     const nuovo = clientCon([[chiavi.config('E'), { ...CONFIG, esperimento: { id: 'E', nome: 'Nuovo' } }]], ADESSO)
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryData<typeof CONFIG>(chiavi.config('E'))?.esperimento.nome).toBe('Nuovo')
   })
 
   it('un altro utente non ripristina nulla, e la copia si toglie', () => {
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]]), 'u1', 'v1', ADESSO)
     const nuovo = new QueryClient()
-    expect(ripristinaCache(nuovo, 'u2', 'v1', ADESSO)).toBeNull()
+    expect(ripristinaCache(nuovo, 'u2', ADESSO)).toBeNull()
     expect(nuovo.getQueryCache().getAll()).toHaveLength(0)
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
   })
 
-  it('una versione dell\'app diversa (una build nuova) non ripristina nulla, e la copia si toglie', () => {
+  it('una build nuova dell\'app (un deploy) conserva i dati: la prima apertura senza rete li ha', () => {
+    salvaCache(clientCon([[chiavi.config('E'), CONFIG]]), 'u1', 'build-di-ieri', ADESSO)
+    const nuovo = new QueryClient()
+    expect(ripristinaCache(nuovo, 'u1', ADESSO)).not.toBeNull()
+    expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
+  })
+
+  it('una versione dei dati diversa (VERSIONE_DATI_CACHE, cambiata a mano) non ripristina nulla, e la copia si toglie', () => {
+    expect(VERSIONE_DATI_CACHE).toBe(1)
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]]), 'u1', 'v1', ADESSO)
-    expect(ripristinaCache(new QueryClient(), 'u1', 'v2', ADESSO)).toBeNull()
+    const copia = JSON.parse(localStorage.getItem(CHIAVE_CACHE) as string)
+    expect(copia.v).toBe(VERSIONE_DATI_CACHE)
+    localStorage.setItem(CHIAVE_CACHE, JSON.stringify({ ...copia, v: VERSIONE_DATI_CACHE + 1 }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const nuovo = new QueryClient()
+    expect(ripristinaCache(nuovo, 'u1', ADESSO)).toBeNull()
+    expect(nuovo.getQueryCache().getAll()).toHaveLength(0)
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
+  })
+
+  it('una lettura salvata con una forma che non torna (un deploy che l\'ha cambiata senza la costante) non arriva alle pagine', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    salvaCache(clientCon([
+      [chiavi.esperimenti, { non: 'un elenco' }],
+      [chiavi.config('E'), { ...CONFIG, piante: 'rotte' }],
+      [chiavi.config('F'), { ...CONFIG, esperimento: { id: 'F', nome: 'Buona' } }],
+      [chiavi.misureGiorno('E', '2026-11-04'), [misura('m1'), { id: 'm2' }]],
+      [chiavi.misurePianta('p35'), [misura('m1')]],
+      [chiavi.misurePianta('p36'), [{ ...misura('m3'), valori: null }]],
+      [chiavi.ultimeMisure('E'), [['spad', '2026-11-04']]],
+      [chiavi.ultimeMisure('F'), new Map([['spad', '2026-11-04']])],
+    ]), 'u1', 'v1', ADESSO)
+    const nuovo = new QueryClient()
+    ripristinaCache(nuovo, 'u1', ADESSO)
+    expect(nuovo.getQueryData(chiavi.esperimenti)).toBeUndefined()
+    expect(nuovo.getQueryData(chiavi.config('E'))).toBeUndefined()
+    expect(nuovo.getQueryData(chiavi.config('F'))).toBeDefined()
+    expect(nuovo.getQueryData(chiavi.misureGiorno('E', '2026-11-04'))).toBeUndefined()
+    expect(nuovo.getQueryData(chiavi.misurePianta('p35'))).toEqual([misura('m1')])
+    expect(nuovo.getQueryData(chiavi.misurePianta('p36'))).toBeUndefined()
+    expect(nuovo.getQueryData(chiavi.ultimeMisure('E'))).toBeUndefined()
+    expect(nuovo.getQueryData(chiavi.ultimeMisure('F'))).toBeInstanceOf(Map)
   })
 
   it('scade dopo 7 giorni: la copia intera, e ogni lettura più vecchia di 7 giorni', () => {
@@ -139,13 +177,13 @@ describe('salvaCache e ripristinaCache', () => {
     client.setQueryData(chiavi.esperimenti, [{ id: 'E' }], { updatedAt: ADESSO - VALIDITA_CACHE_MS - ORA })
     salvaCache(client, 'u1', 'v1', ADESSO)
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryData(chiavi.esperimenti)).toBeUndefined()
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
 
     // Il giorno dopo la scadenza della lettura più recente, nemmeno la configurazione.
     const tardi = new QueryClient()
-    expect(ripristinaCache(tardi, 'u1', 'v1', ADESSO + VALIDITA_CACHE_MS)).toBeNull()
+    expect(ripristinaCache(tardi, 'u1', ADESSO + VALIDITA_CACHE_MS)).toBeNull()
     expect(tardi.getQueryCache().getAll()).toHaveLength(0)
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
   })
@@ -161,7 +199,7 @@ describe('salvaCache e ripristinaCache', () => {
     expect((localStorage.getItem(CHIAVE_CACHE) ?? '').length).toBeLessThanOrEqual(LIMITE_CACHE)
 
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
     expect(nuovo.getQueryData(chiavi.misureGiorno('E', '2026-11-04'))).toEqual([misura('m1')])
     const piante = Array.from({ length: 10 }, (_, i) => nuovo.getQueryData(chiavi.misurePianta(`p${i}`)) !== undefined)
@@ -187,13 +225,13 @@ describe('salvaCache e ripristinaCache', () => {
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
 
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('vietato') })
-    expect(ripristinaCache(new QueryClient(), 'u1', 'v1', ADESSO)).toBeNull()
+    expect(ripristinaCache(new QueryClient(), 'u1', ADESSO)).toBeNull()
   })
 
   it('una copia illeggibile si ignora e si toglie, senza eccezioni', () => {
-    for (const testo of ['{rotto', '[]', '{"v":1,"utente":"u1","versione":"v1","salvataIl":1,"query":"no"}', 'null']) {
+    for (const testo of ['{rotto', '[]', '{"v":1,"utente":"u1","build":"v1","salvataIl":1,"query":"no"}', 'null']) {
       localStorage.setItem(CHIAVE_CACHE, testo)
-      expect(ripristinaCache(new QueryClient(), 'u1', 'v1', ADESSO)).toBeNull()
+      expect(ripristinaCache(new QueryClient(), 'u1', ADESSO)).toBeNull()
       expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
     }
   })
@@ -204,7 +242,7 @@ describe('salvaCache e ripristinaCache', () => {
     copia.query.push({ ...copia.query[0], k: ['note', 'E'], h: '["note","E"]' })
     localStorage.setItem(CHIAVE_CACHE, JSON.stringify(copia))
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     expect(nuovo.getQueryData(chiavi.note('E'))).toBeUndefined()
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
   })
@@ -213,7 +251,7 @@ describe('salvaCache e ripristinaCache', () => {
     vi.useFakeTimers({ now: ADESSO })
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]]), 'u1', 'v1', ADESSO)
     const nuovo = new QueryClient()
-    ripristinaCache(nuovo, 'u1', 'v1', ADESSO)
+    ripristinaCache(nuovo, 'u1', ADESSO)
     vi.advanceTimersByTime(10 * 60 * 1000)
     expect(nuovo.getQueryData(chiavi.config('E'))).toEqual(CONFIG)
     vi.advanceTimersByTime(DURATA_IN_MEMORIA_MS)
@@ -224,7 +262,7 @@ describe('salvaCache e ripristinaCache', () => {
     salvaCache(clientCon([[chiavi.config('E'), CONFIG]]), 'u1', 'v1', ADESSO)
     cancellaCache()
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
-    expect(ripristinaCache(new QueryClient(), 'u1', 'v1', ADESSO)).toBeNull()
+    expect(ripristinaCache(new QueryClient(), 'u1', ADESSO)).toBeNull()
   })
 })
 
@@ -232,7 +270,7 @@ describe('avviaCachePersistente', () => {
   it('scrive 1 s dopo l\'ultimo cambio delle letture dell\'elenco, con l\'utente della sessione', () => {
     vi.useFakeTimers({ now: ADESSO })
     const client = new QueryClient()
-    const ferma = avviaCachePersistente(client, { utente: () => 'u1', versione: 'v1' })
+    const ferma = avviaCachePersistente(client, { utente: () => 'u1', build: 'v1' })
     client.setQueryData(chiavi.config('E'), CONFIG)
     vi.advanceTimersByTime(500)
     client.setQueryData(chiavi.esperimenti, [{ id: 'E' }])
@@ -246,7 +284,7 @@ describe('avviaCachePersistente', () => {
   it('un cambio di una lettura fuori dall\'elenco non scrive', () => {
     vi.useFakeTimers({ now: ADESSO })
     const client = new QueryClient()
-    const ferma = avviaCachePersistente(client, { utente: () => 'u1', versione: 'v1' })
+    const ferma = avviaCachePersistente(client, { utente: () => 'u1', build: 'v1' })
     client.setQueryData(chiavi.note('E'), [{ id: 'n1' }])
     vi.advanceTimersByTime(2_000)
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
@@ -256,7 +294,7 @@ describe('avviaCachePersistente', () => {
   it('scrive subito quando l\'app va in secondo piano', () => {
     vi.useFakeTimers({ now: ADESSO })
     const client = new QueryClient()
-    const ferma = avviaCachePersistente(client, { utente: () => 'u1', versione: 'v1' })
+    const ferma = avviaCachePersistente(client, { utente: () => 'u1', build: 'v1' })
     client.setQueryData(chiavi.config('E'), CONFIG)
     const stato = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
     document.dispatchEvent(new Event('visibilitychange'))
@@ -268,7 +306,7 @@ describe('avviaCachePersistente', () => {
   it('senza un utente con la sessione non scrive', () => {
     vi.useFakeTimers({ now: ADESSO })
     const client = new QueryClient()
-    const ferma = avviaCachePersistente(client, { utente: () => null, versione: 'v1' })
+    const ferma = avviaCachePersistente(client, { utente: () => null, build: 'v1' })
     client.setQueryData(chiavi.config('E'), CONFIG)
     vi.advanceTimersByTime(2_000)
     expect(localStorage.getItem(CHIAVE_CACHE)).toBeNull()
@@ -278,7 +316,7 @@ describe('avviaCachePersistente', () => {
   it('fermato, non scrive più', () => {
     vi.useFakeTimers({ now: ADESSO })
     const client = new QueryClient()
-    const ferma = avviaCachePersistente(client, { utente: () => 'u1', versione: 'v1' })
+    const ferma = avviaCachePersistente(client, { utente: () => 'u1', build: 'v1' })
     client.setQueryData(chiavi.config('E'), CONFIG)
     ferma()
     vi.advanceTimersByTime(2_000)
