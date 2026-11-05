@@ -40,3 +40,8 @@ Task E3: implementatore (sonnet) DONE_WITH_CONCERNS 4651552 - 2599 Vitest (21 nu
 Ruling: accettate le deviazioni E3 (una coppia per riga nella storia, mai troncare; media del trattamento per parametro con più numeri; nome "Ultimi valori" tenuto) - cost if wrong: small
 Task E3: complete (commits e09aa11..4651552), revisione rimandata alla finale; impaginazione a 360 px al collaudo
 Task E4: dispatched implementer (opus)
+Task E4: implementatore (opus) DONE_WITH_CONCERNS 7209450 - 2621 Vitest, 412 pgTAP PASS (35 nuovi); migration 0015 (`conteggi_strumenti`, `parametri_con_dati` in un passaggio, `spazio_progetto` security definer con ripiego su `public.foto` se lo Storage non è visibile); `ModificaStrumento` con azioni sempre visibili e spiegazione per gli strumenti con misure; `SezioneSpazio` con due barre (database e foto) e dettaglio dell'esperimento
+Ruling: accettato il ripiego automatico di `spazio_progetto` (il maggiore tra Storage e `public.foto`, mai uno zero falso) - cost if wrong: none
+Messa online: migration 0015 applicata al progetto FastLab; provata come utente autenticato: database 12,9 MB, foto 1,4 MB, 4 strumenti con misure, dettaglio dell'esperimento presente
+Task E4: complete (commits cc76e52..7209450), revisione rimandata alla finale
+Prima pubblicazione del Piano E (E1-E4)
