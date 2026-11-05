@@ -224,13 +224,13 @@ describe('svuotaCacheAlCambioUtente', () => {
     const bozza = chiaveBozza({ ...riquadro, misuraId: null })
     const aperto = chiaveAperto(riquadro)
     const scrivi = () => {
-      sessionStorage.setItem(bozza, '{"id":"m1","valori":{},"ora":null}')
-      sessionStorage.setItem(aperto, 'm1')
-      sessionStorage.setItem('altro', 'resta')
+      localStorage.setItem(bozza, '{"id":"m1","valori":{},"ora":null}')
+      localStorage.setItem(aperto, 'm1')
+      localStorage.setItem('altro', 'resta')
     }
-    const ciSono = () => sessionStorage.getItem(bozza) !== null && sessionStorage.getItem(aperto) === 'm1'
+    const ciSono = () => localStorage.getItem(bozza) !== null && localStorage.getItem(aperto) === 'm1'
 
-    beforeEach(() => sessionStorage.clear())
+    beforeEach(() => localStorage.clear())
 
     it('a sessione finita (scaduta, o uscita da un\'altra scheda) restano: la stessa persona rientra e le ritrova', () => {
       const { notifica } = avvia(utenteA)
@@ -246,15 +246,15 @@ describe('svuotaCacheAlCambioUtente', () => {
       scrivi()
       notifica('SIGNED_OUT', null)
       notifica('SIGNED_IN', utenteB)
-      expect(Object.keys(sessionStorage).filter(k => k !== 'fastlab-bozza:utente')).toEqual(['altro'])
+      expect(Object.keys(localStorage).filter(k => k !== 'fastlab-bozza:utente')).toEqual(['altro'])
     })
 
     it('A -> B direttamente (accesso con un altro account, anche da un\'altra scheda) le cancella', () => {
       const { notifica } = avvia(utenteA)
       scrivi()
       notifica('SIGNED_IN', utenteB)
-      expect(sessionStorage.getItem(bozza)).toBeNull()
-      expect(sessionStorage.getItem(aperto)).toBeNull()
+      expect(localStorage.getItem(bozza)).toBeNull()
+      expect(localStorage.getItem(aperto)).toBeNull()
     })
 
     it('ricaricando la pagina con la sessione ancora da recuperare (INITIAL_SESSION vuota, poi A) A le ritrova', () => {
@@ -277,7 +277,7 @@ describe('svuotaCacheAlCambioUtente', () => {
     it('bozze di cui non si sa il proprietario non passano al primo che accede', () => {
       scrivi()
       avvia(utenteA)
-      expect(sessionStorage.getItem(bozza)).toBeNull()
+      expect(localStorage.getItem(bozza)).toBeNull()
     })
   })
 

@@ -201,7 +201,7 @@ describe('FineGiro', () => {
     vi.mocked(misureDelGiorno).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     vaiAllaPagina()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(await titolo('SPAD: 0/56')).toBeInTheDocument()
   })

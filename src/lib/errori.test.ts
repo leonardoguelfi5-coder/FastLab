@@ -3,10 +3,12 @@ import {
   EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, ErroreApp, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
   FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, eNomeExportGiaUsato, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE, STRUMENTO_CON_MISURE_ARRIVATE,
 } from './errori'
+import { ErroreRete } from './rete'
 
 afterEach(() => { vi.restoreAllMocks() })
 
 const MSG_OFFLINE = 'Nessuna connessione. Riprova quando torna la rete.'
+const MSG_RETE = 'Rete debole: riprova.'
 const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per più di una settimana il database potrebbe essere in pausa: riattivalo dal pannello Supabase (vedi README).'
 const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
@@ -63,11 +65,70 @@ describe('messaggioErrore', () => {
   })
 
   it.each(['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed'])(
-    'server irraggiungibile: "%s"',
+    'rete che non porta la richiesta: "%s" è rete debole, non il database in pausa',
     (messaggio) => {
-      expect(messaggioErrore(new TypeError(messaggio))).toBe(MSG_SERVER)
+      expect(messaggioErrore(new TypeError(messaggio))).toBe(MSG_RETE)
+      // Così lo riporta PostgREST (un oggetto con il nome dell'errore davanti e code vuoto).
+      expect(messaggioErrore({ message: `TypeError: ${messaggio}`, code: '', details: '', hint: '' })).toBe(MSG_RETE)
     },
   )
+
+  describe('rete debole (limite di tempo scaduto o richiesta non arrivata)', () => {
+    it.each(['limite', 'rete'] as const)('ErroreRete("%s")', (motivo) => {
+      expect(messaggioErrore(new ErroreRete(motivo))).toBe(MSG_RETE)
+    })
+
+    it('ErroreRete come lo riportano PostgREST, l\'autenticazione e lo Storage', () => {
+      const e = new ErroreRete('limite')
+      // PostgREST: un oggetto semplice, il nome dell'errore davanti al messaggio, code vuoto.
+      expect(messaggioErrore({ message: `${e.name}: ${e.message}`, details: '', hint: '', code: '' })).toBe(MSG_RETE)
+      // GoTrue: AuthRetryableFetchError con il messaggio dell'errore e status 0.
+      expect(messaggioErrore(Object.assign(new Error(e.message), { name: 'AuthRetryableFetchError', status: 0 }))).toBe(MSG_RETE)
+      // Storage: StorageUnknownError con il messaggio dell'errore e l'originale.
+      expect(messaggioErrore(Object.assign(new Error(e.message), { name: 'StorageUnknownError', originalError: e }))).toBe(MSG_RETE)
+    })
+
+    it('senza rete (navigator.onLine === false) resta "Nessuna connessione"', () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      expect(messaggioErrore(new ErroreRete('limite'))).toBe(MSG_OFFLINE)
+    })
+
+    it('un annullamento voluto (AbortError) non è rete debole', () => {
+      expect(messaggioErrore(new DOMException('signal is aborted without reason', 'AbortError'))).not.toBe(MSG_RETE)
+      expect(messaggioErrore({ message: 'AbortError: signal is aborted without reason', code: '' })).not.toBe(MSG_RETE)
+    })
+  })
+
+  describe('il database in pausa: solo per un 5xx del server senza codice PostgREST', () => {
+    it.each([500, 502, 503, 504, 520, 540, 599])('status %i senza code', (status) => {
+      expect(messaggioErrore({ status, message: 'Service Unavailable' })).toBe(MSG_SERVER)
+      expect(messaggioErrore({ status, message: '{}', code: '' })).toBe(MSG_SERVER)
+    })
+
+    it('GoTrue con un errore del gateway (AuthRetryableFetchError, status 503)', () => {
+      expect(messaggioErrore(Object.assign(new Error('{}'), { name: 'AuthRetryableFetchError', status: 503 }))).toBe(MSG_SERVER)
+    })
+
+    it('PostgREST che non raggiunge il database (PGRST000-PGRST003, 503 e 504)', () => {
+      for (const code of ['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003']) {
+        expect(messaggioErrore({ code, message: 'Database client error. Retrying the connection.' })).toBe(MSG_SERVER)
+      }
+    })
+
+    it('un 5xx con un codice è un errore vero, non la pausa', () => {
+      expect(messaggioErrore({ status: 500, code: 'XX000', message: 'boom' })).toBe('Errore imprevisto: boom')
+      expect(messaggioErrore({ code: 'P0001', status: 500, message: 'PARAMETRO_CON_DATI' })).toContain('Questo parametro ha già dei dati')
+    })
+
+    it('i messaggi riconosciuti valgono anche con un 500 (registrazione senza invito di GoTrue)', () => {
+      expect(messaggioErrore({ status: 500, message: 'Database error saving new user' })).toBe(MSG_INVITO)
+    })
+
+    it('un 4xx o uno status 0 non è la pausa', () => {
+      expect(messaggioErrore({ status: 404, message: 'Not Found' })).toBe('Errore imprevisto: Not Found')
+      expect(messaggioErrore({ status: 0, message: 'strano' })).toBe('Errore imprevisto: strano')
+    })
+  })
 
   it('sessione scaduta: code PGRST301', () => {
     expect(messaggioErrore({ code: 'PGRST301', message: 'qualcosa' })).toBe(MSG_SESSIONE)

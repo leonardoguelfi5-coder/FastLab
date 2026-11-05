@@ -491,7 +491,7 @@ describe('SceltaStrumento: caricamento ed errori', () => {
     vi.mocked(caricaConfig).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     vaiAllaPagina()
     const avviso = await screen.findByRole('alert')
-    expect(avviso).toHaveTextContent('Il server non risponde')
+    expect(avviso).toHaveTextContent('Rete debole')
     await utente.click(within(avviso).getByRole('button', { name: 'Riprova' }))
     expect(await aspettaElenco()).toBeInTheDocument()
   })

@@ -338,7 +338,7 @@ describe('NuovoEsperimento: modello Hydrochar', () => {
 
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
 
-    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    await vi.waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Rete debole')))
     expect(titoloPasso()).toHaveTextContent('Riepilogo')
     expect(conteggio('Piante')).toHaveTextContent('56')
     expect(screen.queryByText(/Pagina dell'esperimento/)).not.toBeInTheDocument()
@@ -583,7 +583,7 @@ describe('NuovoEsperimento: da zero', () => {
     await utente.type(screen.getByLabelText('Nome'), 'Resistenza')
     await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     await avanti(utente)
     await utente.click(screen.getByRole('button', { name: 'Questo esperimento non ha rilievi fenologici' }))
     await utente.click(screen.getByRole('button', { name: 'Crea esperimento' }))
@@ -756,7 +756,7 @@ describe('NuovoEsperimento: duplicazione', () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina('/esperimenti/nuovo?da=esp-vecchio')
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(await screen.findByLabelText('Nome')).toHaveValue('Copia di Esempio')
   })

@@ -80,7 +80,7 @@ describe('SceltaDalCatalogo', () => {
     const onRiprova = vi.fn()
     rendi({ voci: undefined, errore: { message: 'Failed to fetch' }, onRiprova })
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(screen.getByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(onRiprova).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: '+ Nuovo strumento' })).toBeInTheDocument()

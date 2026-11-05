@@ -143,7 +143,7 @@ describe('archivio .zip: scarica', () => {
   it('se l\'elenco delle foto non si legge lo dice con «Riprova», e il download resta spento', async () => {
     vi.mocked(listaFoto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
-    expect(await sezione().findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await sezione().findByRole('alert')).toHaveTextContent('Rete debole')
     expect(scarica()).toBeDisabled()
     await utente.click(sezione().getByRole('button', { name: 'Riprova' }))
     await waitFor(() => expect(scarica()).toBeEnabled())
@@ -234,7 +234,7 @@ describe('archivio .zip: libera lo spazio', () => {
     await utente.type(dialogo().getByLabelText(/Nome dell'esperimento/), NOME)
     await utente.click(confermaLibera())
 
-    expect(await dialogo().findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await dialogo().findByRole('alert')).toHaveTextContent('Rete debole')
     expect(toastSalvato).not.toHaveBeenCalled()
     // Il download vale ancora: il nome è già scritto, basta riprovare.
     await utente.click(dialogo().getByRole('button', { name: 'Riprova' }))

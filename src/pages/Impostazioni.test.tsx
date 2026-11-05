@@ -292,7 +292,7 @@ describe('Impostazioni: dal piano', () => {
     const { utente } = apri()
     await screen.findByRole('region', { name: 'Generale' })
     const piante = sezione('Piante')
-    expect(await piante.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await piante.findByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(rigaPianta('2'))
     expect(aperta(rigaPianta('2')).getByRole('button', { name: 'Rimuovi' })).toBeDisabled()
     await utente.click(piante.getByRole('button', { name: 'Riprova' }))
@@ -451,7 +451,7 @@ describe('Impostazioni: piante', () => {
     const piante = sezione('Piante')
     await utente.type(piante.getByLabelText('Quante piante'), '2')
     await utente.click(piante.getByRole('button', { name: /^Aggiungi 2 piante/ }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Rete debole')))
     await utente.click(piante.getByRole('button', { name: /^Aggiungi 2 piante/ }))
 
     await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('2 piante aggiunte a «Controllo».'))
@@ -573,7 +573,7 @@ describe('Impostazioni: spazio', () => {
     vi.mocked(spazioProgetto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const { utente } = apri()
     const dentro = within(await spazio())
-    expect(await dentro.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await dentro.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(dentro.queryByText('38 / 500 MB')).not.toBeInTheDocument()
     expect(dentro.queryByRole('progressbar')).not.toBeInTheDocument()
     await utente.click(dentro.getByRole('button', { name: 'Riprova' }))
@@ -664,7 +664,7 @@ describe('Impostazioni: valori degli strumenti', () => {
     await utente.type(metro.getByLabelText('Nome'), 'Diametro')
     await utente.click(metro.getByRole('button', { name: 'Salva' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Rete debole')))
     expect(toastSalvato).not.toHaveBeenCalled()
     // Il valore è già nel database, lo strumento no: la bozza resta com'è e si può riprovare.
     expect(salvaParametro).toHaveBeenCalledTimes(1)
@@ -721,7 +721,7 @@ describe('Impostazioni: valori degli strumenti', () => {
     await utente.type(metro.getByLabelText('Nome dello strumento'), ' lungo')
     await utente.click(metro.getByRole('button', { name: 'Salva' }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Rete debole')))
     expect(metro.getByLabelText('Nome dello strumento')).toHaveValue('Metro lungo')
     expect(metro.getByRole('button', { name: 'Salva' })).toBeEnabled()
     expect(toastSalvato).not.toHaveBeenCalled()
@@ -1212,7 +1212,7 @@ describe('Impostazioni: strumenti', () => {
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
     await utente.click(await screen.findByRole('button', { name: 'Aggiungi «Calibro»' }))
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Il server non risponde')))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Rete debole')))
     const riga = await screen.findByRole('button', { name: /^📐 Calibro/ })
     expect(riga).toHaveTextContent('Non salvato')
 

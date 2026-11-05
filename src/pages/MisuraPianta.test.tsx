@@ -133,7 +133,7 @@ const chiudiDialogo = async () => waitFor(() => expect(screen.queryByRole('dialo
 const piuTardi = (secondi = 1) => vi.setSystemTime(new Date(Date.now() + secondi * 1000))
 /** Il toast d'errore dopo l'uscita resta finché non lo si chiude. */
 const PERSISTENTE = { duration: Infinity, action: { label: 'Chiudi', onClick: expect.any(Function) } }
-const bozzeSalvate = () => Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:'))
+const bozzeSalvate = () => Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:'))
 const MANTIENI = 'Mantieni questo parametro uguale anche nelle prossime misure'
 const mantieni = (nome: string) => {
   let el: HTMLElement | null = campo(nome)
@@ -233,7 +233,7 @@ describe('MisuraPianta: intestazione', () => {
     vi.mocked(misurePianta).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     apri('1')
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(screen.getByRole('heading', { name: 'Pianta #1' })).toBeInTheDocument()
     expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
@@ -246,7 +246,7 @@ describe('MisuraPianta: intestazione', () => {
     vi.mocked(misureDelGiorno).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     apri('1')
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
     await utente.click(pulsante('Riprova'))
     expect(await pronta()).toBeInTheDocument()
@@ -884,7 +884,7 @@ describe('MisuraPianta: casi limite', () => {
     vi.mocked(caricaConfig).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     apri('1')
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(pulsante('Riprova'))
     expect(await pronta()).toBeInTheDocument()
   })
@@ -936,7 +936,7 @@ describe('MisuraPianta: salvataggio', () => {
 
     const errore = await screen.findByRole('alert')
     expect(errore).toHaveTextContent('Pianta #35 non salvata.')
-    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(errore).toHaveTextContent('Rete debole')
     expect(campo('Temp aria')).toHaveValue('24,5')
     expect(posizione()).toBe(percorso('Termometro', '35'))
     expect(toastSalvato).not.toHaveBeenCalled()
@@ -1207,7 +1207,7 @@ describe('MisuraPianta: salvataggio', () => {
     await act(async () => fallisci(new TypeError('Failed to fetch')))
 
     expect(toast.error).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(
-      /^Pianta #35 non salvata\. Il server non risponde\. .*\(vedi README\)\. I valori sono rimasti: riapri la pianta per riprovare\.$/,
+      /^Pianta #35 non salvata\. Rete debole: riprova\. I valori sono rimasti: riapri la pianta per riprovare\.$/,
     ), PERSISTENTE)
     expect(posizione()).toBe('/esperimenti/E/misura')
     // Durante il salvataggio l'uscita non chiede di scartare: i valori erano già partiti.
@@ -2171,7 +2171,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     await utente.type(campo('Temp aria'), '24,5')
     const bozzeAllaPartenza = bozzeSalvate()
     expect(bozzeAllaPartenza.length).toBeGreaterThan(0)
-    const contenuti = bozzeAllaPartenza.map(k => sessionStorage.getItem(k))
+    const contenuti = bozzeAllaPartenza.map(k => localStorage.getItem(k))
     const aperta = vi.spyOn(inputScatto(), 'click').mockImplementation(() => {})
 
     await utente.click(foto())
@@ -2182,7 +2182,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     expect(posizione()).toBe(percorso('Termometro', '35'))
     expect(campo('Temp aria').value).toBe('24,5')
     expect(bozzeSalvate()).toEqual(bozzeAllaPartenza)
-    expect(bozzeSalvate().map(k => sessionStorage.getItem(k))).toEqual(contenuti)
+    expect(bozzeSalvate().map(k => localStorage.getItem(k))).toEqual(contenuti)
     expect(salvaMisura).not.toHaveBeenCalled()
     expect(pulsante('Salva')).toBeEnabled()
   })
@@ -2205,7 +2205,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     apriT('35')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
-    const bozze = bozzeSalvate().map(k => sessionStorage.getItem(k))
+    const bozze = bozzeSalvate().map(k => localStorage.getItem(k))
 
     scegliFile()
 
@@ -2215,7 +2215,7 @@ describe('MisuraPianta: 📷 Aggiungi foto a questa pianta', () => {
     await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
     expect(salvaMisura).not.toHaveBeenCalled()
     expect(campo('Temp aria').value).toBe('24,5')
-    expect(bozzeSalvate().map(k => sessionStorage.getItem(k))).toEqual(bozze)
+    expect(bozzeSalvate().map(k => localStorage.getItem(k))).toEqual(bozze)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

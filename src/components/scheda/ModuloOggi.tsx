@@ -63,7 +63,7 @@ interface ModuloOggiProps {
   obbligatori: Set<string>
   /** L'id con cui si salva: quello della misura in correzione, o quello del modulo nuovo. */
   id: string
-  /** Dove sta la bozza di questo modulo nel sessionStorage. */
+  /** Dove sta la bozza di questo modulo nel localStorage. */
   chiave: string
   /** Dove il riquadro ricorda quale modulo era aperto (vedi `chiaveAperto`): si scrive e si cancella con la bozza. */
   aperto: string

@@ -9,7 +9,10 @@ const bozza = (id = 'n1', extra: Partial<BozzaNota> = {}): BozzaNota => ({
   id, esistente: false, stato: { ...statoVuoto('2026-11-01'), testo: 'Foglie gialle', collegamento: 'piante', pianta_ids: ['p1'] }, ...extra,
 })
 
-beforeEach(() => sessionStorage.clear())
+beforeEach(() => {
+  localStorage.clear()
+  sessionStorage.clear()
+})
 
 describe('bozza di una nota', () => {
   it('la chiave è fastlab-bozza:nota:<espId>:<id>', () => {
@@ -18,6 +21,13 @@ describe('bozza di una nota', () => {
 
   it('scrive e rilegge la bozza, e ricorda quale nota era aperta', () => {
     scriviBozzaNota('E', bozza())
+    expect(leggiBozzaNota('E', 'n1')).toEqual(bozza())
+    expect(notaAperta('E')).toBe('n1')
+  })
+
+  it('sta nel localStorage: sopravvive alla chiusura dell\'app (il sessionStorage vuotato)', () => {
+    scriviBozzaNota('E', bozza())
+    sessionStorage.clear()
     expect(leggiBozzaNota('E', 'n1')).toEqual(bozza())
     expect(notaAperta('E')).toBe('n1')
   })
@@ -39,11 +49,11 @@ describe('bozza di una nota', () => {
   })
 
   it('una bozza rovinata o di un\'altra forma si ignora', () => {
-    sessionStorage.setItem(chiaveBozzaNota('E', 'n1'), '{non json')
+    localStorage.setItem(chiaveBozzaNota('E', 'n1'), '{non json')
     expect(leggiBozzaNota('E', 'n1')).toBeNull()
-    sessionStorage.setItem(chiaveBozzaNota('E', 'n1'), JSON.stringify({ id: 'n1', esistente: false, stato: { testo: 3 } }))
+    localStorage.setItem(chiaveBozzaNota('E', 'n1'), JSON.stringify({ id: 'n1', esistente: false, stato: { testo: 3 } }))
     expect(leggiBozzaNota('E', 'n1')).toBeNull()
-    sessionStorage.setItem(chiaveBozzaNota('E', 'n1'), JSON.stringify({ id: 'altra', esistente: false, stato: bozza().stato }))
+    localStorage.setItem(chiaveBozzaNota('E', 'n1'), JSON.stringify({ id: 'altra', esistente: false, stato: bozza().stato }))
     expect(leggiBozzaNota('E', 'n1')).toBeNull()
   })
 
@@ -54,7 +64,7 @@ describe('bozza di una nota', () => {
     expect(notaAperta('E')).toBeNull()
   })
 
-  it('senza sessionStorage non fa danni', () => {
+  it('senza localStorage non fa danni', () => {
     const originale = Storage.prototype.setItem
     Storage.prototype.setItem = () => { throw new Error('pieno') }
     try {

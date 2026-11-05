@@ -695,7 +695,7 @@ describe('Esporta: Salva questa scelta', () => {
     const { utente } = await apriIlCampo()
     await utente.type(screen.getByLabelText('Nome'), 'Prova')
     await utente.click(pulsante('Salva'))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(screen.getByLabelText('Nome')).toHaveValue('Prova')
     expect(toastSalvato).not.toHaveBeenCalled()
     await utente.click(pulsante('Salva'))
@@ -848,7 +848,7 @@ describe('Esporta: Scarica Excel', () => {
     const { utente } = apri()
     await riepilogoPronto()
     await utente.click(scarica())
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
   })
 
   it('«Scarica Excel» è l\'unico inchiostro pieno della pagina, anche con campo, conferma ed errore aperti', async () => {

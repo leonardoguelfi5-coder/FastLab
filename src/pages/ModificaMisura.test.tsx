@@ -501,7 +501,7 @@ describe('ModificaMisura: salvataggio non riuscito', () => {
 
     const errore = await screen.findByRole('alert')
     expect(errore).toHaveTextContent('Misura non salvata.')
-    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(errore).toHaveTextContent('Rete debole')
     expect(errore).toHaveFocus()
     expect(campo('Temp aria')).toHaveValue('26,2')
     expect(campo('Data di rilievo')).toHaveValue('2026-10-20')
@@ -534,7 +534,7 @@ describe('ModificaMisura: salvataggio non riuscito', () => {
 
     await act(async () => fallisci(new TypeError('Failed to fetch')))
     expect(toast.error).toHaveBeenCalledTimes(1)
-    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Misura del 21\/10\/2026 delle 09:12 non salvata\. Il server non risponde/)
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Misura del 21\/10\/2026 delle 09:12 non salvata\. Rete debole/)
     // Resta finché non lo si chiude: chi è uscito dalla scheda potrebbe non guardare subito.
     expect(vi.mocked(toast.error).mock.calls[0][1]).toEqual({ duration: Infinity, action: { label: 'Chiudi', onClick: expect.any(Function) } })
     expect(toastSalvato).not.toHaveBeenCalled()
@@ -631,7 +631,7 @@ describe('ModificaMisura: eliminazione', () => {
 
     const errore = await screen.findByRole('alert')
     expect(errore).toHaveTextContent('Misura non eliminata.')
-    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(errore).toHaveTextContent('Rete debole')
     expect(campo('Temp aria')).toHaveValue('1')
     expect(posizione()).toBe(`/esperimenti/E/misure/${m.id}`)
     expect(toast.success).not.toHaveBeenCalled()
@@ -713,7 +713,7 @@ describe('ModificaMisura: bozza della scheda', () => {
     await pronta()
     await utente.type(campo('Temp aria'), '1')
 
-    expect(Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:'))).toEqual([])
+    expect(Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:'))).toEqual([])
   })
 })
 
@@ -816,7 +816,7 @@ describe('ModificaMisura: casi limite', () => {
     apri()
 
     const errore = await screen.findByRole('alert')
-    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(errore).toHaveTextContent('Rete debole')
     expect(screen.queryByText('Misura non trovata.')).not.toBeInTheDocument()
     await utente.click(within(errore).getByRole('button', { name: 'Riprova' }))
     expect(await pronta()).toBeInTheDocument()
@@ -829,7 +829,7 @@ describe('ModificaMisura: casi limite', () => {
     apri()
 
     const errore = await screen.findByRole('alert')
-    expect(errore).toHaveTextContent('Il server non risponde')
+    expect(errore).toHaveTextContent('Rete debole')
     await utente.click(within(errore).getByRole('button', { name: 'Riprova' }))
     expect(await pronta()).toBeInTheDocument()
   })

@@ -96,7 +96,7 @@ describe('AdminInviti: accesso', () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina()
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     expect(screen.queryByText('Questa pagina è riservata all\'amministratore.')).not.toBeInTheDocument()
 
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
@@ -141,7 +141,7 @@ describe('AdminInviti: elenco', () => {
     const utente = userEvent.setup({ delay: null })
     vaiAllaPagina()
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(await screen.findByText('marco@example.it')).toBeInTheDocument()
   })
@@ -286,7 +286,7 @@ describe('AdminInviti: revoca', () => {
 
     await utente.click(within(dialogo).getByRole('button', { name: 'Revoca invito' }))
 
-    expect(await within(dialogo).findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await within(dialogo).findByRole('alert')).toHaveTextContent('Rete debole')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(toast.success).not.toHaveBeenCalled()
   })

@@ -99,7 +99,7 @@ describe('PassoStrumenti: dal catalogo', () => {
     const utente = userEvent.setup({ delay: null })
     rendi()
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '+ Nuovo strumento' })).toBeInTheDocument()
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(await screen.findByRole('button', { name: 'Aggiungi «Ciras»' })).toBeInTheDocument()
@@ -224,7 +224,7 @@ describe('PassoStrumenti: + Nuovo strumento', () => {
 
     await utente.click(screen.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
 
-    expect(await screen.findByText(/Il server non risponde/)).toBeInTheDocument()
+    expect(await screen.findByText(/Rete debole/)).toBeInTheDocument()
     expect(screen.getByText(/non è collegato al catalogo/)).toBeInTheDocument()
     const b = ultima(onChange)
     expect(b.strumenti).toHaveLength(1)

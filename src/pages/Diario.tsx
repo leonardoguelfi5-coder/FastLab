@@ -193,7 +193,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
     setErrore(null)
   }
 
-  /** Ogni modifica passa dalla bozza nel sessionStorage; tornata uguale all'originale, la bozza non serve più. */
+  /** Ogni modifica passa dalla bozza nel localStorage; tornata uguale all'originale, la bozza non serve più. */
   function cambia(stato: StatoNota) {
     // Durante il salvataggio non si tocca più nulla: una bozza riscritta dopo il salvataggio resterebbe orfana.
     if (!modifica || inCorso.current) return

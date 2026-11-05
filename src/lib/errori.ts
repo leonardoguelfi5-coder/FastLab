@@ -1,4 +1,9 @@
+import { ErroreRete } from './rete'
+
 const MSG_OFFLINE = 'Nessuna connessione. Riprova quando torna la rete.'
+/** Una richiesta che non è arrivata o non ha avuto risposta entro il limite di tempo (vedi `fetchConLimite`). */
+const MSG_RETE = 'Rete debole: riprova.'
+/** Solo per una risposta 5xx del server senza codice di PostgREST: il segno più probabile di un database in pausa. */
 const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per più di una settimana il database potrebbe essere in pausa: riattivalo dal pannello Supabase (vedi README).'
 const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
@@ -91,7 +96,10 @@ export function messaggioErrore(e: unknown): string {
 
   const { messaggio, code, status } = leggi(e)
 
-  if (/Failed to fetch|NetworkError|Load failed/.test(messaggio)) return MSG_SERVER
+  // Il fetch del browser che non porta la richiesta, o `ErroreRete` (anche ricopiato nel messaggio da PostgREST,
+  // GoTrue o lo Storage, che ne perdono la classe): è la rete, non il server. Il database in pausa si riconosce dallo
+  // stato 5xx della risposta, che con la rete debole non arriva.
+  if (e instanceof ErroreRete || /ErroreRete|Rete debole|Failed to fetch|NetworkError|Load failed/.test(messaggio)) return MSG_RETE
   if (code === 'PGRST301' || status === 401 || messaggio.includes('JWT expired')) return MSG_SESSIONE
   if (messaggio.includes('Invalid login credentials')) return 'Email o password errate.'
   if (messaggio.includes('Database error saving new user') || messaggio.includes('INVITO_MANCANTE')) return MSG_INVITO
@@ -108,6 +116,11 @@ export function messaggioErrore(e: unknown): string {
   if (messaggio.includes('ESPERIMENTO_NON_MODIFICABILE')) {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
+  // Dopo i messaggi riconosciuti (GoTrue dà "Database error saving new user" con HTTP 500): un 5xx senza codice è il
+  // server che non risponde, il segno più probabile del database in pausa.
+  if (status !== undefined && status >= 500 && status <= 599 && (code === undefined || code === '')) return MSG_SERVER
+  // PostgREST che risponde ma non raggiunge il database (503 e 504): come sopra, il database fermo o in pausa.
+  if (code !== undefined && /^PGRST00[0-3]$/.test(code)) return MSG_SERVER
   // I messaggi dell'app (già in italiano, già spiegati) passano così come sono.
   if (e instanceof ErroreApp) return messaggio
   if ([ELEMENTO_NON_TROVATO, INVITO_GIA_USATO, EMAIL_GIA_INVITATA, ESPERIMENTO_NON_TROVATO, SENZA_SESSIONE,

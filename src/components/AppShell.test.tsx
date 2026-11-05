@@ -137,7 +137,7 @@ describe('AppShell', () => {
     await utente.click(screen.getByRole('button', { name: 'Esci' }))
 
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalledOnce())
-    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Il server non risponde/)
+    expect(vi.mocked(toast.error).mock.calls[0][0]).toMatch(/Rete debole/)
     expect(screen.getByText('Corpo')).toBeInTheDocument()
   })
 })

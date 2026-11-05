@@ -135,7 +135,7 @@ describe('Catalogo: l\'elenco', () => {
     vi.mocked(listaCatalogo).mockRejectedValueOnce({ message: 'Failed to fetch' })
     const { utente } = apri()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(screen.getByRole('button', { name: 'Riprova' }))
     expect(await pronta()).toBeInTheDocument()
   })
@@ -287,7 +287,7 @@ describe('Catalogo: salvare una voce', () => {
     await salva(utente)
 
     const avviso = await screen.findByRole('alert')
-    expect(avviso).toHaveTextContent(/^Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati: Il server non risponde/)
+    expect(avviso).toHaveTextContent(/^Catalogo salvato, ma i tuoi esperimenti non sono stati aggiornati: Rete debole/)
     expect(toastSalvato).not.toHaveBeenCalled()
     expect(salvaVoceCatalogo).toHaveBeenCalledTimes(1)
 
@@ -340,7 +340,7 @@ describe('Catalogo: salvare una voce', () => {
     await utente.type(screen.getByLabelText('Nome dello strumento'), ' 2')
     await salva(utente)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(copieDiProprieta).not.toHaveBeenCalled()
     expect(applicaAggiornamento).not.toHaveBeenCalled()
     expect(toastSalvato).not.toHaveBeenCalled()
@@ -571,7 +571,7 @@ describe('Catalogo: archiviare', () => {
     await utente.click(screen.getByRole('button', { name: 'Archivia dal catalogo' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Archivia' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Il server non risponde')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(screen.getByLabelText('Nome dello strumento')).toBeInTheDocument()
     expect(toastSalvato).not.toHaveBeenCalled()
   })

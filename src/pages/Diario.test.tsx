@@ -104,6 +104,7 @@ function azioneAnnulla() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   sessionStorage.clear()
   config = bozzaHydrochar(SEMI_CATALOGO)
   config.esperimento.id = 'E'
@@ -235,7 +236,7 @@ describe('Diario: nuova nota', () => {
     expect(await screen.findByRole('list', { name: 'Note del diario' })).toBeInTheDocument()
     expect(riga('Foglie gialle')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1, name: 'Diario' })).toBeInTheDocument()
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('un doppio tocco su Salva salva una volta sola', async () => {
@@ -572,22 +573,22 @@ describe('Diario: errori e bozza', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.getByLabelText('Nota')).toHaveValue('Non perdere questo')
     expect(toastSalvato).not.toHaveBeenCalled()
-    const chiaviBozza = Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))
+    const chiaviBozza = Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))
     expect(chiaviBozza).toHaveLength(1)
-    expect(JSON.parse(sessionStorage.getItem(chiaviBozza[0])!).stato.testo).toBe('Non perdere questo')
+    expect(JSON.parse(localStorage.getItem(chiaviBozza[0])!).stato.testo).toBe('Non perdere questo')
 
     await utente.click(salva())
     await waitFor(() => expect(salvaNota).toHaveBeenCalledTimes(2))
     expect(vi.mocked(salvaNota).mock.calls[1][1].id).toBe(vi.mocked(salvaNota).mock.calls[0][1].id)
     expect(toastSalvato).toHaveBeenCalledWith('Nota salvata.')
-    expect(Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))).toHaveLength(0)
+    expect(Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))).toHaveLength(0)
   })
 
-  it('scrivendo, la bozza si aggiorna nel sessionStorage con la chiave fastlab-bozza:nota:<espId>:<id>', async () => {
+  it('scrivendo, la bozza si aggiorna nel localStorage con la chiave fastlab-bozza:nota:<espId>:<id>', async () => {
     const { utente } = apri()
     await utente.click(await nuovaNota())
     await utente.type(screen.getByLabelText('Nota'), 'Ciao')
-    const chiavi = Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))
+    const chiavi = Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))
     expect(chiavi).toHaveLength(1)
     expect(chiavi[0]).toMatch(/^fastlab-bozza:nota:E:[0-9a-f-]{36}$/)
   })
@@ -634,10 +635,10 @@ describe('Diario: errori e bozza', () => {
     await prima.utente.type(screen.getByRole('searchbox', { name: 'Cerca pianta' }), '3')
     await prima.utente.click(await screen.findByRole('checkbox', { name: '3' }))
     prima.resa.unmount()
-    const chiave = Object.keys(sessionStorage).find(k => /^fastlab-bozza:nota:E:/.test(k))!
-    const b = JSON.parse(sessionStorage.getItem(chiave)!)
+    const chiave = Object.keys(localStorage).find(k => /^fastlab-bozza:nota:E:/.test(k))!
+    const b = JSON.parse(localStorage.getItem(chiave)!)
     b.stato.pianta_ids.push('pianta-che-non-c-e')
-    sessionStorage.setItem(chiave, JSON.stringify(b))
+    localStorage.setItem(chiave, JSON.stringify(b))
 
     apri()
     await screen.findByLabelText('Nota')
@@ -660,7 +661,7 @@ describe('Diario: uscire mentre si salva', () => {
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/diario')
-    expect(Object.keys(sessionStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))).toHaveLength(1)
+    expect(Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:nota:E:'))).toHaveLength(1)
     await act(async () => finisci())
   })
 
@@ -673,16 +674,16 @@ describe('Diario: uscire mentre si salva', () => {
     fireEvent.click(salva())
     await screen.findByRole('button', { name: 'Salvataggio…' })
     // l'uscita senza passare dall'app toglie la bozza? No: qui si simula il caso peggiore, bozza già tolta
-    sessionStorage.clear()
+    localStorage.clear()
     resa.unmount()
 
     await act(async () => fallisci(new Error('Failed to fetch')))
     expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining('Riapri il Diario'), expect.objectContaining({ duration: Infinity }),
     )
-    const chiave = Object.keys(sessionStorage).find(k => /^fastlab-bozza:nota:E:/.test(k))
+    const chiave = Object.keys(localStorage).find(k => /^fastlab-bozza:nota:E:/.test(k))
     expect(chiave).toBeDefined()
-    expect(JSON.parse(sessionStorage.getItem(chiave!)!).stato.testo).toBe('Non perdere')
+    expect(JSON.parse(localStorage.getItem(chiave!)!).stato.testo).toBe('Non perdere')
 
     // riaprendo il Diario la nota è lì
     apri()
@@ -772,7 +773,7 @@ describe('Diario: uscire con modifiche', () => {
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
     expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E')
     expect(screen.getByTestId('posizione')).not.toHaveTextContent('diario')
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('"Annulla" nell\'editor con modifiche chiede conferma; scartando torna all\'elenco e la bozza va via', async () => {
@@ -782,7 +783,7 @@ describe('Diario: uscire con modifiche', () => {
     await utente.click(screen.getByRole('button', { name: 'Annulla' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
     expect(screen.getByRole('heading', { level: 1, name: 'Diario' })).toBeInTheDocument()
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('il browser chiede conferma prima di chiudere la scheda solo se c\'è una nota non salvata', async () => {
@@ -837,7 +838,7 @@ describe('Diario: le foto della nota', () => {
     expect(vi.mocked(caricaFoto).mock.calls[0][1]).toMatchObject({ notaId: 'a', piantaId: null })
     expect(await within(sezione()).findByRole('button', { name: `Foto del ${formattaData(oggiLocale())}` })).toBeInTheDocument()
     // La nota resta com\'era: nessuna bozza, e «Annulla» esce senza chiedere di scartare.
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
     await utente.click(screen.getByRole('button', { name: 'Annulla' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
@@ -846,14 +847,14 @@ describe('Diario: le foto della nota', () => {
     db = [nota('a', { testo: 'Da correggere' })]
     const { utente } = await apriModifica()
     await utente.type(screen.getByLabelText('Nota'), ' ancora')
-    const bozza = Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))
+    const bozza = Object.keys(localStorage).map(k => localStorage.getItem(k))
 
     scegliFile()
 
     await waitFor(() => expect(caricaFoto).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(toastSalvato).toHaveBeenCalledWith('Foto salvata.'))
     expect(screen.getByLabelText('Nota')).toHaveValue('Da correggere ancora')
-    expect(Object.keys(sessionStorage).map(k => sessionStorage.getItem(k))).toEqual(bozza)
+    expect(Object.keys(localStorage).map(k => localStorage.getItem(k))).toEqual(bozza)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -912,7 +913,7 @@ describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {
     expect(screen.getByText(/Piante scelte/)).toHaveTextContent('Piante scelte: 35')
     expect(salva()).toBeDisabled()
     // Nessuna bozza né ricordo di nota aperta finché non si scrive: il collegamento iniziale non è una modifica.
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('lo stato di arrivo si consuma: ricaricando non si riapre da solo un editor, ma il ritorno resta', async () => {
@@ -931,7 +932,7 @@ describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {
       testo: 'Foglie arricciate', pianta_ids: [idPianta('35')], trattamento_ids: [],
     })
     expect(toastSalvato).toHaveBeenCalledWith('Nota salvata.')
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('«Annulla» senza aver scritto nulla torna alla scheda, senza domande', async () => {
@@ -946,11 +947,11 @@ describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {
   it('«Annulla» dopo aver scritto chiede se scartare; scartando si torna alla scheda e la bozza va via', async () => {
     const { utente } = apri(dallaScheda())
     await utente.type(await screen.findByLabelText('Nota'), 'Qualcosa')
-    expect(sessionStorage.length).toBeGreaterThan(0)
+    expect(localStorage.length).toBeGreaterThan(0)
     await utente.click(screen.getByRole('button', { name: 'Annulla' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
     expect(posizione()).toBe(scheda())
-    expect(sessionStorage.length).toBe(0)
+    expect(localStorage.length).toBe(0)
   })
 
   it('la freccia indietro porta alla scheda (non alla home); con modifiche chiede prima di scartare', async () => {
@@ -985,7 +986,7 @@ describe('Diario: l\'arrivo da Oggi e dalla scheda della pianta', () => {
     apri(dallaScheda())
     expect(await screen.findByLabelText('Nota')).toHaveValue('Scritta prima')
     expect(scelta('Trattamenti')).toBeChecked()
-    expect(JSON.parse(sessionStorage.getItem(Object.keys(sessionStorage).find(k => k.endsWith('vecchia'))!)!).stato.testo).toBe('Scritta prima')
+    expect(JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.endsWith('vecchia'))!)!).stato.testo).toBe('Scritta prima')
   })
 
   it('una pianta che non c\'è più si ignora: si vede l\'elenco', async () => {
