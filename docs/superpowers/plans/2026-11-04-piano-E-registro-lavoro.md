@@ -46,3 +46,8 @@ Messa online: migration 0015 applicata al progetto FastLab; provata come utente 
 Task E4: complete (commits cc76e52..7209450), revisione rimandata alla finale
 Prima pubblicazione del Piano E (E1-E4)
 Task E5: dispatched implementer (opus), BASE bb73fca
+Task E5: implementatore (opus) DONE_WITH_CONCERNS 9589ed7 - 2682 Vitest (61 nuovi), 412 pgTAP; `src/lib/rete.ts` (`fetchConLimite`: 12 s per le richieste, 90 s per i caricamenti nello Storage, `ErroreRete`), client Supabase con il fetch limitato; "Rete debole: riprova." distinto da "database in pausa" (5xx senza code e PGRST000-003); bozze di misure e note in `localStorage` con `scritta_il`, pulizia oltre 14 giorni, spostamento dalla sessione solo per lo stesso proprietario
+Ruling: accettate le deviazioni E5 (spostamento delle bozze legato al proprietario; PGRST000-003 = database in pausa; il limite copre l'attesa della risposta, non la lettura del corpo) - cost if wrong: small
+Ruling (carry to E6/E7): postgrest-js ritenta le GET fino a 3 volte (1, 2, 4 s): una lettura senza rete mostra l'errore dopo circa 55 s; valutare di limitare i ritentativi o di rispondere dalla cache; il wizard tiene la bozza in sessionStorage - cost if wrong: attesa lunga sulle letture
+Task E5: complete (commits 9e6674c..9589ed7), revisione rimandata alla finale
+Task E6: dispatched implementer (opus)
