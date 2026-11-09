@@ -175,8 +175,9 @@ insert into casi (nome, valida, scelte) values
 
 grant select on casi to authenticated;
 
--- Fixture (superuser): A e' proprietario di EA e di EA2, C collabora in EA (e alla fine si
--- elimina), B ha EB e non e' membro di EA.
+-- Fixture (superuser): A e' proprietario di EA e di EA2, C e' lettore in EA (e alla fine si
+-- elimina), B ha EB e non e' membro di EA. C lettore (dal Piano E, Task E9; prima 'collaboratore', ruolo che non
+-- esiste piu'): gli export salvati sono personali per ogni membro, anche per chi ha la sola lettura.
 insert into inviti (email, codice) values
   ('a.export@test.it', 'CODICED1'), ('b.export@test.it', 'CODICED2'), ('c.export@test.it', 'CODICED3');
 insert into auth.users (id, email, aud, role, instance_id, raw_user_meta_data) values
@@ -193,7 +194,7 @@ insert into esperimenti (id, nome, creato_da) values
   ('ed000000-0000-0000-0000-00000000000b', 'EB', '0d000000-0000-0000-0000-00000000000b');
 
 insert into membri_esperimento (esperimento_id, utente_id, ruolo) values
-  ('ed000000-0000-0000-0000-000000000001', '0d000000-0000-0000-0000-00000000000c', 'collaboratore');
+  ('ed000000-0000-0000-0000-000000000001', '0d000000-0000-0000-0000-00000000000c', 'lettore');
 
 -- ===== Struttura =====
 select has_table('public', 'export_salvati', 'la tabella export_salvati esiste');

@@ -40,6 +40,12 @@ describe('l\'elenco chiuso', () => {
     expect(ePersistente(chiavi.ultimeMisure('E'))).toBe(true)
   })
 
+  it('c\'è il ruolo nell\'esperimento (Piano E, Task E9): senza rete il lettore resta lettore', () => {
+    expect(ePersistente(chiavi.ruolo('E'))).toBe(true)
+    expect(ePersistente(['config', '', 'ruolo'])).toBe(false)
+    expect(ePersistente(['config', 'E', 'altro'])).toBe(false)
+  })
+
   it('non ci sono chi ha dati e chi no, misure per strumento, foto, URL firmati, note, inviti, catalogo e il resto', () => {
     for (const chiave of [
       chiavi.parametriConDati('E'), chiavi.pianteConDati('E'), chiavi.pianteNonEliminabili('E'), chiavi.conteggiStrumenti('E'),
@@ -170,6 +176,22 @@ describe('salvaCache e ripristinaCache', () => {
     expect(nuovo.getQueryData(chiavi.misurePianta('p36'))).toBeUndefined()
     expect(nuovo.getQueryData(chiavi.ultimeMisure('E'))).toBeUndefined()
     expect(nuovo.getQueryData(chiavi.ultimeMisure('F'))).toBeInstanceOf(Map)
+  })
+
+  it('il ruolo si ripristina se è un ruolo noto o null (non membro); un valore sconosciuto non arriva alle pagine', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    salvaCache(clientCon([
+      [chiavi.ruolo('E'), 'lettore'],
+      [chiavi.ruolo('F'), null],
+      [chiavi.ruolo('G'), 'collaboratore'],
+      [chiavi.ruolo('H'), { ruolo: 'proprietario' }],
+    ]), 'u1', 'v1', ADESSO)
+    const nuovo = new QueryClient()
+    ripristinaCache(nuovo, 'u1', ADESSO)
+    expect(nuovo.getQueryData(chiavi.ruolo('E'))).toBe('lettore')
+    expect(nuovo.getQueryState(chiavi.ruolo('F'))).toMatchObject({ status: 'success', data: null })
+    expect(nuovo.getQueryState(chiavi.ruolo('G'))).toBeUndefined()
+    expect(nuovo.getQueryState(chiavi.ruolo('H'))).toBeUndefined()
   })
 
   it('scade dopo 7 giorni: la copia intera, e ogni lettura più vecchia di 7 giorni', () => {

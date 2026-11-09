@@ -1,6 +1,7 @@
 import { ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE } from '@/lib/errori'
 import { eUuid } from '@/lib/percorsi'
 import { supabase } from '@/lib/supabase'
+import type { Ruolo } from '@/domain/ruoli'
 import type { BozzaEsperimento, ConfigEsperimento, Esperimento } from '@/domain/tipi'
 import { controllaRighe } from './righe'
 import { eliminaFileEsperimento } from './foto'
@@ -18,6 +19,11 @@ export interface RiepilogoEsperimento {
   ultima_data: string | null
   /** Piante distinte con almeno una misura nell'ultima data. */
   piante_ultima_data: number
+  /**
+   * Il ruolo di chi guarda (dalla migration 0016). Manca in una copia sul telefono scritta prima, e in una risposta di
+   * un database senza la 0016: chi lo usa lo tratta come "non noto", mai come un permesso.
+   */
+  ruolo?: Ruolo | null
 }
 
 export async function listaEsperimenti(): Promise<RiepilogoEsperimento[]> {

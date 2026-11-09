@@ -23,6 +23,8 @@ const misura = (id: string, extra: Partial<Misura> = {}): Misura => ({
 const metti = (id: string, etichetta = id, extra: Partial<Misura> = {}) =>
   accoda('u1', 'E', misura(id, extra), { etichetta, strumento: '💚 SPAD', sulServer: false })
 const errorePg = (code: string, status: number) => ({ code, message: `errore ${code}`, details: '', hint: '', status })
+/** Il messaggio di PostgreSQL quando l'upsert trova una riga che la using dell'update non lascia toccare. */
+const MSG_USING = 'new row violates row-level security policy (USING expression) for table "misure"'
 
 let client: QueryClient
 /** Le misure arrivate al server, nell'ordine. */
@@ -55,6 +57,10 @@ afterEach(() => {
 describe('eDefinitivo', () => {
   it.each([
     ['RLS', errorePg('42501', 403)],
+    // Piano E, Task E9: un rilevatore che corregge la misura di un altro (l'upsert passa l'insert e si ferma sulla using
+    // dell'update), o chi è lettore o è stato tolto dall'esperimento.
+    ['RLS, misura di un altro', { ...errorePg('42501', 403), message: MSG_USING }],
+    ['RLS, chi non scrive piu\'', { ...errorePg('42501', 403), message: 'new row violates row-level security policy for table "misure"' }],
     ['doppione', errorePg('23505', 409)],
     ['pianta tolta (chiave esterna)', errorePg('23503', 409)],
     ['dato non valido', errorePg('22P02', 400)],
@@ -190,6 +196,37 @@ describe('inviaCoda', () => {
 
     await inviaCoda('u1', client, { forza: true })
     expect(salvaMisura).toHaveBeenCalledTimes(2)
+  })
+
+  it('rilevatore che corregge la misura di un altro (42501 dall\'upsert): non inviata con il motivo, mai ritentata', async () => {
+    metti('m1', '35')
+    metti('m2', '36')
+    vi.mocked(salvaMisura).mockRejectedValueOnce({ code: '42501', message: MSG_USING, details: null, hint: null, status: 403 })
+
+    await expect(inviaCoda('u1', client)).resolves.toMatchObject({ inviate: 1, rifiutate: 1, fermato: false })
+
+    const [rifiutata] = vociDi('u1')
+    expect(rifiutata).toMatchObject({ stato: 'rifiutata', prossimoTentativo: null })
+    expect(rifiutata.misura.id).toBe('m1')
+    expect(rifiutata.errore).toBe('Questa misura l\'ha salvata un\'altra persona: puoi correggere solo le tue.')
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Pianta #35 non inviata'), expect.anything())
+
+    // Né da sola né con "Invia ora": un rifiuto non si ritenta.
+    await inviaCoda('u1', client)
+    await inviaCoda('u1', client, { forza: true })
+    expect(salvaMisura).toHaveBeenCalledTimes(2)
+  })
+
+  it('lettore o tolto dall\'esperimento (42501 dall\'insert): non inviata, con il motivo dei permessi', async () => {
+    metti('m1', '35')
+    vi.mocked(salvaMisura).mockRejectedValueOnce(
+      { code: '42501', message: 'new row violates row-level security policy for table "misure"', details: null, hint: null, status: 403 })
+
+    await inviaCoda('u1', client)
+
+    const [rifiutata] = vociDi('u1')
+    expect(rifiutata).toMatchObject({ stato: 'rifiutata', prossimoTentativo: null })
+    expect(rifiutata.errore).toBe('Non hai il permesso di salvare misure in questo esperimento: chiedi al proprietario.')
   })
 
   it('un solo invio alla volta: una seconda chiamata durante l\'invio non manda di nuovo la stessa misura', async () => {

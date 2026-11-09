@@ -67,7 +67,10 @@ function motivoRifiuto(e: unknown): string {
     if (messaggio.includes('strumento_id')) return 'Lo strumento non c\'è più nell\'esperimento.'
     return 'La pianta o lo strumento non c\'è più nell\'esperimento.'
   }
-  if (code === '42501') return 'Non hai il permesso di salvare misure in questo esperimento.'
+  // L'upsert di una misura che c'è già si ferma sulla using dell'update solo se la misura è di un altro e chi scrive è
+  // rilevatore (Piano E, Task E9); un lettore, o chi è stato tolto, si ferma prima, sull'insert.
+  if (code === '42501' && messaggio.includes('USING expression')) return 'Questa misura l\'ha salvata un\'altra persona: puoi correggere solo le tue.'
+  if (code === '42501') return 'Non hai il permesso di salvare misure in questo esperimento: chiedi al proprietario.'
   return messaggioErrore(e)
 }
 

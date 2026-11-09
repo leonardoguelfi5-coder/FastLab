@@ -14,6 +14,39 @@ const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono an
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
 
 describe('messaggioErrore', () => {
+  describe('ruoli e Persone (Piano E, Task E9)', () => {
+    it('solo il proprietario aggiunge, toglie e cambia il ruolo (42501 con il messaggio della RPC)', () => {
+      expect(messaggioErrore({ code: '42501', message: 'SOLO_PROPRIETARIO', status: 403 }))
+        .toBe('Solo il proprietario dell\'esperimento aggiunge, toglie o cambia il ruolo delle persone.')
+    })
+
+    it('email senza account: la registrazione resta all\'amministratore', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'UTENTE_NON_TROVATO', status: 400 }))
+        .toBe('Nessun utente registrato con questa email: chiedi all\'amministratore di invitarlo.')
+    })
+
+    it('ruolo non valido', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'RUOLO_NON_VALIDO', status: 400 }))
+        .toBe('Ruolo non valido: scegli Proprietario, Rilevatore o Lettore.')
+    })
+
+    it('ultimo proprietario', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'ULTIMO_PROPRIETARIO', status: 400 }))
+        .toBe('L\'esperimento deve avere almeno un proprietario: prima rendi proprietario un\'altra persona.')
+    })
+
+    it('ogni altro 42501 (la RLS di un ruolo che non può) dice di chiedere al proprietario', () => {
+      const MSG = 'Non hai il permesso per questa modifica: chiedi al proprietario dell\'esperimento.'
+      expect(messaggioErrore({ code: '42501', message: 'new row violates row-level security policy for table "piante"', status: 403 })).toBe(MSG)
+      expect(messaggioErrore({ code: '42501', message: 'permission denied for table membri_esperimento', status: 403 })).toBe(MSG)
+      expect(messaggioErrore({ code: '42501', message: 'new row violates row-level security policy (USING expression) for table "misure"' })).toBe(MSG)
+    })
+
+    it('un 42501 con 401 resta la sessione scaduta', () => {
+      expect(messaggioErrore({ code: '42501', message: 'permission denied for table misure', status: 401 })).toBe(MSG_SESSIONE)
+    })
+  })
+
   it('pianta con dati che cambia trattamento (guardia del database)', () => {
     expect(messaggioErrore({ code: 'P0001', message: 'PIANTA_CON_DATI' }))
       .toBe('Questa pianta ha già delle misure: il trattamento non si può cambiare. Etichetta e blocco sì.')

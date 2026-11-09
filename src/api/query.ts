@@ -24,6 +24,8 @@ export const chiavi = {
   pianteConDati: (espId: string) => ['config', espId, 'pianteConDati'] as const,
   pianteNonEliminabili: (espId: string) => ['config', espId, 'pianteNonEliminabili'] as const,
   conteggiStrumenti: (espId: string) => ['config', espId, 'conteggiStrumenti'] as const,
+  /** Il ruolo di chi guarda (`useRuolo`): sotto la configurazione, e nella copia sul telefono. */
+  ruolo: (espId: string) => ['config', espId, 'ruolo'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
   misura: (id: string) => ['misure', 'una', id] as const,

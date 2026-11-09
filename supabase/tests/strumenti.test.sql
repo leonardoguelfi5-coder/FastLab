@@ -38,10 +38,13 @@ select is_empty(
 -- (nel dispositivo), non una proprieta' del parametro.
 select hasnt_column('public', 'parametri', 'ricorda_tra_piante', 'parametri non ha piu'' ricorda_tra_piante');
 
-select policies_are('public', 'strumenti', array['strumenti_membro'],
-  'strumenti ha la sola policy strumenti_membro');
-select policies_are('public', 'strumento_parametri', array['strumento_parametri_membro'],
-  'strumento_parametri ha la sola policy strumento_parametri_membro');
+-- Dal Piano E (Task E9) una policy per operazione al posto di quella per membro (`for all`): la configurazione la
+-- scrive solo il proprietario. Restano i nomi senza "passate".
+select policies_are('public', 'strumenti', array['strumenti_select', 'strumenti_insert', 'strumenti_update', 'strumenti_delete'],
+  'strumenti ha una policy per operazione');
+select policies_are('public', 'strumento_parametri',
+  array['strumento_parametri_select', 'strumento_parametri_insert', 'strumento_parametri_update', 'strumento_parametri_delete'],
+  'strumento_parametri ha una policy per operazione');
 
 -- Il grant per colonna di misure segue la rinomina: strumento_id si aggiorna (l'upsert di
 -- PostgREST lo mette nel SET), creato_da no.

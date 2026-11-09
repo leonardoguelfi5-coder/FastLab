@@ -1,4 +1,5 @@
 import { dehydrate, hydrate, type DehydratedState, type QueryClient, type QueryState } from '@tanstack/react-query'
+import { eRuolo } from '@/domain/ruoli'
 
 /**
  * La copia delle letture sul telefono (Piano E, Task E7): con l'app aperta senza rete la configurazione, il giro di
@@ -46,13 +47,15 @@ export const DURATA_IN_MEMORIA_MS = 24 * 60 * 60 * 1000
 const RITARDO_SCRITTURA_MS = 1_000
 
 /**
- * L'elenco chiuso: elenco degli esperimenti, configurazione (solo la chiave esatta, non quelle sotto di lei), misure del
- * giorno, misure di una pianta, data dell'ultima misura di ogni strumento. Le forme sono quelle di `chiavi` in
+ * L'elenco chiuso: elenco degli esperimenti, configurazione (solo la chiave esatta, non quelle sotto di lei, tranne il
+ * ruolo: senza rete il lettore resta lettore), misure del giorno, misure di una pianta, data dell'ultima misura di ogni
+ * strumento. Le forme sono quelle di `chiavi` in
  * `src/api/query.ts` (un test lo verifica): qui non si importa `query.ts` per non legare la copia alle pagine.
  */
 export const CHIAVI_PERSISTENTI: ((chiave: readonly unknown[]) => boolean)[] = [
   k => k.length === 1 && k[0] === 'esperimenti',
   k => k.length === 2 && k[0] === 'config' && typeof k[1] === 'string' && k[1] !== '',
+  k => k.length === 3 && k[0] === 'config' && typeof k[1] === 'string' && k[1] !== '' && k[2] === 'ruolo',
   k => k.length === 4 && k[0] === 'misure' && k[1] === 'giorno' && typeof k[2] === 'string' && typeof k[3] === 'string',
   k => k.length === 3 && k[0] === 'misure' && k[1] === 'pianta' && typeof k[2] === 'string' && k[2] !== '',
   k => k.length === 3 && k[0] === 'misure' && k[1] === 'ultime' && typeof k[2] === 'string' && k[2] !== '',
@@ -168,6 +171,8 @@ const eMisura = (m: unknown): boolean => eOggetto(m) && eTesto(m.id) && eTesto(m
  */
 function formaValida(chiave: readonly unknown[], dati: unknown): boolean {
   if (chiave[0] === 'esperimenti') return elencoConId(dati)
+  // Il ruolo: uno dei tre, o null (non membro). Un valore che l'app non conosce non deve diventare un permesso.
+  if (chiave[0] === 'config' && chiave[2] === 'ruolo') return dati === null || eRuolo(dati)
   if (chiave[0] === 'config') {
     return eOggetto(dati) && conId(dati.esperimento) && ['fattori', 'trattamenti', 'piante', 'parametri', 'strumenti'].every(k => elencoConId(dati[k]))
   }

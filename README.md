@@ -48,9 +48,11 @@ Comandi utili:
 - `ultime_misure_piante.test.sql`: le misure dell'ultima data di ogni pianta per ogni strumento (elenco delle piante), lette rispettando le policy;
 - `note_foto.test.sql`: note, promemoria e foto (collegamenti, vincoli, policy per membro) e il bucket privato `foto` dello Storage con le sue policy;
 - `foto_archiviata.test.sql`: la data di archiviazione di una foto e il vincolo che la tiene allineata a `archiviata`;
-- `export_salvati.test.sql`: gli export salvati di Esporta Excel (ognuno vede e tocca solo i suoi, `creato_da` non si cambia, nome unico per esperimento e utente, forma delle scelte validata da `scelte_export_valide`) e l'indice che serve alla lettura delle misure per strumento.
+- `export_salvati.test.sql`: gli export salvati di Esporta Excel (ognuno vede e tocca solo i suoi, `creato_da` non si cambia, nome unico per esperimento e utente, forma delle scelte validata da `scelte_export_valide`) e l'indice che serve alla lettura delle misure per strumento;
+- `conteggi_spazio.test.sql`: i conteggi degli strumenti e lo spazio del progetto;
+- `ruoli.test.sql`: i ruoli proprietario, rilevatore e lettore (e chi non è membro), tabella per tabella e operazione per operazione, Storage compreso, e le funzioni di Persone.
 
-In tutto sono 377 test pgTAP in 11 file.
+In tutto sono 549 test pgTAP in 13 file.
 
 Quando aggiungi una migration, aggiungi o aggiorna anche il test che la copre.
 
@@ -160,6 +162,26 @@ Le voci del catalogo non si cancellano: si **archiviano** ("Archivia dal catalog
 ### Tabella fenologica
 
 È un elemento a parte, **una sola per esperimento** e **facoltativa**: ognuno costruisce la sua con le voci che gli servono (numeri, testo, sì/no, liste ripetute, anche progressive). Si crea nel passo "Tabella fenologica" della creazione guidata, che si può saltare ("Questo esperimento non ha rilievi fenologici"), o più tardi dalle Impostazioni.
+
+### Persone e ruoli
+
+Chi crea un esperimento ne è il **proprietario** e può aggiungere colleghi già registrati (la registrazione resta su invito dell'amministratore), con uno di tre ruoli. I permessi li impone il database, l'app nasconde solo ciò che il ruolo non permette.
+
+| Che cosa | Proprietario | Rilevatore | Lettore |
+|---|---|---|---|
+| Vedere tutto, Dataset, Esporta, i propri export salvati, Duplica | sì | sì | sì |
+| Vedere chi è nell'esperimento | sì | sì | sì |
+| Misure, note e foto: creare | sì | sì | no |
+| Misure, note e foto: correggere ed eliminare le proprie | sì | sì | no |
+| Misure, note e foto degli altri: correggere ed eliminare | sì | no | no |
+| Configurazione (generale, fattori, trattamenti, piante, parametri, strumenti, fenologia) | sì | no | no |
+| Stato (concluso), archivio .zip e "Libera lo spazio", eliminare l'esperimento | sì | no | no |
+| Persone: aggiungere, cambiare ruolo, togliere | sì | no | no |
+| Lasciare l'esperimento | sì, se resta un altro proprietario | sì | sì |
+
+- I proprietari possono essere più d'uno, mai zero: l'ultimo proprietario non lascia l'esperimento e non cambia il proprio ruolo.
+- "Le proprie" sono quelle salvate da te: una misura, una nota o una foto ricorda chi l'ha salvata, anche dopo che quella persona ha lasciato l'esperimento. Una misura in coda che corregge quella di un altro viene rifiutata e resta tra le "Non inviate" con il motivo.
+- Chi lascia l'esperimento, o ne viene tolto, non lo vede più; le sue misure, note e foto restano.
 
 ## Primo amministratore
 

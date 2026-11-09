@@ -7,6 +7,8 @@ const MSG_RETE = 'Rete debole: riprova.'
 const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per più di una settimana il database potrebbe essere in pausa: riattivalo dal pannello Supabase (vedi README).'
 const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
 const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
+/** Un 42501 del database: il ruolo nell'esperimento non permette questa scrittura (Piano E, Task E9). */
+const MSG_PERMESSO = 'Non hai il permesso per questa modifica: chiedi al proprietario dell\'esperimento.'
 
 /** Il messaggio con cui `caricaMisura` dice che la misura non c'è (cancellata, o non di questo utente). */
 export const MISURA_NON_TROVATA = 'Misura non trovata.'
@@ -116,6 +118,14 @@ export function messaggioErrore(e: unknown): string {
   if (messaggio.includes('ESPERIMENTO_NON_MODIFICABILE')) {
     return 'Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.'
   }
+  // Persone (Piano E, Task E9): i rifiuti di aggiungi_membro e togli_membro. SOLO_PROPRIETARIO ha il codice 42501:
+  // va prima del 42501 generico.
+  if (messaggio.includes('SOLO_PROPRIETARIO')) return 'Solo il proprietario dell\'esperimento aggiunge, toglie o cambia il ruolo delle persone.'
+  if (messaggio.includes('UTENTE_NON_TROVATO')) return 'Nessun utente registrato con questa email: chiedi all\'amministratore di invitarlo.'
+  if (messaggio.includes('RUOLO_NON_VALIDO')) return 'Ruolo non valido: scegli Proprietario, Rilevatore o Lettore.'
+  if (messaggio.includes('ULTIMO_PROPRIETARIO')) {
+    return 'L\'esperimento deve avere almeno un proprietario: prima rendi proprietario un\'altra persona.'
+  }
   // Dopo i messaggi riconosciuti (GoTrue dà "Database error saving new user" con HTTP 500): un 5xx senza codice è il
   // server che non risponde, il segno più probabile del database in pausa.
   if (status !== undefined && status >= 500 && status <= 599 && (code === undefined || code === '')) return MSG_SERVER
@@ -147,6 +157,8 @@ export function messaggioErrore(e: unknown): string {
   }
   if (code === '23503' && messaggio.includes('misure_strumento_id_esperimento_id_fkey')) return STRUMENTO_CON_MISURE_ARRIVATE
   if (code === '23503') return 'Questo elemento ha dati collegati e non può essere eliminato.'
+  // La RLS o un privilegio mancante: il ruolo non permette la modifica (un 42501 con 401 è la sessione, vedi sopra).
+  if (code === '42501') return MSG_PERMESSO
 
   return messaggio === '' ? 'Errore imprevisto.' : `Errore imprevisto: ${messaggio}`
 }
