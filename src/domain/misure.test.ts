@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  valoreVuoto, eVuoto, misureStrumentoNelGiorno, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, raggruppaStoria, formattaValore, fuoriIntervallo,
+  valoreVuoto, eVuoto, misureStrumentoNelGiorno, parametriDiUnaMisura, ultimoValore, mantenibile, valoriDaSalvare, valoriDeiParametri, valoriIniziali, validaMisura, raggruppaStoria, formattaValore, fuoriIntervallo, anomaliaRispettoAllUltimo, ultimiPerAnomalia,
 } from './misure'
-import type { ConfigEsperimento, ElementoLista, Misura, Strumento, ValoriMisura } from './tipi'
+import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, ValoriMisura } from './tipi'
 import { parametro } from './test-helpers'
 
 const D = '2026-10-28'
@@ -512,5 +512,84 @@ describe('valoriDaSalvare', () => {
     const presente = validaMisura([altezza, note], new Set(), { [altezza.id]: [3], [note.id]: '' })
     expect(mancante).toEqual(presente)
     expect(validaMisura([altezza], new Set(), {}).errori).toEqual(['Nessun valore inserito.'])
+  })
+})
+
+describe('anomaliaRispettoAllUltimo', () => {
+  const ultimo = { valore: 41.2, data: '2026-10-28' }
+  const TESTO = "Molto diverso dall'ultima volta (41,2 il 28/10)"
+
+  it('dieci volte più grande (412 al posto di 41,2): avviso con il testo del piano', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 412, ultimo)).toBe(TESTO)
+  })
+  it('dieci volte più piccolo (4,12): avviso', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 4.12, ultimo)).toBe(TESTO)
+  })
+  it('la soglia è 3 volte: 3 volte sì, appena sotto no, in entrambe le direzioni', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 30, { valore: 10, data: '2026-10-28' })).not.toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 29.9, { valore: 10, data: '2026-10-28' })).toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 10, { valore: 30, data: '2026-10-28' })).not.toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 10.1, { valore: 30, data: '2026-10-28' })).toBeNull()
+  })
+  it('la crescita normale non avvisa', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 45.9, ultimo)).toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 41.2, ultimo)).toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 20, ultimo)).toBeNull()
+  })
+  it('senza un ultimo valore, o con l\'ultimo valore 0, niente avviso', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 412, null)).toBeNull()
+    expect(anomaliaRispettoAllUltimo(tempAria, 412, { valore: 0, data: '2026-10-28' })).toBeNull()
+  })
+  it('un cambio di segno con scarto maggiore dell\'ultimo valore avvisa', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, -41.2, ultimo)).toBe(TESTO)
+    expect(anomaliaRispettoAllUltimo(tempAria, -2, { valore: 3, data: '2026-10-28' })).not.toBeNull()
+  })
+  it('due negativi non sono confrontati con il rapporto', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, -412, { valore: -41.2, data: '2026-10-28' })).toBeNull()
+  })
+  it('un valore 0 non avvisa (non è un errore di battitura da rapporto)', () => {
+    expect(anomaliaRispettoAllUltimo(tempAria, 0, ultimo)).toBeNull()
+  })
+  it('i parametri "solo interi" con l\'ultimo valore sotto 5 non avvisano; da 5 in su sì', () => {
+    const interi = { ...parametro('N frutti'), solo_interi: true } as Parametro
+    expect(anomaliaRispettoAllUltimo(interi, 12, { valore: 4, data: '2026-10-28' })).toBeNull()
+    expect(anomaliaRispettoAllUltimo(interi, 50, { valore: 5, data: '2026-10-28' })).toBe("Molto diverso dall'ultima volta (5 il 28/10)")
+  })
+  it('liste, testi e sì/no non hanno avviso', () => {
+    expect(anomaliaRispettoAllUltimo(palchi, 412, ultimo)).toBeNull()
+    expect(anomaliaRispettoAllUltimo(note, 412, ultimo)).toBeNull()
+    expect(anomaliaRispettoAllUltimo(siNo, 412, ultimo)).toBeNull()
+  })
+})
+
+describe('ultimiPerAnomalia', () => {
+  it('prende l\'ultimo valore di ogni parametro numerico nei giorni prima della data di rilievo, con la media delle letture', () => {
+    const misure = [
+      mis('2026-10-20', '09:00', { [spad3.id]: [30, 30, 30] }),
+      mis('2026-10-27', '09:00', { [spad3.id]: [40, 42, null] }),
+      mis('2026-10-28', '09:00', { [spad3.id]: [400, 400, 400] }),
+    ]
+    expect(ultimiPerAnomalia([spad3, note], misure, '2026-10-28')).toEqual({ [spad3.id]: { valore: 41, data: '2026-10-27' } })
+  })
+  it('senza misure precedenti non c\'è nulla', () => {
+    expect(ultimiPerAnomalia([spad3], [mis('2026-10-28', '09:00', { [spad3.id]: [1, 1, 1] })], '2026-10-28')).toEqual({})
+  })
+})
+
+describe('validaMisura: valore anomalo', () => {
+  const ultimi = { [tempAria.id]: { valore: 41.2, data: '2026-10-28' } }
+  it('aggiunge un avviso non bloccante con il nome e il valore', () => {
+    const r = validaMisura([tempAria], new Set(), { [tempAria.id]: [412] }, ultimi)
+    expect(r.errori).toEqual([])
+    expect(r.avvisi).toEqual(["«Temp. aria» = 412 °C. Molto diverso dall'ultima volta (41,2 il 28/10)."])
+  })
+  it('con più letture confronta la media', () => {
+    const tre = parametro('Tre', { n_letture: 3 })
+    const r = validaMisura([tre], new Set(), { [tre.id]: [400, 420, null] }, { [tre.id]: { valore: 41, data: '2026-10-28' } })
+    expect(r.avvisi).toEqual(["«Tre» = 410. Molto diverso dall'ultima volta (41 il 28/10)."])
+  })
+  it('un valore normale non avvisa, e senza ultimi tutto come prima', () => {
+    expect(validaMisura([tempAria], new Set(), { [tempAria.id]: [42] }, ultimi).avvisi).toEqual([])
+    expect(validaMisura([tempAria], new Set(), { [tempAria.id]: [412] }).avvisi).toEqual([])
   })
 })

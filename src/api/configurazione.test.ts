@@ -9,7 +9,7 @@ import { ELEMENTO_NON_TROVATO } from '@/lib/errori'
 import {
   aggiornaParametroDaCatalogo, aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento,
   collegaParametri, eliminaOArchiviaParametro, eliminaStrumento, eliminaPianta, pianteConDati, pianteNonEliminabili, parametriConDati, salvaParametro,
-  salvaStrumento, conteggiStrumenti,
+  salvaStrumento, conteggiStrumenti, salvaOrdinePiante,
 } from './configurazione'
 
 const errore = { code: '23505', message: 'duplicate key', details: '', hint: '' }
@@ -425,5 +425,34 @@ describe('pianteNonEliminabili', () => {
   it('lancia l\'errore di Supabase', async () => {
     mock.risponde('rpc:piante_non_eliminabili', { error: errore })
     await expect(pianteNonEliminabili('E')).rejects.toBe(errore)
+  })
+})
+
+describe('salvaOrdinePiante', () => {
+  const due: Pianta[] = [{ ...pianta, id: 'p1', ordine: 1 }, { ...pianta, id: 'p2', etichetta: '2', ordine: 0 }]
+
+  it('scrive solo l\'ordine, una pianta alla volta, per id e esperimento', async () => {
+    mock.risponde('piante', toccata('p1'))
+    await salvaOrdinePiante('E', due)
+    expect(mock.di('piante').map(c => [c.metodo, ...c.args])).toEqual([
+      ['update', { ordine: 1 }], ['eq', 'id', 'p1'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+      ['update', { ordine: 0 }], ['eq', 'id', 'p2'], ['eq', 'esperimento_id', 'E'], ['select', 'id'],
+    ])
+  })
+
+  it('senza piante non chiama il database', async () => {
+    await salvaOrdinePiante('E', [])
+    expect(supabase.from).not.toHaveBeenCalled()
+  })
+
+  it('una pianta sparita lo dice (nessuna riga toccata) e le altre non si scrivono', async () => {
+    mock.risponde('piante', { data: [] })
+    await expect(salvaOrdinePiante('E', due)).rejects.toThrow(ELEMENTO_NON_TROVATO)
+    expect(mock.di('piante').filter(c => c.metodo === 'update')).toHaveLength(1)
+  })
+
+  it('lancia l\'errore di Supabase', async () => {
+    mock.risponde('piante', { error: errore })
+    await expect(salvaOrdinePiante('E', due)).rejects.toBe(errore)
   })
 })

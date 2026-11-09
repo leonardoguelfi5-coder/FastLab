@@ -48,3 +48,20 @@ export function prossimaEtichetta(piante: Pianta[]): number {
   const numeri = piante.map(p => p.etichetta.trim()).filter(e => SOLO_CIFRE.test(e)).map(Number)
   return numeri.length === 0 ? 1 : Math.max(...numeri) + 1
 }
+
+/**
+ * Le piante il cui `ordine` cambia quando si riordina l'elenco: `idInOrdine` è l'elenco completo degli id nel nuovo
+ * ordine. Il nuovo ordine riusa gli `ordine` che le piante hanno già (dal più piccolo al più grande), così un
+ * riordino non inventa numeri e, con buchi lasciati da piante rimosse, non li sposta. Restano fuori le piante che
+ * mantengono il loro `ordine`. Con un elenco che non è esattamente quello delle piante (mancano o avanzano id) non si
+ * cambia niente: scrivere un ordine a metà confonderebbe il giro.
+ */
+export function riordinaPiante(piante: Pianta[], idInOrdine: string[]): Pianta[] {
+  const perId = new Map(piante.map(p => [p.id, p]))
+  if (idInOrdine.length !== piante.length || new Set(idInOrdine).size !== piante.length || idInOrdine.some(id => !perId.has(id))) return []
+  const ordini = piante.map(p => p.ordine).sort((a, b) => a - b)
+  return idInOrdine.flatMap((id, i) => {
+    const p = perId.get(id)!
+    return p.ordine === ordini[i] ? [] : [{ ...p, ordine: ordini[i] }]
+  })
+}

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { opzioniMisurePianta } from '@/api/query'
+import { completamentoDiretto } from '@/domain/giro'
 import { misureStrumentoNelGiorno } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta } from '@/domain/tipi'
 import { chiaveAperto, chiaveBozza, leggiAperto, leggiBozza } from './bozza'
@@ -130,6 +131,8 @@ export function RiquadroOggi({
   }
 
   const titolo = titoloRiquadro(strumento, dataRilievo, oggi)
+  // La correzione dell'unica misura incompleta del giorno: si è aperta da sola, e il modulo lo dice.
+  const completamento = inCorrezione !== null && completamentoDiretto(strumento, config.parametri, misureOggi, pianta.id)?.id === inCorrezione.id
 
   return (
     <ModuloOggi
@@ -150,6 +153,7 @@ export function RiquadroOggi({
       dataRilievo={dataRilievo}
       avanti={avanti}
       primoCampo={primoCampo}
+      completamento={completamento}
       // Anche il modulo scelto con un tocco all'arrivo (`iniziale`) compare dove c'erano i pulsanti della scelta.
       dopoSalvataggio={primoCampo || appenaSalvata !== null || iniziale !== undefined}
       onCorreggi={m => conferma(() => correggi(m))}

@@ -105,7 +105,7 @@ const percorso = (strumento: string, etichetta: string) =>
   `/esperimenti/E/misura/${idStrumento(strumento)}/${config.piante.find(p => p.etichetta === etichetta)?.id ?? etichetta}`
 
 /** Apre la misura di una pianta con uno strumento, arrivando dalla scelta dello strumento (la voce precedente). */
-function apri(etichetta = '1', strumento = 'SPAD', voce?: string) {
+function apri(etichetta = '1', strumento = 'SPAD', voce?: string | { pathname: string; state: unknown }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   const invalida = vi.spyOn(client, 'invalidateQueries')
   const { unmount } = render(
@@ -140,7 +140,7 @@ const piuTardi = (secondi = 1) => vi.setSystemTime(new Date(Date.now() + secondi
 /** Il toast d'errore dopo l'uscita resta finché non lo si chiude. */
 const PERSISTENTE = { duration: Infinity, action: { label: 'Chiudi', onClick: expect.any(Function) } }
 const bozzeSalvate = () => Object.keys(localStorage).filter(k => k.startsWith('fastlab-bozza:'))
-const MANTIENI = 'Mantieni questo parametro uguale anche nelle prossime misure'
+const MANTIENI = 'Mantieni per le prossime piante'
 const mantieni = (nome: string) => {
   let el: HTMLElement | null = campo(nome)
   while (el && !within(el).queryByRole('checkbox')) el = el.parentElement
@@ -155,6 +155,14 @@ async function scegli(utente: ReturnType<typeof userEvent.setup>, nome: string) 
   const scelta = await screen.findByRole('button', { name: nome })
   piuTardi()
   await utente.click(scelta)
+  piuTardi()
+}
+/**
+ * L'arrivo su una pianta incompleta con una sola misura: il completamento si apre da solo. Aspetta la riga che lo dice
+ * e poi più di un doppio tocco, come `scegli`.
+ */
+async function completa() {
+  await screen.findByText(/^Completi la misura delle/)
   piuTardi()
 }
 /** Il campo del foglio "Vai alla pianta": si apre dall'icona dell'intestazione. */
@@ -520,7 +528,7 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     expect(await screen.findByText(UNA)).toBeInTheDocument()
     expect(screen.queryByLabelText('SPAD')).not.toBeInTheDocument()
     expect(pulsante('Correggi')).toBeInTheDocument()
-    expect(pulsante('Nuova misura')).toBeInTheDocument()
+    expect(pulsante("Aggiungi un'altra misura")).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Salva/ })).not.toBeInTheDocument()
   })
 
@@ -549,7 +557,7 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     archivio = [esistente]
     const utente = userEvent.setup()
     apri('2')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungi un'altra misura")
 
     expect(campo('SPAD')).toHaveValue('')
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
@@ -607,7 +615,7 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     expect(screen.queryByText(/aggiungerne una nuova/)).not.toBeInTheDocument()
   })
 
-  it('nel giro, arrivando su una pianta incompleta (Ciras con solo A e gs) si chiede', async () => {
+  it('nel giro, arrivando su una pianta incompleta con una sola misura (Ciras con solo A e gs) si apre il completamento, senza domanda', async () => {
     aggiungiCiras()
     archivio = [misura('33', {
       strumento_id: idStrumento('Ciras'), valori: { [par('A').id]: [12.3], [par('gs').id]: [0.21] },
@@ -620,30 +628,37 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     await utente.click(pulsante('Salva e vai alla #33'))
 
     await pianta('33')
-    expect(await screen.findByText(UNA)).toBeInTheDocument()
-    expect(screen.queryByLabelText('E')).not.toBeInTheDocument()
+    expect(await screen.findByText('Completi la misura delle 09:12')).toBeInTheDocument()
+    expect(screen.queryByText(UNA)).not.toBeInTheDocument()
+    // La misura che c'è si completa: ha già A e gs, e mancano E e Ci.
+    expect(campo('A')).toHaveValue('12,3')
+    expect(campo('E')).toHaveValue('')
+    expect(pulsante("Aggiungine un'altra")).toBeInTheDocument()
   })
 
-  it('arrivando dopo "Salva e vai", un tocco immediato sulla scelta è il secondo di un doppio tocco: non sceglie', async () => {
-    // La 2 ha solo Temp aria: è incompleta, il giro ci passa e chiede.
+  it('arrivando dopo "Salva e vai" sul completamento, un tocco immediato è il secondo di un doppio tocco: non salva', async () => {
+    // La 2 ha solo Temp aria: è incompleta, il giro ci passa e apre il completamento.
     archivio = [misura('2', { strumento_id: idStrumento('Termometro'), valori: { [par('Temp aria').id]: [24] } })]
     const utente = userEvent.setup()
     apri('1', 'Termometro')
     await pronta()
     await utente.type(campo('Temp aria'), '24,5')
     await utente.click(pulsante('Salva e vai alla #2'))
-    await screen.findByText(UNA)
+    await screen.findByText('Completi la misura delle 09:12')
 
-    await utente.click(pulsante('Nuova misura'))
-    expect(screen.getByText(UNA)).toBeInTheDocument()
+    // Il secondo tocco cade su "Salva e vai alla #3", dove c'era quello appena toccato: non salva la 2.
+    await utente.click(pulsante('Salva e vai alla #3'))
+    await act(async () => {})
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+    expect(posizione()).toBe(percorso('Termometro', '2'))
 
     piuTardi()
-    await utente.click(pulsante('Nuova misura'))
-    expect(screen.queryByText(UNA)).not.toBeInTheDocument()
+    await utente.click(pulsante("Aggiungine un'altra"))
     expect(campo('Temp pianta')).toHaveValue('')
+    expect(screen.getByText('Nuova misura')).toBeInTheDocument()
   })
 
-  it('"Vai alle mancanti" dalla fine del giro porta alla pianta incompleta e chiede', async () => {
+  it('"Vai alle mancanti" dalla fine del giro porta alla pianta incompleta e ne apre il completamento', async () => {
     aggiungiCiras()
     const completa = (etichetta: string) => misura(etichetta, {
       strumento_id: idStrumento('Ciras'),
@@ -660,10 +675,11 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     await utente.click(pulsante('Vai alle mancanti'))
 
     await pianta('33')
-    expect(await screen.findByText(UNA)).toBeInTheDocument()
+    expect(await screen.findByText('Completi la misura delle 09:12')).toBeInTheDocument()
+    expect(screen.queryByText(UNA)).not.toBeInTheDocument()
   })
 
-  it('anche arrivando da "Vai alle mancanti" un doppio tocco non salta la domanda', async () => {
+  it('anche arrivando da "Vai alle mancanti" un doppio tocco non salva la pianta', async () => {
     const termometro = (etichetta: string, valori: ValoriMisura) => misura(etichetta, { strumento_id: idStrumento('Termometro'), valori })
     archivio = [
       ...config.piante.filter(p => p.etichetta !== '2').map(p => termometro(p.etichetta, { [par('Temp aria').id]: [24], [par('Temp pianta').id]: [25] })),
@@ -676,22 +692,22 @@ describe('MisuraPianta: arrivo su una pianta già misurata', () => {
     await utente.click(vai)
     await pianta('2')
 
-    // Il secondo tocco cade su "Nuova misura", che è al posto di "Vai alle mancanti": la domanda resta.
-    await utente.click(await screen.findByRole('button', { name: 'Nuova misura' }))
-    expect(screen.getByText(UNA)).toBeInTheDocument()
-    piuTardi()
-    await utente.click(pulsante('Nuova misura'))
-    expect(screen.queryByText(UNA)).not.toBeInTheDocument()
+    // Il secondo tocco cade sul pulsante principale, dove c'era "Vai alle mancanti": non salva la 2 senza che sia guardata.
+    await screen.findByText('Completi la misura delle 09:12')
+    await utente.click(screen.getByRole('button', { name: /^Salva e / }))
+    await act(async () => {})
+    expect(salvaMisura).not.toHaveBeenCalled()
+    expect(screen.getByText('Completi la misura delle 09:12')).toBeInTheDocument()
   })
 
-  it('il modulo scelto compare dove c\'era la scelta: un doppio tocco su "Nuova misura" non salva i valori mantenuti', async () => {
+  it('il modulo scelto compare dove c\'era la scelta: un doppio tocco su "Aggiungine un\'altra" non salva i valori mantenuti', async () => {
     mantenutaTempAria(26)
     archivio = [misura('2', { strumento_id: idStrumento('Termometro'), valori: { [par('Temp aria').id]: [24] } })]
     const utente = userEvent.setup()
     apri('2', 'Termometro')
-    await screen.findByText(UNA)
+    await screen.findByText('Completi la misura delle 09:12')
     piuTardi()
-    const nuova = pulsante('Nuova misura')
+    const nuova = pulsante("Aggiungine un'altra")
     act(() => {
       fireEvent.click(nuova)
     })
@@ -729,7 +745,7 @@ describe('MisuraPianta: valori non salvati e bozze', () => {
     archivio = [misura('2')]
     const utente = userEvent.setup()
     const primo = apri('2')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungi un'altra misura")
     await utente.type(campo('SPAD'), '44')
     // Uscita senza passare dall'app (gesto indietro, ricarica): i valori restano nella bozza.
     primo.unmount()
@@ -1309,7 +1325,7 @@ describe('MisuraPianta: salvataggio', () => {
     archivio = [vecchia]
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Correggi')
+    await completa()
     await utente.type(campo('Temp aria'), '25')
     await utente.click(pulsante('Salva'))
 
@@ -1642,10 +1658,10 @@ describe('MisuraPianta: passaggio alla pianta successiva', () => {
     archivio = [misuraT({ valori: { [par('Temp aria').id]: [24.5] } })]
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungine un'altra")
     expect(screen.getAllByRole('checkbox', { name: MANTIENI })).toHaveLength(2)
     await utente.click(pulsante(/^09:12 · /))
-    expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
+    expect(screen.getByText('Completi la misura delle 09:12')).toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 
@@ -1752,7 +1768,7 @@ describe('MisuraPianta: più misure nello stesso giorno', () => {
     expect(within(domanda).getAllByRole('listitem').map(li => li.textContent)).toEqual([
       '09:12 · Temp aria 24,5 °C · Temp pianta 25,1 °C', '15:40 · Temp aria 27 °C · Temp pianta 28,3 °C',
     ])
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungi un'altra misura")
     const elenco = screen.getByRole('list', { name: 'Misure già registrate' })
     expect(within(elenco).getAllByRole('button')).toHaveLength(2)
     const [prima, seconda] = within(elenco).getAllByRole('button')
@@ -1771,7 +1787,7 @@ describe('MisuraPianta: più misure nello stesso giorno', () => {
     expect(campo('Temp aria')).toHaveValue('24,5')
     expect(campo('Temp pianta')).toHaveValue('25,1')
     expect(pulsante('Ora: 09:12')).toBeInTheDocument()
-    expect(pulsante('+ Nuova misura')).toBeInTheDocument()
+    expect(pulsante("Aggiungi un'altra misura")).toBeInTheDocument()
 
     await utente.type(campo('Temp pianta'), '25,3')
     await utente.click(pulsante('Salva'))
@@ -1791,12 +1807,12 @@ describe('MisuraPianta: più misure nello stesso giorno', () => {
     const utente = userEvent.setup()
     apriT('35')
     await scegli(utente, 'Correggi 09:12')
-    await utente.click(pulsante('+ Nuova misura'))
+    await utente.click(pulsante("Aggiungi un'altra misura"))
     // Il modulo nuovo compare dove c'era il pulsante: un tocco subito dopo sarebbe il secondo di un doppio tocco.
     piuTardi()
 
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '+ Nuova misura' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: "Aggiungi un'altra misura" })).not.toBeInTheDocument()
     expect(campo('Temp pianta')).toHaveValue('')
     await utente.type(campo('Temp pianta'), '30')
     await utente.click(pulsante('Salva'))
@@ -1838,7 +1854,7 @@ describe('MisuraPianta: niente misure doppie', () => {
     vi.mocked(salvaMisura).mockRejectedValueOnce(new TypeError('Failed to fetch'))
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungine un'altra")
     await utente.type(campo('Temp pianta'), '25')
     await utente.click(pulsante('Salva'))
     await screen.findByRole('alert')
@@ -1846,7 +1862,7 @@ describe('MisuraPianta: niente misure doppie', () => {
     await utente.click(pulsante(/^09:12 · /))
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
     await chiudiDialogo()
-    await utente.click(pulsante('+ Nuova misura'))
+    await utente.click(pulsante("Aggiungine un'altra"))
     piuTardi()
     await utente.type(campo('Temp pianta'), '26')
     await utente.click(pulsante('Salva'))
@@ -1897,8 +1913,8 @@ describe('MisuraPianta: data di rilievo cambiata mentre si corregge', () => {
     const ieri = misuraDiIeri()
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Correggi')
-    expect(screen.getByText('Modifica della misura delle 09:00')).toBeInTheDocument()
+    await completa()
+    expect(screen.getByText('Completi la misura delle 09:00')).toBeInTheDocument()
 
     await utente.click(pulsante('Usa oggi'))
 
@@ -1920,14 +1936,14 @@ describe('MisuraPianta: data di rilievo cambiata mentre si corregge', () => {
     const ieri = misuraDiIeri()
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Correggi')
+    await completa()
     await utente.type(campo('Temp aria'), '21')
 
     await utente.click(pulsante('Usa oggi'))
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Continua a modificare' }))
     await chiudiDialogo()
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe(IERI)
-    expect(screen.getByText('Modifica della misura delle 09:00')).toBeInTheDocument()
+    expect(screen.getByText('Completi la misura delle 09:00')).toBeInTheDocument()
     expect(campo('Temp aria')).toHaveValue('21')
 
     await utente.click(pulsante('Usa oggi'))
@@ -2034,7 +2050,7 @@ describe('MisuraPianta: valori non salvati', () => {
     unaMisuraDiOggi()
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungi un'altra misura")
     await utente.type(campo('Temp aria'), '30')
     await utente.click(pulsante(/^09:12 · /))
 
@@ -2057,11 +2073,11 @@ describe('MisuraPianta: valori non salvati', () => {
     unaMisuraDiOggi()
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungi un'altra misura")
     await utente.click(pulsante(/^09:12 · /))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Modifica della misura delle 09:12')).toBeInTheDocument()
-    await utente.click(pulsante('+ Nuova misura'))
+    await utente.click(pulsante("Aggiungi un'altra misura"))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Nuova misura')).toBeInTheDocument()
     // Aprire il selettore dell'ora non è ancora una modifica.
@@ -2077,7 +2093,7 @@ describe('MisuraPianta: valori non salvati', () => {
     apriT('35')
     await scegli(utente, 'Correggi')
     await utente.type(campo('Temp pianta'), '26')
-    await utente.click(pulsante('+ Nuova misura'))
+    await utente.click(pulsante("Aggiungi un'altra misura"))
 
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
     await chiudiDialogo()
@@ -2278,7 +2294,7 @@ describe('MisuraPianta: dettagli del passaggio tra piante', () => {
     archivio = [mattina]
     const utente = userEvent.setup()
     apriT('35')
-    await scegli(utente, 'Nuova misura')
+    await scegli(utente, "Aggiungine un'altra")
     expect(campo('Temp aria')).toHaveValue('26')
 
     await utente.click(pulsante(/^09:12 · /))
@@ -2644,3 +2660,75 @@ describe('MisuraPianta: coda d\'invio con poco segnale (Piano E, Task E6)', () =
   })
 })
 
+
+describe('MisuraPianta: il giro più scorrevole (Piano E, Task E11)', () => {
+  it('un valore dieci volte più grande dell\'ultimo avvisa, non blocca: "Salva comunque" salva', async () => {
+    archivio = [misura('1', { data_rilievo: IERI, valori: { [par('SPAD').id]: [41.2] } })]
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '412')
+    await utente.click(pulsante('Salva e vai alla #2'))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("«SPAD» = 412. Molto diverso dall'ultima volta (41,2 il 27/10).")
+    expect(salvaMisura).not.toHaveBeenCalled()
+    piuTardi()
+    await utente.click(pulsante('Salva comunque e vai alla #2'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(salvate()[0].valori[par('SPAD').id]).toEqual([412])
+  })
+
+  it('una crescita normale non avvisa', async () => {
+    archivio = [misura('1', { data_rilievo: IERI, valori: { [par('SPAD').id]: [41.2] } })]
+    const utente = userEvent.setup()
+    apri('1')
+    await pronta()
+    await utente.type(campo('SPAD'), '45,3')
+    await utente.click(pulsante('Salva e vai alla #2'))
+    await waitFor(() => expect(salvaMisura).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('misurando dalla scheda, il salvataggio riporta alla scheda e la freccia indietro pure', async () => {
+    const utente = userEvent.setup()
+    apri('1', 'SPAD', { pathname: percorso('SPAD', '1'), state: { primoCampo: true, daScheda: true } })
+    await pronta()
+    const scheda = `/esperimenti/E/piante/${idPianta('1')}`
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', scheda)
+    await utente.type(campo('SPAD'), '41')
+    piuTardi()
+    await utente.click(pulsante('Salva e torna alla scheda'))
+    await waitFor(() => expect(posizione()).toBe(scheda))
+    expect(salvate()).toHaveLength(1)
+  })
+
+  it('senza partire dalla scheda si va alla pianta dopo, come prima', async () => {
+    apri('1')
+    await pronta()
+    expect(pulsante('Salva e vai alla #2')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/misura')
+  })
+
+  it('l\'ordine del giro scelto decide la pianta dopo e la griglia', async () => {
+    useCampoStore.getState().setOrdineGiro('E', { criterio: 'etichetta', inverso: true })
+    const utente = userEvent.setup()
+    apri('5')
+    await pronta()
+    expect(pulsante('Salva e vai alla #4')).toBeInTheDocument()
+    await apriFoglio(utente)
+    const celle = screen.getAllByRole('button', { name: /^Pianta #\d+, / })
+    expect(celle[0]).toHaveAccessibleName(/^Pianta #56, /)
+    expect(celle[celle.length - 1]).toHaveAccessibleName(/^Pianta #1, /)
+  })
+
+  it('"Vai alle mancanti" porta alla prima mancante nell\'ordine scelto', async () => {
+    useCampoStore.getState().setOrdineGiro('E', { criterio: 'etichetta', inverso: true })
+    archivio = [misura('56')]
+    const utente = userEvent.setup()
+    apri('', 'SPAD', `/esperimenti/E/misura/${idStrumento('SPAD')}/fine`)
+    const vai = await screen.findByRole('button', { name: 'Vai alle mancanti' })
+    piuTardi()
+    await utente.click(vai)
+    await pianta('55')
+  })
+})

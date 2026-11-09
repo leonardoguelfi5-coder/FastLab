@@ -19,7 +19,7 @@ vi.mock('@/api/esperimenti', () => ({
 vi.mock('@/api/configurazione', () => ({
   salvaParametro: vi.fn(), parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), conteggiStrumenti: vi.fn(), eliminaOArchiviaParametro: vi.fn(),
   archiviaParametro: vi.fn(), archiviaStrumento: vi.fn(),
-  salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(),
+  salvaStrumento: vi.fn(), eliminaStrumento: vi.fn(), aggiungiPiante: vi.fn(), aggiornaPianta: vi.fn(), eliminaPianta: vi.fn(), salvaOrdinePiante: vi.fn(),
   aggiornaTrattamento: vi.fn(),
 }))
 vi.mock('@/api/foto', () => ({
@@ -42,7 +42,7 @@ import { listaFoto } from '@/api/foto'
 import { spazioProgetto, type SpazioProgetto } from '@/api/spazio'
 import {
   aggiornaPianta, aggiornaTrattamento, aggiungiPiante, archiviaParametro, archiviaStrumento, eliminaOArchiviaParametro,
-  conteggiStrumenti, eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaParametro, salvaStrumento,
+  conteggiStrumenti, eliminaStrumento, eliminaPianta, parametriConDati, pianteConDati, pianteNonEliminabili, salvaOrdinePiante, salvaParametro, salvaStrumento,
 } from '@/api/configurazione'
 import { chiavi } from '@/api/query'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
@@ -136,6 +136,9 @@ beforeEach(() => {
   })
   vi.mocked(aggiungiPiante).mockImplementation(async (_e, nuove) => { config.piante = [...config.piante, ...nuove] })
   vi.mocked(eliminaPianta).mockImplementation(async (_e, id) => { config.piante = config.piante.filter(p => p.id !== id) })
+  vi.mocked(salvaOrdinePiante).mockImplementation(async (_e, cambiate) => {
+    config.piante = config.piante.map(x => cambiate.find(c => c.id === x.id) ?? x)
+  })
   vi.mocked(salvaParametro).mockImplementation(async (_e, p) => {
     config.parametri = config.parametri.some(x => x.id === p.id)
       ? config.parametri.map(x => (x.id === p.id ? p : x))
@@ -474,6 +477,70 @@ describe('Impostazioni: piante', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(
       'La pianta #2 ha già dei dati: il trattamento non si può più cambiare.'))
     expect(aggiornaPianta).not.toHaveBeenCalled()
+  })
+})
+
+describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
+  const etichetteInOrdine = () => within(screen.getByRole('list', { name: 'Ordine delle piante' })).getAllByRole('listitem').map(li => li.textContent?.match(/#(\S+)/)?.[1])
+
+  it('"Riordina" mostra le piante nell\'ordine di oggi, con su e giù da 44 px', async () => {
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
+    expect(etichetteInOrdine().slice(0, 3)).toEqual(config.piante.slice(0, 3).map(p => p.etichetta))
+    expect(screen.getByRole('button', { name: 'Sposta su la pianta #1' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }).className).toMatch(/size-11/)
+    expect(screen.getByRole('button', { name: "Salva l'ordine" })).toBeDisabled()
+  })
+
+  it('sposta una pianta e salva solo l\'ordine delle piante cambiate', async () => {
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
+    const prima = config.piante.slice(0, 2).map(p => ({ ...p }))
+    await utente.click(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }))
+    expect(etichetteInOrdine().slice(0, 2)).toEqual([prima[1].etichetta, prima[0].etichetta])
+
+    await utente.click(screen.getByRole('button', { name: "Salva l'ordine" }))
+    await waitFor(() => expect(salvaOrdinePiante).toHaveBeenCalledTimes(1))
+    expect(salvaOrdinePiante).toHaveBeenCalledWith('E', [
+      { ...prima[1], ordine: prima[0].ordine }, { ...prima[0], ordine: prima[1].ordine },
+    ])
+    // Salvato: si torna all'elenco delle piante.
+    expect(await sezione('Piante').findByRole('button', { name: 'Riordina' })).toBeInTheDocument()
+  })
+
+  it('"Ordina per etichetta" mette 2 prima di 10, "Ordina per blocco" raggruppa i blocchi', async () => {
+    config.piante = config.piante.slice(0, 3).map((p, i) => ({ ...p, etichetta: ['10', '2', '1'][i], blocco: ['B2', 'B1', 'B2'][i], ordine: i }))
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
+    expect(etichetteInOrdine()).toEqual(['10', '2', '1'])
+    await utente.click(screen.getByRole('button', { name: 'Ordina per etichetta' }))
+    expect(etichetteInOrdine()).toEqual(['1', '2', '10'])
+    await utente.click(screen.getByRole('button', { name: 'Ordina per blocco' }))
+    expect(etichetteInOrdine()).toEqual(['2', '10', '1'])
+  })
+
+  it('"Annulla" lascia l\'ordine com\'era, senza scrivere', async () => {
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
+    await utente.click(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }))
+    await utente.click(screen.getByRole('button', { name: 'Annulla' }))
+    expect(salvaOrdinePiante).not.toHaveBeenCalled()
+    expect(await sezione('Piante').findByRole('button', { name: 'Riordina' })).toBeInTheDocument()
+  })
+
+  it('un errore del database lo dice e lascia aperto il riordino', async () => {
+    vi.mocked(salvaOrdinePiante).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const { utente } = apri()
+    await pronta()
+    await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
+    await utente.click(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }))
+    await utente.click(screen.getByRole('button', { name: "Salva l'ordine" }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalled())
+    expect(screen.getByRole('list', { name: 'Ordine delle piante' })).toBeInTheDocument()
   })
 })
 

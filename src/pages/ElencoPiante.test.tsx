@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
@@ -60,11 +60,11 @@ function Posizione() {
   return <p data-testid="posizione">{pathname}</p>
 }
 
-function vaiAllaPagina() {
+function vaiAllaPagina(voce = '/esperimenti/E/piante') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/esperimenti/E/piante']}>
+      <MemoryRouter initialEntries={[voce]}>
         <Routes>
           <Route path="/esperimenti/:espId/piante" element={<ElencoPiante />} />
           <Route path="*" element={<Posizione />} />
@@ -360,5 +360,103 @@ describe('ElencoPiante: caricamento ed errori', () => {
     await utente.click(within(avviso).getByRole('button', { name: 'Riprova' }))
     await vi.waitFor(() => expect(b).toHaveTextContent('Temp aria 24 °C · 1/14'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('ElencoPiante: ritorno all\'elenco (Piano E, Task E11)', () => {
+  /** La ricerca e i blocchi aperti stanno nella URL: la leggiamo con una rotta che la mostra. */
+  function vaiConUrl(voce = '/esperimenti/E/piante') {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    function Url() {
+      const { pathname, search } = useLocation()
+      const tipo = useNavigationType()
+      return <><p data-testid="url">{pathname + search}</p><p data-testid="tipo">{tipo}</p></>
+    }
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[voce]}>
+          <Routes>
+            <Route path="/esperimenti/:espId/piante" element={<><ElencoPiante /><Url /></>} />
+            <Route path="*" element={<Posizione />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+  }
+  const url = () => screen.getByTestId('url').textContent
+
+  beforeEach(() => sessionStorage.clear())
+
+  it('la ricerca va nella URL e si riapre com\'era', async () => {
+    const utente = userEvent.setup()
+    vaiConUrl()
+    await aspettaBlocchi()
+    await utente.type(screen.getByRole('searchbox', { name: 'Cerca pianta' }), '21')
+    expect(url()).toBe('/esperimenti/E/piante?cerca=21')
+    cleanup()
+
+    vaiConUrl('/esperimenti/E/piante?cerca=21')
+    const blocchi = await aspettaBlocchi()
+    expect(screen.getByRole('searchbox', { name: 'Cerca pianta' })).toHaveValue('21')
+    expect(blocchi).toHaveLength(1)
+    expect(blocchi[0]).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('i blocchi aperti a mano vanno nella URL e tornano aperti', async () => {
+    const utente = userEvent.setup()
+    vaiConUrl()
+    const primo = await blocco(config.trattamenti[0].etichetta)
+    await utente.click(primo)
+    const secondo = await blocco(config.trattamenti[2].etichetta)
+    await utente.click(secondo)
+    const salvata = `/esperimenti/E/piante?aperti=${config.trattamenti[0].id}%2C${config.trattamenti[2].id}`
+    expect(url()).toBe(salvata)
+    cleanup()
+
+    vaiConUrl(salvata)
+    expect(await blocco(config.trattamenti[0].etichetta)).toHaveAttribute('aria-expanded', 'true')
+    expect(await blocco(config.trattamenti[2].etichetta)).toHaveAttribute('aria-expanded', 'true')
+    expect(await blocco(config.trattamenti[1].etichetta)).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('ricerca e blocchi sostituiscono la voce della cronologia: tornare indietro non li ripercorre', async () => {
+    const utente = userEvent.setup()
+    vaiConUrl()
+    await utente.click(await blocco(config.trattamenti[0].etichetta))
+    expect(screen.getByTestId('tipo').textContent).toBe('REPLACE')
+    await utente.type(screen.getByRole('searchbox', { name: 'Cerca pianta' }), '2')
+    expect(screen.getByTestId('tipo').textContent).toBe('REPLACE')
+  })
+
+  it('cambiando il testo i blocchi aperti a mano si dimenticano', async () => {
+    const utente = userEvent.setup()
+    vaiConUrl(`/esperimenti/E/piante?aperti=${config.trattamenti[0].id}`)
+    expect(await blocco(config.trattamenti[0].etichetta)).toHaveAttribute('aria-expanded', 'true')
+    await utente.type(screen.getByRole('searchbox', { name: 'Cerca pianta' }), '21')
+    expect(url()).toBe('/esperimenti/E/piante?cerca=21')
+  })
+
+  it('lo scorrimento si ricorda per percorso e si ripristina al ritorno', async () => {
+    const scorri = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    vaiConUrl()
+    await aspettaBlocchi()
+    Object.defineProperty(window, 'scrollY', { value: 480, configurable: true })
+    window.dispatchEvent(new Event('scroll'))
+    expect(sessionStorage.getItem('fastlab-scorrimento:/esperimenti/E/piante')).toBe('480')
+    cleanup()
+
+    vaiConUrl()
+    await aspettaBlocchi()
+    expect(scorri).toHaveBeenCalledWith(0, 480)
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true })
+    scorri.mockRestore()
+  })
+
+  it('senza uno scorrimento ricordato non scorre', async () => {
+    const scorri = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    vaiConUrl()
+    await aspettaBlocchi()
+    expect(scorri).not.toHaveBeenCalled()
+    scorri.mockRestore()
   })
 })

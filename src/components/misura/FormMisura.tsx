@@ -13,10 +13,10 @@ interface FormMisuraProps {
   obbligatori: Set<string>
   valori: ValoriMisura
   onChange: (valori: ValoriMisura) => void
-  /** Gli id dei parametri con la spunta "Mantieni questo parametro uguale". Solo per le misure nuove. */
+  /** Gli id dei parametri con la spunta "Mantieni per le prossime piante". Solo per le misure nuove. */
   mantenuti?: Set<string>
   /**
-   * Spunta o toglie "Mantieni questo parametro uguale anche nelle prossime misure". Senza, le caselle non ci sono
+   * Spunta o toglie "Mantieni per le prossime piante". Senza, le caselle non ci sono
    * (correzione di una misura già salvata): una misura vecchia non decide i valori delle piante dopo.
    */
   onMantieni?: (parametroId: string, attivo: boolean) => void
@@ -45,7 +45,7 @@ function CasellaMantieni({ attiva, onChange }: CasellaMantieniProps) {
         className="peer size-6 shrink-0 cursor-pointer appearance-none rounded-sm border border-riga-controllo bg-foglio checked:border-inchiostro checked:bg-inchiostro"
       />
       <Check aria-hidden className="pointer-events-none absolute left-0 size-6 p-1 text-foglio opacity-0 peer-checked:opacity-100" />
-      Mantieni questo parametro uguale anche nelle prossime misure
+      Mantieni per le prossime piante
     </label>
   )
 }

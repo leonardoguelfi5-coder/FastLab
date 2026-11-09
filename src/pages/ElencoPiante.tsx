@@ -1,5 +1,5 @@
-import { useId, useMemo, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useConfig, useUltimeMisurePiante } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -22,6 +22,39 @@ import { useCampoStore } from '@/store/campo'
 
 const NUMERI = 'font-mono tabular-nums'
 
+/** Dove si ricorda lo scorrimento di questo elenco: una voce per percorso, finché la scheda del browser resta aperta. */
+const chiaveScorrimento = (percorso: string) => `fastlab-scorrimento:${percorso}`
+
+function leggiScorrimento(percorso: string): number {
+  try {
+    const y = Number(sessionStorage.getItem(chiaveScorrimento(percorso)))
+    return Number.isFinite(y) && y > 0 ? y : 0
+  } catch {
+    return 0
+  }
+}
+
+function scriviScorrimento(percorso: string, y: number): void {
+  try {
+    sessionStorage.setItem(chiaveScorrimento(percorso), String(Math.round(y)))
+  } catch { /* senza sessionStorage si riparte dall'alto */ }
+}
+
+/**
+ * Lo scorrimento dell'elenco si ricorda per percorso e si ripristina al ritorno (dalla scheda di una pianta, dalla misura
+ * fatta partire da lì): chi ha cercato la pianta 120 non deve riscorrere l'elenco. Si ripristina una volta sola, a
+ * elenco disegnato, perché la pagina deve essere già abbastanza lunga.
+ */
+function useScorrimentoRicordato(percorso: string) {
+  useEffect(() => {
+    const y = leggiScorrimento(percorso)
+    if (y > 0) window.scrollTo(0, y)
+    const salva = () => scriviScorrimento(percorso, window.scrollY)
+    window.addEventListener('scroll', salva, { passive: true })
+    return () => window.removeEventListener('scroll', salva)
+  }, [percorso])
+}
+
 /**
  * Lo stato degli ultimi valori per le righe: `caricano` finché non sono arrivati (mai un numero finto), `mancano`
  * se non arrivano (l'elenco si usa lo stesso, senza valori).
@@ -36,9 +69,18 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
   const strumentoDelloStore = useCampoStore(s => s.dati(espId).strumentoId)
   const ultime = useUltimeMisurePiante(espId)
 
-  const [cercato, setCercato] = useState('')
-  // Chi apre o chiude un blocco a mano vince sul resto; cambiando il testo cercato si riparte dal comportamento di base.
-  const [aMano, setAMano] = useState<Map<string, boolean>>(new Map())
+  const { pathname } = useLocation()
+  useScorrimentoRicordato(pathname)
+  // La ricerca e i blocchi aperti stanno nella URL (`?cerca=…&aperti=<id>,<id>`, senza nuove voci nella cronologia): da
+  // una scheda o da una misura si torna all'elenco com'era. `aperti` presente (anche vuoto) vuol dire "esattamente questi
+  // blocchi"; assente, i blocchi seguono il comportamento di base (chiusi, aperti se c'è una ricerca).
+  const [ricerca, setRicerca] = useSearchParams()
+  const cercato = ricerca.get('cerca') ?? ''
+  const apertiNellaUrl = ricerca.get('aperti')
+  const aMano = useMemo(
+    () => (apertiNellaUrl === null ? null : new Set(apertiNellaUrl.split(',').filter(x => x !== ''))),
+    [apertiNellaUrl],
+  )
   const [sceltoId, setSceltoId] = useState<string | null>(null)
 
   const gruppi = useMemo(() => parametriMostrabili(config), [config])
@@ -66,9 +108,26 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
   const inRicerca = cercato.trim() !== ''
   const visibili = inRicerca ? blocchi.filter(b => b.trovate.length > 0) : blocchi
 
+  // Cambiando il testo cercato si riparte dal comportamento di base: i blocchi aperti a mano si dimenticano.
   function cerca(testo: string) {
-    setCercato(testo)
-    setAMano(new Map())
+    setRicerca(prima => {
+      const nuova = new URLSearchParams(prima)
+      if (testo === '') nuova.delete('cerca')
+      else nuova.set('cerca', testo)
+      nuova.delete('aperti')
+      return nuova
+    }, { replace: true })
+  }
+
+  function cambiaBlocco(id: string, aperto: boolean) {
+    const adesso = new Set(visibili.filter(b => aMano ? aMano.has(b.trattamento.id) : inRicerca).map(b => b.trattamento.id))
+    if (aperto) adesso.add(id)
+    else adesso.delete(id)
+    setRicerca(prima => {
+      const nuova = new URLSearchParams(prima)
+      nuova.set('aperti', [...adesso].join(','))
+      return nuova
+    }, { replace: true })
   }
 
   // Invio con un'etichetta esatta (anche "035" per "35") apre subito la scheda; altrimenti resta il filtro.
@@ -122,7 +181,7 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
       ) : (
         <ul aria-label="Trattamenti" className="-mx-4 flex flex-col border-t border-riga">
           {visibili.map(({ trattamento, tutte, trovate }) => {
-            const aperto = aMano.get(trattamento.id) ?? inRicerca
+            const aperto = aMano ? aMano.has(trattamento.id) : inRicerca
             const conteggio = inRicerca && trovate.length !== tutte.length
               ? `${trovate.length} di ${tutte.length} piante`
               : `${tutte.length} ${tutte.length === 1 ? 'pianta' : 'piante'}`
@@ -142,7 +201,7 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
                   </>
                 }
                 aperto={aperto}
-                onCambia={() => setAMano(prima => new Map(prima).set(trattamento.id, !aperto))}
+                onCambia={() => cambiaBlocco(trattamento.id, !aperto)}
               >
                 <ul aria-label={`Piante di ${trattamento.etichetta}`} className="-mx-4 flex flex-col border-t border-riga">
                   {trovate.map(p => {

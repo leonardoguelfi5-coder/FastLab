@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { generaPiante, trovaPianta, etichetteNumeriche, prossimaEtichetta } from './piante'
+import { generaPiante, trovaPianta, etichetteNumeriche, prossimaEtichetta, riordinaPiante } from './piante'
 import { piante } from './test-helpers'
 
 describe('piante', () => {
@@ -33,5 +33,29 @@ describe('piante', () => {
   it('gli spazi attorno a un\'etichetta non contano: " 35 " è il numero 35', () => {
     expect(etichetteNumeriche(piante(['1', ' 35 ']))).toBe(true)
     expect(prossimaEtichetta(piante(['1', ' 35 ']))).toBe(36)
+  })
+})
+
+describe('riordinaPiante', () => {
+  const base = piante(['a', 'b', 'c', 'd'])
+
+  it('lo stesso ordine non cambia nulla', () => {
+    expect(riordinaPiante(base, base.map(p => p.id))).toEqual([])
+  })
+
+  it('scambiando due piante vicine cambiano solo quelle due, con gli ordini che avevano', () => {
+    const cambiate = riordinaPiante(base, [base[1].id, base[0].id, base[2].id, base[3].id])
+    expect(cambiate.map(p => [p.etichetta, p.ordine])).toEqual([['b', 0], ['a', 1]])
+  })
+
+  it('usa gli ordini che ci sono già, anche con buchi (dopo piante rimosse)', () => {
+    const buchi = base.map((p, i) => ({ ...p, ordine: i * 10 }))
+    const cambiate = riordinaPiante(buchi, [buchi[3].id, buchi[0].id, buchi[1].id, buchi[2].id])
+    expect(cambiate.map(p => [p.etichetta, p.ordine])).toEqual([['d', 0], ['a', 10], ['b', 20], ['c', 30]])
+  })
+
+  it('una pianta che non c\'è nel nuovo ordine, o un id sconosciuto, non cambia niente', () => {
+    expect(riordinaPiante(base, [base[1].id, base[0].id])).toEqual([])
+    expect(riordinaPiante(base, [...base.map(p => p.id), 'x'])).toEqual([])
   })
 })

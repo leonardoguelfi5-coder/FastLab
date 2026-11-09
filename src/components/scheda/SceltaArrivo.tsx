@@ -91,7 +91,7 @@ export function SceltaArrivo({ titolo, misure, parametri, onScegli }: SceltaArri
               {una ? 'Correggi' : `Correggi ${etichette[i]}`}
             </Button>
           ))}
-          <Button variant="outline" size="lg" className="grow" onClick={() => scegli({ tipo: 'nuova' })}>Nuova misura</Button>
+          <Button variant="outline" size="lg" className="grow" onClick={() => scegli({ tipo: 'nuova' })}>Aggiungi un&apos;altra misura</Button>
         </div>
       </BarraAzioni>
     </section>

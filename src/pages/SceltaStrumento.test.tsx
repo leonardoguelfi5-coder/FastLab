@@ -532,3 +532,24 @@ describe('SceltaStrumento: caricamento ed errori', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Esperimento non trovato')
   })
 })
+
+describe('SceltaStrumento: l\'ordine del giro (Piano E, Task E11)', () => {
+  it('di base è quello delle impostazioni, e si parte dalla prima pianta', async () => {
+    vaiAllaPagina()
+    await aspettaElenco()
+    expect(screen.getByRole('button', { name: 'Ordine: come nelle impostazioni' })).toBeInTheDocument()
+  })
+
+  it('"Al contrario" si salva per l\'esperimento e il giro parte dall\'ultima pianta', async () => {
+    const utente = userEvent.setup()
+    vaiAllaPagina()
+    await aspettaElenco()
+    await utente.click(screen.getByRole('button', { name: /^Ordine:/ }))
+    await utente.click(screen.getByRole('checkbox', { name: 'Al contrario' }))
+    expect(useCampoStore.getState().dati('E').ordineGiro).toEqual({ criterio: 'impostazioni', inverso: true })
+    expect(screen.getByRole('button', { name: 'Ordine: come nelle impostazioni, al contrario' })).toBeInTheDocument()
+
+    await utente.click(riga('SPAD'))
+    expect(screen.getByTestId('posizione')).toHaveTextContent(`/esperimenti/E/misura/${strumento('SPAD').id}/${idPianta(56)}`)
+  })
+})

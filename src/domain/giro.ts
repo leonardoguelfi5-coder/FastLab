@@ -5,9 +5,45 @@ import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, Trattamen
 /** Stato di una pianta in un giro di misura: mai misurata, misurata a metà, completa. */
 export type StatoPianta = 'da_fare' | 'incompleta' | 'fatta'
 
-/** Piante nell'ordine del giro: per `ordine`, con l'etichetta come spareggio stabile. */
-function inOrdine(piante: Pianta[]): Pianta[] {
-  return [...piante].sort((a, b) => a.ordine - b.ordine || (a.etichetta < b.etichetta ? -1 : a.etichetta > b.etichetta ? 1 : 0))
+/**
+ * L'ordine in cui si misurano le piante di un giro: `impostazioni` è il campo `ordine` delle Impostazioni (il
+ * default), `etichetta` l'ordine naturale delle etichette (2 prima di 10), `blocco` il blocco e poi l'ordine;
+ * `inverso` rovescia quello scelto.
+ */
+export type OrdineGiro = { criterio: 'impostazioni' | 'etichetta' | 'blocco'; inverso: boolean }
+
+export const ORDINE_GIRO_PREDEFINITO: OrdineGiro = { criterio: 'impostazioni', inverso: false }
+
+const naturale = (a: string, b: string): number => a.localeCompare(b, 'it', { numeric: true })
+const confrontaLettere = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
+
+/** Per `ordine`, con l'etichetta come spareggio stabile: l'ordine di sempre. */
+const perImpostazioni = (a: Pianta, b: Pianta): number => a.ordine - b.ordine || confrontaLettere(a.etichetta, b.etichetta)
+
+/**
+ * Le piante nell'ordine del giro scelto (una copia). Per etichetta lo spareggio è `ordine`; per blocco, le piante
+ * senza blocco vanno in fondo e dentro lo stesso blocco vale `ordine`.
+ */
+export function ordinaPiante(piante: Pianta[], ordine: OrdineGiro = ORDINE_GIRO_PREDEFINITO): Pianta[] {
+  const confronto = (a: Pianta, b: Pianta): number => {
+    switch (ordine.criterio) {
+      case 'etichetta':
+        return naturale(a.etichetta, b.etichetta) || perImpostazioni(a, b)
+      case 'blocco': {
+        if (a.blocco === null || b.blocco === null) {
+          if (a.blocco !== b.blocco) return a.blocco === null ? 1 : -1
+        } else {
+          const c = naturale(a.blocco, b.blocco)
+          if (c !== 0) return c
+        }
+        return perImpostazioni(a, b)
+      }
+      default:
+        return perImpostazioni(a, b)
+    }
+  }
+  const ordinate = [...piante].sort(confronto)
+  return ordine.inverso ? ordinate.reverse() : ordinate
 }
 
 /**
@@ -46,6 +82,16 @@ export function statoPianta(strumento: Strumento, parametri: Parametro[], misure
   return haValoreQualunque ? 'incompleta' : 'da_fare'
 }
 
+/**
+ * La misura da completare direttamente all'arrivo su una pianta (Piano E, Decisione 13): la pianta è `incompleta` e ha
+ * una sola misura di questo strumento in quel giorno. Con più misure, o con la pianta fatta, si chiede cosa fare;
+ * una pianta senza misure non ha nulla da completare. `misureGiorno` può avere altre piante e altri strumenti.
+ */
+export function completamentoDiretto(strumento: Strumento, parametri: Parametro[], misureGiorno: Misura[], piantaId: string): Misura | null {
+  const sue = misureGiorno.filter(m => m.pianta_id === piantaId && m.strumento_id === strumento.id)
+  return sue.length === 1 && statoPianta(strumento, parametri, sue, piantaId) === 'incompleta' ? sue[0] : null
+}
+
 /** Lo stato di ogni pianta per uno strumento (le misure del giorno sono già filtrate per data dal chiamante). */
 export function statiPiante(strumento: Strumento, parametri: Parametro[], misureGiorno: Misura[], piante: Pianta[]): Map<string, StatoPianta> {
   const delloStrumento = misureGiorno.filter(m => m.strumento_id === strumento.id)
@@ -57,17 +103,19 @@ export function statiPiante(strumento: Strumento, parametri: Parametro[], misure
  * incomplete si riprendono, le fatte si saltano. Senza `dopo` (o con un id che non c'è) parte dall'inizio. Dopo
  * l'ultima non ricomincia: `null`. Una pianta assente da `stati` vale `da_fare`.
  */
-export function prossimaDaMisurare(piante: Pianta[], stati: Map<string, StatoPianta>, dopo: string | null): Pianta | null {
-  const ordinate = inOrdine(piante)
+export function prossimaDaMisurare(
+  piante: Pianta[], stati: Map<string, StatoPianta>, dopo: string | null, ordine: OrdineGiro = ORDINE_GIRO_PREDEFINITO,
+): Pianta | null {
+  const ordinate = ordinaPiante(piante, ordine)
   const i = dopo === null ? -1 : ordinate.findIndex(p => p.id === dopo)
   return ordinate.slice(i + 1).find(p => (stati.get(p.id) ?? 'da_fare') !== 'fatta') ?? null
 }
 
 /** Quante piante sono fatte e quali mancano (comprese le incomplete), nell'ordine del giro. */
-export function riepilogoGiro(piante: Pianta[], stati: Map<string, StatoPianta>): {
+export function riepilogoGiro(piante: Pianta[], stati: Map<string, StatoPianta>, ordine: OrdineGiro = ORDINE_GIRO_PREDEFINITO): {
   fatte: number; totale: number; mancanti: Pianta[]; incomplete: Pianta[]
 } {
-  const ordinate = inOrdine(piante)
+  const ordinate = ordinaPiante(piante, ordine)
   const stato = (p: Pianta): StatoPianta => stati.get(p.id) ?? 'da_fare'
   return {
     fatte: ordinate.filter(p => stato(p) === 'fatta').length,
@@ -112,16 +160,16 @@ export interface RigaStrumento {
  * risulterebbe "senza parametri attivi" e le sue piante "fatte". Se le misure non arrivano (o non sono ancora
  * arrivate) la prossima pianta è la prima del giro: il modulo di misura chiederà lui cosa fare se ha già misure.
  */
-export function righeStrumenti(config: ConfigEsperimento, misure: Misura[] | undefined): RigaStrumento[] {
+export function righeStrumenti(config: ConfigEsperimento, misure: Misura[] | undefined, ordine: OrdineGiro = ORDINE_GIRO_PREDEFINITO): RigaStrumento[] {
   return config.strumenti
     .filter(s => !s.archiviato)
     .sort((a, b) => a.ordine - b.ordine)
     .map(strumento => {
-      if (!misure) return { strumento, giro: null, prossima: prossimaDaMisurare(config.piante, new Map<string, StatoPianta>(), null) }
+      if (!misure) return { strumento, giro: null, prossima: prossimaDaMisurare(config.piante, new Map<string, StatoPianta>(), null, ordine) }
       const stati = statiPiante(strumento, config.parametri, misure, config.piante)
-      const { fatte, totale } = riepilogoGiro(config.piante, stati)
+      const { fatte, totale } = riepilogoGiro(config.piante, stati, ordine)
       const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
-      return { strumento, giro: { fatte, totale, cominciato }, prossima: prossimaDaMisurare(config.piante, stati, null) }
+      return { strumento, giro: { fatte, totale, cominciato }, prossima: prossimaDaMisurare(config.piante, stati, null, ordine) }
     })
 }
 
@@ -129,12 +177,14 @@ export function righeStrumenti(config: ConfigEsperimento, misure: Misura[] | und
 export interface CellaGriglia { pianta: Pianta; stato: StatoPianta; attuale: boolean }
 
 /**
- * Le celle della griglia delle piante, nell'ordine del giro. `stati` viene dalle misure del giorno che già
+ * Le celle della griglia delle piante, nell'ordine del giro scelto. `stati` viene dalle misure del giorno che già
  * comprendono quelle in coda d'invio (una misura appena salvata senza rete fa la pianta `fatta`); una pianta senza
  * stato vale `da_fare`. `attualeId` è la pianta aperta (`null` nel fine giro, dove non ce n'è una).
  */
-export function celleGriglia(piante: Pianta[], stati: Map<string, StatoPianta>, attualeId: string | null): CellaGriglia[] {
-  return inOrdine(piante).map(pianta => ({ pianta, stato: stati.get(pianta.id) ?? 'da_fare', attuale: pianta.id === attualeId }))
+export function celleGriglia(
+  piante: Pianta[], stati: Map<string, StatoPianta>, attualeId: string | null, ordine: OrdineGiro = ORDINE_GIRO_PREDEFINITO,
+): CellaGriglia[] {
+  return ordinaPiante(piante, ordine).map(pianta => ({ pianta, stato: stati.get(pianta.id) ?? 'da_fare', attuale: pianta.id === attualeId }))
 }
 
 /** Media, errore standard (`null` con una sola pianta) e numero di piante di un trattamento, in un giorno. */

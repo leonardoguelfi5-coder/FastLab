@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('useCampoStore: valori predefiniti', () => {
   it('senza nulla di salvato: nessuno strumento, data di oggi, nessun valore mantenuto', () => {
-    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
   })
 
   it('la data predefinita è quella di oggi: segue il cambio di giorno', () => {
@@ -82,6 +82,7 @@ describe('useCampoStore: strumento e data', () => {
     expect(useCampoStore.getState().dati('E')).toEqual({
       strumentoId: 'p1', dataRilievo: '2026-10-27',
       mantenuti: { strumentoId: 'p1', data: '2026-10-27', parametri: [tempAria.id], valori: { [tempAria.id]: [24.5] } },
+      ordineGiro: { criterio: 'impostazioni', inverso: false },
     })
     expect(salvato().state.stato.E.strumentoId).toBe('p1')
   })
@@ -89,7 +90,7 @@ describe('useCampoStore: strumento e data', () => {
   it('ogni esperimento ha le sue scelte', () => {
     useCampoStore.getState().setStrumento('E', 'p1')
     useCampoStore.getState().setData('E', '2026-10-27')
-    expect(useCampoStore.getState().dati('F')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null })
+    expect(useCampoStore.getState().dati('F')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
   })
 
   it('dopo il ricaricamento della pagina le scelte tornano dal localStorage', async () => {
@@ -108,6 +109,7 @@ describe('useCampoStore: strumento e data', () => {
     expect(useCampoStore.getState().dati('E')).toEqual({
       strumentoId: 'p1', dataRilievo: '2026-10-27',
       mantenuti: { strumentoId: 'p1', data: '2026-10-27', parametri: [tempAria.id], valori: { [tempAria.id]: [24.5] } },
+      ordineGiro: { criterio: 'impostazioni', inverso: false },
     })
   })
 
@@ -305,7 +307,7 @@ describe('useCampoStore: mantieni questo parametro uguale', () => {
       version: 1,
     }))
     await useCampoStore.persist.rehydrate()
-    expect(store().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-27', mantenuti: null })
+    expect(store().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-27', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
     // La prossima scrittura non si trascina i ricordati.
     store().setData('E', '2026-10-26')
     expect(salvato().state.stato.E).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-26' })
@@ -376,12 +378,12 @@ describe('useCampoStore: salvataggio con valori non validi', () => {
 
   it('anche strumento e valori mantenuti del tipo sbagliato si ignorano', () => {
     salvaCosi({ strumentoId: 5, dataRilievo: '2026-10-27', mantenuti: 'xyz' })
-    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-27', mantenuti: null })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-27', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
   })
 
   it('una voce che non è un oggetto vale come vuota', () => {
     salvaCosi('boh')
-    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: null, dataRilievo: '2026-10-28', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
   })
 
   it('le scelte nuove si scrivono sopra una voce rovinata senza trascinarsi i campi sbagliati', () => {
@@ -396,7 +398,7 @@ describe('useCampoStore: salvataggio con valori non validi', () => {
   it('dopo il ricaricamento una data rovinata nel localStorage vale oggi', async () => {
     localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { strumentoId: 'p1', dataRilievo: 'ieri' } } }, version: 1 }))
     await useCampoStore.persist.rehydrate()
-    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', mantenuti: null })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
   })
 })
 
@@ -424,6 +426,40 @@ describe('useCampoStore: salvataggio che non funziona', () => {
 
     localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { strumentoId: 'p1' } } }, version: 1 }))
     await useCampoStore.persist.rehydrate()
-    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', mantenuti: null })
+    expect(useCampoStore.getState().dati('E')).toEqual({ strumentoId: 'p1', dataRilievo: '2026-10-28', mantenuti: null, ordineGiro: { criterio: 'impostazioni', inverso: false } })
+  })
+})
+
+describe('useCampoStore: ordine del giro', () => {
+  it('di base è quello delle impostazioni, non al contrario', () => {
+    expect(useCampoStore.getState().dati('E').ordineGiro).toEqual({ criterio: 'impostazioni', inverso: false })
+  })
+
+  it('si sceglie per esperimento e si salva sul dispositivo', () => {
+    useCampoStore.getState().setOrdineGiro('E', { criterio: 'etichetta', inverso: true })
+    expect(useCampoStore.getState().dati('E').ordineGiro).toEqual({ criterio: 'etichetta', inverso: true })
+    expect(useCampoStore.getState().dati('altro').ordineGiro).toEqual({ criterio: 'impostazioni', inverso: false })
+    expect(salvato().state.stato.E.ordineGiro).toEqual({ criterio: 'etichetta', inverso: true })
+  })
+
+  it('cambiare strumento o data non lo cambia, e viceversa', () => {
+    const { setOrdineGiro, setStrumento, setData } = useCampoStore.getState()
+    setOrdineGiro('E', { criterio: 'blocco', inverso: false })
+    setStrumento('E', S)
+    setData('E', '2026-10-20')
+    expect(useCampoStore.getState().dati('E')).toMatchObject({ strumentoId: S, dataRilievo: '2026-10-20', ordineGiro: { criterio: 'blocco', inverso: false } })
+    setOrdineGiro('E', { criterio: 'impostazioni', inverso: true })
+    expect(useCampoStore.getState().dati('E')).toMatchObject({ strumentoId: S, dataRilievo: '2026-10-20' })
+  })
+
+  it('un valore salvato rovinato vale come quello di base', async () => {
+    localStorage.setItem(CHIAVE, JSON.stringify({ state: { stato: { E: { strumentoId: null, ordineGiro: { criterio: 'a caso', inverso: 'si' } } } }, version: 1 }))
+    await useCampoStore.persist.rehydrate()
+    expect(useCampoStore.getState().dati('E').ordineGiro).toEqual({ criterio: 'impostazioni', inverso: false })
+  })
+
+  it('lo stesso oggetto finché lo stato non cambia', () => {
+    useCampoStore.getState().setOrdineGiro('E', { criterio: 'etichetta', inverso: false })
+    expect(useCampoStore.getState().dati('E').ordineGiro).toBe(useCampoStore.getState().dati('E').ordineGiro)
   })
 })

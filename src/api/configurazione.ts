@@ -139,6 +139,17 @@ export async function aggiornaPianta(espId: string, p: Pianta): Promise<void> {
   controllaRighe(await supabase.from('piante').update(campi).eq('id', id).eq('esperimento_id', esperimento_id).select('id'))
 }
 
+/**
+ * Scrive il solo `ordine` delle piante ricevute (quelle che il riordino ha cambiato), una alla volta: a un errore ci si
+ * ferma, e le piante già scritte restano con il nuovo ordine (l'ordine non è unico: niente si rompe, lo si rifà).
+ * Una pianta che non c'è più (rimossa altrove) fallisce con ELEMENTO_NON_TROVATO.
+ */
+export async function salvaOrdinePiante(espId: string, piante: Pianta[]): Promise<void> {
+  for (const p of piante) {
+    controllaRighe(await supabase.from('piante').update({ ordine: p.ordine }).eq('id', p.id).eq('esperimento_id', espId).select('id'))
+  }
+}
+
 /** Elimina una pianta dell'esperimento. Fallisce con 23503 se ha già misure. */
 export async function eliminaPianta(espId: string, id: string): Promise<void> {
   controllaRighe(await supabase.from('piante').delete().eq('id', id).eq('esperimento_id', espId).select('id'))

@@ -4,9 +4,11 @@ import { aggiornaPianta, eliminaPianta, pianteConDati, pianteNonEliminabili } fr
 import { chiavi } from '@/api/query'
 import { Conferma } from '@/components/Conferma'
 import { Scelta } from '@/components/Scelta'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import type { ConfigEsperimento, Pianta } from '@/domain/tipi'
 import { AggiungiPiante } from './AggiungiPiante'
+import { RiordinaPiante } from './RiordinaPiante'
 import { ErroreDaMostrare, useAzione } from './azione'
 import { uguali, useBozze, useSegnalaModifiche } from './modifiche'
 import { AvvisoDati, Sezione, Spiegazione } from './Sezione'
@@ -45,6 +47,7 @@ export function SezionePiante({ espId, config, conDati, nonEliminabili }: Sezion
   const bozze = useBozze<Pianta>()
   const [filtro, setFiltro] = useState(TUTTI)
   const [aperta, setAperta] = useState<string | null>(null)
+  const [riordina, setRiordina] = useState(false)
   // La pianta resta anche a dialogo chiuso: il titolo non cambia mentre il dialogo sparisce.
   const [daRimuovere, setDaRimuovere] = useState<{ pianta: Pianta; aperto: boolean } | null>(null)
   const dati = conDati.data
@@ -109,12 +112,23 @@ export function SezionePiante({ espId, config, conDati, nonEliminabili }: Sezion
     .filter(g => g.piante.length > 0)
   const conteggio = (n: number) => (n === 1 ? '1 pianta' : `${n} piante`)
 
+  if (riordina) {
+    return (
+      <Sezione titolo="Piante · Riordina">
+        <RiordinaPiante espId={espId} config={config} azione={azione} onChiudi={() => setRiordina(false)} />
+      </Sezione>
+    )
+  }
+
   return (
     <Sezione titolo="Piante">
       <Spiegazione>
         {`${conteggio(config.piante.length)}. Tocca una pianta per cambiarne etichetta, blocco o trattamento. Una pianta con misure resta nel suo trattamento; con misure, note o foto non si può rimuovere.`}
       </Spiegazione>
       <AvvisoDati letture={[conDati, nonEliminabili]} />
+      {config.piante.length > 1 && (
+        <Button variant="outline" className="self-start" onClick={() => setRiordina(true)}>Riordina</Button>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-filtro`}>Mostra</Label>

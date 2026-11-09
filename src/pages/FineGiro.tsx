@@ -130,10 +130,11 @@ function Riepilogo({ espId, config, strumento, misure, data }: {
 }) {
   const navigate = useNavigate()
   const idTitolo = useId()
+  const ordine = useCampoStore(s => s.dati(espId).ordineGiro)
   const { fatte, totale, mancanti, celle } = useMemo(() => {
     const stati = statiPiante(strumento, config.parametri, misure, config.piante)
-    return { ...riepilogoGiro(config.piante, stati), celle: celleGriglia(config.piante, stati, null) }
-  }, [config, strumento, misure])
+    return { ...riepilogoGiro(config.piante, stati, ordine), celle: celleGriglia(config.piante, stati, null, ordine) }
+  }, [config, strumento, misure, ordine])
   // Si arriva qui con "Salva e termina", e i pulsanti in basso sono dove c'era lui: il secondo tocco di un doppio
   // tocco non è una scelta (porterebbe via dal riepilogo prima di leggerlo). Vale anche per le celle.
   const toccoValido = useAttesaArrivo()

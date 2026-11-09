@@ -789,6 +789,24 @@ describe('SchedaPianta: misura questa pianta', () => {
     await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${strumento('SPAD').id}/${pianta(35).id}`))
   })
 
+  it('misurando da qui, salvare riporta alla scheda (Piano E, Task E11) e la freccia indietro pure', async () => {
+    const utente = userEvent.setup()
+    apri('35')
+    await pronta()
+    await utente.click(pulsante('Misura questa pianta'))
+    piuTardi()
+    await utente.click(pulsante('SPAD'))
+    await waitFor(() => expect(posizione()).toBe(`/esperimenti/E/misura/${strumento('SPAD').id}/${pianta(35).id}`))
+    const scheda = `/esperimenti/E/piante/${pianta(35).id}`
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', scheda)
+
+    await utente.type(await screen.findByLabelText('SPAD'), '41')
+    piuTardi()
+    await utente.click(pulsante('Salva e torna alla scheda'))
+    await waitFor(() => expect(posizione()).toBe(scheda))
+    expect(salvaMisura).toHaveBeenCalledTimes(1)
+  })
+
   it('un tocco subito dopo l\'apertura della scelta è il secondo di un doppio tocco: non sceglie', async () => {
     const utente = userEvent.setup()
     apri('35')

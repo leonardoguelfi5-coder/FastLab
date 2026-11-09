@@ -1,3 +1,4 @@
+import { formattaGiornoMese } from '@/lib/date'
 import { formattaNumero } from '@/lib/numeri'
 import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, ValoreParametro, ValoriMisura } from './tipi'
 
@@ -152,11 +153,70 @@ export function descriviIntervallo(p: Parametro): string {
   return `≤ ${formattaNumero(max)}`
 }
 
+/** L'ultimo valore di una pianta per un parametro numerico (la media delle letture) e il giorno in cui è stato misurato. */
+export interface UltimoValore { valore: number; data: string }
+
+/** Soglia del valore anomalo: il valore nuovo è almeno così tante volte più grande o più piccolo dell'ultimo. */
+const SOGLIA_ANOMALIA = 3
+/** Un parametro "solo interi" con l'ultimo valore sotto questo non avvisa mai: da 2 a 7 frutti non è un errore di battitura. */
+const MINIMO_INTERI_ANOMALIA = 5
+
+/**
+ * L'avviso "valore anomalo" (Piano E, Decisione 13), o `null`. Un numero almeno 3 volte più grande o più piccolo
+ * dell'ultimo valore della stessa pianta (entrambi positivi), o di segno opposto con uno scarto più grande dell'ultimo
+ * valore, prende i tipici errori di battitura (412 al posto di 41,2) senza avvisare per la crescita normale. Mai con
+ * l'ultimo valore 0, mai per liste, testi e sì/no, mai per i parametri "solo interi" con l'ultimo valore sotto 5.
+ * `valore` è un solo numero: con più letture il chiamante passa la media.
+ */
+export function anomaliaRispettoAllUltimo(parametro: Parametro, valore: number, ultimo: UltimoValore | null): string | null {
+  if (parametro.tipo !== 'numero' || ultimo === null) return null
+  if (!Number.isFinite(valore) || !Number.isFinite(ultimo.valore) || ultimo.valore === 0) return null
+  // `solo_interi` arriva con il Task E12: finché il tipo non lo ha, si legge senza romperlo.
+  const soloInteri = (parametro as Parametro & { solo_interi?: boolean }).solo_interi === true
+  if (soloInteri && Math.abs(ultimo.valore) < MINIMO_INTERI_ANOMALIA) return null
+  const diverso =
+    valore > 0 && ultimo.valore > 0
+      ? Math.max(valore, ultimo.valore) / Math.min(valore, ultimo.valore) >= SOGLIA_ANOMALIA
+      : (valore > 0) !== (ultimo.valore > 0) && valore !== 0 && Math.abs(valore - ultimo.valore) > Math.abs(ultimo.valore)
+  return diverso ? `Molto diverso dall'ultima volta (${formattaNumero(ultimo.valore)} il ${formattaGiornoMese(ultimo.data)})` : null
+}
+
+/** Media delle letture presenti di un valore numerico, o `null` se non ce ne sono. */
+function mediaLetture(v: ValoreParametro | undefined): number | null {
+  if (!Array.isArray(v)) return null
+  const numeri = (v as Lettura[]).filter((x): x is number => x !== null && Number.isFinite(x))
+  return numeri.length === 0 ? null : numeri.reduce((a, b) => a + b, 0) / numeri.length
+}
+
+/**
+ * Per ogni parametro numerico, l'ultimo valore della pianta nei giorni PRIMA della data di rilievo (la media delle
+ * letture di quella misura): è quello con cui `validaMisura` confronta il valore appena scritto. Una misura dello
+ * stesso giorno non conta: correggere o aggiungerne una non si confronta con se stessa.
+ */
+export function ultimiPerAnomalia(parametri: Parametro[], misurePianta: Misura[], dataRilievo: string): Record<string, UltimoValore> {
+  const prima = misurePianta.filter(m => m.data_rilievo < dataRilievo)
+  const ultimi: Record<string, UltimoValore> = {}
+  for (const p of parametri) {
+    if (p.tipo !== 'numero') continue
+    let migliore: Misura | undefined
+    for (const m of prima) {
+      if (mediaLetture(m.valori[p.id]) === null) continue
+      if (!migliore || confronta(`${m.data_rilievo} ${m.ora}`, `${migliore.data_rilievo} ${migliore.ora}`) >= 0) migliore = m
+    }
+    const valore = migliore ? mediaLetture(migliore.valori[p.id]) : null
+    if (migliore && valore !== null) ultimi[p.id] = { valore, data: migliore.data_rilievo }
+  }
+  return ultimi
+}
+
 /**
  * Controlla i valori prima del salvataggio.
- * Gli errori bloccano il salvataggio; gli avvisi (valore fuori dall'intervallo atteso) no.
+ * Gli errori bloccano il salvataggio; gli avvisi (valore fuori dall'intervallo atteso, valore molto diverso
+ * dall'ultimo della pianta) no. `ultimi` sono gli ultimi valori della pianta per parametro (vedi `ultimiPerAnomalia`).
  */
-export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, valori: ValoriMisura): { errori: string[]; avvisi: string[] } {
+export function validaMisura(
+  parametri: Parametro[], obbligatori: Set<string>, valori: ValoriMisura, ultimi: Record<string, UltimoValore | undefined> = {},
+): { errori: string[]; avvisi: string[] } {
   const errori: string[] = []
   const avvisi: string[] = []
   for (const p of parametri) {
@@ -185,6 +245,14 @@ export function validaMisura(parametri: Parametro[], obbligatori: Set<string>, v
         avvisi.push(`${soggetto} = ${misurato} è fuori dall'intervallo atteso (${descriviIntervallo(p)}).`)
       }
     })
+    // Un solo avviso per parametro, sulla media delle letture: tre letture vicine tra loro non ne fanno tre.
+    const media = mediaLetture(v)
+    const numeriValidi = (v as Lettura[]).every(x => x === null || Number.isFinite(x))
+    const anomalia = media !== null && numeriValidi ? anomaliaRispettoAllUltimo(p, media, ultimi[p.id] ?? null) : null
+    if (anomalia && media !== null) {
+      const misurato = p.unita ? `${formattaNumero(media)} ${p.unita}` : formattaNumero(media)
+      avvisi.push(`«${p.nome}» = ${misurato}. ${anomalia}.`)
+    }
   }
   if (errori.length === 0 && parametri.every(p => eVuoto(p, valori[p.id]))) errori.push('Nessun valore inserito.')
   return { errori, avvisi }

@@ -158,7 +158,7 @@ describe('FormMisura', () => {
 })
 
 describe('FormMisura: Mantieni questo parametro uguale', () => {
-  const ETICHETTA = 'Mantieni questo parametro uguale anche nelle prossime misure'
+  const ETICHETTA = 'Mantieni per le prossime piante'
 
   /** Il modulo con le prop di "Mantieni"; `onMantieni` registra le spunte. */
   function rendiMantieni(props: { mantenuti?: string[]; precompilati?: string[]; senzaOnMantieni?: boolean } = {}) {

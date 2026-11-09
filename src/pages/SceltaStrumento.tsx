@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell'
 import { Caricamento } from '@/components/Caricamento'
 import { BannerData } from '@/components/BannerData'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
+import { OrdineGiroScelta } from '@/components/giro/OrdineGiroScelta'
 import { VoceStrumento } from '@/components/VoceStrumento'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -73,7 +74,8 @@ function DataRilievo({ espId }: { espId: string }) {
 /** Il contenuto a configurazione caricata: data di rilievo, banner e l'elenco degli strumenti. */
 function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const oggi = useOggi()
-  const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
+  const { strumentoId, dataRilievo, ordineGiro } = useCampoStore(s => s.dati(espId, oggi))
+  const setOrdineGiro = useCampoStore(s => s.setOrdineGiro)
   const scegli = useAvviaMisura(espId)
   const misure = useMisureGiorno(espId, dataRilievo)
   const ultime = useUltimeMisure(espId)
@@ -81,7 +83,7 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
   // Prima del primo successo non ci sono, e non si calcola nulla.
   const dati = misure.data
 
-  const righe = useMemo(() => righeStrumenti(config, dati), [config, dati])
+  const righe = useMemo(() => righeStrumenti(config, dati, ordineGiro), [config, dati, ordineGiro])
   // Lo strumento dello store sta in cima solo se il suo giro è cominciato e non finito alla data di rilievo.
   const inCima = righe.find(r => r.strumento.id === strumentoId && inCorso(r.giro))
   const ordinate = inCima ? [inCima, ...righe.filter(r => r !== inCima)] : righe
@@ -105,6 +107,7 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
       <div className="flex flex-col gap-4">
         <DataRilievo espId={espId} />
         <BannerData espId={espId} />
+        <OrdineGiroScelta ordine={ordineGiro} onCambia={o => setOrdineGiro(espId, o)} />
       </div>
       <ul aria-label="Strumenti" className="-mx-4 flex flex-col">
         {ordinate.map(riga => (

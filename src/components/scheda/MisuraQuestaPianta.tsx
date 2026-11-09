@@ -40,7 +40,7 @@ interface MisuraQuestaPiantaProps {
 
 /**
  * L'azione principale della scheda: "Misura questa pianta" chiede con quale strumento (se ce n'è uno solo parte
- * subito) e porta alla misura di quella pianta. Lì, se la pianta ha già una misura di oggi, l'app chiede se correggerla
+ * subito) e porta alla misura di quella pianta (`daScheda`: salvando si torna qui). Lì, se la pianta ha già una misura di oggi, l'app chiede se correggerla
  * o aggiungerne una nuova: la scheda non misura, apre solo la strada.
  */
 export function MisuraQuestaPianta({ espId, piantaId, strumenti }: MisuraQuestaPiantaProps) {
@@ -50,7 +50,7 @@ export function MisuraQuestaPianta({ espId, piantaId, strumenti }: MisuraQuestaP
   // appena fatto. Con `primoCampo` il modulo sa di essere appena arrivato: un tocco immediato è il secondo di un
   // doppio tocco e non salva (con valori mantenuti salverebbe una misura che chi rileva non ha guardato).
   const vai = (s: Strumento) => {
-    const arrivo: ArrivoScheda = { primoCampo: true }
+    const arrivo: ArrivoScheda = { primoCampo: true, daScheda: true }
     navigate(percorsoMisuraPianta(espId, s.id, piantaId), { state: arrivo })
   }
 

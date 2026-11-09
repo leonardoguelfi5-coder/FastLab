@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import type { UseQueryResult } from '@tanstack/react-query'
 import { LayoutGrid } from 'lucide-react'
 import { useConfig, useMisureGiorno, useMisurePianta } from '@/api/query'
@@ -11,17 +11,17 @@ import { FoglioPiante } from '@/components/giro/FoglioPiante'
 import { PulsanteAggiungiFoto, StatoCaricamentoFoto } from '@/components/foto/AggiungiFoto'
 import { useCaricaFoto } from '@/components/foto/useCaricaFoto'
 import { AvvisoGiro } from '@/components/scheda/AvvisoGiro'
-import type { Avanti, StatoModulo } from '@/components/scheda/ModuloOggi'
+import type { ArrivoScheda, Avanti, StatoModulo } from '@/components/scheda/ModuloOggi'
 import { RiquadroOggi, type ModuloIniziale } from '@/components/scheda/RiquadroOggi'
 import { SceltaArrivo } from '@/components/scheda/SceltaArrivo'
 import { bozzaDaRiprendere } from '@/components/scheda/bozza'
 import { titoloRiquadro } from '@/components/scheda/titolo'
 import { useModuloProtetto } from '@/components/scheda/useModuloProtetto'
 import { Button } from '@/components/ui/button'
-import { celleGriglia, prossimaDaMisurare, riepilogoGiro, statiPiante } from '@/domain/giro'
+import { celleGriglia, completamentoDiretto, prossimaDaMisurare, riepilogoGiro, statiPiante } from '@/domain/giro'
 import { misureStrumentoNelGiorno } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
-import { percorsoFineGiro, percorsoMisuraPianta, percorsoNuovaMisura } from '@/lib/percorsi'
+import { percorsoFineGiro, percorsoMisuraPianta, percorsoNuovaMisura, percorsoPianta } from '@/lib/percorsi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { useCampoStore } from '@/store/campo'
 
@@ -39,32 +39,42 @@ interface ArrivoPiantaProps {
 }
 
 /**
- * Il riquadro della misura nel giro, fissato per una pianta, uno strumento e una data. Se la pianta ha già misure di
- * questo strumento in quella data, prima si chiede se correggerne una o aggiungerne una nuova (da qualunque parte ci
- * si arrivi: il giro, "Vai alla pianta", "Vai alle mancanti", "Riprendi", un collegamento). Non si chiede se c'è un
- * modulo lasciato a metà da riprendere (la sua bozza): la domanda lo farebbe dimenticare, e il riquadro lo riapre.
+ * Il riquadro della misura nel giro, fissato per una pianta, uno strumento e una data. Arrivando su una pianta che ha già
+ * misure di questo strumento in quella data (da qualunque parte: il giro, "Vai alla pianta", "Vai alle mancanti",
+ * "Riprendi", un collegamento) si chiede il meno possibile (Piano E, Decisione 13):
+ *  - un modulo lasciato a metà da riprendere (la sua bozza) ha sempre la precedenza: la domanda lo farebbe
+ *    dimenticare, e il riquadro lo riapre;
+ *  - una pianta incompleta con una sola misura di questo strumento apre direttamente il completamento di quella misura;
+ *  - altrimenti (pianta fatta, o più misure) si chiede se correggerne una o aggiungerne un'altra.
  */
 function ArrivoPianta({
   espId, config, pianta, strumento, misure, misureGiorno, dataRilievo, oggi, conferma, onModifiche,
 }: ArrivoPiantaProps) {
+  const location = useLocation()
+  const daScheda = (location.state as ArrivoScheda | null)?.daScheda === true
+  const ordine = useCampoStore(s => s.dati(espId).ordineGiro)
   const misureOggi = useMemo(() => misureStrumentoNelGiorno(misure, strumento.id, dataRilievo), [misure, strumento.id, dataRilievo])
   // Si decide una volta, all'arrivo: un salvataggio fatto qui ("Salva", che resta) non fa ricomparire la domanda.
   const [scelta, setScelta] = useState<ModuloIniziale | 'chiedi' | null>(() => {
     const base = { espId, piantaId: pianta.id, strumentoId: strumento.id, dataRilievo }
-    return misureOggi.length > 0 && !bozzaDaRiprendere(base, misureOggi.map(m => m.id)) ? 'chiedi' : null
+    if (misureOggi.length === 0 || bozzaDaRiprendere(base, misureOggi.map(m => m.id))) return null
+    const daCompletare = completamentoDiretto(strumento, config.parametri, misureOggi, pianta.id)
+    return daCompletare ? { tipo: 'correggi', misuraId: daCompletare.id } : 'chiedi'
   })
 
   // La prossima pianta del giro: dopo questa, la prima non "fatta" (le incomplete si riprendono). Le misure del giorno
-  // sono già arrivate: senza, ogni pianta risulterebbe da fare.
+  // sono già arrivate: senza, ogni pianta risulterebbe da fare. Misurando dalla scheda, invece, si torna alla scheda.
   const successiva = useMemo(
-    () => prossimaDaMisurare(config.piante, statiPiante(strumento, config.parametri, misureGiorno, config.piante), pianta.id),
-    [config, strumento, misureGiorno, pianta.id],
+    () => prossimaDaMisurare(config.piante, statiPiante(strumento, config.parametri, misureGiorno, config.piante), pianta.id, ordine),
+    [config, strumento, misureGiorno, pianta.id, ordine],
   )
   const avanti = useMemo<Avanti>(
-    () => (successiva
-      ? { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoMisuraPianta(espId, strumento.id, successiva.id) }
-      : { testo: 'e termina', percorso: percorsoFineGiro(espId, strumento.id) }),
-    [espId, strumento.id, successiva],
+    () => (daScheda
+      ? { testo: 'e torna alla scheda', percorso: percorsoPianta(espId, pianta.id) }
+      : successiva
+        ? { testo: `e vai alla #${successiva.etichetta}`, percorso: percorsoMisuraPianta(espId, strumento.id, successiva.id) }
+        : { testo: 'e termina', percorso: percorsoFineGiro(espId, strumento.id) }),
+    [daScheda, espId, pianta.id, strumento.id, successiva],
   )
 
   if (scelta === 'chiedi' && misureOggi.length > 0) {
@@ -118,6 +128,7 @@ function MisuraCaricata({
   const senzaRete = useSenzaRete()
   const navigate = useNavigate()
   const [foglio, setFoglio] = useState(false)
+  const ordine = useCampoStore(s => s.dati(espId).ordineGiro)
   // Le misure di oggi arrivano già con quelle in coda d'invio sovrapposte (`useMisureGiorno`): una pianta appena
   // misurata senza rete è "fatta" anche qui. Senza le misure gli stati non si inventano.
   const datiGiorno = misureGiorno.data
@@ -125,12 +136,12 @@ function MisuraCaricata({
     () => (datiGiorno ? statiPiante(strumento, config.parametri, datiGiorno, config.piante) : null),
     [datiGiorno, strumento, config],
   )
-  const celle = useMemo(() => (stati ? celleGriglia(config.piante, stati, piantaId) : null), [stati, config.piante, piantaId])
+  const celle = useMemo(() => (stati ? celleGriglia(config.piante, stati, piantaId, ordine) : null), [stati, config.piante, piantaId, ordine])
   const progresso = useMemo(() => {
     if (!stati) return null
-    const { fatte, totale } = riepilogoGiro(config.piante, stati)
+    const { fatte, totale } = riepilogoGiro(config.piante, stati, ordine)
     return { fatte, totale }
-  }, [stati, config.piante])
+  }, [stati, config.piante, ordine])
   const pianta = config.piante.find(p => p.id === piantaId)
   // Prende il posto della pianta attuale come "Salva e vai" (il gesto indietro esce dal giro), e con valori non salvati
   // chiede prima se scartarli. La pianta attuale non è un salto: il foglio si chiude e i valori scritti restano
@@ -250,7 +261,10 @@ export function MisuraPianta() {
     if (idAttivo && useCampoStore.getState().dati(espId).strumentoId !== idAttivo) setStrumento(espId, idAttivo)
   }, [espId, idAttivo, setStrumento])
 
-  const verso = percorsoNuovaMisura(espId)
+  // Misurando dalla scheda della pianta, indietro riporta alla scheda e non alla scelta dello strumento.
+  const location = useLocation()
+  const daScheda = (location.state as ArrivoScheda | null)?.daScheda === true
+  const verso = daScheda ? percorsoPianta(espId, piantaId) : percorsoNuovaMisura(espId)
   return (
     <AppShell
       titolo={attivo ? `${attivo.icona ? `${attivo.icona} ` : ''}${attivo.nome}` : 'Misura'}

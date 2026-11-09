@@ -7,7 +7,7 @@ import { chiavi } from '@/api/query'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { FormMisura } from '@/components/misura/FormMisura'
 import { Button } from '@/components/ui/button'
-import { eVuoto, mantenibile, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
+import { eVuoto, mantenibile, ultimiPerAnomalia, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
 import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
 import { accoda, ErroreCoda, utenteCoda } from '@/lib/coda/codaMisure'
 import { fermaLettureVecchie, inviaCoda } from '@/lib/coda/invio'
@@ -26,7 +26,11 @@ import { SELETTORE_CAMPI, ModuloCampi } from '@/components/ModuloCampi'
 export interface StatoModulo { modificato: boolean; scarta: () => void }
 
 /** Stato della navigazione verso una scheda: dopo "Salva e vai" il cursore va nel primo campo da compilare. */
-export interface ArrivoScheda { primoCampo?: boolean }
+export interface ArrivoScheda {
+  primoCampo?: boolean
+  /** Si è partiti dalla scheda della pianta ("Misura questa pianta"): salvando si torna lì, non alla pianta dopo. */
+  daScheda?: boolean
+}
 
 /**
  * Il pulsante principale "Salva e …" del modulo: il testo che segue "Salva" ("e vai alla #36", "e termina") e la
@@ -79,6 +83,11 @@ interface ModuloOggiProps {
   /** Porta il cursore nel primo campo da compilare appena il modulo compare. */
   primoCampo: boolean
   /**
+   * La misura in correzione è l'unica del giorno per questa pianta e le manca qualcosa: il modulo si è aperto da solo
+   * sul suo completamento (Piano E, Decisione 13) e lo dice, con "Aggiungine un'altra" per chi voleva un'altra misura.
+   */
+  completamento: boolean
+  /**
    * Il modulo compare subito dopo un salvataggio riuscito, con i pulsanti nello stesso punto: un tocco che arriva
    * troppo presto è il secondo di un doppio tocco, non una misura nuova, e si ignora.
    */
@@ -97,7 +106,7 @@ interface ModuloOggiProps {
  */
 export function ModuloOggi({
   espId, config, pianta, strumento, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
-  dataRilievo, avanti, primoCampo, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
+  dataRilievo, avanti, primoCampo, completamento, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
 }: ModuloOggiProps) {
   const idTitolo = useId()
   const navigate = useNavigate()
@@ -235,7 +244,7 @@ export function ModuloOggi({
     if (inCorso.current) return
     // Il secondo tocco di un doppio tocco sul modulo comparso al posto di quello appena salvato: non è un salvataggio.
     if (apertoAlle.current !== null && istante() - apertoAlle.current < ATTESA_CONFERMA_MS) return
-    const { errori, avvisi } = validaMisura(parametri, obbligatori, valori)
+    const { errori, avvisi } = validaMisura(parametri, obbligatori, valori, ultimiPerAnomalia(parametri, misurePianta, dataRilievo))
     if (errori.length > 0) {
       ferma({ tipo: 'errori', messaggi: errori })
       return
@@ -400,12 +409,22 @@ export function ModuloOggi({
         {misureOggi.length > 0 && (
           <div className="flex flex-col gap-2">
             <ElencoOggi misure={misureOggi} parametri={config.parametri} attivaId={misura?.id ?? null} onCorreggi={onCorreggi} />
-            {misura && (
-              <Button variant="ghost" size="sm" className="-ml-3 self-start" onClick={onNuovaMisura}>+ Nuova misura</Button>
+            {misura && completamento && (
+              // Una riga, "Completi la misura delle 09:12 · Aggiungine un'altra": il secondo è il pulsante (44 px).
+              <p className="flex flex-wrap items-center gap-x-1 font-semibold text-grafite">
+                <span>{`Completi la misura delle ${misura.ora}`}</span>
+                <span aria-hidden>·</span>
+                <Button variant="ghost" size="sm" className="font-normal" onClick={onNuovaMisura}>Aggiungine un&apos;altra</Button>
+              </p>
             )}
-            <p className="pt-2 font-semibold text-grafite">
-              {misura ? `Modifica della misura delle ${misura.ora}` : 'Nuova misura'}
-            </p>
+            {misura && !completamento && (
+              <Button variant="ghost" size="sm" className="-ml-3 self-start" onClick={onNuovaMisura}>Aggiungi un&apos;altra misura</Button>
+            )}
+            {!(misura && completamento) && (
+              <p className="pt-2 font-semibold text-grafite">
+                {misura ? `Modifica della misura delle ${misura.ora}` : 'Nuova misura'}
+              </p>
+            )}
           </div>
         )}
 

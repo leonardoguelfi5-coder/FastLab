@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, righeStrumenti, celleGriglia, valoriDiOggi, type StatoPianta } from './giro'
+import { statoPianta, statiPiante, prossimaDaMisurare, riepilogoGiro, progressoOggi, righeStrumenti, celleGriglia, valoriDiOggi, ordinaPiante, completamentoDiretto, type StatoPianta, type OrdineGiro } from './giro'
 import type { ConfigEsperimento, Misura, Parametro, Pianta, Strumento, ValoriMisura } from './tipi'
 import { parametro, piante as creaPiante } from './test-helpers'
 
@@ -326,5 +326,90 @@ describe('valoriDiOggi', () => {
 
   it('senza misure: nessuna riga per il parametro', () => {
     expect(valoriDiOggi(config, spadStr, [], D)).toEqual([{ parametro: spadN, righe: [] }])
+  })
+})
+
+describe('ordinaPiante', () => {
+  const con = (etichetta: string, ordine: number, blocco: string | null = null): Pianta => ({
+    id: `P${etichetta}`, trattamento_id: 't1', etichetta, blocco, ordine,
+  })
+  const lista = [con('10', 0, 'B2'), con('2', 1, 'B1'), con('1', 2, 'B2'), con('W3', 3, 'B1')]
+
+  it('come nelle impostazioni: per ordine, con l\'etichetta come spareggio', () => {
+    expect(etichette(ordinaPiante(lista, { criterio: 'impostazioni', inverso: false }))).toEqual(['10', '2', '1', 'W3'])
+  })
+  it('per etichetta: ordine naturale, 2 prima di 10', () => {
+    expect(etichette(ordinaPiante(lista, { criterio: 'etichetta', inverso: false }))).toEqual(['1', '2', '10', 'W3'])
+  })
+  it('per blocco: il blocco, poi l\'ordine', () => {
+    expect(etichette(ordinaPiante(lista, { criterio: 'blocco', inverso: false }))).toEqual(['2', 'W3', '10', '1'])
+  })
+  it('le piante senza blocco vengono dopo quelle con un blocco', () => {
+    const l = [con('1', 0, null), con('2', 1, 'A')]
+    expect(etichette(ordinaPiante(l, { criterio: 'blocco', inverso: false }))).toEqual(['2', '1'])
+  })
+  it('al contrario rovescia l\'ordine scelto', () => {
+    expect(etichette(ordinaPiante(lista, { criterio: 'etichetta', inverso: true }))).toEqual(['W3', '10', '2', '1'])
+    expect(etichette(ordinaPiante(lista, { criterio: 'impostazioni', inverso: true }))).toEqual(['W3', '1', '2', '10'])
+  })
+  it('non modifica la lista ricevuta', () => {
+    const copia = [...lista]
+    ordinaPiante(lista, { criterio: 'etichetta', inverso: true })
+    expect(lista).toEqual(copia)
+  })
+})
+
+describe('il giro con l\'ordine scelto', () => {
+  const ps: Pianta[] = ['1', '2', '10'].map((e, i) => ({ id: `P${e}`, trattamento_id: 't1', etichetta: e, blocco: null, ordine: 2 - i }))
+  const ordine: OrdineGiro = { criterio: 'etichetta', inverso: false }
+  const stati = new Map<string, StatoPianta>([['P1', 'fatta']])
+
+  it('prossimaDaMisurare segue l\'ordine e salta le fatte', () => {
+    expect(prossimaDaMisurare(ps, stati, null, ordine)?.etichetta).toBe('2')
+    expect(prossimaDaMisurare(ps, stati, 'P2', ordine)?.etichetta).toBe('10')
+    expect(prossimaDaMisurare(ps, stati, 'P10', ordine)).toBeNull()
+  })
+  it('al contrario si parte dall\'ultima', () => {
+    expect(prossimaDaMisurare(ps, new Map(), null, { criterio: 'etichetta', inverso: true })?.etichetta).toBe('10')
+    expect(prossimaDaMisurare(ps, new Map(), 'P10', { criterio: 'etichetta', inverso: true })?.etichetta).toBe('2')
+  })
+  it('senza ordine vale quello delle impostazioni (come prima)', () => {
+    expect(prossimaDaMisurare(ps, new Map(), null)?.etichetta).toBe('10')
+  })
+  it('riepilogoGiro elenca le mancanti nell\'ordine scelto', () => {
+    expect(etichette(riepilogoGiro(ps, stati, ordine).mancanti)).toEqual(['2', '10'])
+  })
+  it('celleGriglia segue l\'ordine scelto', () => {
+    expect(celleGriglia(ps, stati, 'P2', ordine).map(c => c.pianta.etichetta)).toEqual(['1', '2', '10'])
+  })
+  it('righeStrumenti sceglie la prima pianta secondo l\'ordine', () => {
+    const config = { piante: ps, strumenti: [spad], parametri: tutti, trattamenti: [] } as unknown as ConfigEsperimento
+    expect(righeStrumenti(config, [], ordine)[0].prossima?.etichetta).toBe('1')
+    expect(righeStrumenti(config, [])[0].prossima?.etichetta).toBe('10')
+  })
+})
+
+describe('completamentoDiretto', () => {
+  const p = creaPiante(['7'])[0]
+  it('incompleta con una sola misura nel giorno: quella misura', () => {
+    const m = mis(p.id, ciras, { [A.id]: [1, 2, 3], [gs.id]: [0.1] })
+    expect(completamentoDiretto(ciras, tutti, [m], p.id)).toBe(m)
+  })
+  it('con due misure: nessuna (si chiede)', () => {
+    const m1 = mis(p.id, ciras, { [A.id]: [1, 2, 3] })
+    const m2 = mis(p.id, ciras, { [gs.id]: [0.1] }, { ora: '10:00' })
+    expect(completamentoDiretto(ciras, tutti, [m1, m2], p.id)).toBeNull()
+  })
+  it('fatta con una sola misura: nessuna (si chiede)', () => {
+    const m = mis(p.id, spad, { [stadio.id]: [4] })
+    expect(completamentoDiretto(spad, tutti, [m], p.id)).toBeNull()
+  })
+  it('senza misure: nessuna', () => {
+    expect(completamentoDiretto(ciras, tutti, [], p.id)).toBeNull()
+  })
+  it('due misure che insieme la completano: fatta, quindi nessuna', () => {
+    const m1 = mis(p.id, ciras, { [A.id]: [1, 2, 3], [gs.id]: [1] })
+    const m2 = mis(p.id, ciras, { [E.id]: [1], [Ci.id]: [1] }, { ora: '10:00' })
+    expect(completamentoDiretto(ciras, tutti, [m1, m2], p.id)).toBeNull()
   })
 })

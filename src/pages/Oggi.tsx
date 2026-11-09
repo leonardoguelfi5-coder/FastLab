@@ -63,10 +63,11 @@ function Strumenti({ espId, config, oggi }: { espId: string; config: ConfigEsper
   const misureRilievo = useMisureGiorno(espId, dataRilievo)
   const ultime = useUltimeMisure(espId)
   const avvia = useAvviaMisura(espId)
+  const ordine = useCampoStore(s => s.dati(espId, oggi).ordineGiro)
 
   // I dati restano anche se una rilettura in background fallisce; prima del primo successo non c'è nulla da calcolare.
-  const righe = useMemo(() => righeStrumenti(config, misureOggi.data), [config, misureOggi.data])
-  const righeRilievo = useMemo(() => righeStrumenti(config, misureRilievo.data), [config, misureRilievo.data])
+  const righe = useMemo(() => righeStrumenti(config, misureOggi.data, ordine), [config, misureOggi.data, ordine])
+  const righeRilievo = useMemo(() => righeStrumenti(config, misureRilievo.data, ordine), [config, misureRilievo.data, ordine])
 
   if (righe.length === 0) {
     return (

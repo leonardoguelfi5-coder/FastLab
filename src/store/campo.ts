@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
+import { ORDINE_GIRO_PREDEFINITO, type OrdineGiro } from '@/domain/giro'
 import { copiaProfonda, vuotoPerForma } from '@/domain/misure'
 import type { ValoreParametro, ValoriMisura } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
@@ -27,6 +28,8 @@ interface ScelteCampo {
    */
   dataRilievo?: string
   mantenuti?: Mantenuti
+  /** In che ordine si misurano le piante di questo esperimento; assente = come nelle impostazioni. */
+  ordineGiro?: OrdineGiro
 }
 
 /** Quello che serve a una schermata: sempre completo, con la data di oggi se non ne è stata scelta un'altra. */
@@ -35,6 +38,8 @@ export interface DatiCampo {
   dataRilievo: string
   /** I mantenuti, solo se sono quelli dello strumento e della data correnti; altrimenti `null`. */
   mantenuti: Mantenuti | null
+  /** L'ordine del giro scelto per l'esperimento (di base quello delle impostazioni). */
+  ordineGiro: OrdineGiro
 }
 
 interface CampoStore {
@@ -48,6 +53,8 @@ interface CampoStore {
   setStrumento: (espId: string, strumentoId: string | null) => void
   /** Scegliere la data di oggi riporta a "oggi" (non la fissa): domani il rilievo sarà di domani. */
   setData: (espId: string, data: string) => void
+  /** L'ordine in cui si misurano le piante dell'esperimento (resta sul dispositivo, per esperimento). */
+  setOrdineGiro: (espId: string, ordine: OrdineGiro) => void
   /**
    * I mantenuti validi per uno strumento e una data, anche diversi da quelli scelti nello store (il riquadro misura
    * con il proprio strumento): `null` se non ce ne sono per quella coppia. Lo stesso oggetto finché lo stato non cambia.
@@ -101,8 +108,18 @@ function pulite(scelte: unknown): ScelteCampo {
   if (typeof s.dataRilievo === 'string' && DATA_ISO.test(s.dataRilievo)) risultato.dataRilievo = s.dataRilievo
   const mantenuti = mantenutiPuliti(s.mantenuti)
   if (mantenuti) risultato.mantenuti = mantenuti
+  const ordineGiro = ordineGiroPulito(s.ordineGiro)
+  if (ordineGiro) risultato.ordineGiro = ordineGiro
   // Un salvataggio di prima di "Mantieni" porta `ricordati`: non serve più e non si riscrive.
   return risultato
+}
+
+const CRITERI_GIRO: OrdineGiro['criterio'][] = ['impostazioni', 'etichetta', 'blocco']
+
+/** L'ordine del giro rimesso in forma, o `null` se manca o è rovinato (allora vale quello di base). */
+function ordineGiroPulito(o: unknown): OrdineGiro | null {
+  if (!eOggetto(o) || !CRITERI_GIRO.includes(o.criterio as OrdineGiro['criterio']) || typeof o.inverso !== 'boolean') return null
+  return { criterio: o.criterio as OrdineGiro['criterio'], inverso: o.inverso }
 }
 
 /** I mantenuti rimessi in forma, o `null` se mancano o sono rovinati. Una copia: lo stato salvato non si tocca. */
@@ -138,11 +155,12 @@ function leggi(stato: Record<string, ScelteCampo>, espId: string, oggi: string):
   if (!perGiorno) memo.set(chiave, (perGiorno = new Map()))
   let dati = perGiorno.get(oggi)
   if (!dati) {
-    const { strumentoId, dataRilievo } = pulite(salvate)
+    const { strumentoId, dataRilievo, ordineGiro } = pulite(salvate)
     const data = dataRilievo ?? oggi
     // I mantenuti valgono per lo strumento e la data di adesso: con la data implicita "oggi", fino a mezzanotte.
     const mantenuti = mantenutiDi(stato, espId)
-    dati = { strumentoId, dataRilievo: data, mantenuti: mantenuti && mantenuti.strumentoId === strumentoId && mantenuti.data === data ? mantenuti : null }
+    dati = { strumentoId, dataRilievo: data, mantenuti: mantenuti && mantenuti.strumentoId === strumentoId && mantenuti.data === data ? mantenuti : null,
+      ordineGiro: ordineGiro ?? ORDINE_GIRO_PREDEFINITO }
     perGiorno.set(oggi, dati)
   }
   return dati
@@ -170,6 +188,8 @@ export const useCampoStore = create<CampoStore>()(
           else scelte.dataRilievo = data
           return { stato: { ...s.stato, [espId]: scelte } }
         }),
+      setOrdineGiro: (espId, ordine) =>
+        set(s => ({ stato: { ...s.stato, [espId]: { ...pulite(s.stato[espId]), ordineGiro: { criterio: ordine.criterio, inverso: ordine.inverso } } } })),
       mantenutiPer: (espId, strumentoId, data) => {
         const m = mantenutiDi(get().stato, espId)
         return m && m.strumentoId === strumentoId && m.data === data ? m : null
