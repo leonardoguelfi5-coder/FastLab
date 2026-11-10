@@ -422,6 +422,20 @@ insert into public.prove_ruoli (tabella, prova, istruzione, p, r, l, x) values
      on conflict (id) do update set id = excluded.id, esperimento_id = excluded.esperimento_id, data = excluded.data,
        percorso = excluded.percorso, pianta_id = excluded.pianta_id, nota_id = excluded.nota_id $s$,
    'righe 1', 'righe 1', '42501', '42501'),
+  -- Collegare una foto a una nota e' modificare la nota: solo verso una nota che si puo' modificare.
+  ('foto', 'crea collegata alla nota di P', $s$ insert into foto (id, esperimento_id, data, percorso, nota_id)
+     values ('f8000000-0000-0000-0000-0000000000e3', 'e9000000-0000-0000-0000-000000000001', '2026-11-09',
+             'e9000000-0000-0000-0000-000000000001/f8000000-0000-0000-0000-0000000000e3.jpg',
+             'a8000000-0000-0000-0000-00000000000a') $s$,
+   'righe 1', '42501', '42501', '42501'),
+  ('foto', 'crea collegata alla propria nota', $s$ insert into foto (id, esperimento_id, data, percorso, nota_id)
+     values ('f8000000-0000-0000-0000-0000000000e4', 'e9000000-0000-0000-0000-000000000001', '2026-11-09',
+             'e9000000-0000-0000-0000-000000000001/f8000000-0000-0000-0000-0000000000e4.jpg',
+             (select nota from proprie_ruoli where utente = auth.uid())) $s$,
+   'righe 1', 'righe 1', '42501', '42501'),
+  ('foto', 'sposta le proprie sulla nota di P', $s$ update foto set nota_id = 'a8000000-0000-0000-0000-00000000000a'
+     where esperimento_id = 'e9000000-0000-0000-0000-000000000001' and creato_da = auth.uid() $s$,
+   'righe 3', '42501', 'righe 0', 'righe 0'),
 
   -- File delle foto nello Storage. Il rilevatore elimina solo i file caricati da lui, e se c'e' la riga deve essere sua.
   ('storage.objects', 'legge', $s$ select 1 from storage.objects where bucket_id = 'foto'

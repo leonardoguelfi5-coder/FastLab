@@ -2155,15 +2155,19 @@ create policy note_trattamenti_delete on note_trattamenti
 
 -- foto_select resta (membro). Archiviare (archiviata e archiviata_il) e' un update: per il rilevatore solo sulle sue;
 -- "Libera lo spazio" e' del proprietario.
+-- Collegare una foto a una nota e' modificare la nota (come note_piante e note_trattamenti): solo verso una nota
+-- che si puo' modificare, altrimenti un rilevatore attaccherebbe le sue foto alla nota di un altro.
 create policy foto_insert on foto
   for insert to authenticated
-  with check (public.puo_scrivere(esperimento_id) and creato_da = (select auth.uid()));
+  with check (public.puo_scrivere(esperimento_id) and creato_da = (select auth.uid())
+              and (nota_id is null or public.puo_modificare_nota(nota_id)));
 create policy foto_update on foto
   for update to authenticated
   using (public.puo_configurare(esperimento_id)
          or (public.puo_scrivere(esperimento_id) and creato_da = (select auth.uid())))
-  with check (public.puo_configurare(esperimento_id)
-              or (public.puo_scrivere(esperimento_id) and creato_da = (select auth.uid())));
+  with check ((public.puo_configurare(esperimento_id)
+               or (public.puo_scrivere(esperimento_id) and creato_da = (select auth.uid())))
+              and (nota_id is null or public.puo_modificare_nota(nota_id)));
 create policy foto_delete on foto
   for delete to authenticated
   using (public.puo_configurare(esperimento_id)
