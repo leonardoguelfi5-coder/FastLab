@@ -28,7 +28,12 @@ export interface VoceCatalogo { id: string; nome: string; icona: string | null; 
 export interface ConfigEsperimento { esperimento: Esperimento; fattori: Fattore[]; trattamenti: Trattamento[];
   piante: Pianta[]; parametri: Parametro[]; strumenti: Strumento[] }
 export type BozzaEsperimento = ConfigEsperimento   // stessa forma; ids generati dal client con nuovoId() (src/lib/id.ts)
-export interface Misura { id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string; valori: ValoriMisura }
+/**
+ * `creato_da` (Piano E, Task E10) è chi ha scritto la riga, come lo firma il database: lo legge l'interfaccia per
+ * mostrare "Correggi" ed "Elimina" al rilevatore solo sulle cose sue. Manca in una voce nata sul telefono (in coda,
+ * bozza) e nella copia salvata prima: chi lo legge la tratta come propria. Non si scrive mai.
+ */
+export interface Misura { id: string; pianta_id: string; strumento_id: string; data_rilievo: string; ora: string; valori: ValoriMisura; creato_da?: string }
 /**
  * Una nota del Diario. Senza collegamenti (`pianta_ids` e `trattamento_ids` vuoti) riguarda tutto l'esperimento; con i
  * collegamenti, solo quei trattamenti o quelle piante (la scelta è una sola delle tre, non si mescolano).
@@ -36,7 +41,7 @@ export interface Misura { id: string; pianta_id: string; strumento_id: string; d
  * solo dopo la spunta.
  */
 export interface Nota { id: string; data: string; testo: string; promemoria: boolean; fatto_il: string | null;
-  pianta_ids: string[]; trattamento_ids: string[] }
+  pianta_ids: string[]; trattamento_ids: string[]; creato_da?: string }
 
 /**
  * Una foto dell'esperimento. Il file sta nello Storage in `percorso` (`<esperimento_id>/<id>.jpg`); può essere collegata
@@ -46,7 +51,7 @@ export interface Nota { id: string; data: string; testo: string; promemoria: boo
  */
 export interface Foto { id: string; data: string; percorso: string; larghezza: number | null; altezza: number | null;
   byte: number | null; pianta_id: string | null; nota_id: string | null; archiviata: boolean;
-  archiviata_il: string | null }
+  archiviata_il: string | null; creato_da?: string }
 
 /**
  * Un export salvato (Esporta Excel): nome e scelte, per esperimento e per utente. Le `scelte` arrivano dal database

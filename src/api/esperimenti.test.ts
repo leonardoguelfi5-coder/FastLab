@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 vi.mock('./foto', () => ({ eliminaFileEsperimento: vi.fn() }))
+vi.mock('./persone', () => ({ ruoloIn: vi.fn() }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
-import { ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE, messaggioErrore } from '@/lib/errori'
+import { SOLO_PROPRIETARIO_ELIMINA, ELEMENTO_NON_TROVATO, ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE, messaggioErrore } from '@/lib/errori'
 import { configDiEsempio } from '@/domain/test-helpers'
 import { clonaConfig } from '@/domain/bozza'
 import type { RigheConfig } from './mappers'
@@ -13,6 +14,7 @@ import {
   aggiornaEsperimento, caricaConfig, creaEsperimento, eliminaEsperimento, listaEsperimenti, type RiepilogoEsperimento,
 } from './esperimenti'
 import { eliminaFileEsperimento } from './foto'
+import { ruoloIn } from './persone'
 
 const errore = { code: '42501', message: 'permission denied', details: '', hint: '' }
 
@@ -22,6 +24,8 @@ beforeEach(() => {
   vi.mocked(supabase.rpc).mockReset()
   vi.mocked(eliminaFileEsperimento).mockReset()
   vi.mocked(eliminaFileEsperimento).mockResolvedValue(0)
+  vi.mocked(ruoloIn).mockReset()
+  vi.mocked(ruoloIn).mockResolvedValue('proprietario')
   mock = simulaSupabase(supabase)
 })
 
@@ -187,6 +191,13 @@ describe('eliminaEsperimento', () => {
     expect(eliminaFileEsperimento).toHaveBeenCalledWith(E)
     expect(passi).toEqual(['file', 'riga'])
     expect(mock.di('esperimenti').map(c => [c.metodo, ...c.args])).toEqual([['delete'], ['eq', 'id', E], ['select', 'id']])
+  })
+
+  it.each(['rilevatore', 'lettore', null] as const)('con ruolo %s non tocca né i file né la riga', async ruolo => {
+    vi.mocked(ruoloIn).mockResolvedValue(ruolo)
+    await expect(eliminaEsperimento(E)).rejects.toThrow(SOLO_PROPRIETARIO_ELIMINA)
+    expect(eliminaFileEsperimento).not.toHaveBeenCalled()
+    expect(mock.di('esperimenti')).toEqual([])
   })
 
   it('se i file non si tolgono l\'esperimento non si elimina e il messaggio lo dice', async () => {

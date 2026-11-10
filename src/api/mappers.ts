@@ -159,6 +159,7 @@ export function daRigaMisura(r: RigaMisura): Misura {
     data_rilievo: r.data_rilievo,
     ora: r.ora.slice(0, 5),
     valori: r.valori,
+    ...(r.creato_da ? { creato_da: r.creato_da } : {}),
   }
 }
 
@@ -300,6 +301,7 @@ export function daRigaNota(r: RigaNota): Nota {
     fatto_il: r.fatto_il,
     pianta_ids: (r.note_piante ?? []).map(p => p.pianta_id),
     trattamento_ids: (r.note_trattamenti ?? []).map(t => t.trattamento_id),
+    ...(r.creato_da ? { creato_da: r.creato_da } : {}),
   }
 }
 
@@ -333,6 +335,7 @@ export function daRigaFoto(r: RigaFoto): Foto {
   return {
     id: r.id, data: r.data, percorso: r.percorso, larghezza: r.larghezza, altezza: r.altezza, byte: r.byte,
     pianta_id: r.pianta_id, nota_id: r.nota_id, archiviata: r.archiviata, archiviata_il: r.archiviata_il ?? null,
+    ...(r.creato_da ? { creato_da: r.creato_da } : {}),
   }
 }
 

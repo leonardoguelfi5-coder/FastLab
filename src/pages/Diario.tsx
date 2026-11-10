@@ -27,7 +27,9 @@ import { nuovoId } from '@/lib/id'
 import { leggiArrivoDiario, percorsoHome, type ArrivoDiario } from '@/lib/percorsi'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
 import { toastSalvato } from '@/lib/toastSalvato'
+import { SOLO_LETTURA_NOTE } from '@/lib/ruoli'
 import { useOggi } from '@/lib/useOggi'
+import { usePermessi } from '@/lib/usePermessi'
 
 /** La nota nell'editor: una nuova (`esistente` null) o la modifica di una già salvata. */
 interface Modifica {
@@ -118,6 +120,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
   const navigate = useNavigate()
   const posizione = useLocation()
   const queryClient = useQueryClient()
+  const permessi = usePermessi(espId)
   // Come si è arrivati (da Oggi, o dalla scheda di una pianta): letto una volta, all'apertura della pagina.
   const [arrivo] = useState<ArrivoDiario>(() => leggiArrivoDiario(posizione.state, espId))
   // A mezzanotte la nota aperta riapplica la regola del promemoria con il giorno nuovo: la casella mostra ciò che si salva.
@@ -284,7 +287,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
         setConferma('esci')
       }}
     >
-      {modifica ? (
+      {modifica && permessi.puoMisurare ? (
         <>
           <EditorNota
             espId={espId}
@@ -294,6 +297,7 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
             oggi={oggi}
             eraPromemoria={modifica.esistente?.promemoria ?? false}
             notaSalvataId={modifica.esistente?.id ?? null}
+            notaDi={modifica.esistente?.creato_da}
             nuova={modifica.esistente === null}
             ripresa={modifica.ripresa}
             problemi={problemi}
@@ -350,13 +354,18 @@ function DiarioCaricato({ espId, config, note }: { espId: string; config: Config
                     eliminaNotaConAnnulla(queryClient, espId, n)
                   }}
                   onSpunta={() => void spuntaNota(queryClient, espId, n)}
+                  puoCorreggere={permessi.puoCorreggere(n.creato_da)}
                 />
               ))}
             </ul>
           )}
-          <BarraAzioni>
-            <Button size="lg" onClick={apriNuova}>+ Nuova nota</Button>
-          </BarraAzioni>
+          {permessi.puoMisurare ? (
+            <BarraAzioni>
+              <Button size="lg" onClick={apriNuova}>+ Nuova nota</Button>
+            </BarraAzioni>
+          ) : (
+            <p className="text-grafite-tenue">{SOLO_LETTURA_NOTE}</p>
+          )}
         </>
       )}
 

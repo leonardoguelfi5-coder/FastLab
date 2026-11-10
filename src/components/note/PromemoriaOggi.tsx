@@ -8,6 +8,7 @@ import { descriviCollegamento, promemoriaDelGiorno } from '@/domain/note'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
+import { usePermessi } from '@/lib/usePermessi'
 import { percorsoDiario, type ArrivoDiario } from '@/lib/percorsi'
 import { senzaNoteInEliminazione } from './eliminaNotaConAnnulla'
 import { chiaveSpuntaPromemoria, spuntaPromemoriaConAnnulla } from './spuntaPromemoriaConAnnulla'
@@ -29,6 +30,8 @@ export function PromemoriaOggi({ espId, config, oggi }: PromemoriaOggiProps) {
   const id = useId()
   const queryClient = useQueryClient()
   const note = useNote(espId)
+  // Il rilevatore non spunta i promemoria altrui, il lettore nessuno (la guardia vera è il database).
+  const permessi = usePermessi(espId)
 
   if (note.data === undefined) {
     return note.isError
@@ -61,6 +64,7 @@ export function PromemoriaOggi({ espId, config, oggi }: PromemoriaOggiProps) {
               <span className="line-clamp-2 break-words whitespace-pre-line text-base text-grafite">{n.testo}</span>
               <span className="break-words font-mono text-sm tabular-nums text-grafite-tenue">{descriviCollegamento(n, config)}</span>
             </Link>
+            {permessi.puoCorreggere(n.creato_da) && (
             <button
               type="button"
               aria-label={`Segna fatto: ${n.testo}`}
@@ -69,6 +73,7 @@ export function PromemoriaOggi({ espId, config, oggi }: PromemoriaOggiProps) {
             >
               <Check aria-hidden className="size-5" strokeWidth={2.5} />
             </button>
+            )}
           </li>
         ))}
       </ul>

@@ -11,7 +11,8 @@ import { Esporta } from '@/pages/Esporta'
 import { FineGiro } from '@/pages/FineGiro'
 import { Foto } from '@/pages/Foto'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
-import { Impostazioni } from '@/pages/Impostazioni'
+import { Impostazioni } from '@/pages/impostazioni/IndiceImpostazioni'
+import { ImpostazioniSezione } from '@/pages/impostazioni/PaginaSezione'
 import { MisuraPianta } from '@/pages/MisuraPianta'
 import { ModificaMisura } from '@/pages/ModificaMisura'
 import { NuovoEsperimento } from '@/pages/NuovoEsperimento'
@@ -39,6 +40,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/piante/:piantaId" element={<SchedaPianta />} />
         <Route path="/esperimenti/:espId/misure/:misuraId" element={<ModificaMisura />} />
         <Route path="/esperimenti/:espId/impostazioni" element={<Impostazioni />} />
+        <Route path="/esperimenti/:espId/impostazioni/:sezione" element={<ImpostazioniSezione />} />
         <Route path="/esperimenti/:espId/oggi" element={<Oggi />} />
         <Route path="/esperimenti/:espId/dataset" element={<Dataset />} />
         <Route path="/esperimenti/:espId/esporta" element={<Esporta />} />

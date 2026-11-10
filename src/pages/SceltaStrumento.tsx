@@ -14,6 +14,8 @@ import { righeStrumenti, type Giro } from '@/domain/giro'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
 import { percorsoHome, percorsoImpostazioni } from '@/lib/percorsi'
+import { SOLO_LETTURA_MISURE } from '@/lib/ruoli'
+import { usePermessi } from '@/lib/usePermessi'
 import { useAvviaMisura } from '@/lib/useAvviaMisura'
 import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
 import { useOggi } from '@/lib/useOggi'
@@ -93,7 +95,7 @@ function SceltaCaricata({ espId, config }: { espId: string; config: ConfigEsperi
       <div className="flex flex-col items-start gap-2">
         <p className="text-grafite-tenue">Questo esperimento non ha strumenti attivi.</p>
         <Link
-          to={percorsoImpostazioni(espId)}
+          to={percorsoImpostazioni(espId, 'strumenti')}
           className="inline-flex min-h-11 items-center font-medium text-inchiostro underline decoration-1 underline-offset-4"
         >
           Aggiungine uno dalle Impostazioni
@@ -142,9 +144,13 @@ export function SceltaStrumento() {
   const dataRilievo = useCampoStore(s => s.dati(espId, oggi).dataRilievo)
   useLetturaInAnticipo(espId, dati, dataRilievo)
 
+  const { puoMisurare } = usePermessi(espId)
+
   return (
     <AppShell titolo="Nuova misura" indietro={percorsoHome(espId)}>
-      {dati === undefined ? (
+      {!puoMisurare ? (
+        <p className="text-grafite-tenue">{SOLO_LETTURA_MISURE}</p>
+      ) : dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
           : <Caricamento />

@@ -76,8 +76,19 @@ export const percorsoPiante = (espId: string) => `${percorsoHome(espId)}/piante`
 /** Scheda di una pianta. */
 export const percorsoPianta = (espId: string, piantaId: string) => `${percorsoPiante(espId)}/${parte(piantaId)}`
 
-/** Impostazioni di un esperimento (configurazione a esperimento avviato). */
-export const percorsoImpostazioni = (espId: string) => `${percorsoHome(espId)}/impostazioni`
+/** Le pagine delle Impostazioni (Piano E, Task E10): ognuna ha il suo segmento nel percorso. */
+export const SEZIONI_IMPOSTAZIONI = ['generale', 'trattamenti', 'piante', 'strumenti', 'fenologia', 'spazio', 'persone'] as const
+export type SezioneImpostazioni = (typeof SEZIONI_IMPOSTAZIONI)[number]
+
+export const eSezioneImpostazioni = (v: unknown): v is SezioneImpostazioni =>
+  typeof v === 'string' && (SEZIONI_IMPOSTAZIONI as readonly string[]).includes(v)
+
+/**
+ * Impostazioni di un esperimento: senza `sezione` l'indice, una riga per pagina; con `sezione` quella pagina
+ * (configurazione a esperimento avviato, spazio, persone).
+ */
+export const percorsoImpostazioni = (espId: string, sezione?: SezioneImpostazioni) =>
+  `${percorsoHome(espId)}/impostazioni${sezione ? `/${sezione}` : ''}`
 
 /** Modifica di una misura già registrata. */
 export const percorsoModificaMisura = (espId: string, misuraId: string) => `${percorsoHome(espId)}/misure/${parte(misuraId)}`

@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { ruoloIn } from '@/api/persone'
 import type { Ruolo } from '@/domain/ruoli'
-import { chiavi } from '@/api/query'
-import { DURATA_IN_MEMORIA_MS } from './cachePersistente'
+import { opzioniRuolo } from '@/api/query'
 
 export interface StatoRuolo {
   /** Il ruolo di chi guarda, `null` se non è membro, se non lo si è ancora letto o se la lettura è fallita. */
@@ -22,12 +20,7 @@ export interface StatoRuolo {
  * ruolo) ed è nell'elenco chiuso della copia sul telefono: senza rete il lettore resta lettore.
  */
 export function useRuolo(espId: string | undefined): StatoRuolo {
-  const q = useQuery({
-    queryKey: chiavi.ruolo(espId ?? ''),
-    queryFn: () => ruoloIn(espId as string),
-    enabled: !!espId,
-    gcTime: DURATA_IN_MEMORIA_MS,
-  })
+  const q = useQuery({ ...opzioniRuolo(espId ?? ''), enabled: !!espId })
   const ruolo = q.data ?? null
   return {
     ruolo,

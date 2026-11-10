@@ -46,6 +46,8 @@ export const FOTO_NON_LEGGIBILE = 'Non riesco ad aprire questa foto: prova con u
 export const FOTO_TROPPO_GRANDE = 'Foto troppo grande da elaborare sul telefono: scattala con una risoluzione più bassa.'
 
 /** `eliminaEsperimento` non è riuscito a togliere i file delle foto dallo Storage: l'esperimento è rimasto com'era. */
+/** Eliminare l'esperimento è del proprietario (Piano E, Task E10). */
+export const SOLO_PROPRIETARIO_ELIMINA = 'Solo il proprietario può eliminare l\'esperimento.'
 export const FOTO_ESPERIMENTO_NON_RIMOSSE =
   'Non sono riuscito a eliminare le foto dell\'esperimento, quindi l\'esperimento non è stato eliminato. Riprova.'
 

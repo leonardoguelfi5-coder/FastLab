@@ -16,6 +16,8 @@ import { filtraFoto } from '@/domain/foto'
 import type { ConfigEsperimento, Foto as FotoTipo } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoHome } from '@/lib/percorsi'
+import { SOLO_LETTURA_FOTO } from '@/lib/ruoli'
+import { usePermessi } from '@/lib/usePermessi'
 import { cn } from '@/lib/utils'
 
 const CHIP = 'inline-flex h-11 items-center gap-1.5 rounded-lg border px-3.5 text-base font-medium transition-colors'
@@ -108,13 +110,18 @@ function Galleria({ espId, config, foto }: GalleriaProps) {
 /** La pagina a configurazione e foto caricate: lo stato dei caricamenti, la galleria e «+ Aggiungi foto» nella barra. */
 function FotoCaricate({ espId, config, foto }: GalleriaProps) {
   const carica = useCaricaFoto(espId)
+  const { puoMisurare } = usePermessi(espId)
   return (
     <>
       <StatoCaricamentoFoto carica={carica} />
       <Galleria espId={espId} config={config} foto={foto} />
-      <BarraAzioni>
-        <PulsanteAggiungiFoto carica={carica} variante="principale" />
-      </BarraAzioni>
+      {puoMisurare ? (
+        <BarraAzioni>
+          <PulsanteAggiungiFoto carica={carica} variante="principale" />
+        </BarraAzioni>
+      ) : (
+        <p className="text-grafite-tenue">{SOLO_LETTURA_FOTO}</p>
+      )}
     </>
   )
 }

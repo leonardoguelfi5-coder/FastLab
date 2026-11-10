@@ -14,7 +14,9 @@ import type { ConfigEsperimento } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDataset, percorsoDiario, percorsoEsporta, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante } from '@/lib/percorsi'
 import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
+import { SOLO_LETTURA } from '@/lib/ruoli'
 import { useOggi } from '@/lib/useOggi'
+import { usePermessi } from '@/lib/usePermessi'
 import { cn } from '@/lib/utils'
 import { useCampoStore } from '@/store/campo'
 
@@ -137,14 +139,27 @@ function NumerinoDaControllare({ da }: { da: DaControllare }) {
   )
 }
 
+/** Al posto di "Nuova misura" per un lettore: la tessera dice che si guarda soltanto (nessun inchiostro, non è un'azione). */
+function TesseraSoloLettura() {
+  return (
+    <div className="flex min-h-14 flex-col justify-center gap-0.5 rounded-lg border border-riga-controllo px-4 py-3">
+      <span className="text-title text-grafite">{SOLO_LETTURA}</span>
+      <span className="text-sm text-grafite-tenue">Puoi guardare, esportare e duplicare l&apos;esperimento.</span>
+    </div>
+  )
+}
+
 /** La home dell'esperimento a configurazione caricata: riepilogo, "Nuova misura" e le icone delle sezioni. */
 function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperimento }) {
   const daControllare = useDaControllare(espId, config)
+  // Solo un lettore noto perde "Nuova misura": se il ruolo non si è potuto leggere il giro resta aperto (il database
+  // rifiuta ciò che non è permesso).
+  const { puoMisurare } = usePermessi(espId)
 
   return (
     <>
       <p className="font-mono text-dato tabular-nums text-grafite-tenue">{riepilogo(config)}</p>
-      <StrisciaNuovaMisura espId={espId} config={config} />
+      {puoMisurare ? <StrisciaNuovaMisura espId={espId} config={config} /> : <TesseraSoloLettura />}
       <nav aria-label="Sezioni" className="grid grid-cols-2 gap-2.5">
         <Voce to={percorsoOggi(espId)} icona="📅" nome="Oggi">
           {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}

@@ -15,6 +15,8 @@ const misura: Misura = {
   valori: { par1: [24.5] },
 }
 const riga = { ...aRigaMisura('E', misura), ora: '09:12:00', creato_da: 'u1', creato_il: 'x', aggiornato_il: 'y' }
+/** Come arriva dal database: con chi l'ha scritta (Piano E, Task E10). */
+const letta: Misura = { ...misura, creato_da: 'u1' }
 const errore = { code: '23503', message: 'violates foreign key constraint', details: '', hint: '' }
 
 let mock: ReturnType<typeof simulaSupabase>
@@ -72,7 +74,7 @@ describe('misureDelGiorno', () => {
 
     const misure = await misureDelGiorno('E', '2026-10-28')
 
-    expect(misure).toEqual([misura])
+    expect(misure).toEqual([letta])
     const chiamate = mock.di('misure')
     expect(chiamate.find(c => c.metodo === 'select')?.args).toEqual(['*'])
     expect(chiamate.filter(c => c.metodo === 'eq').map(c => c.args)).toEqual([
@@ -95,7 +97,7 @@ describe('misurePianta', () => {
   it('filtra per pianta e converte le righe', async () => {
     mock.risponde('misure', { data: [riga] })
 
-    expect(await misurePianta('p1')).toEqual([misura])
+    expect(await misurePianta('p1')).toEqual([letta])
     expect(mock.di('misure').filter(c => c.metodo === 'eq').map(c => c.args)).toEqual([['pianta_id', 'p1']])
   })
 
@@ -109,7 +111,7 @@ describe('caricaMisura', () => {
   it('legge una misura per id e la converte', async () => {
     mock.risponde('misure', { data: riga })
 
-    expect(await caricaMisura('m1')).toEqual(misura)
+    expect(await caricaMisura('m1')).toEqual(letta)
     expect(mock.di('misure').filter(c => c.metodo === 'eq').map(c => c.args)).toEqual([['id', 'm1']])
   })
 
@@ -162,7 +164,7 @@ describe('ultimeMisurePiante', () => {
   it('chiama la RPC e restituisce le misure convertite (ora senza secondi)', async () => {
     mock.risponde('rpc:ultime_misure_piante', { data: [riga] })
 
-    expect(await ultimeMisurePiante('E')).toEqual([misura])
+    expect(await ultimeMisurePiante('E')).toEqual([letta])
     expect(supabase.rpc).toHaveBeenCalledWith('ultime_misure_piante', { p_esperimento: 'E' })
   })
 

@@ -692,7 +692,7 @@ describe('Dataset: stati', () => {
     config.strumenti = []
     apri()
     expect(await screen.findByText('Aggiungi uno strumento nelle Impostazioni.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Apri le Impostazioni' })).toHaveAttribute('href', '/esperimenti/E/impostazioni')
+    expect(screen.getByRole('link', { name: 'Apri le Impostazioni' })).toHaveAttribute('href', '/esperimenti/E/impostazioni/strumenti')
     expect(screen.queryByRole('group', { name: 'Filtri' })).toBeNull()
     expect(misureStrumento).not.toHaveBeenCalled()
   })

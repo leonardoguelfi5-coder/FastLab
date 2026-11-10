@@ -19,6 +19,8 @@ interface EditorNotaProps {
   eraPromemoria: boolean
   /** La nota già salvata che si sta modificando, a cui si collegano le foto; null per una nota nuova. */
   notaSalvataId: string | null
+  /** Chi ha scritto la nota salvata (`creato_da`), per le foto: il rilevatore le collega solo alle note sue. */
+  notaDi?: string
   /** Una nota nuova: il cursore parte nel testo. */
   nuova: boolean
   /** Il modulo riparte da una bozza lasciata a metà. */
@@ -32,7 +34,7 @@ interface EditorNotaProps {
  * L'editor di una nota in pagina (spec §5.7): testo, data (di base oggi, anche passata o futura), collegamento, la
  * casella "Ricordamelo quel giorno" e le foto della nota. Controllato: chi lo usa tiene lo stato, la bozza e il salvataggio.
  */
-export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria, notaSalvataId, nuova, ripresa, problemi, disabilitato }: EditorNotaProps) {
+export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria, notaSalvataId, notaDi, nuova, ripresa, problemi, disabilitato }: EditorNotaProps) {
   const id = useId()
   return (
     <ModuloCampi className="flex flex-col gap-6">
@@ -83,7 +85,7 @@ export function EditorNota({ espId, config, stato, onCambia, oggi, eraPromemoria
         </p>
       </div>
 
-      <FotoNota espId={espId} config={config} notaId={notaSalvataId} />
+      <FotoNota espId={espId} config={config} notaId={notaSalvataId} notaDi={notaDi} />
 
       {problemi.length > 0 && (
         <div className="flex flex-col gap-1">

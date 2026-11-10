@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { opzioniMisureGiorno, opzioniMisurePianta } from '@/api/query'
+import { opzioniMisureGiorno, opzioniMisurePianta, opzioniRuolo } from '@/api/query'
 import type { ConfigEsperimento } from '@/domain/tipi'
 
 /**
@@ -13,6 +13,9 @@ import type { ConfigEsperimento } from '@/domain/tipi'
  *   ripete.
  * - Oltre 300 piante solo le prime 300 nell'ordine del giro: tutte insieme non starebbero comunque nei 2 MB della
  *   copia, e sarebbero troppe richieste a ogni apertura.
+ * - Anche il ruolo (Piano E, Task E10): senza rete e senza copia l'interfaccia non conosce il ruolo e non nasconde
+ *   "Nuova misura" (la guardia vera è il database); letto in anticipo finisce nella copia sul telefono, dove il
+ *   lettore resta lettore. Si rilegge con la stessa finestra delle piante.
  * - Un fallimento non si mostra: è solo un anticipo, la pagina che serve rilegge da sé.
  */
 
@@ -34,11 +37,12 @@ export function dimenticaLettureInAnticipo(): void {
 export async function leggiInAnticipo(queryClient: QueryClient, espId: string, config: ConfigEsperimento, data: string): Promise<void> {
   if (!conRete()) return
   const giorno = queryClient.prefetchQuery({ ...opzioniMisureGiorno(espId, data), staleTime: FINESTRA_ANTICIPO_MS })
+  const ruolo = queryClient.prefetchQuery({ ...opzioniRuolo(espId), staleTime: FINESTRA_ANTICIPO_MS })
 
   const adesso = Date.now()
   const prima = ultimaLettura.get(espId)
   if (prima !== undefined && adesso - prima < FINESTRA_ANTICIPO_MS) {
-    await giorno
+    await Promise.all([giorno, ruolo])
     return
   }
   ultimaLettura.set(espId, adesso)
@@ -52,7 +56,7 @@ export async function leggiInAnticipo(queryClient: QueryClient, espId: string, c
       await queryClient.prefetchQuery({ ...opzioniMisurePianta(pianta.id), staleTime: FINESTRA_ANTICIPO_MS })
     }
   }
-  await Promise.all([giorno, ...Array.from({ length: CONCORRENZA_ANTICIPO }, lettore)])
+  await Promise.all([giorno, ruolo, ...Array.from({ length: CONCORRENZA_ANTICIPO }, lettore)])
 }
 
 /**

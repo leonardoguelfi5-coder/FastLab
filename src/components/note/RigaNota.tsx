@@ -13,6 +13,8 @@ interface RigaNotaProps {
   onModifica: () => void
   onElimina: () => void
   onSpunta: () => void
+  /** Corregge, elimina e spunta solo chi può (Piano E, Task E10): il rilevatore le note sue, il lettore nessuna. */
+  puoCorreggere?: boolean
 }
 
 /**
@@ -20,7 +22,7 @@ interface RigaNotaProps {
  * collegata. Un promemoria porta la parola "Promemoria" e la spunta (bersaglio di 44 px, fuori dal tocco che apre la
  * riga); fatto, resta barrato con "fatto il GG/MM" e si può riaprire.
  */
-export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, onSpunta }: RigaNotaProps) {
+export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, onSpunta, puoCorreggere = true }: RigaNotaProps) {
   const fatto = nota.promemoria && nota.fatto_il !== null
   const data = formattaData(nota.data)
   return (
@@ -42,7 +44,7 @@ export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, 
           </span>
           <span className="break-words font-mono text-sm tabular-nums text-grafite-tenue">{descriviCollegamento(nota, config)}</span>
         </button>
-        {nota.promemoria && (
+        {nota.promemoria && puoCorreggere && (
           <button
             type="button"
             aria-label={`${fatto ? 'Riapri' : 'Segna fatto'} il promemoria del ${data}`}
@@ -58,7 +60,7 @@ export function RigaNota({ nota, config, aperta, onApri, onModifica, onElimina, 
           </button>
         )}
       </div>
-      {aperta && (
+      {aperta && puoCorreggere && (
         <div className="flex gap-3 px-4 pb-4">
           <Button type="button" variant="outline" onClick={onModifica}>Modifica</Button>
           <Button type="button" variant="destructive" onClick={onElimina}>Elimina</Button>

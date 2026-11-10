@@ -11,6 +11,7 @@ import { listaExportSalvati } from './exportSalvati'
 import { listaFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
+import { membriDi, ruoloIn } from './persone'
 import { spazioProgetto } from './spazio'
 import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
 import type { Misura } from '@/domain/tipi'
@@ -26,6 +27,8 @@ export const chiavi = {
   conteggiStrumenti: (espId: string) => ['config', espId, 'conteggiStrumenti'] as const,
   /** Il ruolo di chi guarda (`useRuolo`): sotto la configurazione, e nella copia sul telefono. */
   ruolo: (espId: string) => ['config', espId, 'ruolo'] as const,
+  /** Le persone dell'esperimento (Impostazioni › Persone): sotto la configurazione, ma non nella copia sul telefono. */
+  membri: (espId: string) => ['config', espId, 'membri'] as const,
   /** Prefisso di tutte le misure: per invalidarle insieme. */
   misure: ['misure'] as const,
   misura: (id: string) => ['misure', 'una', id] as const,
@@ -147,6 +150,25 @@ export function useMisureGiorno(espId: string | undefined, data: string) {
     [voci, data],
   )
   return useQuery({ ...opzioniMisureGiorno(espId ?? '', data), enabled: !!espId, select })
+}
+
+/** Chiave e lettura del ruolo di chi guarda: le stesse per `useRuolo` e per leggerlo in anticipo con la configurazione. */
+export function opzioniRuolo(espId: string) {
+  return queryOptions({
+    queryKey: chiavi.ruolo(espId),
+    queryFn: () => ruoloIn(espId),
+    gcTime: DURATA_IN_MEMORIA_MS,
+  })
+}
+
+/** Le persone dell'esperimento e il loro ruolo. Sempre fresche all'apertura: un altro può averne aggiunte. */
+export function useMembri(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.membri(espId ?? ''),
+    queryFn: () => membriDi(espId as string),
+    enabled: !!espId,
+    staleTime: 0,
+  })
 }
 
 /** Chiave e lettura delle misure del giorno: le stesse per `useMisureGiorno` e per leggerle in anticipo. */

@@ -12,7 +12,9 @@ import { descriviFoto, testoArchiviata } from '@/domain/foto'
 import type { ConfigEsperimento, Foto } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
+import { FOTO_DI_UN_ALTRO } from '@/lib/ruoli'
 import { OPZIONI_ERRORE_TARDIVO } from '@/lib/toastErrore'
+import { usePermessi } from '@/lib/usePermessi'
 
 /** Quanto deve scorrere il dito (in pixel) perché sia una strisciata e non un tocco, e quanto più in orizzontale che in verticale. */
 const STRISCIATA_MIN = 50
@@ -204,6 +206,10 @@ const ATTESA_DATA_MS = 700
 function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; config: ConfigEsperimento; foto: Foto; onElimina: () => void }) {
   const queryClient = useQueryClient()
   const id = useId()
+  // Il rilevatore cambia ed elimina solo le sue foto, il lettore nessuna (Piano E, Task E10): sulle altre il pannello
+  // mostra data e pianta da leggere e lo dice, senza «Elimina foto».
+  const permessi = usePermessi(espId)
+  const modificabile = permessi.puoCorreggere(foto.creato_da)
   const [data, setData] = useState(foto.data)
   const [salvandoData, setSalvandoData] = useState(false)
   const [dataRifiutata, setDataRifiutata] = useState<string | null>(null)
@@ -276,7 +282,7 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-data`}>Data</Label>
         <Input
-          id={`${id}-data`} type="date" variant="campo"
+          id={`${id}-data`} type="date" variant="campo" disabled={!modificabile}
           value={data} onChange={e => { setData(e.target.value); setErrore(null) }}
         />
         {salvandoData && <p role="status" className="text-sm text-grafite-tenue">Salvataggio…</p>}
@@ -285,7 +291,7 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`${id}-pianta`}>Pianta</Label>
         <select
-          id={`${id}-pianta`} className={SELEZIONE} disabled={occupato} value={pianta}
+          id={`${id}-pianta`} className={SELEZIONE} disabled={occupato || !modificabile} value={pianta}
           onChange={e => {
             const prima = pianta
             setPianta(e.target.value)
@@ -309,7 +315,9 @@ function PannelloFoto({ espId, config, foto, onElimina }: { espId: string; confi
         </div>
       )}
 
-      <Button type="button" variant="destructive" onClick={onElimina}>Elimina foto</Button>
+      {modificabile
+        ? <Button type="button" variant="destructive" onClick={onElimina}>Elimina foto</Button>
+        : <p className="text-sm text-grafite-tenue">{FOTO_DI_UN_ALTRO}</p>}
     </div>
   )
 }

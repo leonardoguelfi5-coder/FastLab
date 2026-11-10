@@ -135,7 +135,7 @@ function DatasetCaricato({ espId, config }: { espId: string; config: ConfigEsper
       <div className="flex flex-col items-start gap-2">
         <p className="text-title text-grafite">Nessuno strumento.</p>
         <p className={AVVISO}>Aggiungi uno strumento nelle Impostazioni.</p>
-        <Link to={percorsoImpostazioni(espId)} className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-3' })}>Apri le Impostazioni</Link>
+        <Link to={percorsoImpostazioni(espId, 'strumenti')} className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-3' })}>Apri le Impostazioni</Link>
       </div>
     )
   }

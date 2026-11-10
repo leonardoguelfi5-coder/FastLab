@@ -74,7 +74,7 @@ function Strumenti({ espId, config, oggi }: { espId: string; config: ConfigEsper
       <div className="flex flex-col items-start gap-2">
         <p className="text-grafite-tenue">Questo esperimento non ha strumenti attivi.</p>
         <Link
-          to={percorsoImpostazioni(espId)}
+          to={percorsoImpostazioni(espId, 'strumenti')}
           className="inline-flex min-h-11 items-center font-medium text-inchiostro underline decoration-1 underline-offset-4"
         >
           Aggiungine uno dalle Impostazioni

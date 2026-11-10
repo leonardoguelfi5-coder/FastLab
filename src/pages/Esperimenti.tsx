@@ -8,6 +8,7 @@ import { Caricamento } from '@/components/Caricamento'
 import { BarraAzioni } from '@/components/BarraAzioni'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { buttonVariants } from '@/components/ui/button'
+import { RUOLO_NOME } from '@/domain/ruoli'
 import { formattaData, oggiLocale } from '@/lib/date'
 import { cn } from '@/lib/utils'
 
@@ -99,6 +100,10 @@ function SchedaEsperimento({ esperimento }: { esperimento: RiepilogoEsperimento 
       >
         <h2 className="text-title break-words text-grafite">{esperimento.nome}</h2>
         <p className="text-dato font-sans text-grafite-tenue tabular-nums">{riepilogo(esperimento)}</p>
+        {/* Per gli esperimenti di un altro: con che ruolo ci si entra (il proprio non si dice). */}
+        {(esperimento.ruolo === 'rilevatore' || esperimento.ruolo === 'lettore') && (
+          <p className="text-dato font-sans text-grafite-tenue">{RUOLO_NOME[esperimento.ruolo]}</p>
+        )}
         {esperimento.ultima_data !== null && (
           <p className="text-dato font-sans text-grafite-tenue tabular-nums">
             {`Ultimo rilievo: ${quando(esperimento.ultima_data)}, ${esperimento.piante_ultima_data}/${esperimento.n_piante} piante`}

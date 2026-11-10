@@ -893,7 +893,7 @@ describe('SchedaPianta: misura questa pianta', () => {
     apri('35')
     await pronta()
     expect(screen.getByText('Questo esperimento non ha strumenti attivi.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Aggiungine uno dalle Impostazioni' })).toHaveAttribute('href', '/esperimenti/E/impostazioni')
+    expect(screen.getByRole('link', { name: 'Aggiungine uno dalle Impostazioni' })).toHaveAttribute('href', '/esperimenti/E/impostazioni/strumenti')
     expect(screen.queryByRole('button', { name: 'Misura questa pianta' })).not.toBeInTheDocument()
   })
 

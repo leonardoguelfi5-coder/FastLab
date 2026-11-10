@@ -58,9 +58,9 @@ function Avviso({ children }: { children: string }) {
  * Lo spazio del progetto (Piano E, Decisione 5): il database e le foto di tutto il progetto Supabase contro i limiti del
  * piano gratuito, 500 MB e 1000 MB, e i conteggi di questo esperimento. I totali sono di tutti gli esperimenti, anche di
  * altri utenti, perché i limiti sono del progetto: lo dice. Senza il calcolo non c'è nessun numero. Sotto c'è l'archivio
- * .zip con «Libera lo spazio» (`ArchivioFoto`).
+ * .zip con «Libera lo spazio» (`ArchivioFoto`), che è del proprietario: gli altri leggono i numeri e basta (`puoGestire`).
  */
-export function SezioneSpazio({ espId, config }: { espId: string; config: ConfigEsperimento }) {
+export function SezioneSpazio({ espId, config, puoGestire = true }: { espId: string; config: ConfigEsperimento; puoGestire?: boolean }) {
   const spazio = useSpazioProgetto(espId)
   const dati = spazio.data
 
@@ -96,7 +96,9 @@ export function SezioneSpazio({ espId, config }: { espId: string; config: Config
         </div>
       )}
 
-      <ArchivioFoto espId={espId} config={config} />
+      {puoGestire
+        ? <ArchivioFoto espId={espId} config={config} />
+        : <Spiegazione>Solo il proprietario scarica l&apos;archivio delle foto e libera lo spazio.</Spiegazione>}
     </Sezione>
   )
 }

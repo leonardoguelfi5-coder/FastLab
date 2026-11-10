@@ -13,6 +13,7 @@ vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 vi.mock('./note', () => ({ listaNote: vi.fn() }))
 vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 vi.mock('./spazio', () => ({ spazioProgetto: vi.fn() }))
+vi.mock('./persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
 
 import { listaCatalogo } from './catalogo'
 import { conteggiStrumenti, parametriConDati, pianteConDati, pianteNonEliminabili } from './configurazione'

@@ -183,7 +183,7 @@ describe('Oggi: gli strumenti', () => {
     for (const s of config.strumenti) s.archiviato = true
     vaiAllaPagina()
     expect(await screen.findByText(/non ha strumenti attivi/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Impostazioni/ })).toHaveAttribute('href', '/esperimenti/E/impostazioni')
+    expect(screen.getByRole('link', { name: /Impostazioni/ })).toHaveAttribute('href', '/esperimenti/E/impostazioni/strumenti')
     expect(screen.queryByRole('list', { name: 'Strumenti' })).not.toBeInTheDocument()
   })
 

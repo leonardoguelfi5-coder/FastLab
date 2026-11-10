@@ -26,7 +26,9 @@ import { inviaCoda } from '@/lib/coda/invio'
 import { formattaData } from '@/lib/date'
 import { ErroreApp, eMisuraNonTrovata, messaggioErrore } from '@/lib/errori'
 import { eUuid, percorsoHome, percorsoPianta, type ArrivoMisura } from '@/lib/percorsi'
+import { MISURA_DI_UN_ALTRO, MISURA_SOLO_LETTURA } from '@/lib/ruoli'
 import { toastSalvato } from '@/lib/toastSalvato'
+import { usePermessi } from '@/lib/usePermessi'
 import { ModuloCampi } from '@/components/ModuloCampi'
 
 function NonTrovata({ espId }: { espId: string }) {
@@ -76,6 +78,10 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
   const idData = useId()
   const idOra = useId()
   const queryClient = useQueryClient()
+  // Un lettore, o un rilevatore su una misura di un altro, la guarda soltanto (Piano E, Task E10): niente "Salva" né
+  // "Elimina", e una frase che dice perché. Con il ruolo ignoto si lascia correggere: il database rifiuta (42501).
+  const permessi = usePermessi(espId)
+  const soloLettura = !permessi.puoCorreggere(misura.creato_da)
 
   const [{ parametri, obbligatori }] = useState(() => parametriDiUnaMisura(config, strumento, misura.valori))
   const [valori, setValori] = useState<ValoriMisura>(() => valoriDeiParametri(parametri, misura.valori))
@@ -296,6 +302,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
       <section aria-label="Valori della misura" className="rounded-lg bg-carta-ombra p-4">
         {/* Mentre l'operazione è partita il modulo non si tocca: quel che si scrive adesso andrebbe perso. */}
         <ModuloCampi>
+        <fieldset disabled={soloLettura} className="m-0 min-w-0 border-0 p-0">
         <div inert={occupato} className="flex flex-col gap-6">
           {/* Affiancati se ci stanno; su un telefono stretto l'ora va sotto la data. */}
           <div className="flex flex-wrap gap-3">
@@ -328,16 +335,21 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
             <p className="text-grafite-tenue">Questa misura non ha valori da correggere.</p>
           )}
         </div>
+        </fieldset>
         </ModuloCampi>
       </section>
 
-      {/* Lontano da "Salva", che sta in basso: l'eliminazione non si tocca per sbaglio con il pollice. */}
-      <Button variant="destructive" className="self-start" disabled={occupato} onClick={() => setConfermaElimina(true)}>
-        <Trash2 aria-hidden />
-        {eliminando ? 'Eliminazione…' : 'Elimina misura'}
-      </Button>
+      {soloLettura && <p className="text-grafite-tenue">{permessi.ruolo === 'lettore' ? MISURA_SOLO_LETTURA : MISURA_DI_UN_ALTRO}</p>}
 
-      <BarraAzioni>
+      {/* Lontano da "Salva", che sta in basso: l'eliminazione non si tocca per sbaglio con il pollice. */}
+      {!soloLettura && (
+        <Button variant="destructive" className="self-start" disabled={occupato} onClick={() => setConfermaElimina(true)}>
+          <Trash2 aria-hidden />
+          {eliminando ? 'Eliminazione…' : 'Elimina misura'}
+        </Button>
+      )}
+
+      {!soloLettura && <BarraAzioni>
         {controllo ? (
           <EsitoControllo ref={messaggio} controllo={controllo} />
         ) : stato.tipo === 'errore' ? (
@@ -352,7 +364,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
         <Button size="lg" className="w-full" disabled={occupato} onClick={() => void salva()}>
           {salvando ? 'Salvataggio…' : avvisiVisti ? 'Salva comunque' : 'Salva'}
         </Button>
-      </BarraAzioni>
+      </BarraAzioni>}
 
       <Conferma
         aperta={confermaElimina}

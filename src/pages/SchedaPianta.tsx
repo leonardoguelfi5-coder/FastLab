@@ -13,8 +13,10 @@ import { UltimiValori } from '@/components/scheda/UltimiValori'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import type { ConfigEsperimento, Misura } from '@/domain/tipi'
+import { SOLO_LETTURA_MISURE } from '@/lib/ruoli'
 import { percorsoDiario, percorsoImpostazioni, percorsoPianta, percorsoPiante, type ArrivoDiario } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
+import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 
 interface SchedaCaricataProps {
@@ -28,6 +30,7 @@ interface SchedaCaricataProps {
 /** La scheda a configurazione caricata: intestazione, dati della pianta, riepilogo e avvisi, l'azione, storia, nota e foto. */
 function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricataProps) {
   const senzaRete = useSenzaRete()
+  const permessi = usePermessi(espId)
   const pianta = config.piante.find(p => p.id === piantaId)
   if (!pianta) return <p className="text-grafite">Questa pianta non esiste in questo esperimento.</p>
 
@@ -68,15 +71,22 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
         </div>
       )}
 
-      {strumentiAttivi.length === 0 ? (
+      {!permessi.puoMisurare ? (
+        // Un lettore guarda: al posto dell'azione una frase (Piano E, Task E10). Un ruolo ignoto non arriva qui.
+        <p className="text-grafite-tenue">{SOLO_LETTURA_MISURE}</p>
+      ) : strumentiAttivi.length === 0 ? (
         <div className="flex flex-col items-start gap-2">
           <p className="text-grafite-tenue">Questo esperimento non ha strumenti attivi.</p>
-          <Link
-            to={percorsoImpostazioni(espId)}
-            className="inline-flex min-h-11 items-center font-medium text-inchiostro underline decoration-1 underline-offset-4"
-          >
-            Aggiungine uno dalle Impostazioni
-          </Link>
+          {permessi.soloProprietario ? (
+            <p className="text-grafite-tenue">Chiedi al proprietario di aggiungerne uno.</p>
+          ) : (
+            <Link
+              to={percorsoImpostazioni(espId, 'strumenti')}
+              className="inline-flex min-h-11 items-center font-medium text-inchiostro underline decoration-1 underline-offset-4"
+            >
+              Aggiungine uno dalle Impostazioni
+            </Link>
+          )}
         </div>
       ) : (
         <MisuraQuestaPianta espId={espId} piantaId={pianta.id} strumenti={strumentiAttivi} />
@@ -86,16 +96,18 @@ function SchedaCaricata({ espId, config, piantaId, oggi, misure }: SchedaCaricat
 
       {/* Non dipende dalle misure: si può scrivere una nota anche se non si leggono. Porta all'editor del Diario già
           collegato a questa pianta, e a nota salvata o annullata si torna qui. */}
-      <Link
-        to={percorsoDiario(espId)}
-        state={{ nuovaPerPianta: pianta.id, ritorno: percorsoPianta(espId, pianta.id) } satisfies ArrivoDiario}
-        className={buttonVariants({ variant: 'outline', className: 'self-start' })}
-      >
-        Aggiungi nota
-      </Link>
+      {permessi.puoMisurare && (
+        <Link
+          to={percorsoDiario(espId)}
+          state={{ nuovaPerPianta: pianta.id, ritorno: percorsoPianta(espId, pianta.id) } satisfies ArrivoDiario}
+          className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+        >
+          Aggiungi nota
+        </Link>
+      )}
 
       {/* Solo l'aggiunta: le foto della pianta stanno nella Storia. Non aspetta le misure. */}
-      <FotoPianta espId={espId} piantaId={pianta.id} />
+      {permessi.puoMisurare && <FotoPianta espId={espId} piantaId={pianta.id} />}
     </>
   )
 }

@@ -50,8 +50,11 @@ vi.mock('@/pages/Esporta', () => ({
 vi.mock('@/pages/Foto', () => ({
   Foto: () => <h1>Foto (prova)</h1>,
 }))
-vi.mock('@/pages/Impostazioni', () => ({
+vi.mock('@/pages/impostazioni/IndiceImpostazioni', () => ({
   Impostazioni: () => <h1>Impostazioni dell'esperimento (prova)</h1>,
+}))
+vi.mock('@/pages/impostazioni/PaginaSezione', () => ({
+  ImpostazioniSezione: () => <h1>Pagina delle impostazioni (prova)</h1>,
 }))
 vi.mock('@/pages/Catalogo', () => ({
   Catalogo: () => <h1>Catalogo strumenti (prova)</h1>,
@@ -68,7 +71,7 @@ const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 
 const PERCORSI_PRIVATI = [
   '/', '/esperimenti/x', '/esperimenti/x/misura', '/esperimenti/x/misura/s/p', '/esperimenti/x/misura/s/fine', '/esperimenti/x/piante', '/esperimenti/x/piante/p',
-  '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/oggi', '/esperimenti/x/dataset', '/esperimenti/x/esporta',
+  '/esperimenti/x/misure/m', '/esperimenti/x/impostazioni', '/esperimenti/x/impostazioni/persone', '/esperimenti/x/oggi', '/esperimenti/x/dataset', '/esperimenti/x/esporta',
   '/esperimenti/nuovo', '/admin/inviti', '/catalogo',
 ]
 
@@ -102,6 +105,12 @@ describe('AppRoutes', () => {
     vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
     vaiA('/esperimenti/x/impostazioni')
     expect(screen.getByRole('heading', { level: 1, name: 'Impostazioni dell\'esperimento (prova)' })).toBeInTheDocument()
+  })
+
+  it('con la sessione /esperimenti/:espId/impostazioni/:sezione mostra la pagina', () => {
+    vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
+    vaiA('/esperimenti/x/impostazioni/persone')
+    expect(screen.getByRole('heading', { level: 1, name: 'Pagina delle impostazioni (prova)' })).toBeInTheDocument()
   })
 
   it('con la sessione /catalogo mostra il catalogo degli strumenti', () => {

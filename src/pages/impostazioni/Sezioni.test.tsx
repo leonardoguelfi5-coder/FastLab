@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -27,6 +27,7 @@ vi.mock('@/api/foto', () => ({
   archiviaFileFoto: vi.fn(), fileFotoPresenti: vi.fn(), VALIDITA_URL_SECONDI: 3600,
 }))
 vi.mock('@/api/spazio', () => ({ spazioProgetto: vi.fn() }))
+vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn(), aggiungiMembro: vi.fn(), togliMembro: vi.fn() }))
 vi.mock('@/api/catalogo', () => ({
   listaCatalogo: vi.fn(), salvaVoceCatalogo: vi.fn(), archiviaVoceCatalogo: vi.fn(), copieDiProprieta: vi.fn(), applicaAggiornamento: vi.fn(),
 }))
@@ -49,7 +50,9 @@ import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Parametro, Strumento } from '@/domain/tipi'
 import { toastSalvato } from '@/lib/toastSalvato'
-import { Impostazioni } from './Impostazioni'
+import { ImpostazioniSezione } from './PaginaSezione'
+import { ruoloIn } from '@/api/persone'
+import type { SezioneImpostazioni } from '@/lib/percorsi'
 
 const SESSIONE = { user: { email: 'giulia@example.it' } } as Session
 /** Le misure del Termometro, l'unico strumento che ne ha. */
@@ -71,13 +74,23 @@ function Posizione() {
   return <p data-testid="posizione">{useLocation().pathname}</p>
 }
 
-function apri() {
+/** Il titolo della sezione che ogni pagina mostra. */
+const TITOLO: Record<SezioneImpostazioni, string> = {
+  generale: 'Generale', trattamenti: 'Trattamenti', piante: 'Piante', strumenti: 'Strumenti', fenologia: 'Tabella fenologica',
+  spazio: 'Spazio', persone: 'Persone',
+}
+/** L'ultima pagina aperta: `pronta()` aspetta la sua sezione. */
+let paginaAperta: SezioneImpostazioni = 'strumenti'
+
+/** Apre una pagina delle Impostazioni, come dall'indice (la cronologia ha l'indice sotto: la freccia lo trova). */
+function apri(pagina: SezioneImpostazioni) {
+  paginaAperta = pagina
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/esperimenti/E', '/esperimenti/E/impostazioni']} initialIndex={1}>
+      <MemoryRouter initialEntries={['/esperimenti/E/impostazioni', `/esperimenti/E/impostazioni/${pagina}`]} initialIndex={1}>
         <Routes>
-          <Route path="/esperimenti/:espId/impostazioni" element={<Impostazioni />} />
+          <Route path="/esperimenti/:espId/impostazioni/:sezione" element={<ImpostazioniSezione />} />
           <Route path="*" element={<p>Schermata in campo</p>} />
         </Routes>
         <Posizione />
@@ -90,7 +103,7 @@ function apri() {
 const sezione = (nome: string) => within(screen.getByRole('region', { name: nome }))
 /** Aspetta la pagina caricata (configurazione e dati delle piante e dei parametri). */
 async function pronta() {
-  await screen.findByRole('region', { name: 'Generale' })
+  await screen.findByRole('region', { name: TITOLO[paginaAperta] })
   await waitFor(() => expect(screen.queryByText('Controllo dei dati in corso…')).not.toBeInTheDocument())
 }
 /** La riga (espandibile) di una pianta, dall'etichetta. */
@@ -112,6 +125,7 @@ beforeEach(() => {
   config.esperimento.note = 'serra 2'
   vi.mocked(useSessione).mockReturnValue({ sessione: SESSIONE, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
+  vi.mocked(ruoloIn).mockResolvedValue('proprietario')
   vi.mocked(caricaConfig).mockImplementation(async () => structuredClone(config))
   // Temp aria ha dati; la pianta 1 ha misure.
   vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Temp aria').id]))
@@ -167,7 +181,7 @@ beforeEach(() => {
 describe('Impostazioni: dal piano', () => {
   it('un valore con dati ha il tipo bloccato e "Archivia il valore"; uno senza dati ha "Elimina il valore"', async () => {
     vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('N frutti').id]))
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(rigaValore(tabella(), 'N fruttiNumero'))
@@ -186,7 +200,7 @@ describe('Impostazioni: dal piano', () => {
 
   it('"Aggiungi dal catalogo" Ciras salva i suoi 4 valori con la chiave del catalogo e poi lo strumento', async () => {
     const ciras = SEMI_CATALOGO.find(v => v.nome === 'Ciras')!
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -210,7 +224,7 @@ describe('Impostazioni: dal piano', () => {
 
   it('"Archivia" su uno strumento con misure lo archivia (nessun delete); "Elimina" resta visibile anche con misure', async () => {
     const termometro = strum('Termometro').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -233,14 +247,18 @@ describe('Impostazioni: dal piano', () => {
   })
 
   it('la tabella fenologica ha valori di ogni tipo; in uno strumento semplice il tipo è bloccato su numero', async () => {
-    const { utente } = apri()
+    const { utente: sulla } = apri('fenologia')
     await pronta()
 
     expect(rigaValore(tabella(), 'Palchi')).toHaveTextContent('Lista ripetuta')
     expect(rigaValore(tabella(), 'Note')).toHaveTextContent('Testo')
-    await utente.click(rigaValore(tabella(), 'Note'))
+    await sulla.click(rigaValore(tabella(), 'Note'))
     expect(aperta(rigaValore(tabella(), 'Note')).getByLabelText('Tipo')).toBeEnabled()
 
+    // Gli strumenti stanno in un'altra pagina.
+    cleanup()
+    const { utente } = apri('strumenti')
+    await pronta()
     await utente.click(rigaStrumento('Termometro'))
     const tempAria = rigaValore(aperta(rigaStrumento('Termometro')), 'Temp aria')
     await utente.click(tempAria)
@@ -251,7 +269,7 @@ describe('Impostazioni: dal piano', () => {
   })
 
   it('la pianta con dati non ha "Rimuovi" e lo dice', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('1'))
@@ -269,7 +287,7 @@ describe('Impostazioni: dal piano', () => {
   it('una pianta con note o foto, senza misure, non ha "Rimuovi" e lo dice; il trattamento si può ancora cambiare', async () => {
     // La 3 ha una nota collegata o una foto: l'eliminazione darebbe l'errore 23503 del database.
     vi.mocked(pianteNonEliminabili).mockImplementation(async () => new Set([idPianta('1'), idPianta('3')]))
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('3'))
@@ -282,8 +300,8 @@ describe('Impostazioni: dal piano', () => {
 
   it('finché non si sa se una pianta ha note o foto "Rimuovi" resta spento', async () => {
     vi.mocked(pianteNonEliminabili).mockReturnValue(new Promise(() => undefined))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('piante')
+    await screen.findByRole('region', { name: 'Piante' })
     await waitFor(() => expect(sezione('Piante').getByText('Controllo dei dati in corso…')).toBeInTheDocument())
 
     await utente.click(rigaPianta('2'))
@@ -292,8 +310,8 @@ describe('Impostazioni: dal piano', () => {
 
   it('se la lettura non arriva lo dice con «Riprova», e "Rimuovi" non si offre', async () => {
     vi.mocked(pianteNonEliminabili).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('piante')
+    await screen.findByRole('region', { name: 'Piante' })
     const piante = sezione('Piante')
     expect(await piante.findByRole('alert')).toHaveTextContent('Rete debole')
     await utente.click(rigaPianta('2'))
@@ -303,7 +321,7 @@ describe('Impostazioni: dal piano', () => {
   })
 
   it('"Rimuovi" si ricontrolla al momento: se nel frattempo la pianta ha ricevuto una nota o una foto non la elimina', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('2'))
@@ -319,7 +337,7 @@ describe('Impostazioni: dal piano', () => {
   })
 
   it('"Aggiungi 3 piante a «S1»" aggiunge le piante 57, 58, 59 in fondo all\'ordine', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     const piante = sezione('Piante')
@@ -342,7 +360,7 @@ describe('Impostazioni: dal piano', () => {
 
 describe('Impostazioni: generale e trattamenti', () => {
   it('salva nome, data, note e "Esperimento concluso"', async () => {
-    const { utente } = apri()
+    const { utente } = apri('generale')
     await pronta()
     const generale = sezione('Generale')
     const salva = generale.getByRole('button', { name: 'Salva' })
@@ -362,7 +380,7 @@ describe('Impostazioni: generale e trattamenti', () => {
   })
 
   it('senza nome non salva', async () => {
-    const { utente } = apri()
+    const { utente } = apri('generale')
     await pronta()
     const generale = sezione('Generale')
     await utente.clear(generale.getByLabelText('Nome'))
@@ -371,7 +389,7 @@ describe('Impostazioni: generale e trattamenti', () => {
   })
 
   it('i fattori sono in sola lettura; l\'etichetta di un trattamento si rinomina, ma non uguale a un\'altra', async () => {
-    const { utente } = apri()
+    const { utente } = apri('trattamenti')
     await pronta()
     const trattamenti = sezione('Trattamenti')
     expect(trattamenti.getByText('I fattori non si modificano dopo la creazione.')).toBeInTheDocument()
@@ -397,7 +415,7 @@ describe('Impostazioni: piante', () => {
   it('un\'etichetta già usata (anche con spazi o maiuscole) dà un errore e non salva', async () => {
     config.piante[3].etichetta = 'B3-12'
     const prima = { ...config.piante[1] }
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('2'))
@@ -418,7 +436,7 @@ describe('Impostazioni: piante', () => {
 
   it('"Rimuovi" su una pianta senza dati chiede conferma e la elimina', async () => {
     const due = idPianta('2')
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('2'))
@@ -432,7 +450,7 @@ describe('Impostazioni: piante', () => {
   })
 
   it('un numero di piante non valido non propone di aggiungerne altre', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     const piante = sezione('Piante')
     await utente.type(piante.getByLabelText('Quante piante'), '300')
@@ -448,7 +466,7 @@ describe('Impostazioni: piante', () => {
         throw new TypeError('Failed to fetch')
       })
       .mockRejectedValueOnce({ code: '23505', message: 'duplicate key value violates unique constraint' })
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     const piante = sezione('Piante')
@@ -464,7 +482,7 @@ describe('Impostazioni: piante', () => {
   })
 
   it('il trattamento si cambia solo senza dati, e si ricontrolla al salvataggio', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(rigaPianta('2'))
@@ -484,7 +502,7 @@ describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
   const etichetteInOrdine = () => within(screen.getByRole('list', { name: 'Ordine delle piante' })).getAllByRole('listitem').map(li => li.textContent?.match(/#(\S+)/)?.[1])
 
   it('"Riordina" mostra le piante nell\'ordine di oggi, con su e giù da 44 px', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
     expect(etichetteInOrdine().slice(0, 3)).toEqual(config.piante.slice(0, 3).map(p => p.etichetta))
@@ -494,7 +512,7 @@ describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
   })
 
   it('sposta una pianta e salva solo l\'ordine delle piante cambiate', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
     const prima = config.piante.slice(0, 2).map(p => ({ ...p }))
@@ -512,7 +530,7 @@ describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
 
   it('"Ordina per etichetta" mette 2 prima di 10, "Ordina per blocco" raggruppa i blocchi', async () => {
     config.piante = config.piante.slice(0, 3).map((p, i) => ({ ...p, etichetta: ['10', '2', '1'][i], blocco: ['B2', 'B1', 'B2'][i], ordine: i }))
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
     expect(etichetteInOrdine()).toEqual(['10', '2', '1'])
@@ -523,7 +541,7 @@ describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
   })
 
   it('"Annulla" lascia l\'ordine com\'era, senza scrivere', async () => {
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
     await utente.click(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }))
@@ -534,7 +552,7 @@ describe('Impostazioni: riordino delle piante (Piano E, Task E11)', () => {
 
   it('un errore del database lo dice e lascia aperto il riordino', async () => {
     vi.mocked(salvaOrdinePiante).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('piante')
     await pronta()
     await utente.click(sezione('Piante').getByRole('button', { name: 'Riordina' }))
     await utente.click(screen.getByRole('button', { name: 'Sposta giù la pianta #1' }))
@@ -549,7 +567,7 @@ describe('Impostazioni: spazio', () => {
   const barra = (dentro: ReturnType<typeof within>, nome: string) => dentro.getByRole('progressbar', { name: nome })
 
   it('due barre per tutto il progetto, database su 500 MB e foto su 1000 MB, con le cifre nel font dei dati', async () => {
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     const database = (await dentro.findByText('Database')).closest('div') as HTMLElement
     expect(database).toHaveTextContent('Database38 / 500 MB')
@@ -561,7 +579,7 @@ describe('Impostazioni: spazio', () => {
   })
 
   it('il dettaglio di questo esperimento, e che i numeri sono di tutto il progetto', async () => {
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     expect(await dentro.findByText('Questo esperimento: 3.120 misure, 14 note, 85 foto · circa 31 MB')).toBeInTheDocument()
     expect(dentro.getByText('Anche vuoto, il database occupa qualche decina di MB (tabelle e sistema di Supabase).')).toBeInTheDocument()
@@ -570,7 +588,7 @@ describe('Impostazioni: spazio', () => {
 
   it('sotto l\'80% non avvisa e le barre sono grafite, mai verdi', async () => {
     vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 800_000_000 })
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     await dentro.findByText('800 / 1000 MB')
     expect(dentro.queryByText(/Oltre l'80%/)).not.toBeInTheDocument()
@@ -581,7 +599,7 @@ describe('Impostazioni: spazio', () => {
 
   it('oltre l\'80% delle foto avvisa, in tono attenzione e mai verde, e la barra lo ripete', async () => {
     vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 850_000_000 })
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     const avviso = (await dentro.findByText(/Oltre l'80% dello spazio delle foto/)).closest('p') as HTMLElement
     expect(avviso).toHaveAttribute('role', 'status')
@@ -594,7 +612,7 @@ describe('Impostazioni: spazio', () => {
 
   it('oltre l\'80% del database avvisa a parte', async () => {
     vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, database_byte: 420_000_000 })
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     expect(await dentro.findByText(/Oltre l'80% del database/)).toBeInTheDocument()
     expect(dentro.queryByText(/Oltre l'80% dello spazio delle foto/)).not.toBeInTheDocument()
@@ -603,7 +621,7 @@ describe('Impostazioni: spazio', () => {
 
   it('oltre il limite la barra si ferma al 100 ma il numero è quello vero', async () => {
     vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, foto_byte: 1_200_000_000 })
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     await dentro.findByText('1200 / 1000 MB')
     expect(barra(dentro, 'Foto del progetto')).toHaveAttribute('aria-valuenow', '100')
@@ -611,14 +629,14 @@ describe('Impostazioni: spazio', () => {
 
   it('senza i conteggi dell\'esperimento (non membro) i totali restano, il dettaglio no', async () => {
     vi.mocked(spazioProgetto).mockResolvedValue({ ...SPAZIO, esperimento: null })
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     await dentro.findByText('38 / 500 MB')
     expect(dentro.queryByText(/Questo esperimento:/)).not.toBeInTheDocument()
   })
 
   it('un esperimento in corso spiega che l\'archivio .zip si fa a esperimento concluso, e dove si conclude', async () => {
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     expect(await dentro.findByText(/quando l'esperimento è concluso/)).toBeInTheDocument()
     expect(dentro.queryByRole('button', { name: 'Scarica le foto (.zip)' })).not.toBeInTheDocument()
@@ -630,7 +648,7 @@ describe('Impostazioni: spazio', () => {
       archiviata: false, archiviata_il: null,
     }])
     vi.mocked(caricaConfig).mockImplementation(async () => structuredClone({ ...config, esperimento: { ...config.esperimento, stato: 'concluso' as const } }))
-    apri()
+    apri('spazio')
     const dentro = within(await spazio())
     expect(await dentro.findByRole('button', { name: 'Scarica le foto (.zip)' })).toBeInTheDocument()
     expect(dentro.queryByRole('button', { name: 'Libera lo spazio' })).not.toBeInTheDocument()
@@ -638,7 +656,7 @@ describe('Impostazioni: spazio', () => {
 
   it('mentre calcola non dà numeri; se non riesce lo dice con «Riprova»', async () => {
     vi.mocked(spazioProgetto).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('spazio')
     const dentro = within(await spazio())
     expect(await dentro.findByRole('alert')).toHaveTextContent('Rete debole')
     expect(dentro.queryByText('38 / 500 MB')).not.toBeInTheDocument()
@@ -651,7 +669,7 @@ describe('Impostazioni: spazio', () => {
 describe('Impostazioni: valori degli strumenti', () => {
   it('togliere da uno strumento un valore con dati lo archivia (nessun delete); il collegamento resta', async () => {
     const tempAria = par('Temp aria').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -670,7 +688,7 @@ describe('Impostazioni: valori degli strumenti', () => {
   })
 
   it('togliere un valore senza dati lo elimina, dopo una conferma', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -688,8 +706,8 @@ describe('Impostazioni: valori degli strumenti', () => {
 
   it('finché non si sa se un valore ha dati si archivia, non si elimina', async () => {
     vi.mocked(parametriConDati).mockReturnValue(new Promise(() => undefined))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('strumenti')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
 
     await utente.click(rigaStrumento('SPAD'))
     const spad = aperta(rigaStrumento('SPAD'))
@@ -699,7 +717,7 @@ describe('Impostazioni: valori degli strumenti', () => {
   })
 
   it('un valore nuovo si salva con lo strumento: prima il valore, poi lo strumento con il collegamento', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -722,7 +740,7 @@ describe('Impostazioni: valori degli strumenti', () => {
 
   it('"Salva" che fallisce sul secondo passo lascia la bozza e mostra l\'errore; il nuovo "Salva" riprova', async () => {
     vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -752,7 +770,7 @@ describe('Impostazioni: valori degli strumenti', () => {
 
   it('"Salva" che fallisce sul primo passo non salva lo strumento', async () => {
     vi.mocked(salvaParametro).mockRejectedValueOnce({ code: '23505', message: 'duplicate key' })
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -767,7 +785,7 @@ describe('Impostazioni: valori degli strumenti', () => {
   })
 
   it('un valore con il nome di un altro valore dell\'esperimento non si salva', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -780,7 +798,7 @@ describe('Impostazioni: valori degli strumenti', () => {
 
   it('un errore di rete lascia i valori scritti e lo dice', async () => {
     vi.mocked(salvaStrumento).mockRejectedValue(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -795,7 +813,7 @@ describe('Impostazioni: valori degli strumenti', () => {
   })
 
   it('un ricaricamento in background non cancella quel che si sta scrivendo', async () => {
-    const { client, utente } = apri()
+    const { client, utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -806,7 +824,7 @@ describe('Impostazioni: valori degli strumenti', () => {
   })
 
   it('"Annulla le modifiche" torna ai valori salvati', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -819,7 +837,7 @@ describe('Impostazioni: valori degli strumenti', () => {
 
   it('salvando uno strumento, i valori eliminati nel frattempo non si mandano', async () => {
     const tempAria = par('Temp aria').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -841,11 +859,15 @@ describe('Impostazioni: valori degli strumenti', () => {
     par('Note').archiviato = true
     par('Temp pianta').archiviato = true
     const prima = { ...par('Temp pianta') }
-    const { utente } = apri()
+    apri('fenologia')
     await pronta()
 
     expect(rigaValore(tabella(), 'Palchi')).toBeInTheDocument()
     expect(tabella().queryByRole('button', { name: /^Note/ })).not.toBeInTheDocument()
+    // I valori archiviati si ripristinano dalla pagina degli strumenti.
+    cleanup()
+    const { utente } = apri('strumenti')
+    await pronta()
     const strumenti = sezione('Strumenti')
     await utente.click(strumenti.getByRole('button', { name: 'Valori archiviati (2)' }))
     const riga = within(strumenti.getByText('Temp pianta', { selector: 'span' }).closest('li') as HTMLElement)
@@ -862,7 +884,7 @@ describe('Impostazioni: valori degli strumenti', () => {
 describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare', () => {
   it('"Aggiungi «Ciras»" con un valore omonimo già presente non salva: la bozza resta, con l\'errore', async () => {
     par('SPAD').nome = 'gs'
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -878,7 +900,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
 
   it('"Aggiungi «Calibro»" con uno strumento omonimo non collegato non salva', async () => {
     strum('Metro').nome = 'Calibro'
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -891,7 +913,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
   })
 
   it('eliminando un valore se ne toglie anche il collegamento dalla bozza: nessuna modifica fantasma', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -912,8 +934,8 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
 
   it('"Elimina strumento" si vede ma resta spento se non si sa quali valori hanno dati (lettura fallita)', async () => {
     vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('strumenti')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
     await sezione('Strumenti').findByRole('alert')
 
     await utente.click(rigaStrumento('SPAD'))
@@ -924,7 +946,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
   })
 
   it('prima di eliminare uno strumento si ricontrollano i dati dei suoi valori: se ne hanno, non si elimina', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
@@ -940,7 +962,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
   })
 
   it('la conferma di "Archivia strumento" avverte delle modifiche non salvate', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -957,7 +979,7 @@ describe('Impostazioni: giro di correzione, aggiungere dal catalogo e eliminare'
   })
 
   it('"Archivia" dalla spiegazione di uno strumento con misure e modifiche non salvate passa dalla conferma che lo avverte', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -978,7 +1000,7 @@ describe('Impostazioni: valori senza strumento', () => {
     const fenologica = config.strumenti.find(s => s.tipo === 'fenologico')!
     fenologica.parametri = fenologica.parametri.filter(pp => pp.parametro_id !== note)
     vi.mocked(parametriConDati).mockImplementation(async () => new Set([note]))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     const senza = within(sezione('Strumenti').getByRole('list', { name: 'Valori senza strumento' }))
@@ -994,7 +1016,7 @@ describe('Impostazioni: valori senza strumento', () => {
   })
 
   it('senza valori fuori dagli strumenti l\'elenco non c\'è', async () => {
-    apri()
+    apri('strumenti')
     await pronta()
     expect(sezione('Strumenti').queryByRole('list', { name: 'Valori senza strumento' })).not.toBeInTheDocument()
   })
@@ -1003,7 +1025,7 @@ describe('Impostazioni: valori senza strumento', () => {
 describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
   it('a un valore lista con dati non si toglie un sotto-campo', async () => {
     vi.mocked(parametriConDati).mockImplementation(async () => new Set([par('Palchi').id]))
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(rigaValore(tabella(), 'Palchi'))
@@ -1015,8 +1037,8 @@ describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
 
   it('finché non si sa se un valore lista ha dati, i sotto-campi non si tolgono', async () => {
     vi.mocked(parametriConDati).mockReturnValue(new Promise(() => undefined))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('fenologia')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
 
     await utente.click(rigaValore(tabella(), 'Palchi'))
     const voce = aperta(rigaValore(tabella(), 'Palchi'))
@@ -1027,8 +1049,8 @@ describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
 
   it('anche con dati in errore i sotto-campi non si tolgono', async () => {
     vi.mocked(parametriConDati).mockRejectedValue(new TypeError('Failed to fetch'))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('fenologia')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
     await tabella().findByRole('alert')
 
     await utente.click(rigaValore(tabella(), 'Palchi'))
@@ -1041,7 +1063,7 @@ describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
   })
 
   it('togliendo un sotto-campo si ricontrolla sul server se nel frattempo sono arrivati dati', async () => {
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(rigaValore(tabella(), 'Palchi'))
@@ -1063,7 +1085,7 @@ describe('Impostazioni: sotto-campi delle liste (tabella fenologica)', () => {
 describe('Impostazioni: strumenti', () => {
   it('"Elimina strumento" elimina anche i suoi valori senza dati, dopo una conferma che lo dice', async () => {
     const spad = strum('SPAD').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
@@ -1084,7 +1106,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('"Elimina strumento" con misure arrivate nel frattempo spiega e rimanda ad "Archivia"', async () => {
     vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
@@ -1100,8 +1122,8 @@ describe('Impostazioni: strumenti', () => {
   it('finché le misure non sono contate "Elimina strumento" è spento e lo dice: «Conto le misure…»', async () => {
     let rispondi!: (m: Map<string, typeof MISURE_TERMOMETRO>) => void
     vi.mocked(conteggiStrumenti).mockReturnValue(new Promise(r => { rispondi = r }))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('strumenti')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
 
     await utente.click(rigaStrumento('SPAD'))
     const spad = aperta(rigaStrumento('SPAD'))
@@ -1116,8 +1138,8 @@ describe('Impostazioni: strumenti', () => {
 
   it('con la lettura delle misure in errore "Elimina" è spento, lo dice e c\'è "Riprova", che la rifà', async () => {
     vi.mocked(conteggiStrumenti).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('strumenti')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
     await sezione('Strumenti').findByRole('alert')
 
     await utente.click(rigaStrumento('SPAD'))
@@ -1130,7 +1152,7 @@ describe('Impostazioni: strumenti', () => {
   })
 
   it('le azioni dello strumento stanno in alto, prima del nome da modificare e dei valori', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
     await utente.click(rigaStrumento('SPAD'))
     const spad = aperta(rigaStrumento('SPAD'))
@@ -1142,7 +1164,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('con misure "Elimina strumento" spiega quante, di quante piante e in che date, e offre "Archivia": mai un delete', async () => {
     const termometro = strum('Termometro').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Termometro'))
@@ -1167,7 +1189,7 @@ describe('Impostazioni: strumenti', () => {
   it('un archiviato senza misure si elimina dall\'elenco degli archiviati, dopo una conferma', async () => {
     strum('Metro').archiviato = true
     const metro = strum('Metro').id
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     const strumenti = sezione('Strumenti')
@@ -1185,7 +1207,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('un archiviato con misure non si elimina: "Elimina" spiega quante misure ha, e che restano', async () => {
     strum('Termometro').archiviato = true
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     const strumenti = sezione('Strumenti')
@@ -1203,8 +1225,8 @@ describe('Impostazioni: strumenti', () => {
   it('negli archiviati "Elimina" è spento finché le misure non sono contate', async () => {
     strum('Metro').archiviato = true
     vi.mocked(conteggiStrumenti).mockReturnValue(new Promise(() => {}))
-    const { utente } = apri()
-    await screen.findByRole('region', { name: 'Generale' })
+    const { utente } = apri('strumenti')
+    await screen.findByRole('region', { name: TITOLO[paginaAperta] })
 
     const strumenti = sezione('Strumenti')
     await utente.click(strumenti.getByRole('button', { name: 'Strumenti archiviati (1)' }))
@@ -1216,7 +1238,7 @@ describe('Impostazioni: strumenti', () => {
   it('un archiviato si ripristina con "Ripristina"', async () => {
     strum('Metro').archiviato = true
     const prima = structuredClone(strum('Metro'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     const strumenti = sezione('Strumenti')
@@ -1230,7 +1252,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('uno strumento si modifica e si salva', async () => {
     const prima = structuredClone(strum('SPAD'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('SPAD'))
@@ -1244,7 +1266,7 @@ describe('Impostazioni: strumenti', () => {
   })
 
   it('il nome di uno strumento non può essere uguale a quello di un altro', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -1256,14 +1278,14 @@ describe('Impostazioni: strumenti', () => {
   })
 
   it('"Gestisci il catalogo" porta al catalogo', async () => {
-    apri()
+    apri('strumenti')
     await pronta()
     expect(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' })).toHaveAttribute('href', '/catalogo')
   })
 
   it('dal catalogo si possono aggiungere solo le voci che l\'esperimento non ha già, anche se archiviate', async () => {
     strum('Metro').archiviato = true
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -1274,7 +1296,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('un errore nel salvare dal catalogo lascia lo strumento in elenco, non salvato, e il nuovo "Salva" riprova', async () => {
     vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -1295,7 +1317,7 @@ describe('Impostazioni: strumenti', () => {
       config.strumenti = [...config.strumenti, p]
       throw new TypeError('Failed to fetch')
     })
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -1309,7 +1331,7 @@ describe('Impostazioni: strumenti', () => {
 
   it('"Scarta" uno strumento non salvato toglie anche i valori già scritti nel database dal tentativo andato male', async () => {
     vi.mocked(salvaStrumento).mockRejectedValueOnce(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
@@ -1337,7 +1359,7 @@ describe('Impostazioni: nuovo strumento', () => {
   }
 
   it('entra nel catalogo, poi la copia si aggiunge all\'esperimento collegata alla voce', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
     const modulo = await compilaPenetrometro(utente)
     await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
@@ -1356,7 +1378,7 @@ describe('Impostazioni: nuovo strumento', () => {
 
   it('con il catalogo irraggiungibile la copia entra nell\'esperimento, non collegata, e lo dice', async () => {
     vi.mocked(salvaVoceCatalogo).mockRejectedValue(new TypeError('Failed to fetch'))
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
     const modulo = await compilaPenetrometro(utente)
     await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
@@ -1369,7 +1391,7 @@ describe('Impostazioni: nuovo strumento', () => {
 
   it('con un nome già nel catalogo il modulo resta aperto e nulla entra nell\'esperimento', async () => {
     vi.mocked(salvaVoceCatalogo).mockRejectedValue({ code: '23505', message: 'catalogo_strumenti_nome_unico' })
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
     const modulo = await compilaPenetrometro(utente)
     await utente.click(modulo.getByRole('button', { name: 'Salva nel catalogo e aggiungi' }))
@@ -1381,7 +1403,7 @@ describe('Impostazioni: nuovo strumento', () => {
   })
 
   it('senza nome o con un valore senza nome non si salva', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
     await utente.click(sezione('Strumenti').getByRole('button', { name: '+ Aggiungi dal catalogo' }))
     await utente.click(await screen.findByRole('button', { name: '+ Nuovo strumento' }))
@@ -1394,7 +1416,7 @@ describe('Impostazioni: nuovo strumento', () => {
 describe('Impostazioni: tabella fenologica', () => {
   it('"Elimina la tabella fenologica" c\'è solo senza misure e toglie anche le sue voci', async () => {
     const id = strum('Tabella fenologica').id
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
@@ -1408,7 +1430,7 @@ describe('Impostazioni: tabella fenologica', () => {
 
   it('se la tabella ha misure arrivate nel frattempo, l\'eliminazione spiega che si archiviano i valori', async () => {
     vi.mocked(eliminaStrumento).mockRejectedValue({ code: '23503', message: 'violates foreign key constraint' })
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
@@ -1419,7 +1441,7 @@ describe('Impostazioni: tabella fenologica', () => {
 
   it('con misure la tabella non si elimina: "Elimina" spiega quante misure ha, senza "Archivia"', async () => {
     vi.mocked(conteggiStrumenti).mockResolvedValue(new Map([[strum('Tabella fenologica').id, { misure: 1, piante: 1, prima: '2026-10-07', ultima: '2026-10-07' }]]))
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
     expect(tabella().queryByRole('button', { name: /^Archivia/ })).not.toBeInTheDocument()
     await utente.click(tabella().getByRole('button', { name: 'Elimina la tabella fenologica' }))
@@ -1433,7 +1455,7 @@ describe('Impostazioni: tabella fenologica', () => {
   it('se manca, "Crea la tabella fenologica" ne prepara una vuota che si salva con le sue voci', async () => {
     config.strumenti = config.strumenti.filter(s => s.tipo !== 'fenologico')
     config.parametri = config.parametri.filter(p => ['Temp aria', 'Temp pianta', 'SPAD', 'Altezza'].includes(p.nome))
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     expect(tabella().queryByLabelText('Nome dello strumento')).not.toBeInTheDocument()
@@ -1457,14 +1479,17 @@ describe('Impostazioni: tabella fenologica', () => {
   })
 
   it('le voci della tabella hanno "Obbligatorio" e "Progressivo"; quelle di uno strumento semplice no', async () => {
-    const { utente } = apri()
+    const { utente: sulla } = apri('fenologia')
     await pronta()
 
-    await utente.click(rigaValore(tabella(), 'Palchi'))
+    await sulla.click(rigaValore(tabella(), 'Palchi'))
     const palchi = aperta(rigaValore(tabella(), 'Palchi'))
     expect(palchi.getByRole('switch', { name: /Obbligatorio/ })).toBeInTheDocument()
     expect(palchi.getByRole('switch', { name: /Progressivo/ })).toBeInTheDocument()
 
+    cleanup()
+    const { utente } = apri('strumenti')
+    await pronta()
     await utente.click(rigaStrumento('Metro'))
     const metro = aperta(rigaStrumento('Metro'))
     await utente.click(rigaValore(metro, 'Altezza'))
@@ -1474,17 +1499,17 @@ describe('Impostazioni: tabella fenologica', () => {
 })
 
 describe('Impostazioni: uscita', () => {
-  it('senza modifiche la freccia torna subito alla home dell\'esperimento', async () => {
-    const { utente } = apri()
+  it('senza modifiche la freccia torna subito all\'indice delle Impostazioni', async () => {
+    const { utente } = apri('piante')
     await pronta()
 
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
-    expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E$/)
+    expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E\/impostazioni$/)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('chiede conferma prima di uscire con uno strumento modificato e non salvato', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -1496,15 +1521,15 @@ describe('Impostazioni: uscita', () => {
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     const dialogo = await screen.findByRole('dialog', { name: 'Scartare le modifiche non salvate?' })
     await utente.click(within(dialogo).getByRole('button', { name: 'Continua a modificare' }))
-    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/impostazioni')
+    expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E\/impostazioni\/strumenti$/)
 
     await utente.click(screen.getByRole('link', { name: 'Indietro' }))
     await utente.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Scarta' }))
-    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E$/))
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(/^\/esperimenti\/E\/impostazioni$/))
   })
 
   it('senza modifiche "Gestisci il catalogo" porta subito al catalogo', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(sezione('Strumenti').getByRole('link', { name: 'Gestisci il catalogo' }))
@@ -1513,7 +1538,7 @@ describe('Impostazioni: uscita', () => {
   })
 
   it('con una modifica non salvata "Gestisci il catalogo" chiede conferma: si resta con la modifica, o si scarta e si va', async () => {
-    const { utente } = apri()
+    const { utente } = apri('strumenti')
     await pronta()
 
     await utente.click(rigaStrumento('Metro'))
@@ -1533,7 +1558,7 @@ describe('Impostazioni: uscita', () => {
 
 describe('Impostazioni: uscita, tabella fenologica', () => {
   it('chiede conferma anche con una voce della tabella modificata e non salvata', async () => {
-    const { utente } = apri()
+    const { utente } = apri('fenologia')
     await pronta()
 
     await utente.click(rigaValore(tabella(), 'Note'))

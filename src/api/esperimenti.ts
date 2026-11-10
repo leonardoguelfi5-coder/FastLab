@@ -1,10 +1,11 @@
-import { ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE } from '@/lib/errori'
+import { ErroreApp, ESPERIMENTO_NON_TROVATO, FOTO_ESPERIMENTO_NON_RIMOSSE, SOLO_PROPRIETARIO_ELIMINA } from '@/lib/errori'
 import { eUuid } from '@/lib/percorsi'
 import { supabase } from '@/lib/supabase'
 import type { Ruolo } from '@/domain/ruoli'
 import type { BozzaEsperimento, ConfigEsperimento, Esperimento } from '@/domain/tipi'
 import { controllaRighe } from './righe'
 import { eliminaFileEsperimento } from './foto'
+import { ruoloIn } from './persone'
 import { daRigheConfig, type RigheConfig } from './mappers'
 
 /** Una riga dell'elenco esperimenti (RPC riepilogo_esperimenti). */
@@ -101,6 +102,9 @@ export async function aggiornaEsperimento(espId: string, patch: Partial<Omit<Esp
  */
 export async function eliminaEsperimento(espId: string): Promise<void> {
   if (!eUuid(espId)) throw new Error(ESPERIMENTO_NON_TROVATO)
+  // Prima dei file: un rilevatore toglierebbe i file delle sue foto e poi sarebbe rifiutato sulla riga, lasciando foto
+  // senza file. Il database rifiuta comunque; qui si evita il danno a metà.
+  if (await ruoloIn(espId) !== 'proprietario') throw new ErroreApp(SOLO_PROPRIETARIO_ELIMINA)
   try {
     await eliminaFileEsperimento(espId)
   } catch (cause) {

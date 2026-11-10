@@ -164,11 +164,17 @@ describe('daRigaMisura', () => {
     expect(daRigaMisura({ ...riga, ora: '09:12' }).ora).toBe('09:12')
   })
 
-  it('restituisce esattamente una Misura, senza colonne del database', () => {
-    expect(daRigaMisura(riga)).toEqual(misura)
+  it('restituisce una Misura con chi l\'ha scritta (creato_da) e senza le altre colonne del database', () => {
+    expect(daRigaMisura(riga)).toEqual({ ...misura, creato_da: 'u1' })
     expect(Object.keys(daRigaMisura(riga)).sort()).toEqual(
-      ['data_rilievo', 'id', 'ora', 'pianta_id', 'strumento_id', 'valori'],
+      ['creato_da', 'data_rilievo', 'id', 'ora', 'pianta_id', 'strumento_id', 'valori'],
     )
+  })
+
+  it('senza creato_da (riga nata sul telefono o letta con meno colonne) la misura non lo porta', () => {
+    const senza: Partial<RigaMisura> = { ...riga }
+    delete senza.creato_da
+    expect(daRigaMisura(senza as RigaMisura)).not.toHaveProperty('creato_da')
   })
 })
 
@@ -237,10 +243,10 @@ describe('note', () => {
     note_trattamenti: [{ trattamento_id: 't1' }],
   }
 
-  it('daRigaNota porta i collegamenti nella nota e lascia nel database le colonne solo-database', () => {
+  it('daRigaNota porta i collegamenti e chi l\'ha scritta, e lascia nel database le colonne solo-database', () => {
     expect(daRigaNota(riga)).toEqual({
       id: 'n1', data: '2026-11-01', testo: 'Irrigato', promemoria: true, fatto_il: null,
-      pianta_ids: ['p2', 'p1'], trattamento_ids: ['t1'],
+      pianta_ids: ['p2', 'p1'], trattamento_ids: ['t1'], creato_da: 'u1',
     })
   })
 
@@ -268,10 +274,10 @@ describe('foto', () => {
     pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null, creato_da: 'u1', creato_il: '2026-11-01T08:00:00+00:00',
   }
 
-  it('daRigaFoto porta nel dominio le colonne della foto e lascia nel database esperimento_id, creato_da e creato_il', () => {
+  it('daRigaFoto porta nel dominio le colonne della foto e chi l\'ha caricata, e lascia nel database esperimento_id e creato_il', () => {
     expect(daRigaFoto(riga)).toEqual({
       id: ID, data: '2026-11-01', percorso: `${E}/${ID}.jpg`, larghezza: 1600, altezza: 1200, byte: 250000,
-      pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null,
+      pianta_id: 'p1', nota_id: null, archiviata: false, archiviata_il: null, creato_da: 'u1',
     })
   })
 
