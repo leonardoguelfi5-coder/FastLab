@@ -16,14 +16,14 @@ import type { Nota } from './tipi'
  * verde (è solo "salvato") e niente blu dell'inchiostro (è selezione e focus). Solo dentro i grafici.
  */
 export const COLORI_SERIE = [
-  '#0e8ca0', // 1 petrolio
-  '#d9622b', // 2 arancio
-  '#6a4fc8', // 3 viola
-  '#b8860b', // 4 ocra
-  '#c2457e', // 5 magenta
-  '#2a8fc4', // 6 azzurro
-  '#d03b3b', // 7 rosso
-  '#9a6fd8', // 8 lilla
+  '#2fc3d6', // 1 petrolio
+  '#ff8a4c', // 2 arancio
+  '#a58bff', // 3 viola
+  '#e8b53a', // 4 ocra
+  '#f06ba8', // 5 magenta
+  '#5bb8f0', // 6 azzurro
+  '#ff6b6b', // 7 rosso
+  '#c9a4ff', // 8 lilla
 ] as const
 
 /**
@@ -31,12 +31,12 @@ export const COLORI_SERIE = [
  * variabili CSS, quindi i colori vanno scritti nel disegno. Convertiti da oklch (src/index.css).
  */
 export const COLORI_GRAFICO = {
-  carta: '#fcf9f5', // --carta
-  foglio: '#fffefb', // --foglio, fondo dell'immagine
-  grafite: '#191d24', // --grafite
-  grafiteTenue: '#4e535c', // --grafite-tenue: testi di assi e legenda, e le serie dal nono trattamento
-  riga: '#ddd8d1', // --riga: griglia orizzontale
-  rigaForte: '#bdb6ae', // --riga-forte: asse X, cursore e segni delle note
+  carta: '#0f2523', // --carta
+  foglio: '#17352f', // --foglio, fondo dell'immagine
+  grafite: '#f2f7f5', // --grafite
+  grafiteTenue: '#a9bfb8', // --grafite-tenue: testi di assi e legenda, e le serie dal nono trattamento
+  riga: '#27463f', // --riga: griglia orizzontale
+  rigaForte: '#3d5d56', // --riga-forte: asse X, cursore e segni delle note
 } as const
 
 /** Il carattere dei numeri e delle etichette (src/index.css, `--font-mono`). */

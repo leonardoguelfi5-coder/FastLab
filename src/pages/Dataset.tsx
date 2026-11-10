@@ -235,7 +235,7 @@ export function Dataset() {
   const config = useConfig(espId)
 
   return (
-    <AppShell titolo="Dataset" indietro={percorsoHome(espId)}>
+    <AppShell titolo="Dataset" indietro={percorsoHome(espId)} nav={espId}>
       {config.data === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />

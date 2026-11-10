@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { esci, useSessione } from '@/api/auth'
 import { useSonoAdmin } from '@/api/query'
 import { IndicatoreCoda } from '@/components/coda/IndicatoreCoda'
+import { NavEsperimento } from '@/components/NavEsperimento'
 import { Conferma } from '@/components/Conferma'
 import { RigaSenzaRete } from '@/components/RigaSenzaRete'
 import { applicaAggiornamento, useAggiornamentoPronto } from '@/lib/aggiornamento'
@@ -22,6 +23,8 @@ interface AppShellProps {
   onIndietro?: (evento: MouseEvent<HTMLAnchorElement>) => void
   /** Pulsanti della pagina, a destra del titolo e prima del menu. */
   azioni?: ReactNode
+  /** Id dell'esperimento: mostra la barra in basso (Home, Piante, +, Dataset, Altro). */
+  nav?: string
   children: ReactNode
 }
 
@@ -48,7 +51,7 @@ function testoUscita(daInviare: number, rifiutate: number): string {
  * (fondo carta, linea riga sotto) e resta ferma mentre si scorre; il contenuto sta in una colonna centrale.
  * Se la pagina ha una BarraAzioni, sotto il contenuto resta lo spazio per non esserne coperto.
  */
-export function AppShell({ titolo, indietro, onIndietro, azioni, children }: AppShellProps) {
+export function AppShell({ titolo, indietro, onIndietro, azioni, nav, children }: AppShellProps) {
   const { sessione } = useSessione()
   const { data: amministratore } = useSonoAdmin()
   const voci = useVociCoda()
@@ -171,9 +174,10 @@ export function AppShell({ titolo, indietro, onIndietro, azioni, children }: App
         </div>
         <RigaSenzaRete />
       </header>
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 pt-6 pb-[calc(var(--altezza-barra-azioni,0px)+2.5rem)]">
+      <main className={cn('mx-auto flex w-full max-w-lg flex-1 flex-col gap-6 px-4 pt-6', nav ? 'pb-28' : 'pb-[calc(var(--altezza-barra-azioni,0px)+2.5rem)]')}>
         {children}
       </main>
+      {nav && <NavEsperimento espId={nav} />}
       <Conferma
         aperta={confermaUscita}
         titolo="Uscire con misure da inviare?"
