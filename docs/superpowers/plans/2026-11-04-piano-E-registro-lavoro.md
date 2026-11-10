@@ -84,3 +84,7 @@ Task E9: implementatore (opus) DONE_WITH_CONCERNS a1ff924 - 3011 Vitest, 549 pgT
 Ruling: accettate le deviazioni E9 (insert delle misure con `creato_da = auth.uid()`; delete dei file nello Storage per il rilevatore solo se file e riga sono suoi; il rilevatore non spunta i promemoria altrui) - cost if wrong: small
 Ruling (carry to E10): `useRuolo` senza rete e senza copia dà null: l'interfaccia non deve nascondere "Nuova misura" per un ruolo ignoto (distinguere errore da non membro, leggere il ruolo in anticipo) - cost if wrong: giro bloccato senza rete
 Task E9: dispatched reviewer (opus) su copia prima di applicare la 0016 online; Task E10 dispatched implementer (sonnet)
+Task E9: review di sicurezza (opus) → Needs fixes: (I1) un rilevatore collegava le sue foto alla nota di un altro (foto.nota_id); tutti gli altri attacchi a mano respinti, 8 mutazioni (7 prese, la concorrenza di aggiungi_membro verificata a mano con due sessioni)
+Task E9: correzione del controller: `foto_insert` e `foto_update` con `nota_id is null or puo_modificare_nota(nota_id)`, tre righe nella matrice di ruoli.test.sql (rosse senza la correzione, verdi con), 549 pgTAP PASS; schema-completo rigenerato
+Ruling (carry to E10): "Elimina esperimento" solo al proprietario (oggi un rilevatore toglierebbe i file delle sue foto prima del rifiuto sulla riga); rifiuti RLS dello Storage senza messaggio tradotto - cost if wrong: foto senza file
+Task E9: complete (commits b0e2e13..HEAD)
