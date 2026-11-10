@@ -176,7 +176,7 @@ describe('Oggi: gli strumenti', () => {
     expect(nomi[0]).toContain('Termometro')
     expect(nomi[1]).toContain('SPAD')
     expect(nomi[2]).toContain('Tabella fenologica')
-    expect(within(riga('SPAD')).getByText(strumento('SPAD').icona!)).toHaveAttribute('aria-hidden', 'true')
+    expect(riga('SPAD').querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
   })
 
   it('senza strumenti attivi dice che non ce ne sono e rimanda alle Impostazioni', async () => {
@@ -239,7 +239,7 @@ describe('Oggi: gli strumenti', () => {
     await aspettaStrumenti()
     await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalled())
     expect(screen.queryByText(/^\d+\/\d+$|^ultima|mai misurato|fatto/)).not.toBeInTheDocument()
-    expect(riga('SPAD')).toHaveTextContent(/^\S+ ?SPAD…$/)
+    expect(riga('SPAD')).toHaveTextContent(/^SPAD…$/)
   })
 
   it('se arrivano solo le ultime date non dice nulla sul progresso, e viceversa non dice "mai misurato"', async () => {

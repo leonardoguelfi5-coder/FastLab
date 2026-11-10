@@ -163,7 +163,7 @@ describe('ModificaMisura: cosa mostra', () => {
     expect(screen.getByRole('heading', { name: 'Pianta #35' })).toBeInTheDocument()
     const trattamento = config.trattamenti.find(t => t.id === config.piante.find(p => p.etichetta === '35')!.trattamento_id)!
     expect(screen.getByText(trattamento.etichetta)).toBeInTheDocument()
-    expect(screen.getByText('🌡')).toBeInTheDocument()
+    expect(screen.getByText('Termometro').parentElement!.querySelector('svg')).not.toBeNull()
     expect(screen.getByText('Termometro')).toBeInTheDocument()
 
     expect(campo('Data di rilievo')).toHaveValue(DATA)

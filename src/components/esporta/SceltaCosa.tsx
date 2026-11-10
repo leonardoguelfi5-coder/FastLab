@@ -2,6 +2,7 @@ import { strumentiPerScelta } from '@/domain/dataset'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Chip } from './Chip'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 interface SceltaCosaProps {
   config: ConfigEsperimento
@@ -23,7 +24,7 @@ export function SceltaCosa({ config, scelti, problema, onCambia }: SceltaCosaPro
       <div role="group" aria-label="Strumenti" className="flex flex-wrap gap-2">
         {strumentiPerScelta(config).map(s => (
           <Chip key={s.id} scelto={set.has(s.id)} onClick={() => alterna(s.id)}>
-            {s.icona && <span aria-hidden>{s.icona}</span>}
+            <IconaStrumento emoji={s.icona} piccola className="-ml-1.5 size-6" />
             {s.archiviato ? `${s.nome} (archiviato)` : s.nome}
           </Chip>
         ))}

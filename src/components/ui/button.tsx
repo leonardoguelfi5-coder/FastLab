@@ -4,27 +4,28 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 /**
- * Pulsanti di DESIGN.md §5: grandi per il pollice, piatti (nessuna ombra), premuto più scuro,
+ * Pulsanti di DESIGN.md §5, a pillola (restyling 2026-11): grandi per il pollice, piatti (nessuna ombra), premuto più
+ * scuro e appena rimpicciolito,
  * focus con l'anello d'inchiostro globale (index.css). Il disabilitato non usa opacità: carta ombra
  * con testo grafite tenue, che resta sopra 4.5:1.
  */
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-transparent whitespace-nowrap select-none transition-colors disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-transparent font-medium whitespace-nowrap select-none transition-[color,background-color,border-color,transform] active:not-disabled:scale-95 disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
   {
     variants: {
       variant: {
         /** Principale, inchiostro pieno: uno solo per schermata. */
         default:
-          "bg-inchiostro text-title font-semibold text-foglio hover:bg-inchiostro-scuro active:bg-inchiostro-scuro disabled:bg-carta-ombra disabled:text-grafite-tenue",
-        /** Secondario: foglio con bordo riga controllo (3:1 sulla carta, visibile al sole). */
+          "bg-inchiostro text-base font-semibold text-foglio hover:bg-inchiostro-scuro active:bg-inchiostro-scuro disabled:bg-carta-ombra disabled:text-grafite-tenue",
+        /** Secondario: carta ombra, con un bordo leggero che lo stacca dal fondo scuro. */
         outline:
-          "border-riga-controllo bg-foglio text-base font-medium text-grafite hover:border-grafite-tenue active:bg-carta-ombra aria-expanded:bg-carta-ombra disabled:border-transparent disabled:bg-carta-ombra disabled:text-grafite-tenue",
+          "border-riga bg-carta-ombra text-base font-medium text-grafite hover:border-riga-controllo active:bg-riga aria-expanded:bg-carta-ombra disabled:border-transparent disabled:bg-carta-ombra disabled:text-grafite-tenue",
         /** Tonale, su carta ombra. */
         secondary:
           "bg-carta-ombra text-base font-medium text-grafite hover:bg-riga/60 active:bg-riga aria-expanded:bg-riga/60 disabled:text-grafite-tenue",
         /** Solo testo d'inchiostro, per azioni minori ("Riprova", "Modifica"). */
         ghost:
-          "rounded-sm bg-transparent text-base font-medium text-inchiostro hover:bg-inchiostro-velato/70 active:bg-inchiostro-velato aria-expanded:bg-inchiostro-velato disabled:text-grafite-tenue",
+          "bg-transparent text-base font-medium text-inchiostro hover:bg-inchiostro-velato/70 active:bg-inchiostro-velato aria-expanded:bg-inchiostro-velato disabled:text-grafite-tenue",
         /** Solo icona o testo grafite: frecce, menu, chiusure. Non porta inchiostro sulla pagina. */
         quiet:
           "bg-transparent text-base font-medium text-grafite hover:bg-carta-ombra active:bg-riga/70 aria-expanded:bg-carta-ombra disabled:text-grafite-tenue",
@@ -39,9 +40,9 @@ const buttonVariants = cva(
       },
       // Nessuna taglia scende sotto i 44px: i nomi restano quelli di shadcn per compatibilità.
       size: {
-        default: "h-12 px-4",
+        default: "h-12 px-5",
         xs: "h-11 px-3 text-sm",
-        sm: "h-11 px-3",
+        sm: "h-11 px-4",
         lg: "h-13 px-5",
         icon: "size-11",
         "icon-xs": "size-11",

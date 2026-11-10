@@ -7,6 +7,7 @@ import type { ConfigEsperimento, Misura, Pianta } from '@/domain/tipi'
 import { daQuantoBreve, formattaGiornoMese } from '@/lib/date'
 import { formattaConUnita, formattaMedia } from '@/lib/numeri'
 import { cn } from '@/lib/utils'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 interface ConfrontoProps {
   espId: string
@@ -165,7 +166,7 @@ function BloccoStrumento({ espId, config, pianta, oggi, blocco }: BloccoStrument
     <li>
       <div className="flex items-baseline justify-between gap-3 pb-1">
         <h4 id={id} className="flex min-w-0 items-center gap-2 text-title text-grafite">
-          {strumento.icona && <span aria-hidden>{strumento.icona}</span>}
+          <IconaStrumento emoji={strumento.icona} piccola />
           <span className="min-w-0 truncate">{strumento.nome}</span>
         </h4>
         <span className="shrink-0 font-mono text-label tabular-nums text-grafite-tenue">

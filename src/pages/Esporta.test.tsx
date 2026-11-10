@@ -203,7 +203,7 @@ describe('Esporta: pagina e scelta iniziale', () => {
     apri()
     await riepilogoPronto()
     const nomi = sezione('1 · Cosa').getAllByRole('button').map(b => b.textContent)
-    expect(nomi).toEqual(['📏Altezza', '🌱Fenologici', '📐Calibro (archiviato)'])
+    expect(nomi).toEqual(['Altezza', 'Fenologici', 'Calibro (archiviato)'])
   })
 })
 

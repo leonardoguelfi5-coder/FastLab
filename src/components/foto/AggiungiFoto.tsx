@@ -67,7 +67,7 @@ export function PulsanteAggiungiFoto({ carica, variante = 'secondario', nome = '
     <div ref={radice} className={cn('relative', variante === 'principale' && 'w-full')}>
       {variante === 'icona' ? (
         <Button type="button" variant="quiet" size="icon" className="relative" aria-label={nome} aria-expanded={aperto} data-aggiungi-foto="" onClick={() => setAperto(v => !v)}>
-          <span aria-hidden className="text-[22px] leading-none">📷</span>
+          <Camera aria-hidden className="size-6" />
           {/* Lo stato dei caricamenti sta altrove (sotto il modulo): una foto da riprovare si nota anche da qui, con un segno e non solo con il colore. */}
           {carica.elementi.some(e => e.stato === 'errore') && (
             <span aria-hidden className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-errore font-mono text-[11px] leading-none text-foglio">!</span>

@@ -535,7 +535,7 @@ describe('Catalogo: archiviare', () => {
     await apriVoce(utente, 'Ciras')
 
     const archivia = screen.getByRole('button', { name: 'Archivia dal catalogo' })
-    expect(archivia).toHaveClass('border-riga-controllo')
+    expect(archivia).toHaveClass('border-riga')
     expect(archivia).not.toHaveClass('text-errore')
   })
 

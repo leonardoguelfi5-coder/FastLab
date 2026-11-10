@@ -262,7 +262,7 @@ describe('MisuraPianta: intestazione', () => {
   it('ha lo strumento come titolo, la freccia verso la scelta, "Pianta #1" con il trattamento e i soli campi dello strumento', async () => {
     apri('1')
     await pronta()
-    expect(screen.getByRole('heading', { level: 1, name: '💚 SPAD' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'SPAD' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/misura')
     expect(screen.getByRole('heading', { level: 2, name: 'Pianta #1' })).toBeInTheDocument()
     const trattamento = config.trattamenti.find(t => t.id === config.piante[0].trattamento_id)!
@@ -270,7 +270,7 @@ describe('MisuraPianta: intestazione', () => {
     // Niente più campo "Vai alla pianta" nella pagina: è nel foglio dell'icona.
     expect(screen.queryByRole('textbox', { name: 'Vai alla pianta' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Etichetta della pianta')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Oggi · 💚 SPAD' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Oggi · SPAD' })).toBeInTheDocument()
     expect(campo('SPAD')).toBeInTheDocument()
     expect(screen.queryByLabelText('Temp aria')).not.toBeInTheDocument()
     // Niente storia: si misura e si va avanti.
@@ -985,7 +985,7 @@ describe('MisuraPianta: data di rilievo', () => {
     apri('1')
     await pronta()
     expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '27/10/2026 · 💚 SPAD' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '27/10/2026 · SPAD' })).toBeInTheDocument()
     expect(misureDelGiorno).toHaveBeenCalledWith('E', IERI)
     await utente.type(campo('SPAD'), '40')
     await utente.click(pulsante('Salva e vai alla #2'))
@@ -1225,7 +1225,7 @@ describe('MisuraPianta: salvataggio', () => {
     const { client, invalida } = apriT('35')
     await pronta()
     expect(screen.getByText('Stai registrando con data 27/10/2026, non oggi.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '27/10/2026 · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '27/10/2026 · Termometro' })).toBeInTheDocument()
 
     await utente.type(campo('Temp aria'), '21')
     await utente.click(pulsante('Salva'))
@@ -1919,7 +1919,7 @@ describe('MisuraPianta: data di rilievo cambiata mentre si corregge', () => {
     await utente.click(pulsante('Usa oggi'))
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Oggi · Termometro' })).toBeInTheDocument()
     expect(screen.queryByRole('list', { name: 'Misure già registrate' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Modifica della misura/)).not.toBeInTheDocument()
     expect(pulsante('Ora: 10:00')).toBeInTheDocument()
@@ -1951,7 +1951,7 @@ describe('MisuraPianta: data di rilievo cambiata mentre si corregge', () => {
     await chiudiDialogo()
 
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe(OGGI)
-    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Oggi · Termometro' })).toBeInTheDocument()
     expect(campo('Temp aria')).toHaveValue('')
     expect(bozzeSalvate()).toEqual([])
     expect(salvaMisura).not.toHaveBeenCalled()
@@ -1985,7 +1985,7 @@ describe('MisuraPianta: mezzanotte con la data non scelta', () => {
     expect(campo('Temp aria')).toBe(prima)
     expect(campo('Temp aria')).toHaveValue('24,5')
     expect(screen.queryByText('Bozza ripristinata.')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '28/10/2026 · 🌡 Termometro' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '28/10/2026 · Termometro' })).toBeInTheDocument()
     expect(screen.getByText('Stai registrando con data 28/10/2026, non oggi.')).toBeInTheDocument()
 
     await utente.click(pulsante('Salva'))
@@ -2008,7 +2008,7 @@ describe('MisuraPianta: mezzanotte con la data non scelta', () => {
     await utente.click(pulsante('Usa oggi'))
     await utente.click(within(await dialogo()).getByRole('button', { name: 'Scarta' }))
     await chiudiDialogo()
-    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Oggi · Termometro' })).toBeInTheDocument()
     expect(campo('Temp aria')).toHaveValue('')
     expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
     expect(useCampoStore.getState().dati('E').dataRilievo).toBe(DOMANI)
@@ -2020,7 +2020,7 @@ describe('MisuraPianta: mezzanotte con la data non scelta', () => {
     await pronta()
     riapertoIlMattinoDopo()
 
-    expect(await screen.findByRole('heading', { name: 'Oggi · 🌡 Termometro' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Oggi · Termometro' })).toBeInTheDocument()
     expect(screen.queryByText(/non oggi/)).not.toBeInTheDocument()
     expect(useCampoStore.getState().stato.E.dataRilievo).toBeUndefined()
   })

@@ -17,12 +17,13 @@ import { inEliminazione } from '@/lib/eliminaConAnnulla'
 import { percorsoDiario, percorsoModificaMisura, type ArrivoDiario, type ArrivoMisura } from '@/lib/percorsi'
 import { cn } from '@/lib/utils'
 import { vociMisura } from './voci'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 /** Il nome dello strumento sempre scritto (un archiviato lo dice); l'icona che l'utente ha scelto è solo decorazione. */
 function NomeStrumento({ strumento }: { strumento: Strumento }) {
   return (
     <>
-      {strumento.icona && <><span aria-hidden>{strumento.icona}</span>{' '}</>}
+      <IconaStrumento emoji={strumento.icona} piccola className="mr-1.5 inline-flex align-middle" />
       <span>{strumento.archiviato ? `${strumento.nome} (archiviato)` : strumento.nome}</span>
     </>
   )

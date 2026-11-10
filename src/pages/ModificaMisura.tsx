@@ -30,6 +30,7 @@ import { MISURA_DI_UN_ALTRO, MISURA_SOLO_LETTURA } from '@/lib/ruoli'
 import { toastSalvato } from '@/lib/toastSalvato'
 import { usePermessi } from '@/lib/usePermessi'
 import { ModuloCampi } from '@/components/ModuloCampi'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 function NonTrovata({ espId }: { espId: string }) {
   return (
@@ -206,7 +207,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
     try {
       accoda(utente, espId, m, {
         etichetta: pianta.etichetta,
-        strumento: strumento.icona ? `${strumento.icona} ${strumento.nome}` : strumento.nome,
+        strumento: strumento.nome,
         // La misura aperta qui è sul server (o, se è ancora in coda, la coda sa se lo è già: vale la sua voce).
         sulServer: true,
       })
@@ -294,7 +295,7 @@ function ModuloMisura({ espId, config, misura, pianta, strumento, trattamento, e
           )}
         </div>
         <p className="flex items-center gap-2 font-medium text-grafite">
-          {strumento.icona && <span aria-hidden>{strumento.icona}</span>}
+          <IconaStrumento emoji={strumento.icona} piccola />
           {strumento.nome}
         </p>
       </div>

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 type NomePannello = 'strumento' | 'parametro' | 'trattamenti' | 'fattore' | 'periodo' | 'piante'
 
@@ -297,7 +298,7 @@ export function BarraFiltri({ config, filtri, cercatoGrezzo, intervallo, azzeram
     >
       <div className="flex gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none]">
         <Chip nome="strumento" {...comune}>
-          {strumento?.icona && <span aria-hidden>{strumento.icona}</span>}
+          <IconaStrumento emoji={strumento?.icona} piccola className="-ml-1.5 size-6" />
           {strumento?.nome ?? 'Strumento'}
         </Chip>
         {parametri.length > 1 && <Chip nome="parametro" {...comune}>{parametro?.nome ?? 'Parametro'}</Chip>}

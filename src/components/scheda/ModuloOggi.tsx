@@ -324,7 +324,7 @@ export function ModuloOggi({
     try {
       accoda(utente, espId, m, {
         etichetta: pianta.etichetta,
-        strumento: strumento.icona ? `${strumento.icona} ${strumento.nome}` : strumento.nome,
+        strumento: strumento.nome,
         // Una correzione: la misura è (o può essere) già sul server.
         sulServer: misura !== null,
       })
