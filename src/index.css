@@ -2,7 +2,102 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * FastLab, "Il quaderno di campo" in versione scura verde (restyling 2026-11). I caratteri Atkinson Hyperlegible Next (testo) e Mono (dati) si importano in main.tsx:
+ * importati da qui, dentro Tailwind, i percorsi relativi dei file .woff2 non si risolverebbero.
+ * Solo tema chiaro: nessun elemento ha la classe .dark, quindi le varianti dark: dei componenti
+ * non si attivano mai, nemmeno con il sistema operativo in modalità scura.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Token ─────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+
+  /* Carta e linee */
+  --carta: #0f2523;
+  --foglio: #17352f;
+  --carta-ombra: #1f4039;
+  --riga: #27463f;
+  --riga-forte: #3d5d56;
+  /*
+   * Bordo a riposo di campi, select, caselle, interruttori e pulsanti secondari: l'unico tono di linea che
+   * arriva a 3:1 (3.8:1 su carta, 3.9:1 su foglio, 3.5:1 su carta ombra), come chiede WCAG per i controlli.
+   * Al passaggio questi bordi scuriscono a grafite tenue; riga e riga forte restano per i separatori.
+   */
+  --riga-controllo: #67877f;
+
+  /* Testo */
+  --grafite: #f2f7f5;
+  --grafite-tenue: #a9bfb8;
+
+  /* L'unico inchiostro: ciò che si tocca o che è scelto */
+  --inchiostro: #4fe0a8;
+  --inchiostro-scuro: #3cc994;
+  --inchiostro-velato: #1d4a3f;
+
+  /* Stati */
+  --registrato: #7ff0b8;
+  --registrato-velato: #1b4436;
+  --attenzione: #ffc46b;
+  --attenzione-velato: #3d3520;
+  --errore: #ff8a7a;
+  --errore-scuro: #ff6f5c;
+  --errore-velato: #45282a;
+
+  /* Solo per ciò che galleggia */
+  --ombra-galleggiante: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.4);
+  --ombra-dialogo: 0 2px 6px rgb(0 0 0 / 0.35), 0 20px 48px rgb(0 0 0 / 0.5);
+  --velo: rgb(3 12 11 / 0.6);
+
+  /* La fascia verde in testa alla home dell'esperimento */
+  --fascia: #0f7a5e;
+
+  /* Variabili di shadcn/ui, sulla stessa palette: i componenti che le usano restano coerenti. */
+  --background: var(--carta);
+  --foreground: var(--grafite);
+  --card: var(--carta-ombra);
+  --card-foreground: var(--grafite);
+  --popover: var(--foglio);
+  --popover-foreground: var(--grafite);
+  --primary: var(--inchiostro);
+  --primary-foreground: var(--foglio);
+  --secondary: var(--carta-ombra);
+  --secondary-foreground: var(--grafite);
+  --muted: var(--carta-ombra);
+  --muted-foreground: var(--grafite-tenue);
+  --accent: var(--carta-ombra);
+  --accent-foreground: var(--grafite);
+  --destructive: var(--errore);
+  --border: var(--riga);
+  --input: var(--riga-controllo);
+  --ring: var(--inchiostro);
+  --radius: 10px;
+}
+
 @theme inline {
+  --color-carta: var(--carta);
+  --color-foglio: var(--foglio);
+  --color-carta-ombra: var(--carta-ombra);
+  --color-riga: var(--riga);
+  --color-riga-forte: var(--riga-forte);
+  --color-riga-controllo: var(--riga-controllo);
+  --color-grafite: var(--grafite);
+  --color-grafite-tenue: var(--grafite-tenue);
+  --color-inchiostro: var(--inchiostro);
+  --color-inchiostro-scuro: var(--inchiostro-scuro);
+  --color-inchiostro-velato: var(--inchiostro-velato);
+  --color-registrato: var(--registrato);
+  --color-registrato-velato: var(--registrato-velato);
+  --color-attenzione: var(--attenzione);
+  --color-attenzione-velato: var(--attenzione-velato);
+  --color-errore: var(--errore);
+  --color-errore-scuro: var(--errore-scuro);
+  --color-errore-velato: var(--errore-velato);
+  --color-velo: var(--velo);
+  --color-fascia: var(--fascia);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -21,58 +116,215 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-roboto);
+
+  --shadow-galleggiante: var(--ombra-galleggiante);
+  --shadow-dialogo: var(--ombra-dialogo);
 }
+
+@theme {
+  --font-sans: "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono Variable", ui-monospace, Consolas, monospace;
+  --font-heading: "Space Grotesk Variable", var(--font-sans);
+  --font-display: "Space Grotesk Variable", "Atkinson Hyperlegible Next Variable", system-ui, sans-serif;
+
+  /* Scala tipografica di DESIGN.md (text-base resta il Body: 1rem / 1.5). */
+  --text-numero: 2.25rem;
+  --text-numero--line-height: 1.1;
+  --text-numero--letter-spacing: -0.02em;
+  --text-numero--font-weight: 600;
+  --text-headline: 1.5rem;
+  --text-headline--line-height: 1.2;
+  --text-headline--letter-spacing: -0.015em;
+  --text-headline--font-weight: 650;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.3;
+  --text-title--font-weight: 600;
+  --text-campo: 1.25rem;
+  --text-campo--line-height: 1.3;
+  --text-campo--font-weight: 500;
+  --text-dato: 0.9375rem;
+  --text-dato--line-height: 1.4;
+  --text-dato--font-weight: 450;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: 0.04em;
+  --text-label--font-weight: 550;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 14px;
+
+  /* Movimento: solo per segnalare uno stato, mai coreografico. */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 150ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
 
 @layer base {
-  :root {
-    /* Agriculture / Farm Tech palette */
-    --background: #F0FDF4;
-    --foreground: #14532D;
-    --card: #FFFFFF;
-    --card-foreground: #14532D;
-    --popover: #FFFFFF;
-    --popover-foreground: #14532D;
-    --primary: #15803D;
-    --primary-foreground: #FFFFFF;
-    --secondary: #DCFCE7;
-    --secondary-foreground: #14532D;
-    --muted: #E8F5EC;
-    --muted-foreground: #64748B;
-    --accent: #A16207;
-    --accent-foreground: #FFFFFF;
-    --destructive: #DC2626;
-    --border: #BBF7D0;
-    --input: #BBF7D0;
-    --ring: #15803D;
-    --radius: 0.75rem;
-    --font-roboto: 'Roboto', system-ui, sans-serif;
+  *,
+  ::before,
+  ::after {
+    border-color: var(--riga);
   }
 
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Roboto', system-ui, sans-serif;
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--carta);
+    color: var(--grafite);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    /* Un campo che prende il focus non deve finire sotto la barra d'azione fissa (vedi BarraAzioni). */
+    scroll-padding-bottom: calc(var(--altezza-barra-azioni, 0px) + 1rem);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
-  html {
-    font-family: 'Roboto', system-ui, sans-serif;
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--carta);
+    color: var(--grafite);
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  /* Focus visibile ovunque: anello di 2px d'inchiostro a 2px di distanza. */
+  :focus-visible {
+    outline: 2px solid var(--inchiostro);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--inchiostro-velato);
+    color: var(--grafite);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p,
+  li,
+  dd {
+    text-wrap: pretty;
+  }
+
+  /* Il segnaposto non scende sotto la grafite tenue: in serra un grigio più chiaro non si legge. */
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--grafite-tenue);
+    opacity: 1;
+  }
+
+  code,
+  kbd,
+  samp {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
 }
 
-#root {
-  max-width: 100%;
-  min-height: 100dvh;
-  margin: 0 auto;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-body {
-  margin: 0;
+/* ── Toast (sonner) ────────────────────────────────────────────────────── */
+/* Fondo grafite, testo foglio, angoli 10px, ombra galleggiante; in basso, sopra la barra d'azione. */
+
+[data-sonner-toaster] {
+  font-family: var(--font-sans);
+}
+
+/*
+ * Entra ed esce dissolvendosi sul posto (senza scivolare sopra la barra d'azione), in 200 ms.
+ * Sonner aggiunge il suo foglio di stile in fondo a <head> durante l'esecuzione, quindi a parità di
+ * specificità vincerebbe lui: questi selettori sono più specifici delle regole di sonner per gli stessi stati
+ * (entrata: 0,4,0 contro 0,2,0 di [data-y-position]; uscita: 0,5,0 contro 0,4,0). La pila di più toast
+ * resta quella di sonner.
+ */
+[data-sonner-toaster] [data-sonner-toast] {
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-mounted="false"][data-front="true"] {
+  --y: translateY(0);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-removed="true"][data-front="true"][data-swipe-out="false"] {
+  --y: translateY(0);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  box-shadow: var(--ombra-galleggiante);
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-title] {
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-description] {
+  color: var(--carta-ombra);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-icon] {
+  width: 20px;
+  height: 20px;
+}
+
+/*
+ * Azione dentro il toast (es. "Annulla" dopo "Palchi 3 rimosso."): sonner la fa alta 24px con testo di 12px,
+ * qui diventa un bersaglio di almeno 44px. I colori restano quelli di sonner: foglio su grafite, a contrasto pieno.
+ */
+[data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+  height: auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+/*
+ * Verde negato: un toast di successo qualsiasi ("Messaggio copiato.") resta neutro, ✓ in foglio. Il ✓ in
+ * registrato velato è solo per l'esito "salvato" delle misure, con la classe data da toastSalvato()
+ * (src/lib/toastSalvato.ts).
+ */
+[data-sonner-toaster] [data-sonner-toast].toast-salvato [data-icon] {
+  color: var(--registrato-velato);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] [data-icon] {
+  color: var(--attenzione-velato);
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] [data-icon] {
+  color: var(--errore-velato);
+}
+
+/* ── Restyling scuro verde: titoli e numeri grandi in Space Grotesk ─────── */
+.text-headline,
+.text-numero,
+.font-display {
+  font-family: var(--font-display);
 }

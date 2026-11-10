@@ -1,13 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FastLab 🌱</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-v2-64.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#fcf9f5" />
+    <!-- Installabile dalla schermata Home (Android e iPhone). Il service worker (registrato da src/main.tsx) tiene l'app
+         in cache: si apre anche senza rete. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="FastLab" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>FastLab</title>
   </head>
   <body>
     <div id="root"></div>

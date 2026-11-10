@@ -1,0 +1,267 @@
+# Registro del Piano A: strumenti e catalogo, home, misura sequenziale
+
+Piano: `docs/superpowers/plans/2026-10-29-fastlab-v3-piano-A-strumenti-home-misura.md`
+Spec: `docs/superpowers/specs/2026-10-29-fastlab-v3-home-strumenti-design.md` (+ mockup `2026-10-29-fastlab-v3-home-mockup.html`)
+Branch: `claude/app-review-improvements-c26294` (base 93065bd, piano A committato). Nessun merge su `main`.
+Base nel cloud: 840 test Vitest verdi, `tsc -b` pulito, lint pulito.
+
+Metodo: le skill `superpowers:subagent-driven-development` e `impeccable` non sono installate nell'ambiente cloud. Il controller segue lo stesso metodo a mano: brief scritti, implementatore → revisore → giri di correzione, registro qui. I brief UI riportano le regole di `PRODUCT.md`, `DESIGN.md` e `.impeccable/design.json`.
+Modelli: Opus per i Task 1, 3, 4, 12 e la revisione finale; Sonnet per gli altri (implementazione e revisione).
+
+## Database nel cloud
+
+Docker non c'è, ma nel container ci sono PostgreSQL 16 e pgTAP (installato con apt). Il controller ha preparato uno **strato che imita Supabase** (ruoli `anon`/`authenticated`/`service_role`, `auth.users`, `auth.uid()` da `request.jwt.claims`, schema `extensions` con pgcrypto, privilegi di default di Supabase su `public`): lo script ricrea il DB, applica tutte le migration in ordine ed esegue `pg_prove` su `supabase/tests/*.sql`.
+Sulla base del Piano 1 dà lo stesso risultato della sessione locale: 4 file, 104 test, PASS.
+
+Ruling: le migration nuove (0007–0010) e i loro pgTAP si verificano nel cloud con lo strato emulato; restano comunque da confermare in locale con `npx supabase db reset` + `npm run test:db` (GoTrue, PostgREST e i privilegi reali di Supabase non sono emulati) — cost if wrong: un giro in locale.
+
+## Scansione preliminare
+
+| Coppia / task | Produce → usa | Esito |
+|---|---|---|
+| T1 → tutti | `Strumento`, `strumento_id`, `salvaStrumento` → T2–T12 | coerente |
+| T1 ↔ modello Hydrochar | il modello resta con 4 strumenti, ma "Altezza" è sia in "Altezza" sia in "Fenologici"; il nuovo indice `strumento_parametri_un_solo_strumento` farebbe fallire `crea_esperimento` dal modello fino al T5 | CONFLITTO |
+| T2 → T12 | `setMantieni`/`aggiornaMantenuti`/`valoriIniziali({mantenuti})` → MisuraPianta | coerente |
+| T3 → T4–T8 | `VoceCatalogo`, `listaCatalogo`, `salvaVoceCatalogo`, `strumentoDaCatalogo` | coerente |
+| T3 ↔ `rls.test.sql` | test "ogni tabella ha RLS" e "anon senza privilegi/funzioni" → valgono anche per `catalogo_strumenti` e per la RPC del T11 | coerente (va rispettato) |
+| T5 → T6 | `bozzaHydrochar(catalogo)` cambia firma: i chiamanti esistenti (`SceltaIniziale`) devono continuare a compilare | coerente (passano `[]` o il catalogo) |
+| T6/T7 ↔ T8 | `EditorStrumento`, `SceltaDalCatalogo` riusati | coerente |
+| T9 ↔ T11/T12 | la striscia della home porta a `/misura`, che esiste solo dal T11; `Campo.tsx` resta senza route dal T9 al T12 | LACUNA |
+| T10 → T9/T11/T12 | `statoPianta`, `prossimaDaMisurare`, `riepilogoGiro`, `progressoOggi` | coerente (T10 prima del T9) |
+| T12 ↔ Piano 1 | `RiquadroOggi`/`ModuloOggi` riusati: bozze, `nuovoId()`, finestra 500 ms, niente doppioni | coerente (da non rompere) |
+| T13 grep | `passat` resta nei soli commenti/nomi storici delle migration vecchie | coerente |
+
+Ruling: nel T1 il modello Hydrochar toglie "Altezza" dallo strumento "Fenologici" (anticipa la decisione del T5: niente Altezza nella tabella fenologica), così il modello resta valido con il nuovo indice unico — cost if wrong: nessuno, il T5 ristruttura comunque il modello.
+Ruling: nel T9 la route `/esperimenti/:espId/misura` monta provvisoriamente `Campo` (la vecchia schermata di campo), così la striscia "Nuova misura" porta già a una misura; il T11 la sostituisce con `SceltaStrumento` e il T12 elimina `Campo.tsx` — cost if wrong: nessuno.
+
+## Avanzamento
+Ruling: lo strato emulato è nel repository (`scripts/db-senza-docker/`, script `test-db.sh` + `stub-supabase.sql`), così lo usano gli agenti e le prossime sessioni cloud (Piani B–D) — cost if wrong: due file da togliere.
+Ruling (T2): il cablaggio di "Mantieni" in `ModuloOggi`/`RiquadroOggi` (mantenuti dello store per lo strumento del riquadro e la data di rilievo, casella solo nelle misure nuove, `aggiornaMantenuti` dopo il salvataggio di una misura nuova) si fa già nel T2, perché la schermata di campo attuale lo usa subito; il T12 lo riusa — cost if wrong: nessuno.
+Ruling (T3): `crea_esperimento` si ricrea anche nella migration 0009 per leggere `strumenti[].catalogo_id` e `parametri[].catalogo_chiave` dalla bozza; senza, la creazione guidata (T6) perderebbe il collegamento al catalogo. `clonaConfig` conserva i due collegamenti. Insert nel catalogo con `with check (creato_da = auth.uid())` — cost if wrong: nessuno.
+Ruling (T4): regole esatte del piano di aggiornamento: (a) aggiunta solo per chiavi nuove rispetto alla vecchia voce e assenti dalla copia (una chiave tolta a mano non torna); (b) un campo si aggiorna solo se nella copia è uguale al vecchio valore del catalogo, altrimenti saltato `… : <campo> modificato a mano`; (c) con dati non si aggiornano `n_letture` **e `unita`** (un cambio di unità reinterpreterebbe i numeri salvati: lettura prudente di spec §6.3 "non tocca i valori che hanno dati"), saltato `… : <campo> non aggiornato, ci sono già misure`; nome e min/max sì; (d) etichette dei campi: nome, unità, minimo, massimo, letture; (e) parametri archiviati e senza chiave non si toccano; nome e icona dello strumento non cambiano — cost if wrong: un'unità corretta nel catalogo va ritoccata a mano negli esperimenti con dati.
+Task 1: implementatore (opus) DONE_WITH_CONCERNS f801124 — 847 Vitest, 133 pgTAP (emulato); pkey di strumento_parametri ricreata (l'indice teneva il vecchio nome di colonna); la migration si ferma con PARAMETRO_IN_PIU_STRUMENTI se trova parametri in più strumenti; clonaConfig non copia gli strumenti archiviati; file rinominati EditorStrumento/SezioneStrumenti/PassoStrumenti; lettura tollerante di `passataId` nello store
+Task 1: revisore (opus) avviato su a6fcec1..f801124
+Task 1: review (opus) → Approved (0 Critical/Important); deviazioni 1–5 accettate; prova a mano della 0007 su dati del Piano 1 (doppione → stop senza modifiche; senza doppione misure intatte)
+Task 1: minor (deferred): il messaggio di PARAMETRO_IN_PIU_STRUMENTI cita `strumento_parametri` ma dopo il rollback la tabella si chiama ancora col vecchio nome
+Task 1: minor (carry to T5/T7): la violazione di `strumento_parametri_un_solo_strumento` mostra il generico "Esiste già un elemento…" → messaggio dedicato in `messaggioErrore` + controllo in `validaBozza` (T5) e in `SezioneStrumenti` (T7)
+Task 1: minor (carry to T11): strumenti archiviati ancora nella scelta di `Campo.tsx` (nessuna UI archivia prima del T7)
+Task 1: minor (deferred, primo deploy v3): bozza del wizard v1 scartata in silenzio; un client vecchio che manda `passate` crea un esperimento senza strumenti
+Task 1: complete (commits a6fcec1..f801124, review clean)
+Task 2: dispatched implementer (sonnet), BASE f801124
+Ruling (T10): per la tabella fenologica non contano tutte le voci (una `Note` facoltativa vuota renderebbe ogni pianta "incompleta" per sempre e il giro non finirebbe mai): contano le voci obbligatorie; senza obbligatorie la pianta è `fatta` con almeno un valore. Per gli strumenti semplici (Ciras) contano tutti i valori attivi, come da piano. Strumento senza parametri attivi: `fatta` con almeno una misura — cost if wrong: una tabella fenologica senza obbligatori non segnala le voci dimenticate.
+Ruling (T11): con una data di rilievo diversa da oggi la riga dice `<fatte>/<totale> il GG/MM` invece di `… oggi` — cost if wrong: copy tweak.
+Ruling (T7): l'"Elimina" di uno strumento richiede di sapere se ha misure: nuova lettura `strumentiConDati(espId)` (hook con `staleTime: 0` come `useParametriConDati`); finché non si sa, niente Elimina. Gli strumenti archiviati si possono ripristinare — cost if wrong: una query in più nelle impostazioni.
+Task 2: implementatore (sonnet) DONE_WITH_CONCERNS 7d428d0 — 883 Vitest, 136 pgTAP (emulato); `mantenutiPer(espId, strumentoId, data)` per il riquadro (usa lo strumento del riquadro, non quello dello store); segno `mantenuto` solo finché il valore resta quello di partenza; nessun segno su una bozza ripresa; rosso visto solo per FormMisura
+Task 2: dispatched reviewer (sonnet) on 20a5d09..7d428d0
+Task 10: dispatched implementer (sonnet) in parallelo alla revisione del T2 (solo file nuovi giro.ts/giro.test.ts, add esplicito), BASE 7d428d0
+Task 10: implementatore (sonnet) DONE 45cc256 — 912 Vitest (29 nuovi); fenologica con obbligatorio vuoto ma altre voci scritte → `incompleta` (non `da_fare`)
+Ruling: accettata la scelta `incompleta` per una pianta toccata senza le voci obbligatorie: va ripresa, non saltata (focus n. 2) — cost if wrong: nessuno
+Task 10: dispatched reviewer (sonnet) on 4f24688..45cc256 (solo i due file nuovi)
+Task 2: review (sonnet) → Needs fixes: (I1) una bozza ripresa perde il segno `mantenuto` (il valore mantenuto sembra digitato su quella pianta, focus n. 1)
+Ruling: T2 fix round 1 = I1 + minor 2 (setStrumento/setData azzerano i mantenuti se strumento o data effettiva cambiano, salvo `tieniIlGiorno`), 3 (segno solo con la spunta attiva), 4 (il cursore non cade sulle caselle "Mantieni"), 5 (copiaProfonda al posto di structuredClone) — cost if wrong: small
+Task 2: minor (deferred): con più letture il segno è solo sulla prima e sparisce cambiando la seconda (accettabile); ✓ della casella posizionato senza `top` → guardarlo su Safari iOS
+Task 10: review (sonnet) → Approved (0 Critical/Important), 914 Vitest
+Task 10: minor (carry to T9/T11/T12): non calcolare gli stati prima che la configurazione sia caricata (con `parametri` vuoto uno strumento risulterebbe senza parametri attivi → piante "fatte")
+Task 10: minor (deferred): statiPiante O(piante × misure); id duplicati teorici; test di non mutazione solo per prossimaDaMisurare
+Task 10: complete (commits 4f24688..45cc256, review clean)
+Task 2: fix round 1 implemented cdaf525 (916 Vitest); re-review (sonnet) dispatched
+Task 3: dispatched implementer (opus) in parallelo alla ri-revisione del T2 (add espliciti), BASE cdaf525
+Task 2: re-review fix round 1 → Approved (916 Vitest)
+Task 2: fix round 1/5 (5 addressed, 0 open; commits 20a5d09..cdaf525)
+Task 2: complete (commits 20a5d09..cdaf525, review clean)
+Task 3: implementatore (opus) DONE e5c5734 — 942 Vitest, 177 pgTAP (emulato); salvaVoceCatalogo senza controllaRighe (come gli altri upsert); lettura tollerante dei parametri JSON oltre il brief
+Task 3: minor (carry to T6/T8): le chiavi dei valori di una voce non sono validate nel DB (vuote o doppie possibili) → l'editor del catalogo deve garantirle uniche e non vuote prima di salvare
+Task 3: dispatched reviewer (opus) on 2d41382..e5c5734
+Task 3: review (opus) → Approved (0 Critical/Important), 177 pgTAP, 942 Vitest; prova a mano come utente B (delete/truncate negati, firma altrui rifiutata, anon niente)
+Ruling: fold into T3 fix round 1 i minor che rafforzano l'unica tabella condivisa: (1) trigger che vieta di cambiare `id` di una voce (gli id fissi dei semi restano fissi); (2) messaggio dedicato per la FK `strumenti_catalogo_id_fkey`; (3) `catalogo_strumenti.creato_da … on delete set null` (una voce condivisa sopravvive al suo autore); (4) in lettura i valori senza `chiave` si scartano. Si modifica direttamente la 0009, mai applicata fuori da questa sessione (DB emulato) — cost if wrong: small
+Task 3: fix round 1 implemented 7e7bd47 (945 Vitest, 182 pgTAP); re-review (opus) dispatched
+Task 4: dispatched implementer (opus) in parallelo alla ri-revisione del T3 (add espliciti), BASE 7e7bd47
+Task 3: re-review fix round 1 → Approved (182 pgTAP, 945 Vitest, su copia esatta del commit)
+Task 3: fix round 1/5 (4 addressed, 0 open; commits 2d41382..7e7bd47)
+Task 3: minor (deferred): intestazione `aggiornato_il` fuori posto in catalogo.test.sql; chiavi doppie nella stessa voce da impedire nell'editor (T8, già nel brief)
+Task 3: complete (commits 2d41382..7e7bd47, review clean)
+Task 5: dispatched implementer (sonnet) in parallelo al T4 (semi in src/domain/modelli/semi.ts, non tocca i file del catalogo), BASE 7e7bd47+docs
+Task 5: implementatore (sonnet) DONE_WITH_CONCERNS eb9b336 — 1011 Vitest (con il WIP del T4); SEMI_CATALOGO in src/domain/modelli/semi.ts confrontata con la migration (import ?raw); tolto anche "Aggiungi almeno un parametro."; la regola "parametro in più strumenti" conta anche gli archiviati (come l'indice del DB); hunk di errori.ts committati a parte dal WIP del T4
+Task 5: possibile test instabile: SchedaPianta "cambiando pianta un Annulla rimasto in sospeso sparisce con la lista" fallito una volta sotto carico
+Task 5: dispatched reviewer (sonnet) on 9eaa97a..eb9b336 (verifiche su copia esatta del commit)
+Incidente: due implementatori in parallelo condividono l'indice git; il commit del T5 (eb9b336) ha incluso tutti i file del T4 messi in stage dall'altro agente e ha lasciato fuori il messaggio di errori.ts del T5, committato dal controller a parte (commit successivo). Storia non riscritta (eb9b336 già pushato): eb9b336 = T5 + T4.
+Ruling: d'ora in poi un solo implementatore alla volta nel checkout; in parallelo solo revisori in sola lettura (verifiche su `git archive` del commit) — cost if wrong: meno parallelismo.
+Task 4: implementatore (opus) DONE_WITH_CONCERNS (codice in eb9b336) — 46 test nuovi; `ordineMassimo` in CopiaStrumento; modifiche via nuova `aggiornaParametroDaCatalogo` (update dei soli 5 campi con controllaRighe, non l'upsert che ricreerebbe un parametro eliminato o ne toglierebbe l'archiviazione); `collegaParametri` estratta da salvaStrumento; min/max che invertirebbero l'intervallo → saltati; copie con catalogo_id diverso ignorate; applicaAggiornamento non transazionale (parametro aggiunto ma collegamento fallito → al giro dopo un doppione)
+Task 5: review (sonnet) → Approved (0 Critical/Important); 1010 Vitest, 182 pgTAP; la bozza Hydrochar (dai semi e da []) creata davvero con crea_esperimento nel DB emulato; test dei semi efficace (4 mutazioni della migration lo fanno fallire)
+Task 5: minor (deferred): `normalizza` duplicata in hydrochar.ts e bozza.ts; parametro senza nome in due strumenti → messaggio con nome vuoto; la regola "in più strumenti" ignora i parametri archiviati (irraggiungibile in una bozza nuova)
+Task 5: complete (commits 9eaa97a..af301ae, review clean; eb9b336 contiene anche il T4)
+Task 4: review (opus) → Approved (0 Critical/Important), 1011 Vitest; deviazioni 1–9 accettate
+Ruling: le modifiche dal catalogo passano da `aggiornaParametroDaCatalogo` (update dei soli campi, con controllaRighe) e non da `salvaParametro` come diceva il piano: l'upsert ricreerebbe un parametro eliminato o toglierebbe l'archiviazione — cost if wrong: nessuno
+Ruling: fold into T4 fix round 1 i minor del focus n. 3: (1) se il collegamento di un parametro aggiunto fallisce, il parametro appena creato si elimina (non ha misure) e l'errore originale si rilancia; (2) `aggiornaParametroDaCatalogo` scrive solo i campi cambiati (non sovrascrive un ritocco fatto in Impostazioni tra lettura e applicazione); (3) nessuna aggiunta su uno strumento archiviato (le modifiche sì); (4) controllo difensivo `vecchia.id === nuova.id` — cost if wrong: small
+Task 4: minor (deferred, piano successivo): nessuna guardia SQL su unità/letture di un parametro con dati (la regola è solo nel client, come nelle Impostazioni)
+Task 4: minor (carry to T8): se `applicaAggiornamento` si ferma a metà, la pagina lo dice e "Riprova" usa la stessa voce vecchia (già nel brief del T8)
+Task 4: fix round 1 implemented 7ecc502 (1018 Vitest); `VOCI_DIVERSE` se vecchia e nuova hanno id diversi (errore, non piano vuoto); re-review (opus) dispatched su copia del commit
+Task 6: dispatched implementer (sonnet), BASE 7ecc502 (unico implementatore nel checkout)
+Task 4: re-review fix round 1 → Approved (1018 Vitest su copia del commit)
+Task 4: fix round 1/5 (4 addressed, 0 open; commits eb9b336 (parte T4)..7ecc502)
+Task 4: minor (deferred): rete che cade tra salvataggio del parametro aggiunto e pulizia → orfano (serve una transazione nel DB); `VOCI_DIVERSE` mostrato come errore generico (errore di programmazione)
+Task 4: complete (review clean)
+Ruling (T12): arrivando su una pianta che ha già misure di quello strumento in quella data si chiede sempre "Correggi / Nuova misura", qualunque sia la provenienza. Il giro automatico raggiunge solo piante non fatte, ma una pianta incompleta ha già una misura: un'altra va decisa, non creata in silenzio. Una bozza non salvata da riprendere ha la precedenza sulla domanda — cost if wrong: un tocco in più sulle piante incomplete del giro.
+Task 6: implementatore (sonnet) DONE_WITH_CONCERNS 8be4a83 — 1079 Vitest, build OK; `chiaviDaNomi` e `voceDaStrumento` in domain/catalogo.ts; vecchio editor a interruttori spostato in impostazioni/EditorInclusioneStrumento.tsx (lo elimina il T7); "Obbligatorio" solo nella tabella fenologica; "catalogo noto" per non resettare la bozza quando il catalogo si rilegge
+Task 6: dispatched reviewer (sonnet) on e643c1c..8be4a83
+Task 6: review (sonnet) → Needs fixes: (I1) un salvataggio lento nel catalogo, finito dopo un cambio di passo, sovrascrive la bozza con la versione vecchia (perdita di lavoro, riprodotto con un test)
+Ruling: T6 fix round 1 = I1 (aggiornamenti della bozza con updater funzionale) + minor 1 (stesso id della voce per lo stesso modulo "Nuovo strumento", così un nuovo tentativo è idempotente), 2 (sul 23505 del nome il modulo resta aperto per rinominare o scegliere la voce esistente; solo un errore di rete aggiunge la copia non collegata, come da piano), 3 (con una bozza salvata non si aspetta il catalogo), 5 (pulsante del modulo `outline`: un solo inchiostro pieno), 6 (test: "Crea" da Hydrochar con 3 `catalogo_id` e le `catalogo_chiave`) — cost if wrong: small
+Task 6: minor (deferred): riga "Catalogo non raggiungibile" persa al ripristino; modulo "Nuovo strumento" non conservato cambiando passo
+Task 6: fix round 1 implemented 390e515 (1083 Vitest, build OK); `ModificaBozza` (bozza o funzione della bozza); stesso id della voce per lo stesso modulo; sul nome doppio il modulo resta aperto; "Ricomincia" disabilitato finché il catalogo non è noto; re-review (sonnet) dispatched su copia del commit
+Note: test SchedaPianta "cambiando pianta un «Annulla» rimasto in sospeso sparisce con la lista" fallito di nuovo una volta in una corsa parziale (instabile sotto carico) → da guardare nella revisione finale
+Task 9: dispatched implementer (sonnet), BASE 390e515 (unico implementatore)
+Task 6: re-review fix round 1 → Approved (1083 Vitest, build OK, su copia del commit)
+Task 6: fix round 1/5 (6 addressed, 0 open; commits e643c1c..390e515)
+Task 6: minor (deferred): dopo un errore di rete arrivato comunque al server, un nuovo "+ Nuovo strumento" con lo stesso nome prende un id nuovo → 23505 (raro, coerente col piano); messaggio d'errore del modulo resta mentre si rinomina
+Task 6: complete (commits e643c1c..390e515, review clean)
+Task 9: implementatore (sonnet) DONE 8464ad6 — 1129 Vitest, build OK; `percorsoCampo` eliminato → percorsoHome/percorsoNuovaMisura/percorsoPiante/percorsoSezione; `percorsoMisura` (modifica) rinominato `percorsoModificaMisura`; Impostazioni e creazione → home; SchedaPianta → /misura; freccia di Campo → home
+Task 9: dispatched reviewer (sonnet) on 232fbcd..8464ad6
+Task 7: dispatched implementer (sonnet), BASE 8464ad6 (unico implementatore; revisore T9 su copia)
+Task 9: review (sonnet) → Approved (0 Critical/Important), 1129 Vitest, build OK, su copia del commit
+Task 9: minor (carry to T12): SchedaPianta aperta dall'elenco torna a /misura e, senza strumento scelto, rimbalza lì → con il T12 la freccia va all'elenco e lo strumento è quello dello store o il primo attivo (già nel brief)
+Task 9: minor (carry to T11): la home legge le misure del giorno anche senza strumento scelto → `useMisureGiorno(strumentoId ? espId : undefined, …)`
+Task 9: minor (carry to T13): DESIGN.md dice che le emoji sono ammesse solo come icona della passata → aggiornare (icone delle sezioni della home e degli strumenti); mockup della home ancora con Mappa e badge (riferimento storico); emoji dello strumento nello stato della striscia letta dai lettori di schermo
+Task 9: complete (commits 232fbcd..8464ad6, review clean)
+
+## Come riprendere (istruzione dell'utente, 29/10/2026)
+Se i crediti di utilizzo finiscono, il lavoro riprende **in questa stessa sessione cloud** (non in un'altra app o sessione). Alla ripresa:
+1. `git status` e `git log --oneline -5` sul branch `claude/app-review-improvements-c26294`: il lavoro non committato di un implementatore interrotto resta nel checkout; si controlla, si completa o si scarta con un nuovo implementatore sullo stesso task.
+2. Si riparte dalla prima riga di "Avanzamento" senza `complete`. Ordine restante: T7 → T8 → T11 → T12 → T13 → revisione finale (opus) → un giro di correzioni.
+3. I brief stanno nella scratchpad della sessione (`briefs/`); se non ci sono più, si riscrivono dal piano e dai Ruling di questo registro.
+4. DB senza Docker: `pg_ctlcluster 16 main start`, poi `scripts/db-senza-docker/test-db.sh` (servono `postgresql-16-pgtap` e `libtap-parser-sourcehandler-pgtap-perl`, e `trust` per postgres in pg_hba).
+Task 7: implementatore (sonnet) DONE_WITH_CONCERNS 3f7b7b2 — 1157 Vitest, build OK; `strumentiConDati` a pagine da 1000; logica in impostazioni/useStrumenti.ts; elenco "Valori senza strumento" (solo Archivia) per i parametri rimasti fuori da ogni strumento; tabella fenologica senza "Archivia" (l'indice unico conta anche le archiviate); "Parametri archiviati" → "Valori archiviati"; EditorInclusioneStrumento e SezioneParametri eliminati
+Task 7: dispatched reviewer (sonnet) on 7b87068..3f7b7b2
+Task 8: dispatched implementer (sonnet), BASE 3f7b7b2 (unico implementatore; revisore T7 su copia)
+Task 7: review (sonnet) → Needs fixes: (I1) "Aggiungi dal catalogo" salva subito senza i controlli sui nomi doppi (due "gs", due "Calibro" nel DB; il DB non ha indici unici sui nomi)
+Ruling: T7 fix round 1 (dopo la fine del T8, un implementatore alla volta) = I1 + m1 (eliminando un valore si toglie anche il suo collegamento dalla bozza) + m2 ("Elimina strumento" solo con `parametriConDati` noto, ricontrollo fresco) + m3 (messaggio per `strumenti_un_fenologico`) + m5 (la conferma di "Archivia strumento" dice che le modifiche non salvate si scartano) — cost if wrong: small
+Task 7: minor (deferred): un valore fenologico ripristinato non compare nell'editor con bozza aperta; `strumentiConDati` legge tutte le misure (una RPC sarebbe più leggera)
+Task 8: implementatore (sonnet) DONE b6ff4c4 — 1200 Vitest, build OK; `bozzaDaVoce`/`voceDaModifica`/`problemiVoce` nel dominio (chiave conservata su rinomina, chiavi riparate); descrizione nell'editor solo in modalità catalogo; toast `Strumento aggiunto al catalogo.` e `Strumento archiviato.`
+Task 8: dispatched reviewer (sonnet) su copia; Task 7 fix round 1 dispatched (implementatore T7)
+Task 8: review (sonnet) → Needs fixes: (I1) archiviazione con toast verde (`toastSalvato`), contro la regola "verde solo per salvato"; (I2) valori delle righe non in Geist Mono (`text-dato` non imposta la famiglia; stesso difetto in SceltaDalCatalogo del T6)
+Ruling: T8 fix round 1 (dopo la correzione del T7) = I1 + I2 (anche in SceltaDalCatalogo) + m3 (attendere l'invalidazione del catalogo prima di tornare all'elenco, o `setQueryData`, così riaprendo subito non si parte dalla voce vecchia) + m4 (l'errore della fase esperimenti con "Riprova" resta finché non si riprova o si chiude) — cost if wrong: small
+Task 8: minor (deferred): ramo `problemiVoce` in `salva()` difensivo e irraggiungibile (coperto dai test di dominio)
+Task 7: fix round 1 implemented 3b7d3a5 (1207 Vitest, build OK); re-review (sonnet) dispatched su copia
+Task 8: fix round 1 dispatched (implementatore T8)
+Task 7: re-review fix round 1 → Approved (1207 Vitest, build OK, su copia)
+Task 7: fix round 1/5 (5 addressed, 0 open; commits 7b87068..3b7d3a5)
+Task 7: minor (deferred): tabella fenologica archiviata nel DB resta invisibile (ora l'errore è chiaro)
+Task 7: complete (commits 7b87068..3b7d3a5, review clean)
+Task 8: fix round 1 implemented 9534878 (1210 Vitest, build OK); re-review (sonnet) dispatched su copia
+Task 11: dispatched implementer (sonnet), BASE 9534878 (unico implementatore)
+Task 8: re-review fix round 1 → Approved (1210 Vitest, build OK, su copia)
+Task 8: fix round 1/5 (4 addressed, 0 open; commits 411d79c..9534878)
+Task 8: minor (deferred): il test "catalogo già riletto" non discrimina (mock troppo veloce); l'errore della fase esperimenti non ha "Chiudi"; un nuovo esito sostituisce l'errore pendente
+Task 8: complete (commits 411d79c..9534878, review clean)
+Task 11: implementatore (sonnet) DONE aa1950a — 1250 Vitest, 189 pgTAP (emulato), build OK; `Riprendi` a inchiostro pieno nella riga dello strumento in corso; tocco su uno strumento con misure non ancora caricate → prima pianta (il T12 chiede Correggi/Nuova se ha misure); home legge le misure solo con uno strumento scelto
+Task 11: dispatched reviewer (sonnet) su copia
+Task 12: dispatched implementer (opus), BASE aa1950a (unico implementatore)
+Task 11: review (sonnet) → Approved (0 Critical/Important), 1250 Vitest, 189 pgTAP, build OK, su copia; deviazioni 1–2 accettate (non disabilitare le righe: la pagina resta usabile con poco segnale)
+Task 11: minor (carry to T13/finale): `Riprendi` alto 52 px invece di 56; riga dei dati in `text-label` invece di `text-dato`; progresso perso se una rilettura in background fallisce (come la home)
+Task 11: complete (commits 882ef80..aa1950a, review clean)
+Task 12: implementatore (opus) DONE_WITH_CONCERNS f8f13c4 — 1274 Vitest, 189 pgTAP, build OK; `ModuloOggi.successiva` → `avanti: {testo, percorso} | null`; pannello `SceltaArrivo` in linea con le scelte nella BarraAzioni (tutte in contorno); testo con più misure `Correggere una di quelle delle 09:12 e 15:40 o aggiungerne una nuova?`; finestra di 500 ms anche sul pannello e su "Vai alle mancanti"; `setQueryData` sulle misure del giorno dopo un salvataggio; `useModuloProtetto` estratto (conferma, beforeunload, mezzanotte); SchedaPianta → elenco piante; Campo.tsx eliminato; test instabile di SchedaPianta corretto (attesa della pulizia con waitFor, 12/12 sotto carico)
+Task 12: dispatched reviewer (opus) su copia
+Task 13: dispatched implementer (sonnet), BASE f8f13c4
+Riavvio del container (29/10 ~18:40): interrotte la revisione del T12 e l'implementatore del T13. Il T13 aveva già committato f110f64 (pulizia: `contaPerPianta` eliminata, `Riprendi` 56 px, riga dati `text-dato`) e 42f1f79 (README, PRODUCT, DESIGN, design.json); il suo rapporto è perso. Ripristinati: cluster Postgres (pgTAP ancora installato). Verifica del controller dopo il riavvio su 42f1f79: 189 pgTAP PASS (emulato), 1271 Vitest verdi, tsc 0, lint 0, build OK; grep "passat|ricorda_tra_piante|ricordati" su src e supabase/tests → solo la lettura tollerante dello store, il suo test e un "passata la mezzanotte"/"non parlano più di passate" nei test.
+Task 12: revisione (opus) rilanciata su a693b9f..f8f13c4
+Task 13: revisione affidata alla revisione finale (solo documenti e una pulizia di 4 file, verificata dal controller)
+Task 12: review (opus) → Approved (0 Critical/Important), 1274 Vitest su copia di f8f13c4; SchedaPianta/MisuraPianta/FineGiro 3× sotto carico 127/127; deviazioni 1–7 accettate; correzione del test instabile legittima
+Task 12: minor (carry to final fix round): m1 doppio tocco su "Salva e termina" che cade su "Vai alle mancanti" (finestra di 500 ms anche su FineGiro); m3 "Vai alla pianta" sulla pianta attuale con "Scarta" lascia i valori a schermo; m5 due misure alla stessa ora (testo e pulsanti identici); m6 "Manca 12" al singolare, link della pianta inesistente; m7 `percorsoMisura` → nome non ambiguo, `misureOggi` duplicato, parametro `azione` inutilizzato
+Task 12: minor (deferred): m2 domanda decisa su una cache di 30 s (un collega che misura la stessa pianta → una misura in più, mai persa); m4 "Scarta" su una bozza ripresa non riporta alla domanda; con le misure del giorno in errore non si misura finché non si riprova
+Task 12: complete (commits a693b9f..f8f13c4, review clean)
+Task 13: complete (commits f110f64..42f1f79, verificato dal controller; documenti rivisti nella revisione finale)
+Tutti i 13 task chiusi. Revisione finale: dispatched (opus, 2 aree in parallelo: fin-dati = DB, catalogo, configurazione, wizard, impostazioni; fin-campo = mantieni, home, giro, scelta strumento, misura sequenziale, documenti) su 93065bd..HEAD con tutti i minor rimandati
+Final review (opus, 2 aree): fin-campo → "Pronto dopo correzioni", 0 Critical/Important (focus 1, 2, 5 reggono; nessuna regressione del Piano 1); fin-dati → "Pronto dopo correzioni", 2 Important: (I1) l'aggiornamento dal catalogo può creare due valori con lo stesso nome nello stesso esperimento; (I2) "Gestisci il catalogo" nelle Impostazioni scarta le modifiche non salvate senza conferma. Verifiche di entrambi: 189 pgTAP PASS, 1271 Vitest, tsc/lint/build puliti; bozza del wizard Hydrochar creata davvero nel DB emulato; RLS su 14 tabelle, anon senza privilegi
+Ruling: giro unico di correzione finale = fin-dati I1, I2, minor 45 (testo di PARAMETRO_IN_PIU_STRUMENTI), "Chiudi" sull'errore del catalogo, coerenza dell'archiviazione; fin-campo T12 m1, m3, m5, m6, m7, progresso che resta dopo una rilettura fallita (T11), emoji aria-hidden nella striscia (T9), "ultima volta" riletta dopo un salvataggio, README/DESIGN corretti (regola della domanda nel giro, unità e letture con misure, elenco dei test) — brief in scratchpad fix-finale-dati.md e fix-finale-campo.md — cost if wrong: small
+Final review: minor (deferred, Piani B–D o dopo la prova in locale): modifiche contemporanee nel catalogo (nessun controllo su aggiornato_il; una voce archiviata da altri può tornare attiva); `creato_il`/`aggiornato_il` riscrivibili (anche in misure dal Piano 1); voci di menu di AppShell senza conferma con modifiche aperte; domanda decisa su cache di 30 s (m2); "Scarta" su bozza ripresa senza domanda (m4); misure del giorno senza paginazione (> 1000 misure al giorno); strumento archiviato da un collega durante il giro (valori solo nella bozza); un valore aggiunto a giro iniziato rende "incomplete" le piante fatte; DESIGN "Chips"/"cella-pianta" senza uso (Piano B); `progressoOggi` senza chiamanti (per Oggi, Piano B)
+Final fix round: dispatched implementer (opus)
+Final fix round: implemented 7fa66ee (dati: nomi doppi dal catalogo saltati, conferma prima di "Gestisci il catalogo", testo di PARAMETRO_IN_PIU_STRUMENTI, "Chiudi" sull'errore del catalogo, archiviazione in contorno), bf1b772 (campo: `useAttesaArrivo` anche su FineGiro, "Vai alla pianta" sulla pianta attuale, ore ripetute "09:12 (1)/(2)", "Manca 12", `percorsoMisuraPianta`, `misureStrumentoNelGiorno`, progresso e "ultima volta" che restano dopo una rilettura fallita, icona della striscia aria-hidden, "ultima volta" riletta dopo un salvataggio), ee6ba5d (README, DESIGN, design.json)
+Ruling: accettate le deviazioni del giro finale: un nome liberato da una rinomina resta preso per tutto il piano (prudenza); la seconda copia dello stesso strumento nello stesso esperimento non riceve valori già aggiunti alla prima (sarebbero doppi); stesso criterio "dati che restano dopo un errore di rilettura" anche per "ultima volta" — cost if wrong: qualche "saltato" in più da sistemare a mano
+Verifica del controller dopo il giro finale (ee6ba5d): 189 pgTAP PASS (emulato, 7 file), 1288 Vitest verdi (60 file), tsc 0, lint 0, build OK
+Piano A: COMPLETE nel cloud (commits 93065bd..ee6ba5d + registro). Restano solo le verifiche in locale qui sotto.
+
+## Decisioni del Piano A (elenco finale)
+
+Decisioni del controller (Ruling), in ordine di task:
+1. **DB nel cloud:** strato che imita Supabase su PostgreSQL 16 + pgTAP (`scripts/db-senza-docker/`), committato per i prossimi piani; non sostituisce `npx supabase db reset` + `npm run test:db`.
+2. **T1:** "Altezza" tolta dallo strumento "Fenologici" del modello Hydrochar già nella rinomina (nuovo indice: un parametro in un solo strumento). La migration 0007 si ferma con `PARAMETRO_IN_PIU_STRUMENTI` invece di scegliere da sola quale collegamento togliere. `clonaConfig` non copia gli strumenti archiviati. Lo store legge ancora la vecchia chiave `passataId`.
+3. **T2:** "Mantieni" cablato subito in `ModuloOggi`. Vale per esperimento, strumento e data; si azzera cambiando strumento o data (salvo la data trattenuta a mezzanotte). Il segno `mantenuto` resta solo finché il valore è quello mantenuto e la spunta è attiva, anche su una bozza ripresa.
+4. **T3:** `crea_esperimento` legge anche `catalogo_id`/`catalogo_chiave`. Nel catalogo: insert solo a proprio nome, `creato_da` non aggiornabile e `on delete set null`, id non modificabili (`ID_NON_MODIFICABILE`), nessun delete, niente per anon. In lettura, i valori senza chiave si scartano.
+5. **T4:** regole dell'aggiornamento dal catalogo:
+   - si aggiungono solo le chiavi nuove;
+   - un campo si aggiorna solo se nella copia è uguale al vecchio valore del catalogo;
+   - con misure già salvate non cambiano né l'unità né il numero di letture;
+   - si scrivono solo i campi cambiati (`aggiornaParametroDaCatalogo`, mai l'upsert);
+   - un parametro rimasto orfano si elimina;
+   - uno strumento archiviato non riceve aggiunte;
+   - un nome doppio nell'esperimento va tra i "saltati";
+   - i saltati hanno stringhe esatte;
+   - solo esperimenti di cui si è proprietari (`creato_da` filtrato nella query).
+6. **T5:** semi del catalogo duplicati in `src/domain/modelli/semi.ts`, con un test che li confronta con la migration; `validaBozza` con i 4 messaggi del piano.
+7. **T6:**
+   - la bozza del wizard si aggiorna sempre con una funzione della bozza corrente, così un salvataggio lento non la riporta indietro;
+   - un modulo "Nuovo strumento" tiene lo stesso id tra un tentativo e l'altro;
+   - su un nome doppio il modulo resta aperto;
+   - con un errore di rete la copia resta non collegata;
+   - con una bozza salvata non si aspetta il catalogo;
+   - "Obbligatorio" esiste solo nella tabella fenologica.
+8. **T7:**
+   - nuova lettura `strumentiConDati`; "Elimina" uno strumento solo con dati noti e dopo un ricontrollo fresco;
+   - un valore con dati si archivia, mai eliminato;
+   - elenco "Valori senza strumento";
+   - la tabella fenologica non si archivia, si elimina solo senza misure;
+   - "Aggiungi dal catalogo" rispetta i controlli sui nomi.
+9. **T8:** la chiave di un valore rinominato non cambia. Archiviare mostra un toast neutro (il verde solo per "salvato"). L'errore della fase esperimenti resta con "Riprova" (sulla voce vecchia) e "Chiudi". Prima di tornare all'elenco si aspetta la rilettura del catalogo.
+10. **T9:**
+    - `/misura` ha montato `Campo` finché c'è stata la scelta dello strumento;
+    - percorsi con nomi chiari in `src/lib/percorsi.ts`;
+    - Impostazioni e creazione guidata tornano alla home;
+    - nessun numerino su Oggi (Piano B).
+11. **T10:** per la tabella fenologica contano solo le voci obbligatorie (senza obbligatorie: "fatta" con un valore), per gli strumenti semplici tutti i valori. Una pianta toccata senza le obbligatorie è "incompleta".
+12. **T11:**
+    - con una data diversa da oggi la riga dice "il GG/MM";
+    - le righe restano toccabili anche con le misure in caricamento o in errore;
+    - progresso e "ultima volta" restano dopo una rilettura fallita.
+13. **T12:**
+    - arrivando su una pianta con misure di quello strumento in quella data si chiede **sempre** "Correggi / Nuova misura", anche nel giro (piante incomplete), salvo una bozza da riprendere;
+    - con più misure il testo è "Correggere una di quelle delle … o aggiungerne una nuova?", con ore ripetute numerate;
+    - finestra di 500 ms anche sulla domanda e su FineGiro;
+    - "Salva" resta anche sull'ultima pianta;
+    - `useModuloProtetto` è condiviso da SchedaPianta e MisuraPianta;
+    - `Campo.tsx` eliminato.
+14. **Metodo:** dopo un incidente (due implementatori in parallelo con un solo indice git: eb9b336 contiene T4 + T5), un solo implementatore alla volta; i revisori lavorano su copie `git archive`.
+
+Decisioni dell'utente rispettate:
+- spunta "Mantieni questo parametro uguale anche nelle prossime misure" al posto di "ricorda tra piante";
+- "Correggi" o "Nuova misura" arrivando apposta su una pianta già misurata;
+- niente mappa;
+- grafici prima della tabella (Piano D);
+- catalogo condiviso;
+- ripresa del lavoro in questa sessione cloud se i crediti finiscono.
+
+## Verifiche da fare in locale
+
+1. **Test del database con Supabase vero** (GoTrue, PostgREST e privilegi reali non sono emulati nel cloud):
+   - `npm ci`, poi `npx supabase db reset` (applica da zero 0001–0010, comprese le nuove `20261029000007_strumenti.sql`, `…08_mantieni.sql`, `…09_catalogo.sql`, `…10_ultime_misure.sql`);
+   - `npm run test:db` → atteso 7 file, 189 test, PASS (nuovi: `strumenti.test.sql`, `catalogo.test.sql`, `ultime_misure.test.sql`);
+   - attenzione: un DB locale con dati del Piano 1 (Altezza in due passate) fa fermare la 0007 con `PARAMETRO_IN_PIU_STRUMENTI`, quindi serve il reset.
+2. **Prova nel browser con il DB locale** (375 px; passo 3 del Task 12, mai fatto nel cloud):
+   - creazione dal modello Hydrochar: 3 strumenti dal catalogo + tabella fenologica, riepilogo senza errori;
+   - home: striscia "Nuova misura", sette icone, quelle "In arrivo";
+   - Nuova misura → SPAD su 3 piante ("Salva e vai alla #N", piante fatte saltate);
+   - "Vai alla pianta" 2 → "Correggere quella delle HH:MM o aggiungerne una nuova?": "Correggi" modifica la stessa misura, "Nuova misura" ne aggiunge una (controllare nel DB: nessun doppione);
+   - fine giro con "Mancano …" e "Vai alle mancanti";
+   - Termometro con "Mantieni" su Temp aria: la pianta dopo ha il valore con il segno `mantenuto`; cambiando strumento o data non c'è più;
+   - Impostazioni: aggiungi Ciras dal catalogo, archivia e ripristina uno strumento, "Gestisci il catalogo" con modifiche aperte chiede conferma;
+   - Catalogo: modifica di un'unità con "Aggiorna anche i miei esperimenti" (un esperimento senza misure cambia, uno con misure finisce in "Non aggiornati:"); con un secondo utente, verificare che i suoi esperimenti non cambino.
+3. **Prova sul telefono** (via hotspot o deploy di anteprima):
+   - barra d'azione sopra la tastiera numerica (iOS e Android);
+   - posizione del ✓ nella casella "Mantieni" su Safari iOS;
+   - bersagli della home e della domanda Correggi/Nuova col pollice;
+   - toast sopra la barra;
+   - il primo tocco su "Salva e vai" alla prima pianta della sessione (osservazione del Piano 1).
+
+## Messa online della v3 (31/10/2026, su richiesta dell'utente)
+- Supabase: progetto "FastLab" (eu-west-3), già creato vuoto dall'utente. Il controller vi ha applicato le 10 migration con il connettore Supabase. L'impronta del database (funzioni, colonne, policy, vincoli, indici, trigger, catalogo) coincide con quella del DB emulato su cui passano i 189 pgTAP. Nessun privilegio per anon, RLS su tutte le tabelle, trigger dell'invito su auth.users.
+- Vercel: progetto nuovo "fastlab-v3", separato da "fast-lab" (v2, non toccato), collegato al repository e con le due variabili del progetto Supabase nuovo. Deploy di produzione dal ramo `claude/app-review-improvements-c26294` → https://fastlab-v3.vercel.app (protezione Vercel disattivata, perché la pagina deve aprirsi dal telefono). La pagina e il manifest rispondono 200.
+- Primo amministratore: invito creato per l'email dell'utente. Dopo la registrazione il controller conferma l'account via SQL (conferma email di Supabase attiva di default) e imposta `admin = true`.
+- Da fare: la produzione si aggiorna solo con un deploy di produzione esplicito (il ramo di produzione del progetto Vercel resta `main`). Un push sul ramo crea solo un'anteprima, protetta. Per i colleghi va spenta "Confirm email" nel Dashboard (il connettore non la gestisce).

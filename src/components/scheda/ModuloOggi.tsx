@@ -1,0 +1,481 @@
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { salvaMisura } from '@/api/misure'
+import { chiavi } from '@/api/query'
+import { BarraAzioni } from '@/components/BarraAzioni'
+import { FormMisura } from '@/components/misura/FormMisura'
+import { Button } from '@/components/ui/button'
+import { eVuoto, mantenibile, ultimiPerAnomalia, validaMisura, valoriDaSalvare, valoriDeiParametri, valoriIniziali } from '@/domain/misure'
+import type { ConfigEsperimento, Misura, Parametro, Strumento, Pianta, ValoriMisura } from '@/domain/tipi'
+import { accoda, ErroreCoda, utenteCoda } from '@/lib/coda/codaMisure'
+import { fermaLettureVecchie, inviaCoda } from '@/lib/coda/invio'
+import { formattaData, oggiLocale, oraLocale } from '@/lib/date'
+import { messaggioErrore } from '@/lib/errori'
+import { toastSalvato } from '@/lib/toastSalvato'
+import { useCampoStore } from '@/store/campo'
+import { cancellaBozza, leggiBozza, scriviAperto, scriviBozza } from './bozza'
+import { CampoOra } from './CampoOra'
+import { ElencoOggi } from './ElencoOggi'
+import { ErroreSalvataggio, EsitoControllo, type Controllo } from './MessaggiSalvataggio'
+import { ATTESA_CONFERMA_MS, istante, OPZIONI_ERRORE_TARDIVO } from './salvataggio'
+import { SELETTORE_CAMPI, ModuloCampi } from '@/components/ModuloCampi'
+
+/** Quel che la pagina deve sapere del modulo aperto per non farne perdere i valori: se è cambiato e come scartarlo. */
+export interface StatoModulo { modificato: boolean; scarta: () => void }
+
+/** Stato della navigazione verso una scheda: dopo "Salva e vai" il cursore va nel primo campo da compilare. */
+export interface ArrivoScheda {
+  primoCampo?: boolean
+  /** Si è partiti dalla scheda della pianta ("Misura questa pianta"): salvando si torna lì, non alla pianta dopo. */
+  daScheda?: boolean
+}
+
+/**
+ * Il pulsante principale "Salva e …" del modulo: il testo che segue "Salva" ("e vai alla #36", "e termina") e la
+ * pagina che prende il posto di questa dopo un salvataggio riuscito.
+ */
+export interface Avanti { testo: string; percorso: string }
+
+/** "vai": salva e va avanti (vedi `Avanti`); "resta": salva e ricomincia con una misura nuova della stessa pianta. */
+type Azione = 'vai' | 'resta'
+
+type Stato =
+  | { tipo: 'pronto' }
+  | { tipo: 'salvando'; azione: Azione }
+  | { tipo: 'errore'; azione: Azione; errore: unknown }
+
+/**
+ * Il messaggio di un salvataggio diretto (senza la coda d'invio) fallito quando chi rileva è già uscito dalla scheda. Dice se i valori sono rimasti
+ * (in una bozza) e, se la misura non è di oggi, con quale data riaprire la pianta: riaprendola si vede il giorno scelto.
+ */
+function nonSalvataDopoUscita(etichetta: string, errore: unknown, dataRilievo: string, valoriRimasti: boolean): string {
+  const motivo = messaggioErrore(errore)
+  const conData = dataRilievo === oggiLocale() ? '' : ` con data ${formattaData(dataRilievo)}`
+  const cosaFare = valoriRimasti
+    ? `I valori sono rimasti: riapri la pianta${conData} per riprovare.`
+    : `Controlla i valori della pianta${conData} e salvali di nuovo.`
+  return `Pianta #${etichetta} non salvata. ${/[.!?…]$/.test(motivo) ? motivo : `${motivo}.`} ${cosaFare}`
+}
+
+interface ModuloOggiProps {
+  espId: string
+  config: ConfigEsperimento
+  pianta: Pianta
+  strumento: Strumento
+  titolo: string
+  parametri: Parametro[]
+  obbligatori: Set<string>
+  /** L'id con cui si salva: quello della misura in correzione, o quello del modulo nuovo. */
+  id: string
+  /** Dove sta la bozza di questo modulo nel localStorage. */
+  chiave: string
+  /** Dove il riquadro ricorda quale modulo era aperto (vedi `chiaveAperto`): si scrive e si cancella con la bozza. */
+  aperto: string
+  /** La misura che si sta correggendo; `null` per una misura nuova. */
+  misura: Misura | null
+  misureOggi: Misura[]
+  misurePianta: Misura[]
+  dataRilievo: string
+  /** Dove porta il pulsante principale; `null`: c'è solo "Salva", che resta sulla pianta. */
+  avanti: Avanti | null
+  /** Porta il cursore nel primo campo da compilare appena il modulo compare. */
+  primoCampo: boolean
+  /**
+   * La misura in correzione è l'unica del giorno per questa pianta e le manca qualcosa: il modulo si è aperto da solo
+   * sul suo completamento (Piano E, Decisione 13) e lo dice, con "Aggiungine un'altra" per chi voleva un'altra misura.
+   */
+  completamento: boolean
+  /**
+   * Il modulo compare subito dopo un salvataggio riuscito, con i pulsanti nello stesso punto: un tocco che arriva
+   * troppo presto è il secondo di un doppio tocco, non una misura nuova, e si ignora.
+   */
+  dopoSalvataggio: boolean
+  onCorreggi: (m: Misura) => void
+  onNuovaMisura: () => void
+  onSalvata: (m: Misura) => void
+  /** Dopo "Scarta" sulla bozza ripresa: lo stesso modulo, da capo. */
+  onDaCapo: () => void
+  onModifiche: (stato: StatoModulo | null) => void
+}
+
+/**
+ * Il modulo di una misura nel riquadro di oggi: valori, ora, controlli e salvataggio. Si rimonta per ogni misura
+ * (id diverso), quindi lo stato qui dentro vale per un solo modulo.
+ */
+export function ModuloOggi({
+  espId, config, pianta, strumento, titolo, parametri, obbligatori, id, chiave, aperto, misura, misureOggi, misurePianta,
+  dataRilievo, avanti, primoCampo, completamento, dopoSalvataggio, onCorreggi, onNuovaMisura, onSalvata, onDaCapo, onModifiche,
+}: ModuloOggiProps) {
+  const idTitolo = useId()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const setMantieni = useCampoStore(s => s.setMantieni)
+  const aggiornaMantenuti = useCampoStore(s => s.aggiornaMantenuti)
+  // Le spunte "Mantieni" valgono per lo strumento del riquadro e la data di rilievo di questo modulo, anche se lo store
+  // ha scelto altro: i mantenuti seguono lo strumento con cui si sta misurando.
+  const mantenutiOra = useCampoStore(s => s.mantenutiPer(espId, strumento.id, dataRilievo))
+
+  // I valori di partenza si calcolano una volta, all'apertura: un ricaricamento in background non cancella quel che
+  // si scrive. Prima la bozza lasciata da un'uscita senza salvare, poi la misura che si corregge, poi i precompilati.
+  const [iniziale] = useState(() => {
+    const bozza = leggiBozza(chiave)
+    const ripresa = bozza !== null && bozza.id === id
+    // I mantenuti si leggono dallo store adesso, non dall'ultimo disegno: dopo un salvataggio sono già aggiornati.
+    // Una correzione non li usa mai.
+    const mantenuti = misura ? {} : (useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)?.valori ?? {})
+    // Quali campi portano il segno "mantenuto": quelli con un valore mantenuto (nella forma del parametro). Per una
+    // bozza ripresa il segno resta finché il campo ha ancora quel valore (vedi sotto): non deve sembrare digitato.
+    const mantenutiAdattati = valoriIniziali({ parametri, misurePianta: [], dataRilievo, mantenuti })
+    const daMantenuti = new Map(
+      parametri.filter(p => mantenibile(p) && mantenuti[p.id] !== undefined && !eVuoto(p, mantenuti[p.id])).map(p => [p.id, mantenutiAdattati[p.id]]),
+    )
+    if (bozza && ripresa) return { valori: valoriDeiParametri(parametri, bozza.valori), ora: bozza.ora, ripresa: true, daMantenuti }
+    if (misura) return { valori: valoriDeiParametri(parametri, misura.valori), ora: misura.ora, ripresa: false, daMantenuti }
+    return { valori: valoriIniziali({ parametri, misurePianta, dataRilievo, mantenuti }), ora: null, ripresa: false, daMantenuti }
+  })
+  const [valori, setValori] = useState<ValoriMisura>(iniziale.valori)
+  const spuntati = useMemo(() => new Set(mantenutiOra?.parametri ?? []), [mantenutiOra])
+  // Il segno "mantenuto" resta finché il campo è spuntato e ha il valore con cui è partito: scritto un altro, o tolta
+  // la spunta, non è più il valore che si porta da una pianta all'altra.
+  const precompilatiDaMantenuti = useMemo(
+    () => new Set(
+      [...iniziale.daMantenuti]
+        .filter(([pid, v]) => spuntati.has(pid) && JSON.stringify(valori[pid]) === JSON.stringify(v))
+        .map(([pid]) => pid),
+    ),
+    [iniziale.daMantenuti, valori, spuntati],
+  )
+  const [ora, setOra] = useState<string | null>(iniziale.ora)
+  const [modificato, setModificato] = useState(iniziale.ripresa)
+  const [controllo, setControllo] = useState<Controllo | null>(null)
+  const [avvisiVisti, setAvvisiVisti] = useState(false)
+  const [stato, setStato] = useState<Stato>({ tipo: 'pronto' })
+  const [fermate, setFermate] = useState(0)
+
+  // Il blocco contro il doppio tocco: il pulsante disabilitato arriva solo al prossimo disegno, il ref subito.
+  const inCorso = useRef(false)
+  const avvisoAlle = useRef(0)
+  // Quando è comparso il modulo, se compare subito dopo un salvataggio (vedi `dopoSalvataggio`).
+  const apertoAlle = useRef<number | null>(null)
+  // Salvata la misura, il modulo è chiuso: nessuna bozza va più scritta (tornerebbe come "ripristinata" con lo stesso id).
+  const chiuso = useRef(false)
+  const montato = useRef(false)
+  const campi = useRef<HTMLDivElement>(null)
+  const messaggio = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    montato.current = true
+    return () => { montato.current = false }
+  }, [])
+
+  useEffect(() => {
+    if (dopoSalvataggio) apertoAlle.current = istante()
+  }, [dopoSalvataggio])
+
+  // La bozza e il ricordo di quale modulo era aperto vanno insieme: tornando, si riapre questo modulo con i suoi valori.
+  const misuraId = misura?.id ?? null
+  /**
+   * Cancella la bozza di questo modulo. Una bozza con un altro id alla stessa chiave è di un modulo aperto dopo
+   * (si è rientrati nella scheda mentre questo salvava): resta com'è.
+   */
+  function cancellaTutto() {
+    const bozza = leggiBozza(chiave)
+    if (bozza && bozza.id !== id) return
+    cancellaBozza(chiave)
+    scriviAperto(aperto, null)
+  }
+
+  // La pagina chiede conferma prima di azioni che chiudono il modulo (indietro, un'altra misura, un'altra data).
+  // Durante il salvataggio no: i valori sono già partiti, e se il salvataggio fallisce la bozza resta e lo si dice.
+  const salvando = stato.tipo === 'salvando'
+  useEffect(() => {
+    onModifiche({
+      modificato: modificato && !salvando,
+      scarta: () => {
+        cancellaBozza(chiave)
+        scriviAperto(aperto, null)
+      },
+    })
+  }, [onModifiche, modificato, salvando, chiave, aperto])
+  useEffect(() => () => onModifiche(null), [onModifiche])
+
+  // Per le uscite che l'app non può fermare (gesto indietro del telefono, menu, ricarica) i valori restano in una bozza.
+  useEffect(() => {
+    if (!modificato || chiuso.current) return
+    scriviBozza(chiave, { id, valori, ora })
+    scriviAperto(aperto, misuraId)
+  }, [chiave, aperto, misuraId, id, valori, ora, modificato])
+
+  // Dopo "Salva e vai" si continua a scrivere: il cursore va nel primo campo vuoto (Temp aria mantenuta è già
+  // compilata, si scrive Temp pianta). Se il browser non apre la tastiera da solo, pazienza.
+  useEffect(() => {
+    if (!primoCampo || !campi.current) return
+    const elenco = [...campi.current.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(SELETTORE_CAMPI)]
+    ;(elenco.find(c => c.value === '') ?? elenco[0])?.focus()
+  }, [primoCampo])
+
+  // Un salvataggio fermato (errori, avvisi, rete) porta il focus sul messaggio, che nomina il campo da guardare.
+  useEffect(() => {
+    if (fermate > 0) messaggio.current?.focus()
+  }, [fermate])
+
+  function cambia(nuovi: ValoriMisura) {
+    setValori(nuovi)
+    setModificato(true)
+    // I messaggi erano per i valori di prima: un valore nuovo si ricontrolla (e un avviso si riconferma).
+    setControllo(null)
+    setAvvisiVisti(false)
+  }
+
+  function cambiaOra(nuova: string) {
+    setOra(nuova)
+    setModificato(true)
+  }
+
+  function ferma(c: Controllo) {
+    setControllo(c)
+    setStato({ tipo: 'pronto' })
+    setFermate(n => n + 1)
+  }
+
+  async function salva(azione: Azione) {
+    if (inCorso.current) return
+    // Il secondo tocco di un doppio tocco sul modulo comparso al posto di quello appena salvato: non è un salvataggio.
+    if (apertoAlle.current !== null && istante() - apertoAlle.current < ATTESA_CONFERMA_MS) return
+    const { errori, avvisi } = validaMisura(parametri, obbligatori, valori, ultimiPerAnomalia(parametri, misurePianta, dataRilievo))
+    if (errori.length > 0) {
+      ferma({ tipo: 'errori', messaggi: errori })
+      return
+    }
+    if (avvisi.length > 0) {
+      if (!avvisiVisti) {
+        avvisoAlle.current = istante()
+        setAvvisiVisti(true)
+        ferma({ tipo: 'avvisi', messaggi: avvisi })
+        return
+      }
+      if (istante() - avvisoAlle.current < ATTESA_CONFERMA_MS) return
+    }
+
+    // L'ora di una misura nuova è quella del primo tentativo: un nuovo tentativo più tardi non la sposta.
+    const oraMisura = ora ?? oraLocale()
+    const daSalvare: Misura = {
+      id,
+      pianta_id: pianta.id,
+      strumento_id: misura?.strumento_id ?? strumento.id,
+      data_rilievo: misura?.data_rilievo ?? dataRilievo,
+      ora: oraMisura,
+      // Correggendo si tengono le chiavi che il modulo non mostra (altri strumenti, parametri archiviati); un parametro
+      // lasciato vuoto che la misura non aveva non si scrive (la chiave direbbe "ha dati").
+      valori: valoriDaSalvare(misura?.valori ?? null, valori),
+    }
+
+    // La via di sempre: la misura va in coda (scritta subito sul telefono, Piano E, Task E6), si passa alla pianta dopo
+    // e l'invio parte in background; il verde lo dà l'invio quando il server risponde. Senza la coda (nessun utente
+    // della sessione, localStorage assente o pieno) si salva direttamente, come prima: si aspetta il server.
+    // Il blocco resta alzato anche dopo l'accodamento: il modulo si chiude, un secondo tocco non accoda di nuovo.
+    inCorso.current = true
+    if (accodata(daSalvare)) {
+      setOra(oraMisura)
+      setControllo(null)
+      salvata(daSalvare, azione, false)
+      const utente = utenteCoda()
+      if (utente) void inviaCoda(utente, queryClient)
+      return
+    }
+
+    setOra(oraMisura)
+    setControllo(null)
+    setStato({ tipo: 'salvando', azione })
+    try {
+      await salvaMisura(espId, daSalvare)
+    } catch (e) {
+      inCorso.current = false
+      if (montato.current) {
+        setStato({ tipo: 'errore', azione, errore: e })
+        setFermate(n => n + 1)
+      } else {
+        // Chi è già uscito dalla scheda non vede più il modulo: l'esito non va perso in silenzio. I valori restano
+        // nella bozza (scritta anche se non erano stati toccati, come i precompilati), così riaprendo la pianta tornano.
+        // Una bozza che c'è già non si tocca: con lo stesso id ha questi valori o quelli scritti dopo, rientrando;
+        // con un altro id è di un modulo aperto dopo, e questi valori non hanno più dove stare (il messaggio lo dice).
+        const presente = leggiBozza(chiave)
+        if (!presente) {
+          scriviBozza(chiave, { id, valori, ora: oraMisura })
+          scriviAperto(aperto, misuraId)
+        }
+        toast.error(nonSalvataDopoUscita(pianta.etichetta, e, daSalvare.data_rilievo, !presente || presente.id === id), OPZIONI_ERRORE_TARDIVO)
+      }
+      return
+    }
+    // Una lettura della pianta o del giorno partita prima del salvataggio, arrivando dopo, toglierebbe la misura dalla
+    // cache appena messa: si ferma prima di metterla.
+    await fermaLettureVecchie(queryClient, espId, pianta.id)
+    inCorso.current = false
+    salvata(daSalvare, azione, true)
+  }
+
+  /** Mette la misura nella coda d'invio; falso se la coda non c'è (nessun utente) o non si può scrivere. */
+  function accodata(m: Misura): boolean {
+    const utente = utenteCoda()
+    if (!utente) return false
+    try {
+      accoda(utente, espId, m, {
+        etichetta: pianta.etichetta,
+        strumento: strumento.icona ? `${strumento.icona} ${strumento.nome}` : strumento.nome,
+        // Una correzione: la misura è (o può essere) già sul server.
+        sulServer: misura !== null,
+      })
+      return true
+    } catch (e) {
+      if (e instanceof ErroreCoda) return false
+      throw e
+    }
+  }
+
+  /**
+   * Il modulo si chiude e si va avanti. `confermata`: il server ha già risposto (salvataggio diretto, senza coda), quindi
+   * il verde si dà qui e la misura entra nella cache delle letture; dalla coda invece si vede già (le letture le
+   * sovrappongono) e il verde lo dà l'invio quando arriva.
+   */
+  function salvata(m: Misura, azione: Azione, confermata: boolean) {
+    chiuso.current = true
+    cancellaTutto()
+    if (confermata) toastSalvato(`Pianta #${pianta.etichetta} salvata ✓`)
+    // Solo una misura nuova è "l'ultima inserita": correggere quella del mattino non cambia la Temp aria del pomeriggio.
+    // Se le spunte non sono più per questo strumento e questa data (la scheda è stata riaperta altrove), non si toccano.
+    if (!misura && useCampoStore.getState().mantenutiPer(espId, strumento.id, dataRilievo)) aggiornaMantenuti(espId, valori)
+    if (confermata) {
+      // La misura entra subito nella cache: l'elenco di oggi la mostra senza aspettare il ricaricamento.
+      queryClient.setQueryData<Misura[]>(chiavi.misurePianta(pianta.id), prima => [m, ...(prima ?? []).filter(x => x.id !== m.id)])
+      // Anche tra quelle del giorno, se sono già state lette: il giro (la pianta dopo, la fine del giro) non deve
+      // vedere per un attimo questa pianta come ancora da misurare. Se non sono state lette, le leggerà chi le usa.
+      // Non si rileggono (Piano E, bassa 15): con la misura dentro la cache è già giusta, e con poco segnale una
+      // lettura in più è solo attesa.
+      queryClient.setQueryData<Misura[]>(chiavi.misureGiorno(espId, m.data_rilievo), prima => prima && [m, ...prima.filter(x => x.id !== m.id)])
+      void queryClient.invalidateQueries({ queryKey: chiavi.misurePianta(pianta.id) })
+      // "ultima volta" nella scelta dello strumento: questa può essere la misura più recente del suo strumento.
+      void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisure(espId) })
+      // Gli ultimi valori di ogni pianta (elenco Piante): senza questa resterebbero quelli di prima fino alla scadenza della cache.
+      void queryClient.invalidateQueries({ queryKey: chiavi.ultimeMisurePiante(espId) })
+      void queryClient.invalidateQueries({ queryKey: chiavi.esperimenti })
+      // Dataset ed Esporta leggono tutte le misure di ogni strumento: senza questa resterebbero indietro di un giro.
+      void queryClient.invalidateQueries({ queryKey: chiavi.misureStrumento(espId, m.strumento_id) })
+    }
+    // Uscito dalla scheda durante il salvataggio, chi rileva non va riportato a una pianta.
+    if (!montato.current) return
+    if (azione === 'vai' && avanti) {
+      // Al posto della pagina appena fatta: il gesto indietro riporta a dove si è partiti, non a ogni pianta.
+      const arrivo: ArrivoScheda = { primoCampo: true }
+      navigate(avanti.percorso, { replace: true, state: arrivo })
+    } else {
+      onSalvata(m)
+    }
+  }
+
+  const comunque = avvisiVisti ? ' comunque' : ''
+  const etichetta = (azione: Azione): string => {
+    if (stato.tipo === 'salvando' && stato.azione === azione) return 'Salvataggio…'
+    return azione === 'vai' && avanti ? `Salva${comunque} ${avanti.testo}` : `Salva${comunque}`
+  }
+
+  return (
+    <section aria-labelledby={idTitolo} className="rounded-lg bg-carta-ombra p-4">
+      {/* Mentre salva il modulo non si tocca: quel che si scrive adesso andrebbe perso con il modulo che si chiude. */}
+      <div inert={salvando} className="flex flex-col gap-4">
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <h3 id={idTitolo} className="min-w-0 text-label text-grafite-tenue uppercase">{titolo}</h3>
+          <CampoOra ora={ora} onApri={setOra} onChange={cambiaOra} />
+        </div>
+
+        {iniziale.ripresa && (
+          <div role="status" className="flex items-center justify-between gap-3 rounded-md border border-riga-controllo bg-foglio py-1 pr-1 pl-3">
+            <p className="text-sm text-grafite">Bozza ripristinata.</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                cancellaTutto()
+                onDaCapo()
+              }}
+            >
+              Scarta
+            </Button>
+          </div>
+        )}
+
+        {misureOggi.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <ElencoOggi misure={misureOggi} parametri={config.parametri} attivaId={misura?.id ?? null} onCorreggi={onCorreggi} />
+            {misura && completamento && (
+              // Una riga, "Completi la misura delle 09:12 · Aggiungine un'altra": il secondo è il pulsante (44 px).
+              <p className="flex flex-wrap items-center gap-x-1 font-semibold text-grafite">
+                <span>{`Completi la misura delle ${misura.ora}`}</span>
+                <span aria-hidden>·</span>
+                <Button variant="ghost" size="sm" className="font-normal" onClick={onNuovaMisura}>Aggiungine un&apos;altra</Button>
+              </p>
+            )}
+            {misura && !completamento && (
+              <Button variant="ghost" size="sm" className="-ml-3 self-start" onClick={onNuovaMisura}>Aggiungi un&apos;altra misura</Button>
+            )}
+            {!(misura && completamento) && (
+              <p className="pt-2 font-semibold text-grafite">
+                {misura ? `Modifica della misura delle ${misura.ora}` : 'Nuova misura'}
+              </p>
+            )}
+          </div>
+        )}
+
+        <ModuloCampi>
+        <div ref={campi}>
+          {parametri.length > 0 ? (
+            <FormMisura
+              parametri={parametri}
+              obbligatori={obbligatori}
+              valori={valori}
+              onChange={cambia}
+              // La casella c'è solo nelle misure nuove: correggerne una vecchia non decide i valori delle piante dopo.
+              mantenuti={misura ? undefined : spuntati}
+              onMantieni={misura ? undefined : (parametroId, attivo) => setMantieni(espId, strumento.id, dataRilievo, parametroId, attivo)}
+              precompilatiDaMantenuti={precompilatiDaMantenuti}
+            />
+          ) : (
+            <p className="text-grafite-tenue">Questo strumento non ha parametri da compilare: aggiungili dalle impostazioni.</p>
+          )}
+        </div>
+        </ModuloCampi>
+      </div>
+
+      <BarraAzioni>
+        {controllo ? (
+          <EsitoControllo ref={messaggio} controllo={controllo} />
+        ) : stato.tipo === 'errore' ? (
+          <ErroreSalvataggio
+            ref={messaggio}
+            etichetta={pianta.etichetta}
+            errore={stato.errore}
+            onRiprova={() => void salva(stato.azione)}
+          />
+        ) : null}
+        {/* Uno accanto all'altro finché ci stanno; con le etichette lunghe ("Salva comunque…") vanno a capo. */}
+        <div className="flex flex-wrap gap-2">
+          {avanti && (
+            <Button variant="outline" size="lg" className="grow" disabled={salvando} onClick={() => void salva('resta')}>
+              {etichetta('resta')}
+            </Button>
+          )}
+          <Button
+            size="lg"
+            className="grow-3 basis-52"
+            disabled={salvando}
+            onClick={() => void salva(avanti ? 'vai' : 'resta')}
+          >
+            {etichetta(avanti ? 'vai' : 'resta')}
+          </Button>
+        </div>
+      </BarraAzioni>
+    </section>
+  )
+}

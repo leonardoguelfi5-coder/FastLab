@@ -1,0 +1,311 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  EMAIL_GIA_INVITATA, ELEMENTO_NON_TROVATO, ErroreApp, eEsperimentoNonTrovato, eMisuraNonTrovata, ESPERIMENTO_NON_TROVATO,
+  FOTO_ESPERIMENTO_NON_RIMOSSE, FOTO_NON_LEGGIBILE, FOTO_TROPPO_GRANDE, eNomeExportGiaUsato, INVITO_GIA_USATO, MISURA_NON_TROVATA, messaggioErrore, SENZA_SESSIONE, STRUMENTO_CON_MISURE_ARRIVATE,
+} from './errori'
+import { ErroreRete } from './rete'
+
+afterEach(() => { vi.restoreAllMocks() })
+
+const MSG_OFFLINE = 'Nessuna connessione. Riprova quando torna la rete.'
+const MSG_RETE = 'Rete debole: riprova.'
+const MSG_SERVER = 'Il server non risponde. Se l\'app non è stata usata per più di una settimana il database potrebbe essere in pausa: riattivalo dal pannello Supabase (vedi README).'
+const MSG_SESSIONE = 'Sessione scaduta: accedi di nuovo. I dati inseriti sono ancora nel modulo.'
+const MSG_INVITO = 'Email o codice invito non validi. Controlla il messaggio di invito o chiedi all\'amministratore.'
+
+describe('messaggioErrore', () => {
+  describe('ruoli e Persone (Piano E, Task E9)', () => {
+    it('solo il proprietario aggiunge, toglie e cambia il ruolo (42501 con il messaggio della RPC)', () => {
+      expect(messaggioErrore({ code: '42501', message: 'SOLO_PROPRIETARIO', status: 403 }))
+        .toBe('Solo il proprietario dell\'esperimento aggiunge, toglie o cambia il ruolo delle persone.')
+    })
+
+    it('email senza account: la registrazione resta all\'amministratore', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'UTENTE_NON_TROVATO', status: 400 }))
+        .toBe('Nessun utente registrato con questa email: chiedi all\'amministratore di invitarlo.')
+    })
+
+    it('ruolo non valido', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'RUOLO_NON_VALIDO', status: 400 }))
+        .toBe('Ruolo non valido: scegli Proprietario, Rilevatore o Lettore.')
+    })
+
+    it('ultimo proprietario', () => {
+      expect(messaggioErrore({ code: 'P0001', message: 'ULTIMO_PROPRIETARIO', status: 400 }))
+        .toBe('L\'esperimento deve avere almeno un proprietario: prima rendi proprietario un\'altra persona.')
+    })
+
+    it('ogni altro 42501 (la RLS di un ruolo che non può) dice di chiedere al proprietario', () => {
+      const MSG = 'Non hai il permesso per questa modifica: chiedi al proprietario dell\'esperimento.'
+      expect(messaggioErrore({ code: '42501', message: 'new row violates row-level security policy for table "piante"', status: 403 })).toBe(MSG)
+      expect(messaggioErrore({ code: '42501', message: 'permission denied for table membri_esperimento', status: 403 })).toBe(MSG)
+      expect(messaggioErrore({ code: '42501', message: 'new row violates row-level security policy (USING expression) for table "misure"' })).toBe(MSG)
+    })
+
+    it('un 42501 con 401 resta la sessione scaduta', () => {
+      expect(messaggioErrore({ code: '42501', message: 'permission denied for table misure', status: 401 })).toBe(MSG_SESSIONE)
+    })
+  })
+
+  it('pianta con dati che cambia trattamento (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'PIANTA_CON_DATI' }))
+      .toBe('Questa pianta ha già delle misure: il trattamento non si può cambiare. Etichetta e blocco sì.')
+  })
+
+  it('riga spostata in un altro esperimento (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'ESPERIMENTO_NON_MODIFICABILE' }))
+      .toBe('Questo elemento appartiene a un altro esperimento e non si può spostare. Ricarica la pagina.')
+  })
+
+  it('elemento non trovato (nessuna riga aggiornata o eliminata): il messaggio è già per l\'utente', () => {
+    expect(messaggioErrore(new Error(ELEMENTO_NON_TROVATO))).toBe(ELEMENTO_NON_TROVATO)
+    expect(ELEMENTO_NON_TROVATO).toBe('Elemento non trovato: forse è stato rimosso. Ricarica la pagina.')
+  })
+
+  it('foto non leggibile e foto dell\'esperimento non rimosse: i messaggi passano come sono', () => {
+    expect(messaggioErrore(new Error(FOTO_NON_LEGGIBILE))).toBe(FOTO_NON_LEGGIBILE)
+    expect(messaggioErrore(new Error(FOTO_TROPPO_GRANDE))).toBe(FOTO_TROPPO_GRANDE)
+    expect(messaggioErrore(new Error(FOTO_ESPERIMENTO_NON_RIMOSSE))).toBe(FOTO_ESPERIMENTO_NON_RIMOSSE)
+    expect(FOTO_ESPERIMENTO_NON_RIMOSSE).toContain('non è stato eliminato')
+  })
+
+  it('invito già usato o revocato, email già invitata, esperimento non trovato: i messaggi passano come sono', () => {
+    expect(messaggioErrore(new Error(INVITO_GIA_USATO))).toBe('Questo invito è già stato usato o non c\'è più: ricarica la pagina.')
+    expect(messaggioErrore(new Error(EMAIL_GIA_INVITATA))).toBe('Questa email è già stata invitata: trovi l\'invito nell\'elenco.')
+    expect(messaggioErrore(new Error(ESPERIMENTO_NON_TROVATO)))
+      .toBe('Esperimento non trovato: forse è stato eliminato, o il link non è giusto.')
+  })
+
+  it('senza sessione: il messaggio dell\'app passa com\'è', () => {
+    expect(messaggioErrore(new Error(SENZA_SESSIONE))).toBe('Sessione scaduta: accedi di nuovo.')
+  })
+
+  it('eEsperimentoNonTrovato riconosce solo l\'errore di caricaConfig', () => {
+    expect(eEsperimentoNonTrovato(new Error(ESPERIMENTO_NON_TROVATO))).toBe(true)
+    expect(eEsperimentoNonTrovato(new Error(ELEMENTO_NON_TROVATO))).toBe(false)
+    expect(eEsperimentoNonTrovato(ESPERIMENTO_NON_TROVATO)).toBe(false)
+  })
+
+  it('senza rete (navigator.onLine === false)', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    expect(messaggioErrore(new Error('qualunque cosa'))).toBe(MSG_OFFLINE)
+  })
+
+  it('senza rete ha la precedenza su ogni altro errore', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    expect(messaggioErrore(new TypeError('Failed to fetch'))).toBe(MSG_OFFLINE)
+    expect(messaggioErrore({ code: '23505', message: 'duplicate key' })).toBe(MSG_OFFLINE)
+  })
+
+  it.each(['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed'])(
+    'rete che non porta la richiesta: "%s" è rete debole, non il database in pausa',
+    (messaggio) => {
+      expect(messaggioErrore(new TypeError(messaggio))).toBe(MSG_RETE)
+      // Così lo riporta PostgREST (un oggetto con il nome dell'errore davanti e code vuoto).
+      expect(messaggioErrore({ message: `TypeError: ${messaggio}`, code: '', details: '', hint: '' })).toBe(MSG_RETE)
+    },
+  )
+
+  describe('rete debole (limite di tempo scaduto o richiesta non arrivata)', () => {
+    it.each(['limite', 'rete'] as const)('ErroreRete("%s")', (motivo) => {
+      expect(messaggioErrore(new ErroreRete(motivo))).toBe(MSG_RETE)
+    })
+
+    it('ErroreRete come lo riportano PostgREST, l\'autenticazione e lo Storage', () => {
+      const e = new ErroreRete('limite')
+      // PostgREST: un oggetto semplice, il nome dell'errore davanti al messaggio, code vuoto.
+      expect(messaggioErrore({ message: `${e.name}: ${e.message}`, details: '', hint: '', code: '' })).toBe(MSG_RETE)
+      // GoTrue: AuthRetryableFetchError con il messaggio dell'errore e status 0.
+      expect(messaggioErrore(Object.assign(new Error(e.message), { name: 'AuthRetryableFetchError', status: 0 }))).toBe(MSG_RETE)
+      // Storage: StorageUnknownError con il messaggio dell'errore e l'originale.
+      expect(messaggioErrore(Object.assign(new Error(e.message), { name: 'StorageUnknownError', originalError: e }))).toBe(MSG_RETE)
+    })
+
+    it('senza rete (navigator.onLine === false) resta "Nessuna connessione"', () => {
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      expect(messaggioErrore(new ErroreRete('limite'))).toBe(MSG_OFFLINE)
+    })
+
+    it('un annullamento voluto (AbortError) non è rete debole', () => {
+      expect(messaggioErrore(new DOMException('signal is aborted without reason', 'AbortError'))).not.toBe(MSG_RETE)
+      expect(messaggioErrore({ message: 'AbortError: signal is aborted without reason', code: '' })).not.toBe(MSG_RETE)
+    })
+  })
+
+  describe('il database in pausa: solo per un 5xx del server senza codice PostgREST', () => {
+    it.each([500, 502, 503, 504, 520, 540, 599])('status %i senza code', (status) => {
+      expect(messaggioErrore({ status, message: 'Service Unavailable' })).toBe(MSG_SERVER)
+      expect(messaggioErrore({ status, message: '{}', code: '' })).toBe(MSG_SERVER)
+    })
+
+    it('GoTrue con un errore del gateway (AuthRetryableFetchError, status 503)', () => {
+      expect(messaggioErrore(Object.assign(new Error('{}'), { name: 'AuthRetryableFetchError', status: 503 }))).toBe(MSG_SERVER)
+    })
+
+    it('PostgREST che non raggiunge il database (PGRST000-PGRST003, 503 e 504)', () => {
+      for (const code of ['PGRST000', 'PGRST001', 'PGRST002', 'PGRST003']) {
+        expect(messaggioErrore({ code, message: 'Database client error. Retrying the connection.' })).toBe(MSG_SERVER)
+      }
+    })
+
+    it('un 5xx con un codice è un errore vero, non la pausa', () => {
+      expect(messaggioErrore({ status: 500, code: 'XX000', message: 'boom' })).toBe('Errore imprevisto: boom')
+      expect(messaggioErrore({ code: 'P0001', status: 500, message: 'PARAMETRO_CON_DATI' })).toContain('Questo parametro ha già dei dati')
+    })
+
+    it('i messaggi riconosciuti valgono anche con un 500 (registrazione senza invito di GoTrue)', () => {
+      expect(messaggioErrore({ status: 500, message: 'Database error saving new user' })).toBe(MSG_INVITO)
+    })
+
+    it('un 4xx o uno status 0 non è la pausa', () => {
+      expect(messaggioErrore({ status: 404, message: 'Not Found' })).toBe('Errore imprevisto: Not Found')
+      expect(messaggioErrore({ status: 0, message: 'strano' })).toBe('Errore imprevisto: strano')
+    })
+  })
+
+  it('sessione scaduta: code PGRST301', () => {
+    expect(messaggioErrore({ code: 'PGRST301', message: 'qualcosa' })).toBe(MSG_SESSIONE)
+  })
+
+  it('sessione scaduta: status 401', () => {
+    expect(messaggioErrore({ status: 401, message: 'Unauthorized' })).toBe(MSG_SESSIONE)
+  })
+
+  it('sessione scaduta: messaggio con JWT expired', () => {
+    expect(messaggioErrore({ message: 'JWT expired' })).toBe(MSG_SESSIONE)
+  })
+
+  it('credenziali errate', () => {
+    expect(messaggioErrore({ message: 'Invalid login credentials', status: 400 })).toBe('Email o password errate.')
+  })
+
+  it('registrazione senza invito: messaggio storico di GoTrue', () => {
+    expect(messaggioErrore({ message: 'Database error saving new user' })).toBe(MSG_INVITO)
+  })
+
+  it('registrazione senza invito: INVITO_MANCANTE (GoTrue recente, HTTP 500)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'INVITO_MANCANTE' })).toBe(MSG_INVITO)
+    expect(messaggioErrore(new Error('Errore: INVITO_MANCANTE (trigger)'))).toBe(MSG_INVITO)
+  })
+
+  it('email già registrata', () => {
+    expect(messaggioErrore({ message: 'User already registered' })).toBe('Esiste già un account con questa email: accedi.')
+  })
+
+  it('parametro con dati', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'PARAMETRO_CON_DATI' })).toBe(
+      'Questo parametro ha già dei dati: non si può eliminare né cambiarne il tipo. Puoi archiviarlo.',
+    )
+  })
+
+  it('duplicato (23505)', () => {
+    expect(messaggioErrore({ code: '23505', message: 'duplicate key value violates unique constraint' })).toBe(
+      'Esiste già un elemento con questo nome o etichetta.',
+    )
+  })
+
+  it('parametro già in un altro strumento (indice strumento_parametri_un_solo_strumento)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "strumento_parametri_un_solo_strumento"',
+    })).toBe('Un parametro può stare in un solo strumento.')
+  })
+
+  it('seconda tabella fenologica (indice strumenti_un_fenologico)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "strumenti_un_fenologico"',
+    })).toBe('C\'è già una tabella fenologica in questo esperimento.')
+  })
+
+  it('nome doppio nel catalogo (indice catalogo_strumenti_nome_unico)', () => {
+    expect(messaggioErrore({
+      code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"',
+    })).toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
+  it('nome doppio tra gli export salvati (indice export_salvati_nome_unico)', () => {
+    const e = { code: '23505', message: 'duplicate key value violates unique constraint "export_salvati_nome_unico"' }
+    expect(messaggioErrore(e)).toBe('Hai già un export salvato con questo nome: scegline un altro o sostituisci quello.')
+    expect(eNomeExportGiaUsato(e)).toBe(true)
+  })
+
+  it('eNomeExportGiaUsato riconosce solo quell\'indice, e non dipende dalla rete', () => {
+    expect(eNomeExportGiaUsato({ code: '23505', message: 'duplicate key value violates unique constraint "export_salvati_pkey"' })).toBe(false)
+    expect(eNomeExportGiaUsato({ code: '23505', message: 'duplicate key value violates unique constraint "catalogo_strumenti_nome_unico"' })).toBe(false)
+    expect(eNomeExportGiaUsato(new Error('export_salvati_nome_unico'))).toBe(false)
+    expect(eNomeExportGiaUsato(null)).toBe(false)
+  })
+
+  it('scelte di un export non valide (check export_salvati_scelte_valide, 23514)', () => {
+    expect(messaggioErrore({
+      code: '23514', message: 'new row for relation "export_salvati" violates check constraint "export_salvati_scelte_valide"',
+    })).toBe('Le scelte di questo export non sono valide: controlla strumenti, piante, periodo e fogli, poi riprova.')
+  })
+
+  it('nome di un export vuoto o troppo lungo (check export_salvati_nome_check, 23514)', () => {
+    expect(messaggioErrore({
+      code: '23514', message: 'new row for relation "export_salvati" violates check constraint "export_salvati_nome_check"',
+    })).toBe('Il nome dell\'export deve avere da 1 a 80 caratteri.')
+  })
+
+  it('strumento collegato a una voce del catalogo che non c\'è (23503 su strumenti_catalogo_id_fkey)', () => {
+    expect(messaggioErrore({
+      code: '23503',
+      message: 'insert or update on table "strumenti" violates foreign key constraint "strumenti_catalogo_id_fkey"',
+    })).toBe('Questo strumento del catalogo non esiste più: ricarica la pagina e riprova.')
+  })
+
+  it('id di una voce del catalogo cambiato (guardia del database)', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'ID_NON_MODIFICABILE' }))
+      .toBe('L\'identificativo di una voce del catalogo non si può cambiare. Ricarica la pagina.')
+  })
+
+  it('il nome dell\'indice del catalogo senza 23505 non basta', () => {
+    expect(messaggioErrore({ code: 'P0001', message: 'catalogo_strumenti_nome_unico' }))
+      .not.toBe('Nel catalogo c\'è già uno strumento con questo nome.')
+  })
+
+  it('strumento eliminato mentre arrivavano le sue misure (23503 su misure_strumento_id_esperimento_id_fkey)', () => {
+    expect(messaggioErrore({
+      code: '23503',
+      message: 'update or delete on table "strumenti" violates foreign key constraint "misure_strumento_id_esperimento_id_fkey" on table "misure"',
+    })).toBe(STRUMENTO_CON_MISURE_ARRIVATE)
+    expect(STRUMENTO_CON_MISURE_ARRIVATE).toBe('Nel frattempo sono arrivate misure di questo strumento: si può solo archiviare.')
+  })
+
+  it('dati collegati (23503)', () => {
+    expect(messaggioErrore({ code: '23503', message: 'violates foreign key constraint' })).toBe(
+      'Questo elemento ha dati collegati e non può essere eliminato.',
+    )
+  })
+
+  it('altro: Errore imprevisto con il messaggio originale', () => {
+    expect(messaggioErrore(new Error('boom'))).toBe('Errore imprevisto: boom')
+    expect(messaggioErrore({ message: 'strano' })).toBe('Errore imprevisto: strano')
+    expect(messaggioErrore('testo semplice')).toBe('Errore imprevisto: testo semplice')
+  })
+
+  it('altro: nessun messaggio utilizzabile', () => {
+    expect(messaggioErrore(null)).toBe('Errore imprevisto.')
+    expect(messaggioErrore(undefined)).toBe('Errore imprevisto.')
+    expect(messaggioErrore({})).toBe('Errore imprevisto.')
+  })
+})
+
+describe('ErroreApp', () => {
+  it('il suo messaggio, già in italiano, passa così com\'è', () => {
+    expect(messaggioErrore(new ErroreApp('Una foto non si è scaricata.'))).toBe('Una foto non si è scaricata.')
+  })
+
+  it('un Error qualsiasi con lo stesso testo resta «Errore imprevisto»', () => {
+    expect(messaggioErrore(new Error('Una foto non si è scaricata.'))).toBe('Errore imprevisto: Una foto non si è scaricata.')
+  })
+})
+
+describe('eMisuraNonTrovata', () => {
+  it('riconosce l\'errore di caricaMisura e nessun altro', () => {
+    expect(eMisuraNonTrovata(new Error(MISURA_NON_TROVATA))).toBe(true)
+    expect(eMisuraNonTrovata(new Error('Failed to fetch'))).toBe(false)
+    expect(eMisuraNonTrovata({ message: MISURA_NON_TROVATA })).toBe(false)
+    expect(eMisuraNonTrovata(undefined)).toBe(false)
+  })
+})

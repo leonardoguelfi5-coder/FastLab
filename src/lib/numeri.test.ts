@@ -1,0 +1,42 @@
+import { describe, it, expect } from 'vitest'
+import { parseNumero, formattaNumero, formattaMedia, formattaConUnita, leggiIntero } from './numeri'
+
+describe('numeri', () => {
+  it.each([
+    ['24,5', 24.5],
+    ['24.5', 24.5],
+    [' 7 ', 7],
+    ['-3,5', -3.5],
+    ['24,', 24],
+    ['0', 0],
+    [',5', 0.5],
+    ['.5', 0.5],
+    ['-,5', -0.5],
+    ['-.5', -0.5],
+  ])('parseNumero(%s) = %s', (raw, n) => expect(parseNumero(raw)).toBe(n))
+  it('vuoto → null', () => {
+    expect(parseNumero('')).toBeNull()
+    expect(parseNumero('  ')).toBeNull()
+  })
+  it.each(['abc', '1,2,3', '12a', ',', '.', '-', '-,', ',,5'])('non valido %s → NaN', (raw) =>
+    expect(parseNumero(raw)).toBeNaN(),
+  )
+  it('formattaNumero', () => {
+    expect(formattaNumero(24.5)).toBe('24,5')
+    expect(formattaNumero(null)).toBe('')
+  })
+  it.each([
+    ['1', 1], [' 20 ', 20], ['007', 7],
+  ])('leggiIntero(%s, 1, 20) = %s', (raw, n) => expect(leggiIntero(raw, 1, 20)).toBe(n))
+  it.each(['', '0', '21', '-1', '2,5', '2.5', '2,0', 'tre', '1e1', '+3'])('leggiIntero(%s, 1, 20) → null', (raw) =>
+    expect(leggiIntero(raw, 1, 20)).toBeNull(),
+  )
+  it('leggiIntero accetta lo zero se il minimo è zero', () => expect(leggiIntero('0', 0, 10)).toBe(0))
+  it.each([
+    [41.2, '41,2'], [41.234, '41,23'], [41.2351, '41,24'], [40, '40'], [0.1 + 0.2, '0,3'], [-3.456, '-3,46'], [0, '0'],
+  ])('formattaMedia(%s) = %s', (n, testo) => expect(formattaMedia(n)).toBe(testo))
+  it('formattaMedia non scrive "-0"', () => expect(formattaMedia(-0.001)).toBe('0'))
+  it.each([
+    [24.5, '°C', '24,5 °C'], [41.234, null, '41,23'], [80, 'cm', '80 cm'], [3, '', '3'],
+  ])('formattaConUnita(%s, %s) = %s', (n, unita, testo) => expect(formattaConUnita(n, unita)).toBe(testo))
+})

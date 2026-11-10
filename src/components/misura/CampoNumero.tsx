@@ -1,0 +1,59 @@
+import type { Parametro } from '@/domain/tipi'
+import { descriviIntervallo, fuoriIntervallo } from '@/domain/misure'
+import { NumericField } from '@/components/NumericField'
+
+interface CampoNumeroProps {
+  parametro: Parametro
+  /** Una lettura per campo; `NaN` per un testo non numerico. */
+  valore: (number | null)[]
+  onChange: (valore: (number | null)[]) => void
+  obbligatorio?: boolean
+  /** Parte dal valore mantenuto: il segno "mantenuto" compare una volta, sulla prima lettura. */
+  mantenuto?: boolean
+}
+
+/** Il messaggio (non bloccante) per una lettura fuori dall'intervallo atteso del parametro. */
+function avvisoFuoriIntervallo(p: Parametro, x: number | null): string | undefined {
+  return x !== null && fuoriIntervallo(p, x) ? `Fuori dall'intervallo atteso (${descriviIntervallo(p)}).` : undefined
+}
+
+/** I limiti lasciano posto a valori negativi: minimo sotto zero, o nessun minimo e massimo a zero o sotto. */
+function ammetteNegativi(p: Parametro): boolean {
+  if (p.valore_min !== null) return p.valore_min < 0
+  return p.valore_max !== null && p.valore_max <= 0
+}
+
+/**
+ * Quanti campi mostrare: le letture del parametro, o di più se la misura ne ha di salvate oltre (`n_letture` è stato
+ * ridotto dopo). Quelle in più restano visibili e modificabili, anche svuotandole (il campo non sparisce mentre si
+ * scrive): altrimenti correggere il parametro le farebbe sparire.
+ */
+function quanteLetture(p: Parametro, valore: (number | null)[]): number {
+  return Math.max(p.n_letture, valore.length)
+}
+
+/** Un campo numerico per lettura: "SPAD · lettura 1", "SPAD · lettura 2"…, o solo il nome se la lettura è una. */
+export function CampoNumero({ parametro, valore, onChange, obbligatorio, mantenuto }: CampoNumeroProps) {
+  const quante = quanteLetture(parametro, valore)
+  const letture = Array.from({ length: quante }, (_, i) => valore[i] ?? null)
+  // La tastiera decimale non ha il segno meno: se il parametro ammette negativi serve quella normale.
+  const negativo = ammetteNegativi(parametro)
+
+  return (
+    <div className="flex flex-col gap-4">
+      {letture.map((x, i) => (
+        <NumericField
+          key={i}
+          label={quante > 1 ? `${parametro.nome} · lettura ${i + 1}` : parametro.nome}
+          unita={parametro.unita}
+          value={x}
+          avviso={avvisoFuoriIntervallo(parametro, x)}
+          obbligatorio={obbligatorio}
+          negativo={negativo}
+          mantenuto={mantenuto && i === 0}
+          onChange={(v) => onChange(letture.map((y, j) => (j === i ? v : y)))}
+        />
+      ))}
+    </div>
+  )
+}

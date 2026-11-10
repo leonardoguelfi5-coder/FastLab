@@ -1,0 +1,161 @@
+import { supabase } from '@/lib/supabase'
+import type { CampiCatalogo } from '@/domain/catalogo'
+import type { ConteggioStrumento } from '@/domain/conteggi'
+import type { Parametro, Strumento, StrumentoParametro, Pianta } from '@/domain/tipi'
+import { controllaRighe } from './righe'
+import { aRigaParametro, aRigaStrumento, aRigaStrumentoParametro, aRigaPianta } from './mappers'
+
+const CAMPI_CATALOGO = ['nome', 'unita', 'valore_min', 'valore_max', 'n_letture'] as const
+
+/** Crea o aggiorna un parametro (upsert per id). Cambiare il tipo di un parametro con dati fallisce con PARAMETRO_CON_DATI. */
+export async function salvaParametro(espId: string, p: Parametro): Promise<void> {
+  const { error } = await supabase.from('parametri').upsert(aRigaParametro(espId, p), { onConflict: 'id' })
+  if (error) throw error
+}
+
+/**
+ * Scrive in un parametro solo i campi indicati tra quelli che il catalogo può cambiare (nome, unità, minimo, massimo,
+ * letture), con un update e non un upsert: gli altri campi restano quelli del database anche se nel frattempo sono
+ * cambiati altrove, e un parametro eliminato nel frattempo fa fallire l'operazione invece di essere ricreato. Senza
+ * campi non scrive nulla.
+ */
+export async function aggiornaParametroDaCatalogo(espId: string, id: string, campi: CampiCatalogo): Promise<void> {
+  const daScrivere: CampiCatalogo = {}
+  for (const k of CAMPI_CATALOGO) {
+    if (k in campi) Object.assign(daScrivere, { [k]: campi[k] })
+  }
+  if (Object.keys(daScrivere).length === 0) return
+  controllaRighe(await supabase.from('parametri').update(daScrivere).eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
+/** Ids dei parametri dell'esperimento che compaiono in almeno una misura: non si possono eliminare. */
+export async function parametriConDati(espId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.rpc('parametri_con_dati', { p_esperimento: espId })
+  if (error) throw error
+  return new Set((data ?? []) as string[])
+}
+
+/** Ids delle piante dell'esperimento con almeno una misura: non si possono eliminare. */
+export async function pianteConDati(espId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.rpc('piante_con_dati', { p_esperimento: espId })
+  if (error) throw error
+  return new Set((data ?? []) as string[])
+}
+
+/**
+ * Ids delle piante dell'esperimento che non si possono eliminare: con almeno una misura, una nota collegata o una
+ * foto (RPC `piante_non_eliminabili`, migration 0012). Serve a offrire "Rimuovi" solo dove il database lo permette;
+ * `pianteConDati` resta sulle sole misure perché decide anche il cambio di trattamento, che note e foto non vincolano.
+ */
+export async function pianteNonEliminabili(espId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.rpc('piante_non_eliminabili', { p_esperimento: espId })
+  if (error) throw error
+  return new Set((data ?? []) as string[])
+}
+
+interface RigaConteggio { strumento_id: string; misure: number | string; piante: number | string; prima: string; ultima: string }
+
+/**
+ * Per ogni strumento dell'esperimento con almeno una misura: quante misure, di quante piante, la prima e l'ultima data
+ * (RPC `conteggi_strumenti`, migration 0015: un `group by` sul database, una sola lettura). Uno strumento che non c'è
+ * non ha misure: si può eliminare. La guardia vera resta il database (eliminare uno strumento con misure dà 23503).
+ */
+export async function conteggiStrumenti(espId: string): Promise<Map<string, ConteggioStrumento>> {
+  const { data, error } = await supabase.rpc('conteggi_strumenti', { p_esperimento: espId })
+  if (error) throw error
+  return new Map(((data ?? []) as RigaConteggio[]).map(r => [
+    r.strumento_id,
+    { misure: Number(r.misure), piante: Number(r.piante), prima: r.prima, ultima: r.ultima },
+  ]))
+}
+
+/**
+ * Elimina il parametro se non ha dati, altrimenti lo archivia. Se nel frattempo arriva una
+ * misura che lo usa, l'eliminazione fallisce con PARAMETRO_CON_DATI (guardia del database).
+ */
+export async function eliminaOArchiviaParametro(espId: string, p: Parametro): Promise<'eliminato' | 'archiviato'> {
+  const conDati = await parametriConDati(espId)
+  if (conDati.has(p.id)) {
+    await archiviaParametro(espId, p.id)
+    return 'archiviato'
+  }
+  controllaRighe(await supabase.from('parametri').delete().eq('id', p.id).eq('esperimento_id', espId).select('id'))
+  return 'eliminato'
+}
+
+/** Archivia un parametro (mai eliminato): sparisce dai moduli, i suoi dati restano. */
+export async function archiviaParametro(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('parametri').update({ archiviato: true }).eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
+/** Archivia uno strumento (mai eliminato): sparisce dalla scelta in misura, le sue misure restano. */
+export async function archiviaStrumento(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('strumenti').update({ archiviato: true }).eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
+/**
+ * Salva uno strumento e sostituisce i suoi parametri. Prima si scrive lo strumento, poi i
+ * collegamenti nuovi o modificati, infine si tolgono quelli non più presenti: se un passo
+ * fallisce lo strumento resta con più collegamenti, mai con meno.
+ */
+export async function salvaStrumento(espId: string, p: Strumento): Promise<void> {
+  const { error: erroreRiga } = await supabase.from('strumenti').upsert(aRigaStrumento(espId, p), { onConflict: 'id' })
+  if (erroreRiga) throw erroreRiga
+
+  await collegaParametri(espId, p.id, p.parametri)
+
+  // Gli id sono uuid (solo cifre esadecimali e trattini): sicuri nella lista del filtro `in`.
+  let elimina = supabase.from('strumento_parametri').delete().eq('strumento_id', p.id).eq('esperimento_id', espId)
+  if (p.parametri.length > 0) {
+    elimina = elimina.not('parametro_id', 'in', `(${p.parametri.map(pp => pp.parametro_id).join(',')})`)
+  }
+  const { error } = await elimina
+  if (error) throw error
+}
+
+/** Aggiunge o aggiorna dei collegamenti di uno strumento ai suoi parametri; gli altri collegamenti restano. */
+export async function collegaParametri(espId: string, strumentoId: string, collegamenti: StrumentoParametro[]): Promise<void> {
+  if (collegamenti.length === 0) return
+  const { error } = await supabase
+    .from('strumento_parametri')
+    .upsert(collegamenti.map(pp => aRigaStrumentoParametro(espId, strumentoId, pp)), { onConflict: 'strumento_id,parametro_id' })
+  if (error) throw error
+}
+
+/** Elimina uno strumento dell'esperimento (con i suoi collegamenti). Fallisce con 23503 se ha già misure. */
+export async function eliminaStrumento(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('strumenti').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
+export async function aggiungiPiante(espId: string, piante: Pianta[]): Promise<void> {
+  if (piante.length === 0) return
+  const { error } = await supabase.from('piante').insert(piante.map(p => aRigaPianta(espId, p)))
+  if (error) throw error
+}
+
+/** Aggiorna una pianta dell'esperimento. Cambiarne il trattamento con misure fallisce con PIANTA_CON_DATI. */
+export async function aggiornaPianta(espId: string, p: Pianta): Promise<void> {
+  const { id, esperimento_id, ...campi } = aRigaPianta(espId, p)
+  controllaRighe(await supabase.from('piante').update(campi).eq('id', id).eq('esperimento_id', esperimento_id).select('id'))
+}
+
+/**
+ * Scrive il solo `ordine` delle piante ricevute (quelle che il riordino ha cambiato), una alla volta: a un errore ci si
+ * ferma, e le piante già scritte restano con il nuovo ordine (l'ordine non è unico: niente si rompe, lo si rifà).
+ * Una pianta che non c'è più (rimossa altrove) fallisce con ELEMENTO_NON_TROVATO.
+ */
+export async function salvaOrdinePiante(espId: string, piante: Pianta[]): Promise<void> {
+  for (const p of piante) {
+    controllaRighe(await supabase.from('piante').update({ ordine: p.ordine }).eq('id', p.id).eq('esperimento_id', espId).select('id'))
+  }
+}
+
+/** Elimina una pianta dell'esperimento. Fallisce con 23503 se ha già misure. */
+export async function eliminaPianta(espId: string, id: string): Promise<void> {
+  controllaRighe(await supabase.from('piante').delete().eq('id', id).eq('esperimento_id', espId).select('id'))
+}
+
+/** Rinomina un trattamento dell'esperimento. Fallisce con 23505 se l'etichetta c'è già. */
+export async function aggiornaTrattamento(espId: string, id: string, etichetta: string): Promise<void> {
+  controllaRighe(await supabase.from('trattamenti').update({ etichetta }).eq('id', id).eq('esperimento_id', espId).select('id'))
+}
