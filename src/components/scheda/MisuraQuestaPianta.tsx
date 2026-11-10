@@ -6,6 +6,7 @@ import type { Strumento } from '@/domain/tipi'
 import { percorsoMisuraPianta } from '@/lib/percorsi'
 import type { ArrivoScheda } from './ModuloOggi'
 import { useAttesaArrivo } from './useAttesaArrivo'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 /**
  * La scelta dello strumento, al posto del pulsante appena toccato. Un tocco troppo vicino all'apertura è il secondo di
@@ -21,7 +22,7 @@ function SceltaDelloStrumento({ strumenti, onScegli, onAnnulla }: {
       <div className="flex flex-wrap gap-2">
         {strumenti.map(s => (
           <Button key={s.id} variant="outline" size="lg" className="grow" onClick={() => { if (toccoValido()) onScegli(s) }}>
-            {s.icona && <span aria-hidden>{s.icona}</span>}
+            <IconaStrumento emoji={s.icona} piccola />
             {s.nome}
           </Button>
         ))}

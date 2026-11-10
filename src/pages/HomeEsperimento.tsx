@@ -1,6 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronRight } from 'lucide-react'
+import { Camera, CalendarDays, ChevronRight, FileDown, NotebookPen, Plus, type LucideIcon } from 'lucide-react'
+import { IconaStrumento, IconaTonda } from '@/components/IconaTonda'
 import { useConfig, useMisureGiorno, useNote, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { Caricamento } from '@/components/Caricamento'
@@ -96,13 +97,13 @@ function Fascia({ espId, config, puoMisurare }: { espId: string; config: ConfigE
       {puoMisurare ? (
         <Link
           to={percorsoNuovaMisura(espId)}
-          className="flex min-h-14 items-center gap-3 rounded-lg bg-white/15 px-4 py-3 text-white transition-colors hover:bg-white/20 active:bg-white/25"
+          className="flex min-h-14 items-center gap-3 rounded-full bg-white/15 px-5 py-3 text-white transition-colors hover:bg-white/20 active:bg-white/25"
         >
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="text-title"><span aria-hidden>➕ </span>Nuova misura</span>
+            <span className="flex items-center gap-2 text-title"><Plus aria-hidden className="size-5" strokeWidth={2.5} />Nuova misura</span>
             {giro && (
               <span className="font-mono text-label tabular-nums text-white/85">
-                {giro.icona && <span aria-hidden>{`${giro.icona} `}</span>}
+                <IconaStrumento emoji={giro.icona} piccola className="mr-1.5 inline-flex size-5 bg-white/15 align-middle text-white" />
                 {giro.testo}
               </span>
             )}
@@ -148,7 +149,7 @@ function UltimeMisure({ espId, config }: { espId: string; config: ConfigEsperime
                 className={cn('absolute top-[22px] -left-[22px] size-3 rounded-full shadow-[0_0_0_3px_var(--carta)]', data ? 'bg-inchiostro' : 'bg-riga-forte')}
               />
               <Link to={percorsoDataset(espId, new URLSearchParams({ s: s.id }))} className="flex min-h-14 items-center gap-3 py-2">
-                {s.icona && <span aria-hidden className="text-[20px] leading-none">{s.icona}</span>}
+                <IconaStrumento emoji={s.icona} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="font-[600] text-grafite">{s.nome}</span>
                   <span className="font-mono text-label tabular-nums text-grafite-tenue">
@@ -165,13 +166,13 @@ function UltimeMisure({ espId, config }: { espId: string; config: ConfigEsperime
   )
 }
 
-const VOCE = 'relative flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-lg border border-riga bg-foglio px-1 py-3 text-center text-label font-[600] text-grafite transition-colors hover:border-riga-controllo active:bg-carta-ombra'
+const VOCE = 'relative flex min-h-[92px] flex-col items-center justify-center gap-2 rounded-2xl border border-riga bg-foglio px-1 py-3 text-center text-label font-[600] text-grafite transition-colors hover:border-riga-controllo active:bg-carta-ombra'
 
 /** Una sezione: l'emoji è l'icona scelta nella spec, solo decorativa (il nome la dice già). */
-function Voce({ to, icona, nome, className, children }: { to: string; icona: string; nome: string; className?: string; children?: ReactNode }) {
+function Voce({ to, icona, nome, className, children }: { to: string; icona: LucideIcon; nome: string; className?: string; children?: ReactNode }) {
   return (
     <Link to={to} className={cn(VOCE, className)}>
-      <span aria-hidden className="text-[22px] leading-none">{icona}</span>
+      <IconaTonda icona={icona} />
       <span>{nome}</span>
       {children}
     </Link>
@@ -246,12 +247,12 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
       <Fascia espId={espId} config={config} puoMisurare={puoMisurare} />
       {/* Le altre sezioni (Piante, Dataset) sono nella barra in basso, Impostazioni in Altro. */}
       <nav aria-label="Sezioni" className="grid grid-cols-4 gap-2">
-        <Voce to={percorsoOggi(espId)} icona="📅" nome="Oggi">
+        <Voce to={percorsoOggi(espId)} icona={CalendarDays} nome="Oggi">
           {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}
         </Voce>
-        <Voce to={percorsoDiario(espId)} icona="📒" nome="Diario" />
-        <Voce to={percorsoGalleria(espId)} icona="📷" nome="Foto" />
-        <Voce to={percorsoEsporta(espId)} icona="⬇️" nome="Esporta Excel" />
+        <Voce to={percorsoDiario(espId)} icona={NotebookPen} nome="Diario" />
+        <Voce to={percorsoGalleria(espId)} icona={Camera} nome="Foto" />
+        <Voce to={percorsoEsporta(espId)} icona={FileDown} nome="Esporta Excel" />
       </nav>
       <UltimeMisure espId={espId} config={config} />
     </>

@@ -1,6 +1,7 @@
 import { useId } from 'react'
 import { ChevronRight } from 'lucide-react'
 import type { Strumento } from '@/domain/tipi'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 /**
  * La riga di uno strumento: icona, nome e una riga nel font dei dati sotto (il progresso, o da quanto non si misura).
@@ -17,7 +18,7 @@ export function VoceStrumento({ strumento, testo, onScegli }: { strumento: Strum
       aria-describedby={idTesto}
       className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors -outline-offset-2 hover:bg-carta-ombra/70 active:bg-carta-ombra"
     >
-      <span aria-hidden className="w-7 shrink-0 text-center text-[22px] leading-none">{strumento.icona}</span>
+      <IconaStrumento emoji={strumento.icona} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-[550] text-grafite">{strumento.nome}</span>
         <span id={idTesto} aria-hidden className="min-h-[1.3em] font-mono text-dato tabular-nums text-grafite-tenue">{testo}</span>

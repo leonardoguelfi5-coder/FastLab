@@ -8,6 +8,7 @@ import {
 import type { ConfigEsperimento, ExportSalvato } from '@/domain/tipi'
 import { cn } from '@/lib/utils'
 import { eliminaExportConAnnulla, senzaExportInEliminazione } from './eliminaExportConAnnulla'
+import { Pin } from 'lucide-react'
 
 /** L'identificativo di «Tutto l'esperimento» tra gli export segnati come quello in uso: non è una riga del database. */
 export const ID_TUTTO = 'tutto'
@@ -74,7 +75,7 @@ export function ExportSalvati({ espId, config, inUso, onApplica }: ExportSalvati
       <ul aria-label="Export salvati" className="flex flex-col border-t border-riga">
         <li className={cn(RIGA, inUso === ID_TUTTO && RIGA_IN_USO)}>
           <button type="button" aria-pressed={inUso === ID_TUTTO} onClick={() => onApplica(SCELTA_TUTTO, ID_TUTTO)} className={APPLICA}>
-            <span className="text-title text-grafite"><span aria-hidden>📌 </span>Tutto l'esperimento</span>
+            <span className="text-title text-grafite"><Pin aria-hidden className="mr-1.5 inline size-4 align-[-2px]" />Tutto l'esperimento</span>
           </button>
         </li>
         {righe.map(e => (

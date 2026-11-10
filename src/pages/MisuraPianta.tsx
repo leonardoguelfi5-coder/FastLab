@@ -267,7 +267,7 @@ export function MisuraPianta() {
   const verso = daScheda ? percorsoPianta(espId, piantaId) : percorsoNuovaMisura(espId)
   return (
     <AppShell
-      titolo={attivo ? `${attivo.icona ? `${attivo.icona} ` : ''}${attivo.nome}` : 'Misura'}
+      titolo={attivo ? attivo.nome : 'Misura'}
       indietro={verso}
       onIndietro={onIndietro(verso)}
     >

@@ -178,8 +178,7 @@ describe('SceltaStrumento: l\'elenco', () => {
     vaiAllaPagina()
     await aspettaElenco()
     const spad = riga('SPAD')
-    expect(spad).toHaveTextContent(strumento('SPAD').icona!)
-    expect(within(spad).getByText(strumento('SPAD').icona!)).toHaveAttribute('aria-hidden', 'true')
+    expect(spad.querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
   })
 
   it('uno strumento archiviato non c\'è', async () => {
@@ -261,7 +260,7 @@ describe('SceltaStrumento: la riga secondaria', () => {
     await aspettaElenco()
     await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalled())
     expect(screen.queryByText(/oggi|ultima volta|mai misurato|fatto/)).not.toBeInTheDocument()
-    expect(riga('SPAD')).toHaveTextContent(/^\S+ ?SPAD…$/)
+    expect(riga('SPAD')).toHaveTextContent(/^SPAD…$/)
   })
 
   it('mentre arrivano solo le ultime date, non dice "mai misurato" per uno strumento che ha misure di oggi da leggere', async () => {

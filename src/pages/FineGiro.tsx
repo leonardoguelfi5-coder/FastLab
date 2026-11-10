@@ -20,6 +20,7 @@ import { formattaConUnita, formattaMedia } from '@/lib/numeri'
 import { percorsoMisuraPianta, percorsoModificaMisura, percorsoNuovaMisura, type ArrivoMisura } from '@/lib/percorsi'
 import { useOggi } from '@/lib/useOggi'
 import { useCampoStore } from '@/store/campo'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 /** "Valori di oggi": per ogni parametro numerico, una riga per trattamento, con le funzioni del Dataset. */
 function ValoriDiOggi({ config, strumento, misure, data }: { config: ConfigEsperimento; strumento: Strumento; misure: Misura[]; data: string }) {
@@ -153,7 +154,7 @@ function Riepilogo({ espId, config, strumento, misure, data }: {
     <section aria-labelledby={idTitolo} className="flex flex-col gap-6">
       <div className="flex flex-col gap-3">
         <h2 id={idTitolo} className="text-headline text-grafite">
-          {strumento.icona && <span aria-hidden>{`${strumento.icona} `}</span>}
+          <IconaStrumento emoji={strumento.icona} className="mr-2 inline-flex align-middle" />
           {`${strumento.nome} · fine giro `}
           <span className="font-mono tabular-nums">{`${fatte}/${totale}`}</span>
         </h2>

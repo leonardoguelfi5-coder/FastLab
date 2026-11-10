@@ -195,10 +195,10 @@ describe('HomeEsperimento: le sezioni', () => {
   it('mostra le icone di ogni riquadro senza leggerle come testo', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
-    for (const [nome, icona] of [['Oggi', '📅'], ['Esporta Excel', '⬇️'], ['Diario', '📒'], ['Foto', '📷']]) {
+    for (const nome of ['Oggi', 'Esporta Excel', 'Diario', 'Foto']) {
       const voce = screen.getByRole('link', { name: nome })
-      expect(voce).toHaveTextContent(icona)
-      expect(within(voce).getByText(icona)).toHaveAttribute('aria-hidden', 'true')
+      // Un'icona Lucide in un cerchio, nascosta ai lettori di schermo.
+      expect(voce.querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
     }
   })
 
@@ -217,7 +217,7 @@ describe('HomeEsperimento: le sezioni', () => {
     vaiAllaPagina()
     await aspettaLaHome()
     await misureLette()
-    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveTextContent(/^📅Oggi$/)
+    expect(screen.getByRole('link', { name: 'Oggi' })).toHaveTextContent(/^Oggi$/)
     expect(screen.queryByRole('link', { name: /Mappa/ })).not.toBeInTheDocument()
   })
 
@@ -249,7 +249,7 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     vi.mocked(misureDelGiorno).mockResolvedValue(misureSpad(34))
     vaiAllaPagina()
     expect(await within(await aspettaLaHome()).findByText(/SPAD in corso · 34\/56/)).toBeInTheDocument()
-    expect(striscia()).toHaveTextContent(`${strumento('SPAD').icona} SPAD in corso · 34/56`)
+    expect(striscia()).toHaveTextContent('SPAD in corso · 34/56')
     expect(misureDelGiorno).toHaveBeenCalledWith('E', OGGI)
   })
 
@@ -258,7 +258,7 @@ describe('HomeEsperimento: la striscia Nuova misura', () => {
     vi.mocked(misureDelGiorno).mockResolvedValue(misureSpad(34))
     vaiAllaPagina()
     await within(await aspettaLaHome()).findByText(/SPAD in corso · 34\/56/)
-    expect(within(striscia()).getByText(strumento('SPAD').icona!)).toHaveAttribute('aria-hidden', 'true')
+    expect(striscia().querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
     expect(striscia()).toHaveAccessibleName(/^Nuova misura ?SPAD in corso · 34\/56$/)
   })
 
@@ -433,7 +433,7 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
     vaiAllaPagina()
     await aspettaLaHome()
     await misureLette()
-    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(oggi()).toHaveTextContent(/^Oggi$/)
   })
 
   it('mentre le misure caricano non mostra il numerino', async () => {
@@ -441,7 +441,7 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
     vaiAllaPagina()
     await aspettaLaHome()
     await vi.waitFor(() => expect(misureDelGiorno).toHaveBeenCalled())
-    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(oggi()).toHaveTextContent(/^Oggi$/)
   })
 
   it('se la lettura fallisce non mostra il numerino e la home non allarma', async () => {
@@ -449,7 +449,7 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
     vaiAllaPagina()
     await aspettaLaHome()
     await misureLette()
-    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(oggi()).toHaveTextContent(/^Oggi$/)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -512,7 +512,7 @@ describe('HomeEsperimento: il numerino con i promemoria', () => {
     await aspettaLaHome()
     await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
     await misureLette()
-    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(oggi()).toHaveTextContent(/^Oggi$/)
   })
 
   it('usa il giorno di oggi, non la data di rilievo scelta', async () => {
@@ -541,7 +541,7 @@ describe('HomeEsperimento: il numerino con i promemoria', () => {
     await aspettaLaHome()
     await vi.waitFor(() => expect(listaNote).toHaveBeenCalled())
     await misureLette()
-    expect(oggi()).toHaveTextContent(/^📅Oggi$/)
+    expect(oggi()).toHaveTextContent(/^Oggi$/)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

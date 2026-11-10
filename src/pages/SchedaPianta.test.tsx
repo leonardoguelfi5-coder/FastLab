@@ -268,7 +268,7 @@ describe('SchedaPianta: ultimi valori', () => {
     const sezione = await pronta()
     // Gli strumenti seguono il loro ordine: Termometro, poi SPAD.
     const gruppi = within(sezione).getAllByRole('heading', { level: 4 }).map(h => h.textContent)
-    expect(gruppi).toEqual(['🌡Termometro', '💚SPAD'])
+    expect(gruppi).toEqual(['Termometro', 'SPAD'])
     const [tempAria, tempPianta] = await righe('Termometro')
     expect(tempAria).toHaveTextContent('Temp aria 24,5 °C')
     expect(tempPianta).toHaveTextContent('Temp pianta 25,1 °C')
@@ -706,8 +706,7 @@ describe('SchedaPianta: storia', () => {
     expect(voci[1]).toHaveAccessibleName(/^08:30 · Termometro\s+Temp aria\s+22 °C$/)
     expect(voci[2]).toHaveAccessibleName(/^09:00 · SPAD\s+SPAD \(archiviato\)\s+38,1$/)
     // L'icona resta, ma è solo decorazione: il nome dello strumento è scritto.
-    expect(voci[2]).toHaveTextContent('💚')
-    expect(within(voci[2]).getByText('💚')).toHaveAttribute('aria-hidden', 'true')
+    expect(voci[2].querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
   })
 
   it('ogni misura ha il nome dello strumento scritto e i valori su due colonne: nome a sinistra, valore a destra', async () => {
@@ -780,7 +779,7 @@ describe('SchedaPianta: misura questa pianta', () => {
     expect(screen.getByText('Con quale strumento?')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Misura questa pianta' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('button').map(b => b.textContent).filter(t => t !== 'Menu')).toEqual(
-      expect.arrayContaining(['🌡Termometro', '💚SPAD', '🌱Tabella fenologica', 'Annulla']),
+      expect.arrayContaining(['Termometro', 'SPAD', 'Tabella fenologica', 'Annulla']),
     )
     expect(screen.queryByRole('button', { name: 'Metro' })).not.toBeInTheDocument()
 

@@ -3,6 +3,7 @@ import { riassuntoParametro } from '@/components/config/riassunti'
 import { formattaData } from '@/lib/date'
 import type { ConfigEsperimento, Parametro, Strumento } from '@/domain/tipi'
 import { Sezione, Spiegazione } from './Sezione'
+import { IconaStrumento } from '@/components/IconaTonda'
 
 /** La frase al posto dei controlli: la configurazione è del proprietario. */
 export const SOLO_IL_PROPRIETARIO = 'Solo il proprietario modifica la configurazione.'
@@ -85,7 +86,7 @@ function Strumenti({ config, tipo, titolo }: { config: ConfigEsperimento; tipo: 
           {strumenti.map(s => (
             <div key={s.id} className="flex flex-col gap-1">
               <h3 className="text-base font-medium text-grafite">
-                {s.icona && <span aria-hidden>{`${s.icona} `}</span>}
+                <IconaStrumento emoji={s.icona} piccola className="mr-1.5 inline-flex align-middle" />
                 {s.nome}
                 {s.archiviato && <span className="font-normal text-grafite-tenue">{' · archiviato'}</span>}
               </h3>
