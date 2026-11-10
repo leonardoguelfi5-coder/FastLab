@@ -88,3 +88,8 @@ Task E9: review di sicurezza (opus) → Needs fixes: (I1) un rilevatore collegav
 Task E9: correzione del controller: `foto_insert` e `foto_update` con `nota_id is null or puo_modificare_nota(nota_id)`, tre righe nella matrice di ruoli.test.sql (rosse senza la correzione, verdi con), 549 pgTAP PASS; schema-completo rigenerato
 Ruling (carry to E10): "Elimina esperimento" solo al proprietario (oggi un rilevatore toglierebbe i file delle sue foto prima del rifiuto sulla riga); rifiuti RLS dello Storage senza messaggio tradotto - cost if wrong: foto senza file
 Task E9: complete (commits b0e2e13..HEAD)
+Task E10: implementatore (sonnet) DONE_WITH_CONCERNS 4935bee - 3080 Vitest; Impostazioni a pagine (indice e 7 sezioni con guscio comune e protezione delle modifiche), sezione Persone (aggiunta, ruolo, rimozione, "Lascia l'esperimento"), `usePermessi` che nasconde solo per un ruolo noto (giro mai bloccato da un ruolo ignoto), ruolo letto in anticipo; interfaccia per lettore e rilevatore (misure, note, foto altrui in sola lettura), `eliminaEsperimento` solo per il proprietario, niente "Aggiungi foto" su note altrui per il rilevatore
+Ruling: accettate le deviazioni E10 (configurazione in sola lettura con un componente separato; indicatore della coda per utente) - cost if wrong: small
+Task E10: complete (commits 308b431..4935bee), revisione rimandata alla finale
+Messa online: migration 0016 applicata al progetto FastLab (versione senza le righe di solo commento); provata come utente autenticato: 2 esperimenti con ruolo proprietario, membri_di 1, 22 misure visibili; policy fastlab_foto_* ricreate su storage.objects
+Terza pubblicazione del Piano E (E8-E11): dpl_37StPVo9dQXCsXNFdbkWxvVNMe5S da 4935bee. Pausa chiesta dall'utente: si riprende da E12
