@@ -68,6 +68,9 @@ export function leggiArrivoDiario(stato: unknown, espId: string): ArrivoDiario {
 }
 
 /** La galleria delle foto dell'esperimento. */
+/** La pagina Altro: le sezioni che non stanno nella barra in basso. */
+export const percorsoAltro = (espId: string) => `${percorsoHome(espId)}/altro`
+
 export const percorsoGalleria = (espId: string) => `${percorsoHome(espId)}/foto`
 
 /** Elenco delle piante di un esperimento. */

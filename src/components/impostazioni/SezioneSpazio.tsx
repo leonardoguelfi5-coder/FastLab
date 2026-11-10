@@ -6,7 +6,8 @@ import { migliaia } from '@/domain/export/riepilogo'
 import { LIMITE_DATABASE_BYTE, LIMITE_FOTO_BYTE, megabyte, quota } from '@/domain/spazio'
 import { cn } from '@/lib/utils'
 import type { ConfigEsperimento } from '@/domain/tipi'
-import { ArchivioFoto } from './ArchivioFoto'
+// Con l'estensione: su Windows './ArchivioFoto' si confonderebbe con './archivioFoto.ts' (cambia solo la maiuscola).
+import { ArchivioFoto } from './ArchivioFoto.tsx'
 import { Sezione, Spiegazione } from './Sezione'
 
 const parola = (n: number, una: string, tante: string) => `${migliaia(n)} ${n === 1 ? una : tante}`

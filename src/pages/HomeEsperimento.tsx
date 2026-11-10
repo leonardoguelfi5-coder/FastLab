@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
-import { useConfig, useMisureGiorno, useNote } from '@/api/query'
+import { useConfig, useMisureGiorno, useNote, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { Caricamento } from '@/components/Caricamento'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
@@ -12,7 +12,7 @@ import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
-import { percorsoDataset, percorsoDiario, percorsoEsporta, percorsoGalleria, percorsoImpostazioni, percorsoNuovaMisura, percorsoOggi, percorsoPiante } from '@/lib/percorsi'
+import { percorsoDataset, percorsoDiario, percorsoEsporta, percorsoGalleria, percorsoNuovaMisura, percorsoOggi } from '@/lib/percorsi'
 import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
 import { SOLO_LETTURA } from '@/lib/ruoli'
 import { useOggi } from '@/lib/useOggi'
@@ -35,7 +35,7 @@ function riepilogo({ esperimento, piante, trattamenti }: ConfigEsperimento): str
  * quali piante sono fatte. Un errore di lettura qui non si mostra: non serve per aprire la misura, e la home non deve
  * allarmare per un dettaglio. L'icona è a parte, per tenerla fuori dal nome che leggono i lettori di schermo.
  */
-function useGiroInCorso(espId: string, config: ConfigEsperimento): { icona: string | null; testo: string } | null {
+function useGiroInCorso(espId: string, config: ConfigEsperimento): { icona: string | null; testo: string; fatte: number; totale: number } | null {
   const oggi = useOggi()
   const { strumentoId, dataRilievo } = useCampoStore(s => s.dati(espId, oggi))
   // Senza uno strumento scelto non c'è giro da mostrare: non si legge nulla (la home non paga una query per niente).
@@ -50,44 +50,129 @@ function useGiroInCorso(espId: string, config: ConfigEsperimento): { icona: stri
     const { fatte, totale } = riepilogoGiro(config.piante, stati)
     const cominciato = [...stati.values()].some(stato => stato !== 'da_fare')
     if (!cominciato || fatte >= totale) return null
-    return { icona: strumento.icona, testo: `${strumento.nome} in corso · ${fatte}/${totale}` }
+    return { icona: strumento.icona, testo: `${strumento.nome} in corso · ${fatte}/${totale}`, fatte, totale }
   }, [dati, config, strumentoId])
 }
 
-/**
- * "Nuova misura": l'unico elemento a inchiostro pieno della home (regola dell'unico inchiostro). Porta alla misura;
- * sotto il titolo, se c'è un giro a metà, dice a che punto è.
- */
-function StrisciaNuovaMisura({ espId, config }: { espId: string; config: ConfigEsperimento }) {
-  const giro = useGiroInCorso(espId, config)
-
+/** L'anello del giro in corso: quante piante sono fatte sul totale. Solo decorativo, il testo lo dice già. */
+function AnelloGiro({ fatte, totale }: { fatte: number; totale: number }) {
+  const r = 31
+  const giro = 2 * Math.PI * r
   return (
-    <Link
-      to={percorsoNuovaMisura(espId)}
-      className="flex min-h-14 items-center gap-3 rounded-lg bg-inchiostro px-4 py-3 text-foglio transition-colors hover:bg-inchiostro-scuro active:bg-inchiostro-scuro"
-    >
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-title"><span aria-hidden>➕ </span>Nuova misura</span>
-        {giro && (
-          <span className="font-mono text-label tabular-nums text-foglio/85">
-            {giro.icona && <span aria-hidden>{`${giro.icona} `}</span>}
-            {giro.testo}
-          </span>
-        )}
-      </span>
-      <ChevronRight aria-hidden className="size-6 shrink-0" />
-    </Link>
+    <svg aria-hidden viewBox="0 0 74 74" className="size-[76px] shrink-0">
+      <circle cx="37" cy="37" r={r} stroke="rgb(255 255 255 / 0.2)" strokeWidth="7" fill="none" />
+      <circle
+        cx="37" cy="37" r={r} stroke="var(--inchiostro)" strokeWidth="7" fill="none" strokeLinecap="round"
+        strokeDasharray={`${(fatte / Math.max(totale, 1)) * giro} ${giro}`} transform="rotate(-90 37 37)"
+      />
+      <text x="37" y="36" textAnchor="middle" fontSize="17" fontWeight="700" fill="currentColor" className="font-display">{fatte}</text>
+      <text x="37" y="49" textAnchor="middle" fontSize="8.5" fill="currentColor" opacity="0.75">di {totale}</text>
+    </svg>
   )
 }
 
-const VOCE = 'flex min-h-14 items-center gap-2.5 rounded-lg border border-riga-controllo bg-foglio px-3 py-3 font-[550] text-grafite transition-colors hover:border-grafite-tenue active:bg-carta-ombra'
+/**
+ * La fascia verde in testa: quante piante, il riepilogo, l'anello del giro a metà e "Nuova misura" (o, per un
+ * lettore, la tessera di sola lettura). Sotto "Nuova misura", se c'è un giro a metà, si dice a che punto è.
+ */
+function Fascia({ espId, config, puoMisurare }: { espId: string; config: ConfigEsperimento; puoMisurare: boolean }) {
+  const giro = useGiroInCorso(espId, config)
+  const nPiante = config.piante.length
+
+  return (
+    <section className="-mx-4 -mt-6 flex flex-col gap-4 rounded-b-[34px] bg-fascia px-5 pt-5 pb-6 text-white">
+      <div className="flex items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <p aria-hidden className="font-display text-[52px] leading-none font-bold tracking-tight tabular-nums">
+            {nPiante}
+            <span className="ml-1.5 text-xl tracking-normal">{nPiante === 1 ? 'pianta' : 'piante'}</span>
+          </p>
+          {/* Il numero grande dice già le piante: a vista resta il resto, ai lettori di schermo la frase intera. */}
+          <p className="sr-only">{riepilogo(config)}</p>
+          <p aria-hidden className="mt-2 font-mono text-label tabular-nums text-white/80">{riepilogo(config).split(' · ').slice(1).join(' · ')}</p>
+        </div>
+        {giro && <AnelloGiro fatte={giro.fatte} totale={giro.totale} />}
+      </div>
+      {puoMisurare ? (
+        <Link
+          to={percorsoNuovaMisura(espId)}
+          className="flex min-h-14 items-center gap-3 rounded-lg bg-white/15 px-4 py-3 text-white transition-colors hover:bg-white/20 active:bg-white/25"
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-title"><span aria-hidden>➕ </span>Nuova misura</span>
+            {giro && (
+              <span className="font-mono text-label tabular-nums text-white/85">
+                {giro.icona && <span aria-hidden>{`${giro.icona} `}</span>}
+                {giro.testo}
+              </span>
+            )}
+          </span>
+          <ChevronRight aria-hidden className="size-6 shrink-0" />
+        </Link>
+      ) : <TesseraSoloLettura />}
+    </section>
+  )
+}
+
+/** "oggi", "ieri", "3 giorni fa": date AAAA-MM-GG confrontate a mezzogiorno, così l'ora legale non sposta i giorni. */
+function quantoTempoFa(data: string, oggi: string): string {
+  const giorni = Math.round((Date.parse(`${oggi}T12:00:00`) - Date.parse(`${data}T12:00:00`)) / 86400000)
+  if (giorni <= 0) return 'oggi'
+  if (giorni === 1) return 'ieri'
+  return `${giorni} giorni fa`
+}
+
+/**
+ * Le ultime misure in ordine di tempo: ogni strumento attivo con la data della sua ultima misura, dalla più recente;
+ * quelli mai misurati in fondo. Toccando uno strumento si apre il suo grafico nel Dataset. Finché le date non sono
+ * arrivate (o se la lettura non riesce) la sezione non c'è: la home non mostra dati finti né allarma.
+ */
+function UltimeMisure({ espId, config }: { espId: string; config: ConfigEsperimento }) {
+  const oggi = useOggi()
+  const ultime = useUltimeMisure(espId).data
+  const strumenti = config.strumenti.filter(s => !s.archiviato)
+  if (!ultime || strumenti.length === 0) return null
+
+  const ordinati = [...strumenti].sort((a, b) => (ultime.get(b.id) ?? '').localeCompare(ultime.get(a.id) ?? ''))
+
+  return (
+    <section aria-labelledby="titolo-ultime" className="flex flex-col gap-1">
+      <h2 id="titolo-ultime" className="px-1 text-label text-grafite-tenue uppercase">Ultime misure</h2>
+      <ol className="relative pl-6 before:absolute before:top-4 before:bottom-4 before:left-[7px] before:w-0.5 before:bg-riga">
+        {ordinati.map(s => {
+          const data = ultime.get(s.id)
+          return (
+            <li key={s.id} className="relative">
+              <span
+                aria-hidden
+                className={cn('absolute top-[22px] -left-[22px] size-3 rounded-full shadow-[0_0_0_3px_var(--carta)]', data ? 'bg-inchiostro' : 'bg-riga-forte')}
+              />
+              <Link to={percorsoDataset(espId, new URLSearchParams({ s: s.id }))} className="flex min-h-14 items-center gap-3 py-2">
+                {s.icona && <span aria-hidden className="text-[20px] leading-none">{s.icona}</span>}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="font-[600] text-grafite">{s.nome}</span>
+                  <span className="font-mono text-label tabular-nums text-grafite-tenue">
+                    {data ? `ultima ${data.slice(8, 10)}/${data.slice(5, 7)} · ${quantoTempoFa(data, oggi)}` : 'mai misurato'}
+                  </span>
+                </span>
+                <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />
+              </Link>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
+const VOCE = 'relative flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-lg border border-riga bg-foglio px-1 py-3 text-center text-label font-[600] text-grafite transition-colors hover:border-riga-controllo active:bg-carta-ombra'
 
 /** Una sezione: l'emoji è l'icona scelta nella spec, solo decorativa (il nome la dice già). */
 function Voce({ to, icona, nome, className, children }: { to: string; icona: string; nome: string; className?: string; children?: ReactNode }) {
   return (
     <Link to={to} className={cn(VOCE, className)}>
       <span aria-hidden className="text-[22px] leading-none">{icona}</span>
-      <span className="flex-1">{nome}</span>
+      <span>{nome}</span>
       {children}
     </Link>
   )
@@ -131,7 +216,7 @@ function descriviDaControllare({ promemoria, valori }: DaControllare): string {
 function NumerinoDaControllare({ da }: { da: DaControllare }) {
   return (
     <>
-      <span aria-hidden className="inline-flex h-6 min-w-6 items-center justify-center rounded-sm bg-attenzione-velato px-1.5 font-mono text-label tabular-nums text-attenzione">{da.promemoria + da.valori}</span>
+      <span aria-hidden className="absolute top-1.5 right-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-attenzione px-1 font-mono text-[11px] tabular-nums text-carta">{da.promemoria + da.valori}</span>
       {/* Lo spazio tiene staccata la frase da "Oggi" nel nome del link. */}
       {' '}
       <span className="sr-only">{descriviDaControllare(da)}</span>
@@ -142,9 +227,9 @@ function NumerinoDaControllare({ da }: { da: DaControllare }) {
 /** Al posto di "Nuova misura" per un lettore: la tessera dice che si guarda soltanto (nessun inchiostro, non è un'azione). */
 function TesseraSoloLettura() {
   return (
-    <div className="flex min-h-14 flex-col justify-center gap-0.5 rounded-lg border border-riga-controllo px-4 py-3">
-      <span className="text-title text-grafite">{SOLO_LETTURA}</span>
-      <span className="text-sm text-grafite-tenue">Puoi guardare, esportare e duplicare l&apos;esperimento.</span>
+    <div className="flex min-h-14 flex-col justify-center gap-0.5 rounded-lg border border-white/30 px-4 py-3">
+      <span className="text-title text-white">{SOLO_LETTURA}</span>
+      <span className="text-sm text-white/80">Puoi guardare, esportare e duplicare l&apos;esperimento.</span>
     </div>
   )
 }
@@ -158,19 +243,17 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
 
   return (
     <>
-      <p className="font-mono text-dato tabular-nums text-grafite-tenue">{riepilogo(config)}</p>
-      {puoMisurare ? <StrisciaNuovaMisura espId={espId} config={config} /> : <TesseraSoloLettura />}
-      <nav aria-label="Sezioni" className="grid grid-cols-2 gap-2.5">
+      <Fascia espId={espId} config={config} puoMisurare={puoMisurare} />
+      {/* Le altre sezioni (Piante, Dataset) sono nella barra in basso, Impostazioni in Altro. */}
+      <nav aria-label="Sezioni" className="grid grid-cols-4 gap-2">
         <Voce to={percorsoOggi(espId)} icona="📅" nome="Oggi">
           {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}
         </Voce>
-        <Voce to={percorsoPiante(espId)} icona="🌿" nome="Piante" />
-        <Voce to={percorsoDataset(espId)} icona="📊" nome="Dataset" />
-        <Voce to={percorsoEsporta(espId)} icona="⬇️" nome="Esporta Excel" />
         <Voce to={percorsoDiario(espId)} icona="📒" nome="Diario" />
         <Voce to={percorsoGalleria(espId)} icona="📷" nome="Foto" />
-        <Voce to={percorsoImpostazioni(espId)} icona="⚙️" nome="Impostazioni" className="col-span-2" />
+        <Voce to={percorsoEsporta(espId)} icona="⬇️" nome="Esporta Excel" />
       </nav>
+      <UltimeMisure espId={espId} config={config} />
     </>
   )
 }
@@ -187,7 +270,7 @@ export function HomeEsperimento() {
   useLetturaInAnticipo(espId, dati, dataRilievo)
 
   return (
-    <AppShell titolo={dati?.esperimento.nome ?? 'Esperimento'} indietro="/">
+    <AppShell titolo={dati?.esperimento.nome ?? 'Esperimento'} indietro="/" nav={espId}>
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />

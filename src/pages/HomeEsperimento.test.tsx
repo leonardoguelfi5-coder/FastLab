@@ -177,39 +177,40 @@ describe('HomeEsperimento: intestazione e riepilogo', () => {
 })
 
 describe('HomeEsperimento: le sezioni', () => {
-  it('ha le sette voci con il loro testo e il loro link', async () => {
+  it('ha i quattro riquadri con il loro testo e il loro link', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
+    const sezioni = screen.getByRole('navigation', { name: 'Sezioni' })
     const voci: [string, string][] = [
       ['Oggi', '/esperimenti/E/oggi'],
-      ['Piante', '/esperimenti/E/piante'],
-      ['Dataset', '/esperimenti/E/dataset'],
-      ['Esporta Excel', '/esperimenti/E/esporta'],
       ['Diario', '/esperimenti/E/diario'],
       ['Foto', '/esperimenti/E/foto'],
-      ['Impostazioni', '/esperimenti/E/impostazioni'],
+      ['Esporta Excel', '/esperimenti/E/esporta'],
     ]
     for (const [nome, href] of voci) {
-      expect(screen.getByRole('link', { name: nome })).toHaveAttribute('href', href)
+      expect(within(sezioni).getByRole('link', { name: nome })).toHaveAttribute('href', href)
     }
   })
 
-  it('mostra le icone di ogni voce senza leggerle come testo', async () => {
+  it('mostra le icone di ogni riquadro senza leggerle come testo', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
-    for (const [nome, icona] of [['Oggi', '📅'], ['Piante', '🌿'], ['Dataset', '📊'], ['Esporta Excel', '⬇️'], ['Diario', '📒'], ['Foto', '📷'], ['Impostazioni', '⚙️']]) {
+    for (const [nome, icona] of [['Oggi', '📅'], ['Esporta Excel', '⬇️'], ['Diario', '📒'], ['Foto', '📷']]) {
       const voce = screen.getByRole('link', { name: nome })
       expect(voce).toHaveTextContent(icona)
       expect(within(voce).getByText(icona)).toHaveAttribute('aria-hidden', 'true')
     }
   })
 
-  it('Impostazioni sta in fondo, a tutta larghezza, dopo le altre voci', async () => {
+  it('Piante, Dataset e Altro stanno nella barra in basso; Impostazioni è dentro Altro', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
-    const voci = screen.getAllByRole('link').filter(l => l.getAttribute('href')?.startsWith('/esperimenti/E/'))
-    expect(voci.map(l => l.getAttribute('href')).at(-1)).toBe('/esperimenti/E/impostazioni')
-    expect(screen.getByRole('link', { name: 'Impostazioni' }).className).toContain('col-span-2')
+    const barra = screen.getByRole('navigation', { name: 'Navigazione esperimento' })
+    expect(within(barra).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/esperimenti/E')
+    expect(within(barra).getByRole('link', { name: 'Piante' })).toHaveAttribute('href', '/esperimenti/E/piante')
+    expect(within(barra).getByRole('link', { name: 'Dataset' })).toHaveAttribute('href', '/esperimenti/E/dataset')
+    expect(within(barra).getByRole('link', { name: 'Altro' })).toHaveAttribute('href', '/esperimenti/E/altro')
+    expect(screen.queryByRole('link', { name: 'Impostazioni' })).not.toBeInTheDocument()
   })
 
   it('senza valori da controllare non ha il numerino su Oggi, né la Mappa', async () => {
@@ -400,13 +401,13 @@ describe('HomeEsperimento: il numerino su Oggi', () => {
     await vi.waitFor(() => expect(oggi()).toHaveAccessibleName('Oggi 1 valore da controllare'))
   })
 
-  it('è un segno in attenzione velato, con il numero: mai solo colore', async () => {
+  it('è un segno in attenzione, con il numero: mai solo colore', async () => {
     vi.mocked(misureDelGiorno).mockResolvedValue(conStonate(7))
     vaiAllaPagina()
     await aspettaLaHome()
     const numero = await within(oggi()).findByText('1')
-    expect(numero).toHaveClass('bg-attenzione-velato')
-    expect(numero).toHaveClass('text-attenzione')
+    expect(numero).toHaveClass('bg-attenzione')
+    expect(numero).toHaveClass('text-carta')
     expect(numero).toHaveClass('font-mono')
   })
 

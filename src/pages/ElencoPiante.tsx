@@ -254,7 +254,7 @@ export function ElencoPiante() {
   const dati = config.data
 
   return (
-    <AppShell titolo="Piante" indietro={percorsoHome(espId)}>
+    <AppShell titolo="Piante" indietro={percorsoHome(espId)} nav={espId}>
       {dati === undefined ? (
         config.isError
           ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
