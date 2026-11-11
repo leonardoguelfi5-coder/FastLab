@@ -22,7 +22,7 @@ import { avanzamentoFase, FASI, NOMI_FASE, passiDellaFase, statoSessione } from 
 import { NOMI_TIPO, type SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
-import { messaggioErrore } from '@/lib/errori'
+import { ELEMENTO_NON_TROVATO, messaggioErrore, SESSIONE_CON_PESI_ALTRUI } from '@/lib/errori'
 import { percorsoPesata, percorsoPesatura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
@@ -99,6 +99,9 @@ function Contenuto({ espId, sessione, dati, config }: {
   // Come `puo_gestire_sessione` del database: il proprietario, oppure chi ha creato la sessione. Il database ha l'ultima parola.
   const puoGestire = permessi.puoMisurare && (!permessi.soloProprietario || (sessione.creato_da !== undefined && sessione.creato_da === utente?.user.id))
   const stato = statoSessione(sessione, campioni, pesi)
+  // Come `sessioni_pesatura_delete` (20261111000018): chi non è il proprietario non elimina una sessione con pesi
+  // di altre persone, che sparirebbero con lei.
+  const conPesiAltrui = permessi.soloProprietario && pesi.some(p => p.creato_da !== utente?.user.id)
 
   /** Esegue un'azione che scrive o scarica: un solo tocco alla volta, l'errore resta sotto i pulsanti. */
   async function esegui(azione: () => Promise<void>) {
@@ -122,7 +125,15 @@ function Contenuto({ espId, sessione, dati, config }: {
   const elimina = () => {
     setConfermaElimina(false)
     return esegui(async () => {
-      await eliminaSessione(sessione.id)
+      try {
+        await eliminaSessione(sessione.id)
+      } catch (e) {
+        // Nessuna riga eliminata: per chi non è il proprietario, quasi sempre un peso altrui arrivato nel frattempo.
+        if (permessi.soloProprietario && e instanceof Error && e.message === ELEMENTO_NON_TROVATO) {
+          throw new Error(SESSIONE_CON_PESI_ALTRUI, { cause: e })
+        }
+        throw e
+      }
       await queryClient.invalidateQueries({ queryKey: chiavi.pesatura(espId) })
       navigate(percorsoPesatura(espId))
     })
@@ -212,12 +223,13 @@ function Contenuto({ espId, sessione, dati, config }: {
               {sessione.conclusa ? 'Riapri' : 'Segna come conclusa'}
             </Button>
           )}
-          {puoGestire && (
+          {puoGestire && !conPesiAltrui && (
             <Button type="button" size="lg" variant="ghost" disabled={occupato || senzaRete} onClick={() => setConfermaElimina(true)}>
               Elimina sessione
             </Button>
           )}
         </div>
+        {puoGestire && conPesiAltrui && <p className="text-base text-grafite-tenue">{SESSIONE_CON_PESI_ALTRUI}</p>}
         {errore && <TestoErrore role="alert" className="text-base">{errore}</TestoErrore>}
       </section>
 

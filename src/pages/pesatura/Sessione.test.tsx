@@ -20,6 +20,7 @@ import { ruoloIn } from '@/api/persone'
 import { aggiornaSessione, eliminaSessione, listaPesatura } from '@/api/pesatura'
 import { scaricaGraficoPng, scaricaPesatura } from '@/components/pesatura/scaricaPesatura'
 import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from '@/domain/pesatura/tipi'
+import { ELEMENTO_NON_TROVATO, SESSIONE_CON_PESI_ALTRUI } from '@/lib/errori'
 import { Sessione } from './Sessione'
 
 const sessione = (extra: Partial<SessionePesatura> = {}): SessionePesatura => ({
@@ -150,6 +151,34 @@ describe('Sessione', () => {
     apri()
     await titolo()
     expect(await screen.findByRole('button', { name: 'Segna come conclusa' })).toBeInTheDocument()
+  })
+
+  it('un rilevatore non elimina la sua sessione se contiene pesi di altre persone', async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
+    dati([sessione()], campioni, [...pesiRwc.slice(1), { ...pesiRwc[0], creato_da: 'altro' }])
+    apri()
+    await titolo()
+    expect(await screen.findByText(SESSIONE_CON_PESI_ALTRUI)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Elimina sessione' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Segna come conclusa' })).toBeInTheDocument()
+  })
+
+  it('il proprietario elimina anche una sessione con pesi di altre persone', async () => {
+    dati([sessione()], campioni, [...pesiRwc.slice(1), { ...pesiRwc[0], creato_da: 'altro' }])
+    apri()
+    await titolo()
+    expect(await screen.findByRole('button', { name: 'Elimina sessione' })).toBeInTheDocument()
+    expect(screen.queryByText(SESSIONE_CON_PESI_ALTRUI)).not.toBeInTheDocument()
+  })
+
+  it('un rilevatore a cui il database rifiuta l\'eliminazione legge perché', async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
+    vi.mocked(eliminaSessione).mockRejectedValue(new Error(ELEMENTO_NON_TROVATO))
+    const u = apri()
+    await titolo()
+    await u.click(await screen.findByRole('button', { name: 'Elimina sessione' }))
+    await u.click(await screen.findByRole('button', { name: 'Elimina' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(SESSIONE_CON_PESI_ALTRUI)
   })
 
   it('Scarica Excel scarica la sessione, Scarica tutte quelle dell\'analisi', async () => {

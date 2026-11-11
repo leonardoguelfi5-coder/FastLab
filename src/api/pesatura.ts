@@ -50,7 +50,8 @@ function daRigaPeso(r: Peso): Peso {
 }
 
 /** Le analisi che l'utente può vedere (la RLS decide quali), in ordine di titolo. Archiviate comprese: le filtra la pagina. */
-export async function listaAnalisi(_espId: string): Promise<AnalisiPesatura[]> {
+export async function listaAnalisi(espId: string): Promise<AnalisiPesatura[]> {
+  void espId // la firma resta per chi la chiama: le analisi non dipendono dall'esperimento
   const { data, error } = await supabase.from('analisi_pesatura').select('*').order('titolo', { ascending: true })
   if (error) throw error
   return ((data ?? []) as AnalisiPesatura[]).map(daRigaAnalisi)

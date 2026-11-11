@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(58);
+select plan(64);
 
 -- Pesatura: analisi dell'utente, sessioni dell'esperimento, campioni e pesi, con le loro sicurezze.
 -- Fixture (superuser): A proprietario di EA, R rilevatore in EA, L lettore in EA, B estraneo (proprietario di EB).
@@ -262,6 +262,60 @@ select throws_ok(
              '51100000-0000-0000-0000-000000000001', 'e1100000-0000-0000-0000-000000000001', 'fresco', 1.1) $$,
   '42501', null,
   'B non inserisce pesi in EA');
+
+-- ===== Eliminazioni: il rilevatore non porta via i pesi degli altri =====
+-- Fixture (superuser): due sessioni di R. La 7 ha il campione 7 con un peso di A e il campione 8 con un peso di R;
+-- la 8 ha il campione 9 con un solo peso di R.
+reset role;
+insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data, creato_da) values
+  ('51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001',
+   'a1100000-0000-0000-0000-000000000001', 'Sessione R mista', 'aliquota', 'g', '{}', '2026-11-13',
+   '01100000-0000-0000-0000-00000000000b'),
+  ('51100000-0000-0000-0000-000000000008', 'e1100000-0000-0000-0000-000000000001',
+   'a1100000-0000-0000-0000-000000000001', 'Sessione R sola', 'aliquota', 'g', '{}', '2026-11-13',
+   '01100000-0000-0000-0000-00000000000b');
+insert into campioni_pesatura (id, sessione_id, esperimento_id, nome, ordine) values
+  ('c1100000-0000-0000-0000-000000000007', '51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001', 'M1', 0),
+  ('c1100000-0000-0000-0000-000000000008', '51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001', 'M2', 1),
+  ('c1100000-0000-0000-0000-000000000009', '51100000-0000-0000-0000-000000000008', 'e1100000-0000-0000-0000-000000000001', 'S1', 0);
+insert into pesi (id, campione_id, sessione_id, esperimento_id, tipo, valore, creato_da) values
+  ('d1100000-0000-0000-0000-000000000017', 'c1100000-0000-0000-0000-000000000007', '51100000-0000-0000-0000-000000000007',
+   'e1100000-0000-0000-0000-000000000001', 'aliquota', 0.2, '01100000-0000-0000-0000-00000000000a'),
+  ('d1100000-0000-0000-0000-000000000018', 'c1100000-0000-0000-0000-000000000008', '51100000-0000-0000-0000-000000000007',
+   'e1100000-0000-0000-0000-000000000001', 'aliquota', 0.3, '01100000-0000-0000-0000-00000000000b'),
+  ('d1100000-0000-0000-0000-000000000019', 'c1100000-0000-0000-0000-000000000009', '51100000-0000-0000-0000-000000000008',
+   'e1100000-0000-0000-0000-000000000001', 'aliquota', 0.4, '01100000-0000-0000-0000-00000000000b');
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', '01100000-0000-0000-0000-00000000000b', 'role', 'authenticated')::text, true);
+
+select is_empty(
+  $$ delete from sessioni_pesatura where id = '51100000-0000-0000-0000-000000000007' returning id $$,
+  'R non elimina la sua sessione se contiene un peso di A');
+
+select is_empty(
+  $$ delete from campioni_pesatura where id = 'c1100000-0000-0000-0000-000000000007' returning id $$,
+  'R non elimina il suo campione se contiene un peso di A');
+
+select is(
+  (select count(*)::int from pesi where id = 'd1100000-0000-0000-0000-000000000017'), 1,
+  'il peso di A resta');
+
+select isnt_empty(
+  $$ delete from campioni_pesatura where id = 'c1100000-0000-0000-0000-000000000008' returning id $$,
+  'R elimina un campione con solo pesi suoi');
+
+select isnt_empty(
+  $$ delete from sessioni_pesatura where id = '51100000-0000-0000-0000-000000000008' returning id $$,
+  'R elimina una sua sessione con solo pesi suoi');
+
+select set_config('request.jwt.claims',
+  json_build_object('sub', '01100000-0000-0000-0000-00000000000a', 'role', 'authenticated')::text, true);
+
+select isnt_empty(
+  $$ delete from sessioni_pesatura where id = '51100000-0000-0000-0000-000000000007' returning id $$,
+  'A elimina la sessione di R anche con pesi di altri');
 
 -- ===== Di nuovo A, proprietario: corregge tutto, poi i vincoli =====
 select set_config('request.jwt.claims',

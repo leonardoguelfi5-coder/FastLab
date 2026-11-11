@@ -25,6 +25,10 @@ export const EMAIL_GIA_INVITATA = 'Questa email è già stata invitata: trovi l\
 /** Un peso già inserito da un'altra persona per lo stesso campione, replica e tipo (indice unico `pesi_unico`). */
 export const PESO_GIA_INSERITO = 'Questo peso è già stato inserito da un\'altra persona: ricarica la sessione.'
 
+/** Un rilevatore non elimina una sessione con pesi inseriti da altri: con lei sparirebbero anche quei pesi
+ *  (policy `sessioni_pesatura_delete`, 20261111000018). */
+export const SESSIONE_CON_PESI_ALTRUI = 'Non puoi eliminare la sessione: contiene pesi inseriti da altre persone.'
+
 /** Un nome già usato da un'altra voce non archiviata del catalogo (indice unico `catalogo_strumenti_nome_unico`). */
 const MSG_NOME_NEL_CATALOGO = 'Nel catalogo c\'è già uno strumento con questo nome.'
 
