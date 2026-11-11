@@ -279,6 +279,7 @@ Decisi e grandi, pensati per il pollice.
 - **Do** colorare le serie dei grafici solo con la tavolozza dei dati, seguendo il posto del trattamento, e dare a ognuna marcatore e voce di legenda.
 - **Do** mettere l'azione principale in una barra in basso, alta 52px, raggiungibile col pollice.
 - **Do** limitare il movimento a 150–200 ms con easing `cubic-bezier(0.22, 1, 0.36, 1)` e rispettare `prefers-reduced-motion`.
+- **Do** tenere la schermata d'avvio (`index.html`, `src/lib/splash.ts`) come **unica eccezione** alla regola del movimento: circa 2 s solo alla prima apertura della sessione, un tocco la chiude, e con `prefers-reduced-motion` resta il marchio fermo.
 
 ### Don't:
 - **Don't** fare un'app "startup" colorata: niente gradienti, illustrazioni, animazioni ovunque, emoji a profusione (le emoji sono ammesse solo come icona di uno strumento scelta dall'utente e come icone delle sezioni nella home dell'esperimento).
