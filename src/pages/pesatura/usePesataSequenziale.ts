@@ -36,8 +36,11 @@ export function usePesataSequenziale({ espId, sessione, campioni, pesi, fase }: 
 
   const finito = indice >= passi.length
 
+  /** Durante un salvataggio ci si ferma: il passo non si sposta sotto il dito (né per la tastiera né per la voce). */
   function vaiA(i: number) {
+    if (inCorso.current) return
     setErrore(null)
+    setUltimo(null)
     setIndice(Math.min(Math.max(0, i), passi.length))
   }
 

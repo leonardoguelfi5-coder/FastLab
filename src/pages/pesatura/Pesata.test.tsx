@@ -151,6 +151,20 @@ describe('Pesata', () => {
     expect(await screen.findByText('Replica B')).toBeInTheDocument()
   })
 
+  it('durante il salvataggio Indietro e Salta sono spenti e l\'indice non salta', async () => {
+    let finisci: () => void = () => {}
+    vi.mocked(salvaPeso).mockReturnValue(new Promise<void>(r => { finisci = r }))
+    const utente = apri()
+    await salva()
+    await utente.type(campoPeso(), '1')
+    await utente.click(await salva())
+    expect(screen.getByRole('button', { name: 'Salta' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Indietro' })).toBeDisabled()
+    finisci()
+    expect(await screen.findByText('Replica B')).toBeInTheDocument()
+    expect(screen.getByText('Passo 2 di 4')).toBeInTheDocument()
+  })
+
   it('con un errore di rete il valore resta, compare Riprova e l\'indice non cambia; riprovando si riscrive la stessa riga', async () => {
     vi.mocked(salvaPeso).mockRejectedValueOnce(new Error('Failed to fetch'))
     const utente = apri()
@@ -193,6 +207,16 @@ describe('Pesata', () => {
     await utente.click(screen.getByRole('button', { name: 'Indietro' }))
     expect(screen.getByText('Replica A')).toBeInTheDocument()
     expect(salvaPeso).not.toHaveBeenCalled()
+  })
+
+  it('spostarsi toglie il messaggio di salvato', async () => {
+    const utente = apri()
+    await salva()
+    await utente.type(campoPeso(), '1')
+    await utente.click(await salva())
+    expect(await screen.findByText('P12 · A salvato ✓')).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Salta' }))
+    expect(screen.queryByText('P12 · A salvato ✓')).not.toBeInTheDocument()
   })
 
   it('un peso di un\'altra persona, senza il permesso di correggere, è in sola lettura', async () => {

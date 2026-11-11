@@ -263,11 +263,11 @@ function SchedaPasso({ sessione, pesi, fase, passo, etichetta, trattamento, repl
           Salva e vai al prossimo
         </Button>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1" disabled={giro.indice === 0} onClick={() => giro.vaiA(giro.indice - 1)}>
+          <Button type="button" variant="outline" className="flex-1" disabled={giro.indice === 0 || giro.occupato} onClick={() => giro.vaiA(giro.indice - 1)}>
             <ArrowLeft aria-hidden />
             Indietro
           </Button>
-          <Button type="button" variant="outline" className="flex-1" onClick={() => giro.vaiA(giro.indice + 1)}>
+          <Button type="button" variant="outline" className="flex-1" disabled={giro.occupato} onClick={() => giro.vaiA(giro.indice + 1)}>
             <SkipForward aria-hidden />
             Salta
           </Button>
