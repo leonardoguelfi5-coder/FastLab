@@ -15,6 +15,7 @@ import { avviaCachePersistente, ripristinaCache } from '@/lib/cachePersistente'
 import { utenteCoda } from '@/lib/coda/codaMisure'
 import { avviaInvioAutomatico } from '@/lib/coda/invio'
 import { Toaster } from '@/components/ui/sonner'
+import { FineSplash } from '@/components/FineSplash'
 
 const queryClient = creaQueryClient()
 // La copia delle letture sul telefono (Piano E, Task E7), prima del primo disegno: senza rete la configurazione e il
@@ -41,6 +42,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <App />
       <Toaster />
+      <FineSplash />
     </QueryClientProvider>
   </StrictMode>,
 )

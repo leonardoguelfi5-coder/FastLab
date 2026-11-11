@@ -14,8 +14,235 @@
     <meta name="apple-mobile-web-app-title" content="FastLab" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>FastLab</title>
+    <link rel="preload" as="image" href="/splash-logo.png" fetchpriority="high" />
+    <!-- La schermata d'avvio: sta qui, e non in React, perché deve vedersi subito, mentre il JavaScript si carica.
+         La chiude src/lib/splash.ts dopo il primo disegno dell'app. Unica animazione "di scena" dell'app (DESIGN.md). -->
+    <style>
+      #splash {
+        --splash-fondo: #0f2523; /* la carta dell'app (src/index.css): l'uscita non ha salti di colore */
+        --splash-testo: #e8f5ee;
+        --splash-menta: #6fe0b0;
+        --splash-ease: cubic-bezier(0.22, 1, 0.36, 1);
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: var(--splash-fondo);
+        color: var(--splash-testo);
+        cursor: default;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: opacity 480ms var(--splash-ease), visibility 0s linear 480ms;
+      }
+      html.con-splash,
+      html.con-splash body {
+        background: #0f2523;
+        overflow: hidden;
+      }
+
+      /* Il bagliore dietro il logo: si accende piano, come una lampada da banco. */
+      .splash-alone {
+        position: absolute;
+        left: 50%;
+        top: 44%;
+        width: min(140vw, 760px);
+        aspect-ratio: 1;
+        translate: -50% -50%;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, rgb(46 196 134 / 0.22), rgb(46 196 134 / 0.07) 55%, transparent);
+        opacity: 0;
+        scale: 0.55;
+        animation: splash-alone 1400ms var(--splash-ease) 80ms both;
+      }
+
+      .splash-marchio {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: -6vh;
+        transition: scale 520ms var(--splash-ease), filter 520ms var(--splash-ease);
+      }
+
+      .splash-logo {
+        position: relative;
+        width: clamp(150px, 46vw, 220px);
+        aspect-ratio: 600 / 471;
+      }
+      .splash-logo img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        /* Entra da sinistra come le linee di velocità del logo: una tendina che si apre, con un po' di sfocatura. */
+        -webkit-mask-image: linear-gradient(90deg, #000 42%, transparent 58%);
+        mask-image: linear-gradient(90deg, #000 42%, transparent 58%);
+        -webkit-mask-size: 260% 100%;
+        mask-size: 260% 100%;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        animation: splash-tendina 900ms var(--splash-ease) 160ms both, splash-arrivo 1000ms var(--splash-ease) 160ms both;
+      }
+      /* Un riflesso che attraversa il vetro della beuta, una volta sola. */
+      .splash-luce {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(110deg, transparent 38%, rgb(255 255 255 / 0.75) 50%, transparent 62%) no-repeat;
+        background-size: 300% 100%;
+        background-position: 100% 0;
+        -webkit-mask: url(/splash-logo.png) center / contain no-repeat;
+        mask: url(/splash-logo.png) center / contain no-repeat;
+        mix-blend-mode: soft-light;
+        animation: splash-luce 900ms cubic-bezier(0.45, 0, 0.25, 1) 1000ms both;
+      }
+
+      .splash-nome {
+        margin: 26px 0 0;
+        font-family: "Space Grotesk Variable", "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 32px;
+        font-weight: 640;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        animation: splash-nome 900ms var(--splash-ease) 720ms both;
+      }
+      .splash-nome span {
+        color: var(--splash-menta);
+      }
+      .splash-motto {
+        margin: 12px 0 0;
+        font-family: "Atkinson Hyperlegible Next Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 12px;
+        font-weight: 550;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgb(232 245 238 / 0.62);
+        animation: splash-sale 800ms var(--splash-ease) 980ms both;
+      }
+
+      /* Se l'app ci mette più del previsto, una riga sottile dice che sta ancora caricando. */
+      .splash-barra {
+        position: absolute;
+        left: 50%;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
+        width: 72px;
+        height: 2px;
+        translate: -50% 0;
+        overflow: hidden;
+        border-radius: 2px;
+        background: rgb(232 245 238 / 0.12);
+        opacity: 0;
+        animation: splash-sale 400ms var(--splash-ease) 2400ms both;
+      }
+      .splash-barra::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        width: 40%;
+        border-radius: inherit;
+        background: var(--splash-menta);
+        animation: splash-barra 1100ms cubic-bezier(0.65, 0, 0.35, 1) 2400ms infinite;
+      }
+
+      /* L'uscita: il marchio si avvicina e la schermata si dissolve sull'app già pronta sotto. */
+      #splash.splash--uscita {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #splash.splash--uscita .splash-marchio {
+        scale: 1.08;
+        filter: blur(3px);
+      }
+
+      @keyframes splash-alone {
+        to { opacity: 1; scale: 1; }
+      }
+      @keyframes splash-tendina {
+        from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }
+        to { -webkit-mask-position: 0 0; mask-position: 0 0; }
+      }
+      @keyframes splash-arrivo {
+        from { translate: -14% 0; filter: blur(6px); }
+        to { translate: 0 0; filter: blur(0); }
+      }
+      @keyframes splash-luce {
+        from { background-position: 100% 0; }
+        to { background-position: 0 0; }
+      }
+      @keyframes splash-nome {
+        from { opacity: 0; translate: 0 10px; letter-spacing: 0.14em; filter: blur(4px); }
+        to { opacity: 1; translate: 0 0; letter-spacing: -0.02em; filter: blur(0); }
+      }
+      @keyframes splash-sale {
+        from { opacity: 0; translate: 0 6px; }
+        to { opacity: 1; translate: 0 0; }
+      }
+      @keyframes splash-barra {
+        from { translate: -100% 0; }
+        to { translate: 250% 0; }
+      }
+
+      /* Movimento ridotto: niente di tutto questo, solo il marchio fermo e una dissolvenza breve. */
+      @media (prefers-reduced-motion: reduce) {
+        #splash *,
+        #splash *::after {
+          animation: none !important;
+        }
+        .splash-alone { opacity: 1; scale: 1; }
+        .splash-logo img { -webkit-mask-image: none; mask-image: none; }
+        .splash-luce { display: none; }
+        #splash,
+        .splash-marchio { transition-duration: 200ms; }
+        #splash.splash--uscita .splash-marchio { scale: 1; filter: none; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <div class="splash-alone"></div>
+      <div class="splash-marchio">
+        <div class="splash-logo">
+          <img src="/splash-logo.png" width="600" height="471" alt="" decoding="sync" fetchpriority="high" />
+          <span class="splash-luce"></span>
+        </div>
+        <p class="splash-nome">Fast<span>Lab</span></p>
+        <p class="splash-motto">Quaderno di campo</p>
+      </div>
+      <div class="splash-barra"></div>
+    </div>
+    <script>
+      // Solo alla prima apertura della sessione: un ricaricamento della pagina non la ripete. Se l'app non la chiude
+      // (il JavaScript non si carica), dopo 8 secondi se ne va comunque, per non coprire un errore.
+      (function () {
+        var splash = document.getElementById('splash')
+        var vista = false
+        try {
+          vista = sessionStorage.getItem('fastlab-splash') === '1'
+          sessionStorage.setItem('fastlab-splash', '1')
+        } catch (e) {}
+        if (vista) {
+          splash.remove()
+          return
+        }
+        document.documentElement.classList.add('con-splash')
+        var colore = document.querySelector('meta[name="theme-color"]')
+        if (colore) {
+          colore.setAttribute('data-app', colore.getAttribute('content'))
+          colore.setAttribute('content', '#0f2523')
+        }
+        window.__splashInizio = performance.now()
+        setTimeout(function () {
+          if (window.__chiudiSplash) window.__chiudiSplash()
+          else if (splash.isConnected) {
+            splash.remove()
+            document.documentElement.classList.remove('con-splash')
+            if (colore) colore.setAttribute('content', colore.getAttribute('data-app'))
+          }
+        }, 8000)
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
