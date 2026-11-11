@@ -16,6 +16,7 @@ import { EditorAnalisi } from '@/pages/pesatura/EditorAnalisi'
 import { NuovaSessione } from '@/pages/pesatura/NuovaSessione'
 import { Pesata } from '@/pages/pesatura/Pesata'
 import { Pesatura } from '@/pages/pesatura/Pesatura'
+import { Sessione } from '@/pages/pesatura/Sessione'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/impostazioni/IndiceImpostazioni'
 import { ImpostazioniSezione } from '@/pages/impostazioni/PaginaSezione'
@@ -60,6 +61,7 @@ export function AppRoutes() {
         {/* Anche "nuova" è un segmento fisso: va dichiarato prima di `:sessioneId`. */}
         <Route path="/esperimenti/:espId/laboratorio/pesatura/nuova" element={<NuovaSessione />} />
         <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId/pesa/:fase" element={<Pesata />} />
+        <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId" element={<Sessione />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>
 
