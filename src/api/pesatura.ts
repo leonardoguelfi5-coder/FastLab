@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase'
-import type { AnalisiPesatura, CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
+import {
+  IMPOSTAZIONI_PREDEFINITE, type AnalisiPesatura, type CampionePesatura, type ImpostazioniAnalisi, type Peso, type SessionePesatura,
+} from '@/domain/pesatura/tipi'
 import { controllaRighe } from './righe'
 
 /*
@@ -16,19 +18,22 @@ export interface DatiPesatura {
   pesi: Peso[]
 }
 
+/** Le impostazioni di una riga: il default del database è `{}`, e i campi mancanti prendono i valori predefiniti. */
+const conPredefinite = (i: Partial<ImpostazioniAnalisi> | null | undefined): ImpostazioniAnalisi => ({ ...IMPOSTAZIONI_PREDEFINITE, ...(i ?? {}) })
+
 /** Il campo `creato_da` solo se la riga lo ha: nel dominio è facoltativo. */
 const autore = (r: { creato_da?: string | null }) => (r.creato_da ? { creato_da: r.creato_da } : {})
 
 function daRigaAnalisi(r: AnalisiPesatura): AnalisiPesatura {
   return {
-    id: r.id, titolo: r.titolo, tipo: r.tipo, unita: r.unita, impostazioni: r.impostazioni, archiviata: r.archiviata, ...autore(r),
+    id: r.id, titolo: r.titolo, tipo: r.tipo, unita: r.unita, impostazioni: conPredefinite(r.impostazioni), archiviata: r.archiviata, ...autore(r),
   }
 }
 
 function daRigaSessione(r: SessionePesatura): SessionePesatura {
   return {
     id: r.id, esperimento_id: r.esperimento_id, analisi_id: r.analisi_id, titolo: r.titolo, tipo: r.tipo, unita: r.unita,
-    impostazioni: r.impostazioni, data: r.data, nota: r.nota, conclusa: r.conclusa, ...autore(r),
+    impostazioni: conPredefinite(r.impostazioni), data: r.data, nota: r.nota, conclusa: r.conclusa, ...autore(r),
     ...(r.creato_il ? { creato_il: r.creato_il } : {}),
   }
 }

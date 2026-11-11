@@ -67,6 +67,23 @@ describe('listaAnalisi', () => {
   })
 })
 
+describe('impostazioni vuote nel database ({})', () => {
+  const predefinite = { repliche: 1, rapportoTampone: null, sensore: null }
+
+  it('analisi e sessioni ricevono le impostazioni predefinite', async () => {
+    mock.risponde('analisi_pesatura', { data: [{ ...analisi, impostazioni: {} }] })
+    expect((await listaAnalisi('E'))[0].impostazioni).toEqual(predefinite)
+
+    pagineDa({ sessioni_pesatura: [[{ ...rigaSessione(1), impostazioni: {} }], []], campioni_pesatura: [[]], pesi: [[]] })
+    expect((await listaPesatura('E')).sessioni[0].impostazioni).toEqual(predefinite)
+  })
+
+  it('i campi presenti restano, quelli mancanti si completano', async () => {
+    mock.risponde('analisi_pesatura', { data: [{ ...analisi, impostazioni: { repliche: 3 } }] })
+    expect((await listaAnalisi('E'))[0].impostazioni).toEqual({ ...predefinite, repliche: 3 })
+  })
+})
+
 describe('salvaAnalisi', () => {
   it('upsert per id, senza creato_da', async () => {
     await salvaAnalisi({ ...analisi, creato_da: 'u1' })
