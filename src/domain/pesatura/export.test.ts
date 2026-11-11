@@ -64,7 +64,7 @@ describe('cartellaPesatura: RWC', () => {
     expect(pesi.intestazione).toBe(true)
     expect(titoli(pesi)).toEqual([
       'Esperimento', 'Analisi', 'Data', 'Campione', 'Sale', 'Trattamento', 'Replica',
-      'Fresco', 'Turgido', 'Secco', 'RWC (%)', 'Sostanza secca (%)',
+      'Fresco (g)', 'Turgido (g)', 'Secco (g)', 'RWC (%)', 'Sostanza secca (%)',
     ])
   })
 
@@ -87,8 +87,8 @@ describe('cartellaPesatura: RWC', () => {
     const pesi = foglio('Pesi', cartella.fogli)
     const b = pesi.righe[1]
     expect(col(pesi, b, 'Replica')).toBe('B')
-    expect(col(pesi, b, 'Fresco')).toBe(1.3)
-    expect(col(pesi, b, 'Secco')).toBeNull()
+    expect(col(pesi, b, 'Fresco (g)')).toBe(1.3)
+    expect(col(pesi, b, 'Secco (g)')).toBeNull()
     expect(col(pesi, b, 'RWC (%)')).toBeNull()
     expect(col(pesi, b, 'Sostanza secca (%)')).toBeNull()
   })
@@ -136,8 +136,25 @@ describe('cartellaPesatura: aliquota e sostanza secca', () => {
       sessioni: [s], campioni: [campione('c1', 1, { nome: 'A1' })], pesi: [peso('1', 'c1', 1, 'fresco', 2), peso('2', 'c1', 1, 'secco', 0.5)],
     }
     const pesi = foglio('Pesi', cartellaPesatura([s], dati, config, OGGI, ADESSO).fogli)
-    expect(titoli(pesi).slice(-3)).toEqual(['Fresco', 'Secco', 'Sostanza secca (%)'])
+    expect(titoli(pesi).slice(-3)).toEqual(['Fresco (g)', 'Secco (g)', 'Sostanza secca (%)'])
     expect(col(pesi, pesi.righe[0], 'Sostanza secca (%)')).toBeCloseTo(25, 9)
+  })
+
+  it('sessioni passate dalla più nuova: tipo, unità e righe seguono la più vecchia', () => {
+    const vecchia = sessione({ id: 'S1', data: '2026-11-03', titolo: 'Prima', tipo: 'sostanza_secca', unita: 'mg', impostazioni: IMPOSTAZIONI_PREDEFINITE })
+    const nuova = sessione({ id: 'S2', data: '2026-11-10', titolo: 'Seconda', tipo: 'sostanza_secca', unita: 'g', impostazioni: IMPOSTAZIONI_PREDEFINITE })
+    const dati: DatiPesatura = {
+      sessioni: [nuova, vecchia],
+      campioni: [campione('c1', 1, { nome: 'A', sessione_id: 'S1' }), campione('c2', 1, { nome: 'A', sessione_id: 'S2' })],
+      pesi: [peso('1', 'c1', 1, 'fresco', 2000), peso('2', 'c2', 1, 'fresco', 3)],
+    }
+    const c = cartellaPesatura([nuova, vecchia], dati, config, OGGI, ADESSO)
+    const pesi = foglio('Pesi', c.fogli)
+    expect(c.nomeFile).toBe('Pesatura_Prima_2026-11-12.xlsx')
+    expect(titoli(pesi)).toContain('Fresco (mg)')
+    // la sessione in g è convertita nell'unità della più vecchia (mg)
+    expect(pesi.righe.map(r => col(pesi, r, 'Fresco (mg)'))).toEqual([2000, 3000])
+    expect(JSON.stringify(foglio('Info', c.fogli).righe)).toContain('"mg"')
   })
 
   it('più sessioni: righe di tutte, intervallo dal minimo al massimo', () => {

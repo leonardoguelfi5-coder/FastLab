@@ -116,9 +116,11 @@ function foglioPesi(sessioni: SessionePesatura[], dati: DatiPesatura, ctx: Conte
     colonne.push(numero(`Peso (${unita})`))
     if (conTampone) colonne.push(numero('Tampone (mL)'))
   } else if (tipo === 'rwc') {
-    colonne.push(numero('Fresco'), numero('Turgido'), numero('Secco'), numero('RWC (%)'), numero('Sostanza secca (%)'))
+    colonne.push(
+      numero(`Fresco (${unita})`), numero(`Turgido (${unita})`), numero(`Secco (${unita})`), numero('RWC (%)'), numero('Sostanza secca (%)'),
+    )
   } else {
-    colonne.push(numero('Fresco'), numero('Secco'), numero('Sostanza secca (%)'))
+    colonne.push(numero(`Fresco (${unita})`), numero(`Secco (${unita})`), numero('Sostanza secca (%)'))
   }
 
   const righe: Cella[][] = []
@@ -260,9 +262,11 @@ function foglioInfo(
 
 /** `oggi` e `adesso` si passano nei test; l'app usa la data e l'ora del momento. */
 export function cartellaPesatura(
-  sessioni: SessionePesatura[], dati: DatiPesatura, config: ConfigEsperimento, oggi: string = oggiLocale(), adesso: string = new Date().toISOString(),
+  sessioniDate: SessionePesatura[], dati: DatiPesatura, config: ConfigEsperimento, oggi: string = oggiLocale(), adesso: string = new Date().toISOString(),
 ): Cartella {
-  const titolo = [...sessioni].sort(dallaPiuVecchia)[0]?.titolo ?? ''
+  // Si ordina una volta sola, dalla più vecchia: tipo, unità, titolo e impostazioni vengono tutti dalla prima.
+  const sessioni = [...sessioniDate].sort(dallaPiuVecchia)
+  const titolo = sessioni[0]?.titolo ?? ''
   const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_${oggi}.xlsx`
   if (sessioni.length === 0) return { nomeFile, fogli: [], grafici: [], strumenti: [], intervallo: { da: null, a: null } }
 
