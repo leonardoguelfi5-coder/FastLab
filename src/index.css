@@ -132,6 +132,11 @@
   --text-numero--line-height: 1.1;
   --text-numero--letter-spacing: -0.02em;
   --text-numero--font-weight: 600;
+  /* La dettatura a voce: il campione e l'ultimo peso si leggono da un metro. */
+  --text-gigante: 4.5rem;
+  --text-gigante--line-height: 1;
+  --text-gigante--letter-spacing: -0.02em;
+  --text-gigante--font-weight: 650;
   --text-headline: 1.5rem;
   --text-headline--line-height: 1.2;
   --text-headline--letter-spacing: -0.015em;
@@ -325,6 +330,7 @@
 /* ── Restyling scuro verde: titoli e numeri grandi in Space Grotesk ─────── */
 .text-headline,
 .text-numero,
+.text-gigante,
 .font-display {
   font-family: var(--font-display);
 }

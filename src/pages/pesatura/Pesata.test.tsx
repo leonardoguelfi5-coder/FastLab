@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -15,6 +15,7 @@ vi.mock('@/api/inviti', () => ({
 vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
 vi.mock('@/api/esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), salvaPeso: vi.fn() }))
+vi.mock('@/lib/dettatura', () => ({ useDettatura: vi.fn(), parla: vi.fn(), suonoErrore: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { caricaConfig } from '@/api/esperimenti'
@@ -24,6 +25,7 @@ import { listaPesatura, salvaPeso } from '@/api/pesatura'
 import {
   IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura,
 } from '@/domain/pesatura/tipi'
+import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
 import { PESO_GIA_INSERITO } from '@/lib/errori'
 import { Pesata } from './Pesata'
 
@@ -70,6 +72,14 @@ function apri(fase = 'fresco') {
 }
 
 const salva = () => screen.findByRole('button', { name: 'Salva e vai al prossimo' })
+
+// La dettatura finta: `detta` fa arrivare una frase come se l'avesse riconosciuta il browser.
+let dettatura: Dettatura
+let suFrase: (testo: string) => void = () => {}
+function dettaturaFinta(extra: Partial<Dettatura> = {}) {
+  dettatura = { disponibile: true, motivo: null, inAscolto: false, ascolta: vi.fn(), ferma: vi.fn(), ...extra }
+}
+const detta = (testo: string) => act(async () => { suFrase(testo) })
 const campoPeso = () => screen.getByLabelText(/^Peso/)
 
 beforeEach(() => {
@@ -80,6 +90,11 @@ beforeEach(() => {
   vi.mocked(caricaConfig).mockResolvedValue({ trattamenti, piante } as never)
   vi.mocked(salvaPeso).mockResolvedValue(undefined)
   dati(sessione(), campioni, [])
+  dettaturaFinta()
+  vi.mocked(useDettatura).mockImplementation(onFrase => {
+    suFrase = onFrase
+    return dettatura
+  })
 })
 
 afterEach(() => vi.restoreAllMocks())
@@ -353,5 +368,148 @@ describe('Pesata', () => {
     apri()
     expect(await screen.findByText(/hai solo la lettura/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Salva e vai al prossimo' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Pesata: dettatura a voce', () => {
+  const unaReplica = () => dati(sessione({ impostazioni: unaRepliche }), campioni, [])
+
+  it('il pulsante Detta è grande e avvia l\'ascolto', async () => {
+    const utente = apri()
+    await salva()
+    const pulsante = screen.getByRole('button', { name: 'Detta' })
+    expect(pulsante).toHaveClass('h-16')
+    expect(pulsante).toBeEnabled()
+    await utente.click(pulsante)
+    expect(dettatura.ascolta).toHaveBeenCalledTimes(1)
+  })
+
+  it('in ascolto il pulsante ferma la dettatura e dice cosa dire', async () => {
+    dettaturaFinta({ inAscolto: true })
+    const utente = apri()
+    await salva()
+    expect(screen.getByText(/«avanti»/)).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Ferma la dettatura' }))
+    expect(dettatura.ferma).toHaveBeenCalledTimes(1)
+  })
+
+  it('una frase "0,1023 avanti" salva, passa al prossimo e lo dice', async () => {
+    unaReplica()
+    apri()
+    await salva()
+    await detta('0,1023 avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('0,1023 salvato, prossimo P13'))
+    expect(salvaPeso).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'c12', replica: 1, tipo: 'fresco', valore: 0.1023, lettura: null })
+    expect(await screen.findByText('Passo 2 di 2')).toBeInTheDocument()
+    expect(suonoErrore).not.toHaveBeenCalled()
+  })
+
+  it('con le repliche dice anche la replica del prossimo', async () => {
+    apri()
+    await salva()
+    await detta('53 avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('53 salvato, prossimo P12 replica B'))
+  })
+
+  it('all\'ultimo campione dice pesata finita e smette di ascoltare', async () => {
+    dati(sessione({ impostazioni: unaRepliche }), campioni, [peso('x1', 'c12', 1, 'fresco', 1)])
+    apri()
+    await salva()
+    expect(screen.getByText('P13')).toBeInTheDocument()
+    await detta('cinquantatré avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('53 salvato, pesata finita'))
+    expect(await screen.findByText('Pesata finita')).toBeInTheDocument()
+    expect(dettatura.ferma).toHaveBeenCalled()
+  })
+
+  it('una frase non capita fa il bip e non salva', async () => {
+    apri()
+    await salva()
+    await detta('cinquanta tre avanti')
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    await detta('avanti')
+    expect(suonoErrore).toHaveBeenCalledTimes(2)
+    expect(salvaPeso).not.toHaveBeenCalled()
+    expect(parla).not.toHaveBeenCalled()
+    expect(screen.getByText('Passo 1 di 4')).toBeInTheDocument()
+  })
+
+  it('"indietro" torna al passo precedente; al primo passo fa il bip', async () => {
+    const utente = apri()
+    await salva()
+    await detta('indietro')
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    await utente.click(screen.getByRole('button', { name: 'Salta' }))
+    expect(screen.getByText('Passo 2 di 4')).toBeInTheDocument()
+    await detta('Indietro')
+    expect(screen.getByText('Passo 1 di 4')).toBeInTheDocument()
+    expect(salvaPeso).not.toHaveBeenCalled()
+  })
+
+  it('un salvataggio fallito a voce fa il bip, dice di riprovare e resta sul campione con il valore nel campo', async () => {
+    vi.mocked(salvaPeso).mockRejectedValueOnce(new Error('Failed to fetch'))
+    apri()
+    await salva()
+    await detta('0,1023 avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('Non salvato, riprova'))
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByText('Passo 1 di 4')).toBeInTheDocument()
+    expect(campoPeso()).toHaveValue('0,1023')
+  })
+
+  it('asciugatura: "peso <n> umidità <n> avanti" salva peso e lettura', async () => {
+    dati(
+      sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'umidita', unita: '%' } } }),
+      [campione('v1', 1, { nome: 'V1' }), campione('v2', 2, { nome: 'V2' })],
+      [],
+    )
+    apri('asciugatura')
+    await salva()
+    await detta('150 avanti')
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    await detta('peso 150 umidità 35 avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('150 salvato, prossimo V2'))
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'asciugatura', valore: 150, lettura: 35 })
+  })
+
+  it('in ascolto il campione e l\'ultimo valore salvato sono a caratteri molto grandi', async () => {
+    dettaturaFinta({ inAscolto: true })
+    unaReplica()
+    apri()
+    await salva()
+    expect(screen.getByText('P12')).toHaveClass('text-gigante')
+    await detta('0,1023 avanti')
+    expect(await screen.findByText('Passo 2 di 2')).toBeInTheDocument()
+    expect(screen.getByText('P13')).toHaveClass('text-gigante')
+    expect(screen.getByText('0,1023 g')).toHaveClass('text-gigante')
+  })
+
+  it('un peso di un\'altra persona non si riscrive a voce', async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
+    dati(sessione({ impostazioni: unaRepliche }), [campioni[0]], [peso('x1', 'c12', 1, 'fresco', 1.2, { creato_da: 'altro' })])
+    const utente = apri()
+    await utente.click(await screen.findByRole('button', { name: 'Indietro' }))
+    expect(await screen.findByText('Pesato da un\'altra persona.')).toBeInTheDocument()
+    await detta('53 avanti')
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    expect(salvaPeso).not.toHaveBeenCalled()
+  })
+
+  it('senza dettatura disponibile il pulsante è spento e il motivo è scritto sotto', async () => {
+    dettaturaFinta({ disponibile: false, motivo: 'La dettatura non è supportata da questo browser.' })
+    apri()
+    await salva()
+    expect(screen.getByRole('button', { name: 'Detta' })).toBeDisabled()
+    expect(screen.getByText('La dettatura non è supportata da questo browser.')).toBeInTheDocument()
+  })
+
+  it('un motivo con la dettatura disponibile (permesso negato) si legge sotto il pulsante acceso', async () => {
+    dettaturaFinta({ motivo: 'Permesso del microfono negato: attivalo nelle impostazioni del browser.' })
+    apri()
+    await salva()
+    expect(screen.getByRole('button', { name: 'Detta' })).toBeEnabled()
+    expect(screen.getByText('Permesso del microfono negato: attivalo nelle impostazioni del browser.')).toBeInTheDocument()
   })
 })

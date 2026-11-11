@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSenzaRete } from './useSenzaRete'
 
 /**
@@ -213,10 +213,11 @@ export function useDettatura(onFrase: (testo: string) => void): Dettatura {
     ascolto.current.avvia()
   }
 
-  function ferma() {
+  // Stabile: chi la usa può fermare l'ascolto da un effetto.
+  const ferma = useCallback(() => {
     setInAscolto(false)
     ascolto.current?.ferma()
-  }
+  }, [])
 
   return { disponibile, motivo, inAscolto, ascolta, ferma }
 }

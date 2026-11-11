@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CloudOff, SkipForward } from 'lucide-react'
+import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward } from 'lucide-react'
 import { useConfig, usePesatura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BarraAzioni } from '@/components/BarraAzioni'
@@ -17,11 +17,14 @@ import {
   etichettaCampione, FASI, letteraReplica, NOMI_FASE, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
+import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
+import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
 import { formattaMedia, formattaNumero } from '@/lib/numeri'
 import { percorsoPesata, percorsoPesatura, percorsoSessione } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
+import { cn } from '@/lib/utils'
 import { SENZA_RETE_PESATURA } from './messaggi'
 import { usePesataSequenziale } from './usePesataSequenziale'
 
@@ -98,6 +101,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
   trattamenti: Trattamento[]
 }) {
   const permessi = usePermessi(espId)
+  const senzaRete = useSenzaRete()
   const giro = usePesataSequenziale({ espId, sessione, campioni, pesi, fase })
   const { passi, indice, finito } = giro
   const mappaPiante = useMemo(() => new Map(piante.map(p => [p.id, p])), [piante])
@@ -105,6 +109,44 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
   const etichetta = (p: Passo) => etichettaCampione(p.campione, mappaPiante)
   const conReplica = (p: Passo) => passi.filter(x => x.campione.id === p.campione.id).length > 1
   const sigla = (p: Passo) => (conReplica(p) ? `${etichetta(p)} · ${letteraReplica(p.replica)}` : etichetta(p))
+  // Detto ad alta voce: "P12 replica B" (il puntino non si legge).
+  const nomeDetto = (p: Passo) => (conReplica(p) ? `${etichetta(p)} replica ${letteraReplica(p.replica)}` : etichetta(p))
+  const puoModificarePasso = (p: Passo) => p.peso === null || permessi.puoCorreggere(p.peso.creato_da)
+  // Un salvataggio a voce fallito: il valore detto resta nel campo, come quello scritto (si rimonta la scheda).
+  const [dettatoFallito, setDettatoFallito] = useState<{ indice: number; valore: number; lettura: number | null; volta: number } | null>(null)
+
+  /** Una frase detta: un comando del giro, con la conferma a voce o il bip. Gli stessi salvataggi della tastiera. */
+  async function suFrase(testo: string) {
+    const comando = leggiComando(testo, fase === 'asciugatura')
+    if (comando.tipo === 'non_capito' || finito || giro.occupato) {
+      suonoErrore()
+      return
+    }
+    if (comando.tipo === 'indietro') {
+      if (indice === 0) suonoErrore()
+      else giro.vaiA(indice - 1)
+      return
+    }
+    if (senzaRete || !puoModificarePasso(passi[indice])) {
+      suonoErrore()
+      return
+    }
+    const { valore, lettura } = comando
+    if (await giro.salva(valore, lettura)) {
+      const prossimo = passi[indice + 1]
+      parla(fraseSalvato(valore, sessione.unita, prossimo ? nomeDetto(prossimo) : null))
+    } else {
+      setDettatoFallito(d => ({ indice, valore, lettura, volta: (d?.volta ?? 0) + 1 }))
+      suonoErrore()
+      parla('Non salvato, riprova')
+    }
+  }
+  const dettatura = useDettatura(testo => void suFrase(testo))
+  const fermaDettatura = dettatura.ferma
+  // Finita la fase non c'è più nulla da dettare: l'ascolto si chiude (anche arrivandoci con Salta).
+  useEffect(() => {
+    if (finito) fermaDettatura()
+  }, [finito, fermaDettatura])
 
   if (!permessi.puoMisurare) {
     return <p className="text-grafite">Non puoi pesare: hai solo la lettura di questo esperimento.</p>
@@ -145,9 +187,10 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
   const trattamento = passo.campione.pianta_id
     ? mappaTrattamenti.get(mappaPiante.get(passo.campione.pianta_id)?.trattamento_id ?? '') ?? null
     : passo.campione.substrato
+  const dettato = dettatoFallito !== null && dettatoFallito.indice === indice && giro.errore !== null ? dettatoFallito : null
   return (
     <SchedaPasso
-      key={indice}
+      key={`${indice}:${dettatoFallito?.volta ?? 0}`}
       sessione={sessione}
       pesi={pesi}
       fase={fase}
@@ -158,13 +201,20 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
       posizione={`Passo ${indice + 1} di ${passi.length}`}
       giro={giro}
       ultimo={giro.ultimo ? `${sigla(giro.ultimo)} salvato ✓` : null}
-      puoModificare={passo.peso === null || permessi.puoCorreggere(passo.peso.creato_da)}
+      puoModificare={puoModificarePasso(passo)}
+      dettatura={dettatura}
+      dettato={dettato}
     />
   )
 }
 
-/** Un passo: l'etichetta in grande e i campi. Rimontato a ogni passo, così i campi ripartono dal valore del passo. */
-function SchedaPasso({ sessione, pesi, fase, passo, etichetta, trattamento, replica, posizione, giro, ultimo, puoModificare }: {
+/**
+ * Un passo: l'etichetta in grande e i campi. Rimontato a ogni passo, così i campi ripartono dal valore del passo
+ * (o da quello appena dettato, se il salvataggio a voce non è riuscito).
+ */
+function SchedaPasso({
+  sessione, pesi, fase, passo, etichetta, trattamento, replica, posizione, giro, ultimo, puoModificare, dettatura, dettato,
+}: {
   sessione: SessionePesatura
   pesi: Peso[]
   fase: FasePesata
@@ -176,21 +226,29 @@ function SchedaPasso({ sessione, pesi, fase, passo, etichetta, trattamento, repl
   giro: StatoGiro
   ultimo: string | null
   puoModificare: boolean
+  dettatura: Dettatura
+  dettato: { valore: number; lettura: number | null } | null
 }) {
   const senzaRete = useSenzaRete()
   const idPeso = useId()
   const radice = useRef<HTMLDivElement>(null)
-  const [valore, setValore] = useState<number | null>(passo.peso ? passo.peso.valore : null)
-  const [lettura, setLettura] = useState<number | null>(passo.peso ? passo.peso.lettura : null)
+  const [valore, setValore] = useState<number | null>(dettato ? dettato.valore : passo.peso ? passo.peso.valore : null)
+  const [lettura, setLettura] = useState<number | null>(dettato ? dettato.lettura : passo.peso ? passo.peso.lettura : null)
+  const inAscolto = dettatura.inAscolto
+  // Mentre si detta il campo non prende il fuoco: sul telefono aprirebbe la tastiera sopra i numeri grandi.
+  const [fuocoAlCampo] = useState(!inAscolto)
   const [provato, setProvato] = useState(false)
   const eAsciugatura = fase === 'asciugatura'
   const sensore = sessione.impostazioni.sensore
   const nomeLettura = !sensore ? 'Lettura del sensore' : `${sensore.tipo === 'umidita' ? 'Umidità' : 'Tensione'} (${sensore.unita})`
+  const comandoDetto = eAsciugatura
+    ? `Di' «peso 150 ${sensore?.tipo === 'tensione' ? 'tensione' : 'umidità'} 35 avanti».`
+    : "Di' il peso e poi «avanti», per esempio «zero virgola uno due avanti»."
 
   // La tastiera è già pronta sul primo campo: si scrive subito.
   useEffect(() => {
-    if (puoModificare) radice.current?.querySelector('input')?.focus()
-  }, [puoModificare])
+    if (puoModificare && fuocoAlCampo) radice.current?.querySelector('input')?.focus()
+  }, [puoModificare, fuocoAlCampo])
 
   const valoreValido = valore !== null && Number.isFinite(valore) && valore >= 0
   const letturaValida = lettura !== null && Number.isFinite(lettura)
@@ -222,13 +280,31 @@ function SchedaPasso({ sessione, pesi, fase, passo, etichetta, trattamento, repl
       <div ref={radice} className="flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <p className="text-sm text-grafite-tenue">{posizione}</p>
-          <p className="font-mono text-numero tabular-nums text-grafite">{etichetta}</p>
+          <p className={cn('font-mono tabular-nums text-grafite', inAscolto ? 'text-gigante' : 'text-numero')}>{etichetta}</p>
           {trattamento && <p className="text-title text-grafite">{trattamento}</p>}
           {replica && <p className="text-title text-grafite">{replica}</p>}
           <p className="text-title text-grafite-tenue">{NOMI_FASE[fase]}</p>
         </div>
 
         {ultimo && <p role="status" className="text-base font-medium text-grafite">{ultimo}</p>}
+        {inAscolto && giro.ultimo?.peso && (
+          <p className="font-mono text-gigante tabular-nums text-grafite">{formattaNumero(giro.ultimo.peso.valore)} {sessione.unita}</p>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-16 w-full text-lg [&_svg:not([class*='size-'])]:size-6"
+            disabled={!dettatura.disponibile}
+            onClick={() => (inAscolto ? dettatura.ferma() : dettatura.ascolta())}
+          >
+            {inAscolto ? <MicOff aria-hidden /> : <Mic aria-hidden />}
+            {inAscolto ? 'Ferma la dettatura' : 'Detta'}
+          </Button>
+          {inAscolto && <p className="text-base text-grafite">{comandoDetto} «Indietro» torna al campione prima.</p>}
+          {dettatura.motivo && <p className="text-base text-grafite-tenue">{dettatura.motivo}</p>}
+        </div>
 
         <ModuloCampi className="flex flex-col gap-4">
           {puoModificare ? (
