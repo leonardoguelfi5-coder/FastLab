@@ -57,11 +57,11 @@ function dati(s: SessionePesatura, c: CampionePesatura[], pesi: Peso[]) {
   vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [s], campioni: c, pesi })
 }
 
-function apri(fase = 'fresco') {
+function apri(fase = 'fresco', ricerca = '') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/pesatura/S/pesa/${fase}`]}>
+      <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/pesatura/S/pesa/${fase}${ricerca}`]}>
         <Routes>
           <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId/pesa/:fase" element={<Pesata />} />
         </Routes>

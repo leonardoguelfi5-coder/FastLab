@@ -64,6 +64,26 @@ export function primoPassoMancante(passi: Passo[]): number {
   return i === -1 ? passi.length : i
 }
 
+/**
+ * Il passo di un campione e di una replica (in asciugatura la replica è sempre 1); `null` se non c'è. Serve per
+ * aprire la pesata da una riga del riepilogo.
+ */
+export function indiceDelPasso(passi: Passo[], campioneId: string, replica: number): number | null {
+  const i = passi.findIndex(p => p.campione.id === campioneId && p.replica === replica)
+  return i === -1 ? null : i
+}
+
+/**
+ * La fase da aprire toccando un campione nel riepilogo: la prima in cui a quel campione e a quella replica manca il
+ * peso. Se li ha tutti: per i vasi l'asciugatura (si aggiunge un punto), per gli altri la prima fase (per correggere).
+ */
+export function faseDaAprire(s: SessionePesatura, campioneId: string, replica: number, pesi: Peso[]): FasePesata {
+  const fasi = FASI[s.tipo].filter(f => f !== 'asciugatura')
+  const mancante = fasi.find(f => !pesi.some(p => p.campione_id === campioneId && p.replica === replica && p.tipo === f))
+  if (mancante) return mancante
+  return s.tipo === 'vasi' ? 'asciugatura' : FASI[s.tipo][0]
+}
+
 export interface Avanzamento { pesati: number; totali: number }
 
 export function avanzamentoFase(passi: Passo[]): Avanzamento {

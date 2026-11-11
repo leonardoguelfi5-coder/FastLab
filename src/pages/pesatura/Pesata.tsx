@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward } from 'lucide-react'
 import { useConfig, usePesatura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -33,6 +33,10 @@ type StatoGiro = ReturnType<typeof usePesataSequenziale>
 /** La pesata di una fase, un campione alla volta (tastiera). Solo online. */
 export function Pesata() {
   const { espId = '', sessioneId = '', fase = '' } = useParams()
+  const [ricerca] = useSearchParams()
+  const campioneDa = ricerca.get('campione')
+  const replicaDa = Number(ricerca.get('replica') ?? '1')
+  const partenza = campioneDa ? { campione: campioneDa, replica: Number.isInteger(replicaDa) && replicaDa >= 1 ? replicaDa : 1 } : null
   const dati = usePesatura(espId)
   const config = useConfig(espId)
   const senzaRete = useSenzaRete()
@@ -57,8 +61,9 @@ export function Pesata() {
   } else {
     corpo = (
       <Giro
-        key={`${sessione.id}/${fase}`}
+        key={`${sessione.id}/${fase}/${campioneDa ?? ''}/${replicaDa}`}
         espId={espId}
+        partenza={partenza}
         sessione={sessione}
         campioni={dati.data.campioni.filter(c => c.sessione_id === sessione.id)}
         pesi={dati.data.pesi}
@@ -91,8 +96,9 @@ function NonTrovata({ testo, a, link }: { testo: string; a: string; link: string
   )
 }
 
-function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
+function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, partenza }: {
   espId: string
+  partenza: { campione: string; replica: number } | null
   sessione: SessionePesatura
   campioni: CampionePesatura[]
   pesi: Peso[]
@@ -102,7 +108,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti }: {
 }) {
   const permessi = usePermessi(espId)
   const senzaRete = useSenzaRete()
-  const giro = usePesataSequenziale({ espId, sessione, campioni, pesi, fase })
+  const giro = usePesataSequenziale({ espId, sessione, campioni, pesi, fase, partenza })
   const { passi, indice, finito } = giro
   const mappaPiante = useMemo(() => new Map(piante.map(p => [p.id, p])), [piante])
   const mappaTrattamenti = useMemo(() => new Map(trattamenti.map(t => [t.id, t.etichetta])), [trattamenti])

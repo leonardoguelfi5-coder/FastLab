@@ -1,4 +1,5 @@
-import { TriangleAlert } from 'lucide-react'
+import { ChevronRight, TriangleAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { controllaReplica, mlTampone, rwc, sostanzaSecca } from '@/domain/pesatura/calcoli'
 import { etichettaCampione, letteraReplica, repliche } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
@@ -14,6 +15,8 @@ interface Riga {
   valori: Valore[]
   avvisi: string[]
   media: boolean
+  /** Il campione e la replica della riga (non c'è sulle righe `Media`). */
+  da: { campione: string; replica: number } | null
 }
 
 interface RiepilogoSessioneProps {
@@ -24,6 +27,8 @@ interface RiepilogoSessioneProps {
   piante: ReadonlyMap<string, Pianta>
   /** Il nome del trattamento per id: solo le piante ne hanno uno. */
   trattamenti: ReadonlyMap<string, string>
+  /** Dove porta il tocco su una riga: la pesata da quel campione. Senza, le righe non si toccano (lettore). */
+  apri?: (campione: string, replica: number) => string
 }
 
 const TRATTINO = '—'
@@ -80,6 +85,7 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
         valori,
         avvisi: controllaReplica(sessione.tipo, valore),
         media: false,
+        da: { campione: c.id, replica },
       })
     }
 
@@ -92,6 +98,7 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
         valori: [{ nome: sessione.tipo === 'rwc' ? 'RWC' : 'Sostanza secca', testo: numero(media, ' %') }],
         avvisi: [],
         media: true,
+        da: null,
       })
     }
   }
@@ -100,35 +107,54 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
 
 /**
  * Il riepilogo di una sessione a caratteri grandi: una riga per campione e replica, con i pesi della sessione, i mL o
- * i valori calcolati e gli avvisi di coerenza. Un peso che manca si legge `—`, mai uno zero.
+ * i valori calcolati e gli avvisi di coerenza. Un peso che manca si legge `—`, mai uno zero. Con `apri` ogni riga
+ * (non le `Media`) porta alla pesata da quel campione.
  */
 export function RiepilogoSessione(props: RiepilogoSessioneProps) {
   const righe = righeDi(props)
   if (righe.length === 0) return <p className="text-grafite-tenue">Questa sessione non ha campioni.</p>
   return (
     <ul className="rounded-2xl border border-riga bg-foglio">
-      {righe.map(r => (
-        <li key={r.chiave} className={`flex flex-col gap-1 border-b border-riga px-4 py-3 last:border-0 ${r.media ? 'bg-carta' : ''}`}>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-            <span className={`font-mono text-title tabular-nums text-grafite ${r.media ? 'font-semibold' : ''}`}>{r.titolo}</span>
-            {r.dettaglio && <span className="text-sm text-grafite-tenue">{r.dettaglio}</span>}
-          </div>
-          <dl className="flex flex-wrap gap-x-5 gap-y-1">
-            {r.valori.map(v => (
-              <div key={v.nome} className="flex items-baseline gap-1.5">
-                <dt className="text-sm text-grafite-tenue">{v.nome}</dt>
-                <dd className="font-mono text-title tabular-nums text-grafite">{v.testo}</dd>
-              </div>
+      {righe.map(r => {
+        const contenuto = (
+          <>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <span className={`font-mono text-title tabular-nums text-grafite ${r.media ? 'font-semibold' : ''}`}>{r.titolo}</span>
+              {r.dettaglio && <span className="text-sm text-grafite-tenue">{r.dettaglio}</span>}
+            </div>
+            <dl className="flex flex-wrap gap-x-5 gap-y-1">
+              {r.valori.map(v => (
+                <div key={v.nome} className="flex items-baseline gap-1.5">
+                  <dt className="text-sm text-grafite-tenue">{v.nome}</dt>
+                  <dd className="font-mono text-title tabular-nums text-grafite">{v.testo}</dd>
+                </div>
+              ))}
+            </dl>
+            {r.avvisi.map(a => (
+              <p key={a} className="flex items-start gap-1.5 text-sm font-medium text-attenzione">
+                <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                {a}
+              </p>
             ))}
-          </dl>
-          {r.avvisi.map(a => (
-            <p key={a} className="flex items-start gap-1.5 text-sm font-medium text-attenzione">
-              <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-              {a}
-            </p>
-          ))}
-        </li>
-      ))}
+          </>
+        )
+        const classe = `border-b border-riga last:border-0 ${r.media ? 'bg-carta' : ''}`
+        if (props.apri && r.da) {
+          return (
+            <li key={r.chiave} className={classe}>
+              <Link
+                to={props.apri(r.da.campione, r.da.replica)}
+                aria-label={`Pesa ${r.titolo}`}
+                className="flex min-h-11 items-center gap-3 px-4 py-3"
+              >
+                <div className="flex flex-1 flex-col gap-1">{contenuto}</div>
+                <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />
+              </Link>
+            </li>
+          )
+        }
+        return <li key={r.chiave} className={`flex flex-col gap-1 px-4 py-3 ${classe}`}>{contenuto}</li>
+      })}
     </ul>
   )
 }

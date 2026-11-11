@@ -125,6 +125,13 @@ export const percorsoNuovaSessione = (espId: string, analisiId: string) =>
 /** Una sessione di pesata: i campioni e i risultati. */
 export const percorsoSessione = (espId: string, sessioneId: string) => `${percorsoPesatura(espId)}/${parte(sessioneId)}`
 
-/** La pesata di una fase (per esempio fresco, turgido, secco) di una sessione. */
-export const percorsoPesata = (espId: string, sessioneId: string, fase: FasePesata) =>
-  `${percorsoSessione(espId, sessioneId)}/pesa/${parte(fase)}`
+/**
+ * La pesata di una fase (per esempio fresco, turgido, secco) di una sessione. Con `da` parte da quel campione e da
+ * quella replica (dal riepilogo della sessione) invece che dal primo peso che manca.
+ */
+export const percorsoPesata = (
+  espId: string, sessioneId: string, fase: FasePesata, da?: { campione: string; replica: number },
+) => {
+  const base = `${percorsoSessione(espId, sessioneId)}/pesa/${parte(fase)}`
+  return da ? `${base}?campione=${parte(da.campione)}&replica=${da.replica}` : base
+}

@@ -287,3 +287,23 @@ describe('Sessione con i vasi', () => {
     expect(screen.getByRole('link', { name: 'Asciugatura · 4 pesi' })).toBeInTheDocument()
   })
 })
+
+describe('Sessione: dal riepilogo alla pesata', () => {
+  it('toccando una riga si apre la pesata da quel campione, nella prima fase che gli manca', async () => {
+    dati([sessione()], campioni, [peso('1', 'c12', 2, 'fresco', 1.4)])
+    const utente = apri()
+    await titolo()
+    expect(screen.getByRole('link', { name: 'Pesa P12 · B' })).toHaveAttribute(
+      'href', '/esperimenti/E/laboratorio/pesatura/S/pesa/turgido?campione=c12&replica=2')
+    await utente.click(screen.getByRole('link', { name: 'Pesa P12 · A' }))
+    expect(await screen.findByText('Pagina di pesata')).toBeInTheDocument()
+  })
+
+  it('un lettore non apre la pesata dal riepilogo', async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('lettore')
+    dati([sessione()], campioni, pesiRwc)
+    apri()
+    await titolo()
+    await waitFor(() => expect(screen.queryByRole('link', { name: /^Pesa P12/ })).not.toBeInTheDocument())
+  })
+})

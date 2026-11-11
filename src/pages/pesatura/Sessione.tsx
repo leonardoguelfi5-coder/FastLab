@@ -18,7 +18,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { gruppiDeiVasi } from '@/domain/pesatura/export'
 import { equazione } from '@/domain/pesatura/curva'
-import { avanzamentoFase, FASI, NOMI_FASE, passiDellaFase, statoSessione } from '@/domain/pesatura/sequenza'
+import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, statoSessione } from '@/domain/pesatura/sequenza'
 import { NOMI_TIPO, type SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
@@ -186,7 +186,12 @@ function Contenuto({ espId, sessione, dati, config }: {
 
       <section aria-labelledby="titolo-riepilogo" className="flex flex-col gap-3">
         <h2 id="titolo-riepilogo" className="text-title text-grafite">Riepilogo</h2>
-        <RiepilogoSessione sessione={sessione} campioni={campioni} pesi={pesi} piante={piante} trattamenti={trattamenti} />
+        <RiepilogoSessione
+          sessione={sessione} campioni={campioni} pesi={pesi} piante={piante} trattamenti={trattamenti}
+          apri={permessi.puoMisurare
+            ? (campione, replica) => percorsoPesata(espId, sessione.id, faseDaAprire(sessione, campione, replica, pesi), { campione, replica })
+            : undefined}
+        />
       </section>
 
       {vasi && (

@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { salvaPeso } from '@/api/pesatura'
 import { chiavi } from '@/api/query'
-import { passiDellaFase, primoPassoMancante, type FasePesata, type Passo } from '@/domain/pesatura/sequenza'
+import { indiceDelPasso, passiDellaFase, primoPassoMancante, type FasePesata, type Passo } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
 import { ePesoGiaInserito, messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
@@ -13,6 +13,8 @@ interface Argomenti {
   campioni: CampionePesatura[]
   pesi: Peso[]
   fase: FasePesata
+  /** Da dove partire (una riga toccata nel riepilogo). Senza, o se non c'è nella fase: dal primo peso che manca. */
+  partenza?: { campione: string; replica: number } | null
 }
 
 /**
@@ -22,10 +24,12 @@ interface Argomenti {
  * I passi si calcolano UNA volta all'ingresso nella fase e non si ricalcolano a ogni salvataggio: in asciugatura il
  * giro non si accorcia. Un peso salvato resta nel passo (stato locale), così il passo risulta pesato senza altre letture.
  */
-export function usePesataSequenziale({ espId, sessione, campioni, pesi, fase }: Argomenti) {
+export function usePesataSequenziale({ espId, sessione, campioni, pesi, fase, partenza }: Argomenti) {
   const queryClient = useQueryClient()
   const [passi, setPassi] = useState<Passo[]>(() => passiDellaFase(sessione, campioni, pesi, fase))
-  const [indice, setIndice] = useState(() => primoPassoMancante(passi))
+  const [indice, setIndice] = useState(
+    () => (partenza ? indiceDelPasso(passi, partenza.campione, partenza.replica) : null) ?? primoPassoMancante(passi),
+  )
   const [occupato, setOccupato] = useState(false)
   const [errore, setErrore] = useState<{ testo: string; giaInserito: boolean } | null>(null)
   const [ultimo, setUltimo] = useState<Passo | null>(null)

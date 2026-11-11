@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   FASI, NOMI_FASE, passiDellaFase, primoPassoMancante, avanzamentoFase, statoSessione, repliche, etichettaCampione, letteraReplica,
+  faseDaAprire, indiceDelPasso,
 } from './sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoAnalisi, TipoPeso } from './tipi'
 import type { Pianta } from '../tipi'
@@ -84,5 +85,29 @@ describe('etichettaCampione', () => {
   it('pianta o nome', () => {
     expect(etichettaCampione(camp('c', 1, { pianta_id: 'p' }), piante)).toBe('P12')
     expect(etichettaCampione(camp('c', 1, { nome: 'Bianco' }), piante)).toBe('Bianco')
+  })
+})
+
+describe('aprire la pesata da un campione del riepilogo', () => {
+  it('faseDaAprire: la prima fase in cui manca il peso di quella replica', () => {
+    const s = sessione('rwc', 2)
+    expect(faseDaAprire(s, 'c', 1, [])).toBe('fresco')
+    expect(faseDaAprire(s, 'c', 1, [peso('c', 'fresco')])).toBe('turgido')
+    expect(faseDaAprire(s, 'c', 2, [peso('c', 'fresco', 1)])).toBe('fresco')
+    expect(faseDaAprire(s, 'c', 1, [peso('c', 'fresco'), peso('c', 'turgido'), peso('c', 'secco')])).toBe('fresco')
+    expect(faseDaAprire(sessione('aliquota'), 'c', 1, [peso('c', 'aliquota')])).toBe('aliquota')
+  })
+
+  it('faseDaAprire: un vaso completo apre l\'asciugatura', () => {
+    const s = sessione('vasi')
+    expect(faseDaAprire(s, 'v', 1, [peso('v', 'secco')])).toBe('capacita_campo')
+    expect(faseDaAprire(s, 'v', 1, [peso('v', 'secco'), peso('v', 'capacita_campo')])).toBe('asciugatura')
+  })
+
+  it('indiceDelPasso trova campione e replica, null se non c\'è', () => {
+    const passi = passiDellaFase(sessione('rwc', 2), [camp('a', 1), camp('b', 2)], [], 'fresco')
+    expect(indiceDelPasso(passi, 'b', 2)).toBe(3)
+    expect(indiceDelPasso(passi, 'b', 3)).toBeNull()
+    expect(indiceDelPasso(passi, 'x', 1)).toBeNull()
   })
 })
