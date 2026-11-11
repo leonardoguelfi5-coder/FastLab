@@ -11,6 +11,7 @@ import { listaExportSalvati } from './exportSalvati'
 import { listaFoto, urlFoto, VALIDITA_URL_SECONDI } from './foto'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
+import { listaAnalisi, listaPesatura } from './pesatura'
 import { membriDi, ruoloIn } from './persone'
 import { spazioProgetto } from './spazio'
 import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMisuraPerStrumento, ultimeMisurePiante } from './misure'
@@ -48,6 +49,10 @@ export const chiavi = {
   urlFoto: (percorsi: readonly string[]) => ['urlFoto', [...percorsi].sort().join('|')] as const,
   /** Gli export salvati dell'utente in un esperimento: fuori dalle misure, si invalidano a ogni salvataggio o eliminazione. */
   exportSalvati: (espId: string) => ['exportSalvati', espId] as const,
+  /** Le analisi di Pesatura visibili all'utente: solo online, non stanno nella copia sul telefono. */
+  analisiPesatura: (espId: string) => ['analisiPesatura', espId] as const,
+  /** Sessioni, campioni e pesi di Pesatura di un esperimento: solo online, non stanno nella copia sul telefono. */
+  pesatura: (espId: string) => ['pesatura', espId] as const,
   inviti: ['inviti'] as const,
   /** Il catalogo è condiviso tra gli esperimenti: fuori dal prefisso `config`, non si rilegge a ogni configurazione. */
   catalogo: ['catalogo'] as const,
@@ -328,6 +333,24 @@ export function useNote(espId: string | undefined) {
   return useQuery({
     queryKey: chiavi.note(espId ?? ''),
     queryFn: () => listaNote(espId as string),
+    enabled: !!espId,
+  })
+}
+
+/** Le analisi di Pesatura dell'utente (nessuna copia sul telefono: la Pesatura funziona solo online). */
+export function useAnalisiPesatura(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.analisiPesatura(espId ?? ''),
+    queryFn: () => listaAnalisi(espId as string),
+    enabled: !!espId,
+  })
+}
+
+/** Sessioni, campioni e pesi di Pesatura dell'esperimento (nessuna copia sul telefono). */
+export function usePesatura(espId: string | undefined) {
+  return useQuery({
+    queryKey: chiavi.pesatura(espId ?? ''),
+    queryFn: () => listaPesatura(espId as string),
     enabled: !!espId,
   })
 }

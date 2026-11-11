@@ -11,6 +11,7 @@ vi.mock('./inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn() }))
 vi.mock('./configurazione', () => ({ parametriConDati: vi.fn(), pianteConDati: vi.fn(), pianteNonEliminabili: vi.fn(), conteggiStrumenti: vi.fn() }))
 vi.mock('./catalogo', () => ({ listaCatalogo: vi.fn() }))
 vi.mock('./note', () => ({ listaNote: vi.fn() }))
+vi.mock('./pesatura', () => ({ listaAnalisi: vi.fn(), listaPesatura: vi.fn() }))
 vi.mock('./foto', () => ({ listaFoto: vi.fn(), urlFoto: vi.fn(), VALIDITA_URL_SECONDI: 3600 }))
 vi.mock('./spazio', () => ({ spazioProgetto: vi.fn() }))
 vi.mock('./persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
@@ -20,6 +21,7 @@ import { conteggiStrumenti, parametriConDati, pianteConDati, pianteNonEliminabil
 import { caricaConfig, listaEsperimenti } from './esperimenti'
 import { listaInviti, sonoAdmin } from './inviti'
 import { listaNote } from './note'
+import { listaAnalisi, listaPesatura } from './pesatura'
 import { listaFoto, urlFoto } from './foto'
 import { spazioProgetto } from './spazio'
 import { listaExportSalvati } from './exportSalvati'
@@ -27,7 +29,7 @@ import { caricaMisura, misureDelGiorno, misurePianta, misureStrumento, ultimaMis
 import {
   chiavi, creaQueryClient, useCatalogo, useConfig, useEsperimenti, useInviti, useMisura, useMisureGiorno, useMisurePianta,
   useFoto, useNote, useParametriConDati, usePianteNonEliminabili, useSpazioProgetto, useUrlFoto, usePianteConDati, useSonoAdmin, useConteggiStrumenti, useUltimeMisure, useUltimeMisurePiante,
-  useExportSalvati, useMisureStrumenti, useMisureStrumento, useUltimaData, ultimaDataConMisure,
+  useAnalisiPesatura, usePesatura, useExportSalvati, useMisureStrumenti, useMisureStrumento, useUltimaData, ultimaDataConMisure,
 } from './query'
 
 import { accoda, impostaUtenteCoda } from '@/lib/coda/codaMisure'
@@ -295,6 +297,30 @@ describe('hook di lettura', () => {
     const { result } = renderHook(() => useNote(undefined), { wrapper: wrapper() })
     expect(result.current.fetchStatus).toBe('idle')
     expect(listaNote).not.toHaveBeenCalled()
+  })
+
+  it('le chiavi della Pesatura sono per esperimento', () => {
+    expect(chiavi.analisiPesatura('E')).toEqual(['analisiPesatura', 'E'])
+    expect(chiavi.pesatura('E')).toEqual(['pesatura', 'E'])
+  })
+
+  it('useAnalisiPesatura e usePesatura leggono per esperimento, e senza esperimento non interrogano nessuno', async () => {
+    const dati = { sessioni: [], campioni: [], pesi: [] }
+    vi.mocked(listaAnalisi).mockResolvedValue([])
+    vi.mocked(listaPesatura).mockResolvedValue(dati)
+    const analisi = renderHook(() => useAnalisiPesatura('E'), { wrapper: wrapper() })
+    const pesatura = renderHook(() => usePesatura('E'), { wrapper: wrapper() })
+    await waitFor(() => expect(analisi.result.current.isSuccess && pesatura.result.current.isSuccess).toBe(true))
+    expect(listaAnalisi).toHaveBeenCalledWith('E')
+    expect(listaPesatura).toHaveBeenCalledWith('E')
+    expect(pesatura.result.current.data).toBe(dati)
+
+    vi.mocked(listaAnalisi).mockClear()
+    vi.mocked(listaPesatura).mockClear()
+    expect(renderHook(() => useAnalisiPesatura(undefined), { wrapper: wrapper() }).result.current.fetchStatus).toBe('idle')
+    expect(renderHook(() => usePesatura(undefined), { wrapper: wrapper() }).result.current.fetchStatus).toBe('idle')
+    expect(listaAnalisi).not.toHaveBeenCalled()
+    expect(listaPesatura).not.toHaveBeenCalled()
   })
 
   it('useFoto legge le foto dell\'esperimento, e senza esperimento non interroga nessuno', async () => {
