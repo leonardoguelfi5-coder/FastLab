@@ -193,6 +193,13 @@ describe('consultaPerCC', () => {
     expect(hc.media).toBeCloseTo(2200)
   })
 
+  it('un vaso con CC non maggiore del secco dà peso null', () => {
+    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: 2600, cc: 2600, punti: [] }), vaso('c', 'HC', { secco: 2600, cc: 2000, punti: [] })], 'lineare')
+    const [hc] = consultaPerCC(gruppi, 50)
+    expect(hc.vasi.map((v) => v.peso)).toEqual([2200, null, null])
+    expect(hc.media).toBeCloseTo(2200)
+  })
+
   it('media null se nessun vaso ha secco e CC', () => {
     const gruppi = curvePerSubstrato([vaso('a', 'HC', { cc: null, punti: [] })], 'lineare')
     expect(consultaPerCC(gruppi, 50)[0].media).toBeNull()
@@ -246,6 +253,13 @@ describe('consultaPerLettura', () => {
     const [hc] = consultaPerLettura(gruppi, 2.5, 'lineare')
     expect(hc.vasi[1].peso).toBeNull()
     expect(hc.media).toBeCloseTo(1920)
+  })
+
+  it('un vaso con CC non maggiore del secco dà peso null anche con la curva media', () => {
+    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: 2600, cc: 2000, punti: [] })], 'lineare')
+    const [hc] = consultaPerLettura(gruppi, 10, 'lineare')
+    expect(hc.vasi[1]).toEqual({ vaso: 'b', peso: null, fuoriCampo: false })
+    expect(hc.media).toBeCloseTo(2040)
   })
 
   it('logaritmico: una lettura a zero non dà un peso infinito', () => {

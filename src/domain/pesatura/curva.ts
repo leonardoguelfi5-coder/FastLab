@@ -181,16 +181,19 @@ function risposta(substrato: string, vasi: PesoTarget[]): RispostaConsulta {
   }
 }
 
+/** Il peso del vaso a p % CC, oppure `null` se mancano secco o CC o se la CC non supera il secco (dati impossibili). */
+function pesoDelVaso(v: Vaso, p: number): number | null {
+  if (v.secco === null || v.cc === null || v.cc <= v.secco) return null
+  const peso = pesoAPercentualeCC(p, v.secco, v.cc)
+  return Number.isFinite(peso) ? peso : null
+}
+
 /** Il peso di ogni vaso a p % della sua capacità di campo: non dipende dalla curva, quindi non è mai fuori campo. */
 export function consultaPerCC(gruppi: CurveSubstrato[], p: number): RispostaConsulta[] {
   return gruppi.map((g) =>
     risposta(
       g.substrato,
-      g.vasi.map((v) => ({
-        vaso: v.campione.id,
-        peso: v.secco === null || v.cc === null ? null : pesoAPercentualeCC(p, v.secco, v.cc),
-        fuoriCampo: false,
-      })),
+      g.vasi.map((v) => ({ vaso: v.campione.id, peso: pesoDelVaso(v, p), fuoriCampo: false })),
     ),
   )
 }
@@ -205,9 +208,8 @@ export function consultaPerLettura(gruppi: CurveSubstrato[], lettura: number, mo
       g.substrato,
       g.vasi.map((v): PesoTarget => {
         const curva = adattaCurva(v.punti, modello) ?? g.media
-        if (curva === null || v.secco === null || v.cc === null) return { vaso: v.campione.id, peso: null, fuoriCampo: false }
-        const peso = pesoAPercentualeCC(pccDaLettura(curva, lettura), v.secco, v.cc)
-        if (!Number.isFinite(peso)) return { vaso: v.campione.id, peso: null, fuoriCampo: false }
+        const peso = curva === null ? null : pesoDelVaso(v, pccDaLettura(curva, lettura))
+        if (curva === null || peso === null) return { vaso: v.campione.id, peso: null, fuoriCampo: false }
         return { vaso: v.campione.id, peso, fuoriCampo: lettura < curva.min || lettura > curva.max }
       }),
     ),
