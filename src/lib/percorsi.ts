@@ -1,3 +1,5 @@
+import type { FasePesata } from '../domain/pesatura/sequenza'
+
 const parte = encodeURIComponent
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -124,5 +126,5 @@ export const percorsoNuovaSessione = (espId: string, analisiId: string) =>
 export const percorsoSessione = (espId: string, sessioneId: string) => `${percorsoPesatura(espId)}/${parte(sessioneId)}`
 
 /** La pesata di una fase (per esempio fresco, turgido, secco) di una sessione. */
-export const percorsoPesata = (espId: string, sessioneId: string, fase: string) =>
+export const percorsoPesata = (espId: string, sessioneId: string, fase: FasePesata) =>
   `${percorsoSessione(espId, sessioneId)}/pesa/${parte(fase)}`
