@@ -2,7 +2,7 @@ import { useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-const RIGA_SCELTA = 'flex min-h-11 w-full items-center gap-2 border-b border-riga py-2 text-left text-base text-grafite transition-colors hover:bg-carta-ombra active:bg-carta-ombra'
+const RIGA_SCELTA = 'flex min-h-11 w-full items-center gap-2 border-b border-riga py-2 text-left text-base text-grafite transition-colors hover:bg-carta-ombra active:bg-carta-ombra disabled:cursor-not-allowed disabled:text-grafite-tenue disabled:hover:bg-transparent'
 
 interface SceltaSingolaProps<T extends string> {
   nome: string
@@ -15,10 +15,12 @@ interface SceltaSingolaProps<T extends string> {
    * si chiude dopo la scelta lo chiude qui: con le frecce si scorre tra le voci senza perdere il fuoco.
    */
   onConferma?: (valore: T) => void
+  /** La scelta non si può cambiare: le righe restano visibili, la scelta fatta è marcata. */
+  disabilitato?: boolean
 }
 
 /** Una scelta tra poche: righe da quaderno, `radiogroup` con la sola scelta attiva in tabulazione e le frecce che spostano. */
-export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegli, onConferma }: SceltaSingolaProps<T>) {
+export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegli, onConferma, disabilitato }: SceltaSingolaProps<T>) {
   const gruppo = useRef<HTMLDivElement>(null)
 
   function frecce(evento: KeyboardEvent<HTMLDivElement>) {
@@ -42,6 +44,7 @@ export function SceltaSingola<T extends string>({ nome, opzioni, scelto, onScegl
             role="radio"
             data-valore={o.valore}
             aria-checked={attiva}
+            disabled={disabilitato}
             tabIndex={attiva || (scelto === null && i === 0) ? 0 : -1}
             onClick={() => { onScegli(o.valore); onConferma?.(o.valore) }}
             className={cn(RIGA_SCELTA, attiva && 'font-semibold')}

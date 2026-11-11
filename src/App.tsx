@@ -12,6 +12,8 @@ import { FineGiro } from '@/pages/FineGiro'
 import { Foto } from '@/pages/Foto'
 import { Altro } from '@/pages/Altro'
 import { Laboratorio } from '@/pages/Laboratorio'
+import { EditorAnalisi } from '@/pages/pesatura/EditorAnalisi'
+import { Pesatura } from '@/pages/pesatura/Pesatura'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/impostazioni/IndiceImpostazioni'
 import { ImpostazioniSezione } from '@/pages/impostazioni/PaginaSezione'
@@ -50,6 +52,9 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/foto" element={<Foto />} />
         <Route path="/esperimenti/:espId/altro" element={<Altro />} />
         <Route path="/esperimenti/:espId/laboratorio" element={<Laboratorio />} />
+        <Route path="/esperimenti/:espId/laboratorio/pesatura" element={<Pesatura />} />
+        {/* "analisi" è un segmento fisso: va dichiarato prima di `:sessioneId` (le altre pagine della Pesatura) e vince su di esso. */}
+        <Route path="/esperimenti/:espId/laboratorio/pesatura/analisi" element={<EditorAnalisi />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>
 
