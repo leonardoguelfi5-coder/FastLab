@@ -105,3 +105,24 @@ export interface ArrivoMisura { daScheda?: boolean }
 
 /** Il catalogo degli strumenti, condiviso tra tutti gli esperimenti. */
 export const percorsoCatalogo = '/catalogo'
+
+/** Il Laboratorio: le pagine degli strumenti di laboratorio (per ora la Pesatura). */
+export const percorsoLaboratorio = (espId: string) => `${percorsoHome(espId)}/laboratorio`
+
+/** La Pesatura: l'elenco delle analisi e delle sessioni di pesata. */
+export const percorsoPesatura = (espId: string) => `${percorsoLaboratorio(espId)}/pesatura`
+
+/** Una analisi di pesatura: nuova, oppure da modificare con `analisiId` (nel parametro `id`). */
+export const percorsoNuovaAnalisi = (espId: string, analisiId?: string) =>
+  `${percorsoPesatura(espId)}/analisi${analisiId ? `?id=${parte(analisiId)}` : ''}`
+
+/** Una nuova sessione di pesata, per l'analisi scelta (nel parametro `analisi`). */
+export const percorsoNuovaSessione = (espId: string, analisiId: string) =>
+  `${percorsoPesatura(espId)}/nuova?analisi=${parte(analisiId)}`
+
+/** Una sessione di pesata: i campioni e i risultati. */
+export const percorsoSessione = (espId: string, sessioneId: string) => `${percorsoPesatura(espId)}/${parte(sessioneId)}`
+
+/** La pesata di una fase (per esempio fresco, turgido, secco) di una sessione. */
+export const percorsoPesata = (espId: string, sessioneId: string, fase: string) =>
+  `${percorsoSessione(espId, sessioneId)}/pesa/${parte(fase)}`

@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Camera, CalendarDays, ChevronRight, FileDown, NotebookPen, Plus, type LucideIcon } from 'lucide-react'
+import { Camera, BarChart3, CalendarDays, ChevronRight, NotebookPen, Plus, type LucideIcon } from 'lucide-react'
 import { IconaStrumento, IconaTonda } from '@/components/IconaTonda'
 import { useConfig, useMisureGiorno, useNote, useUltimeMisure } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -13,7 +13,7 @@ import { riepilogoGiro, statiPiante } from '@/domain/giro'
 import { daSistemare } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { inEliminazione } from '@/lib/eliminaConAnnulla'
-import { percorsoDataset, percorsoDiario, percorsoEsporta, percorsoGalleria, percorsoNuovaMisura, percorsoOggi } from '@/lib/percorsi'
+import { percorsoDataset, percorsoDiario, percorsoGalleria, percorsoNuovaMisura, percorsoOggi } from '@/lib/percorsi'
 import { useLetturaInAnticipo } from '@/lib/letturaInAnticipo'
 import { SOLO_LETTURA } from '@/lib/ruoli'
 import { useOggi } from '@/lib/useOggi'
@@ -245,14 +245,14 @@ function HomeCaricata({ espId, config }: { espId: string; config: ConfigEsperime
   return (
     <>
       <Fascia espId={espId} config={config} puoMisurare={puoMisurare} />
-      {/* Le altre sezioni (Piante, Dataset) sono nella barra in basso, Impostazioni in Altro. */}
+      {/* Piante e Laboratorio stanno nella barra in basso; Esporta Excel e Impostazioni in Altro. */}
       <nav aria-label="Sezioni" className="grid grid-cols-4 gap-2">
         <Voce to={percorsoOggi(espId)} icona={CalendarDays} nome="Oggi">
           {daControllare.promemoria + daControllare.valori > 0 && <NumerinoDaControllare da={daControllare} />}
         </Voce>
         <Voce to={percorsoDiario(espId)} icona={NotebookPen} nome="Diario" />
         <Voce to={percorsoGalleria(espId)} icona={Camera} nome="Foto" />
-        <Voce to={percorsoEsporta(espId)} icona={FileDown} nome="Esporta Excel" />
+        <Voce to={percorsoDataset(espId)} icona={BarChart3} nome="Dataset" />
       </nav>
       <UltimeMisure espId={espId} config={config} />
     </>

@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { BarChart3, Home, Leaf, MoreHorizontal, Plus } from 'lucide-react'
-import { percorsoAltro, percorsoDataset, percorsoHome, percorsoNuovaMisura, percorsoPiante } from '@/lib/percorsi'
+import { FlaskConical, Home, Leaf, MoreHorizontal, Plus } from 'lucide-react'
+import { percorsoAltro, percorsoHome, percorsoLaboratorio, percorsoNuovaMisura, percorsoPiante } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { cn } from '@/lib/utils'
 
@@ -16,7 +16,7 @@ function Voce({ to, nome, icona: Icona, fine }: { to: string; nome: string; icon
 }
 
 /**
- * La barra in basso delle pagine principali di un esperimento: Home, Piante, il + della misura, Dataset e Altro.
+ * La barra in basso delle pagine principali di un esperimento: Home, Piante, il + della misura, Laboratorio e Altro.
  * "Altro" raccoglie le sezioni che non stanno qui, così se ne possono aggiungere senza toccare la barra.
  * Un lettore non vede il +: al suo posto resta uno spazio vuoto, così le voci non si spostano.
  */
@@ -44,7 +44,7 @@ export function NavEsperimento({ espId }: { espId: string }) {
             </button>
           )}
         </div>
-        <Voce to={percorsoDataset(espId)} nome="Dataset" icona={BarChart3} />
+        <Voce to={percorsoLaboratorio(espId)} nome="Laboratorio" icona={FlaskConical} />
         <Voce to={percorsoAltro(espId)} nome="Altro" icona={MoreHorizontal} />
       </div>
     </nav>

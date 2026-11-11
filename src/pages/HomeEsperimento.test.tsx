@@ -185,7 +185,7 @@ describe('HomeEsperimento: le sezioni', () => {
       ['Oggi', '/esperimenti/E/oggi'],
       ['Diario', '/esperimenti/E/diario'],
       ['Foto', '/esperimenti/E/foto'],
-      ['Esporta Excel', '/esperimenti/E/esporta'],
+      ['Dataset', '/esperimenti/E/dataset'],
     ]
     for (const [nome, href] of voci) {
       expect(within(sezioni).getByRole('link', { name: nome })).toHaveAttribute('href', href)
@@ -195,20 +195,21 @@ describe('HomeEsperimento: le sezioni', () => {
   it('mostra le icone di ogni riquadro senza leggerle come testo', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
-    for (const nome of ['Oggi', 'Esporta Excel', 'Diario', 'Foto']) {
+    for (const nome of ['Oggi', 'Dataset', 'Diario', 'Foto']) {
       const voce = screen.getByRole('link', { name: nome })
       // Un'icona Lucide in un cerchio, nascosta ai lettori di schermo.
       expect(voce.querySelector('[aria-hidden] svg, svg[aria-hidden]')).not.toBeNull()
     }
   })
 
-  it('Piante, Dataset e Altro stanno nella barra in basso; Impostazioni è dentro Altro', async () => {
+  it('Piante, Laboratorio e Altro stanno nella barra in basso; Impostazioni è dentro Altro', async () => {
     vaiAllaPagina()
     await aspettaLaHome()
     const barra = screen.getByRole('navigation', { name: 'Navigazione esperimento' })
     expect(within(barra).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/esperimenti/E')
     expect(within(barra).getByRole('link', { name: 'Piante' })).toHaveAttribute('href', '/esperimenti/E/piante')
-    expect(within(barra).getByRole('link', { name: 'Dataset' })).toHaveAttribute('href', '/esperimenti/E/dataset')
+    expect(within(barra).getByRole('link', { name: 'Laboratorio' })).toHaveAttribute('href', '/esperimenti/E/laboratorio')
+    expect(within(barra).queryByRole('link', { name: 'Dataset' })).not.toBeInTheDocument()
     expect(within(barra).getByRole('link', { name: 'Altro' })).toHaveAttribute('href', '/esperimenti/E/altro')
     expect(screen.queryByRole('link', { name: 'Impostazioni' })).not.toBeInTheDocument()
   })
@@ -225,7 +226,7 @@ describe('HomeEsperimento: le sezioni', () => {
     const utente = userEvent.setup()
     vaiAllaPagina()
     await aspettaLaHome()
-    await utente.click(screen.getByRole('link', { name: 'Dataset' }))
+    await utente.click(within(screen.getByRole('navigation', { name: 'Sezioni' })).getByRole('link', { name: 'Dataset' }))
     expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/dataset')
   })
 })

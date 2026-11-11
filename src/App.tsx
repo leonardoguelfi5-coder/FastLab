@@ -11,6 +11,7 @@ import { Esporta } from '@/pages/Esporta'
 import { FineGiro } from '@/pages/FineGiro'
 import { Foto } from '@/pages/Foto'
 import { Altro } from '@/pages/Altro'
+import { Laboratorio } from '@/pages/Laboratorio'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/impostazioni/IndiceImpostazioni'
 import { ImpostazioniSezione } from '@/pages/impostazioni/PaginaSezione'
@@ -48,6 +49,7 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/diario" element={<Diario />} />
         <Route path="/esperimenti/:espId/foto" element={<Foto />} />
         <Route path="/esperimenti/:espId/altro" element={<Altro />} />
+        <Route path="/esperimenti/:espId/laboratorio" element={<Laboratorio />} />
         <Route path="/admin/inviti" element={<AdminInviti />} />
       </Route>
 
