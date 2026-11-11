@@ -84,7 +84,7 @@ export function NuovaSessione() {
 
   // Il modulo porta la sua barra azioni; negli altri casi c'è solo il messaggio.
   return (
-    <AppShell titolo="Nuova sessione" indietro={indietro} nav={espId}>
+    <AppShell titolo="Nuova sessione" indietro={indietro}>
       {senzaRete && <MessaggioSenzaRete />}
       {corpo}
     </AppShell>

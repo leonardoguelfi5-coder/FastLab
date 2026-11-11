@@ -70,7 +70,7 @@ export function Pesata() {
   }
 
   return (
-    <AppShell titolo="Pesata" indietro={percorsoDellaSessione} nav={espId}>
+    <AppShell titolo="Pesata" indietro={percorsoDellaSessione}>
       {senzaRete && (
         <p role="status" className="mb-4 flex items-start gap-2 text-base text-grafite-tenue">
           <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0" />

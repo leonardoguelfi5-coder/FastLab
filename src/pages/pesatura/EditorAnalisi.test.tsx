@@ -82,6 +82,12 @@ describe('EditorAnalisi: nuova analisi', () => {
     expect(screen.getByLabelText('Repliche di default')).toHaveValue('1')
   })
 
+  it('non mostra la barra in basso: coprirebbe il pulsante Salva', async () => {
+    apri()
+    expect(await screen.findByRole('heading', { name: 'Nuova analisi', level: 1 })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Navigazione esperimento' })).not.toBeInTheDocument()
+  })
+
   it('non salva senza titolo', async () => {
     const utente = apri()
     await utente.click(await screen.findByRole('button', { name: 'Salva' }))

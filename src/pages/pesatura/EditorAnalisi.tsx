@@ -101,7 +101,7 @@ export function EditorAnalisi() {
   const attesa = id !== null && (analisi.data === undefined || pesatura.data === undefined)
   if (attesa) {
     return (
-      <AppShell titolo={titolo} indietro={indietro} nav={espId}>
+      <AppShell titolo={titolo} indietro={indietro}>
         {senzaRete && <MessaggioSenzaRete />}
         {analisi.isError ? (
           <ErroreConRiprova errore={analisi.error} onRiprova={() => void analisi.refetch()} />
@@ -117,7 +117,7 @@ export function EditorAnalisi() {
   const esistente = id !== null ? (analisi.data ?? []).find(a => a.id === id) ?? null : null
   if (id !== null && !esistente) {
     return (
-      <AppShell titolo={titolo} indietro={indietro} nav={espId}>
+      <AppShell titolo={titolo} indietro={indietro}>
         <div className="flex flex-col items-start gap-2">
           <p className="text-grafite">Analisi non trovata.</p>
           <Link to={indietro} className={buttonVariants({ variant: 'ghost', className: '-ml-3' })}>Torna alla Pesatura</Link>
@@ -198,7 +198,7 @@ function Editor({ espId, esistente, haSessioni }: { espId: string; esistente: An
   const titoloPagina = esistente ? (soloLettura ? 'Analisi' : 'Modifica analisi') : 'Nuova analisi'
 
   return (
-    <AppShell titolo={titoloPagina} indietro={indietro} nav={espId}>
+    <AppShell titolo={titoloPagina} indietro={indietro}>
       {senzaRete && <MessaggioSenzaRete />}
 
       {soloLettura ? (
