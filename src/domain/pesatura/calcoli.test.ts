@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { formattaCifre } from '@/lib/numeri'
 import {
   controllaAsciugatura,
   controllaReplica,
@@ -9,6 +10,7 @@ import {
   pesoAPercentualeCC,
   rwc,
   sostanzaSecca,
+  arrotondato, differenzaPesi, mlTamponeCalcolato, percentualeCCCalcolata, precisioneDeiPesi, rwcCalcolato, sostanzaSeccaCalcolata,
 } from './calcoli'
 
 describe('formule', () => {
@@ -73,5 +75,42 @@ describe('controlli', () => {
   it('asciugatura', () => {
     expect(controllaAsciugatura(1700, 1800)).toBe('Il vaso pesa meno del peso secco.')
     expect(controllaAsciugatura(1900, 1800)).toBeNull()
+  })
+})
+
+describe('valori calcolati con le cifre significative del dato che ne ha di più', () => {
+  it('RWC: fresco 0,412, turgido 0,445, secco 0,062 → tre cifre, 91,4 %', () => {
+    const c = rwcCalcolato(0.412, 0.445, 0.062)!
+    expect(c.cifre).toBe(3)
+    expect(formattaCifre(c.valore, c.cifre)).toBe('91,4')
+    expect(arrotondato(c)).toBe(91.4)
+  })
+  it('sostanza secca, tampone e % CC', () => {
+    expect(sostanzaSeccaCalcolata(1.25, 0.31)).toMatchObject({ cifre: 3 })
+    const ml = mlTamponeCalcolato(0.0017, 'g', 10)!
+    expect(formattaCifre(ml.valore, ml.cifre)).toBe('0,017')
+    expect(percentualeCCCalcolata(2200, 1800, 2600)).toMatchObject({ valore: 50, cifre: 4 })
+    expect(rwcCalcolato(1, 1, 1)).toBeNull()
+    expect(arrotondato(null)).toBeNull()
+  })
+  it('una differenza di pesi ha i decimali del peso che ne ha di più', () => {
+    expect(differenzaPesi(2350.5, 1800)).toEqual({ valore: 550.5, decimali: 1 })
+  })
+})
+
+describe('le cifre intere non si arrotondano mai, e i pesi si leggono con i decimali della bilancia', () => {
+  it('fresco 2 g e secco 0,5 g: 25 %, non 30 %', () => {
+    const c = sostanzaSeccaCalcolata(2, 0.5)!
+    expect(formattaCifre(c.valore, c.cifre)).toBe('25')
+    expect(arrotondato(c)).toBe(25)
+  })
+  it('con una bilancia a tre decimali, 2 è 2,000 e 0,5 è 0,500: 25,00 %', () => {
+    const c = sostanzaSeccaCalcolata(2, 0.5, 3)!
+    expect(formattaCifre(c.valore, c.cifre)).toBe('25,00')
+  })
+  it('la precisione di una pesata è il massimo dei decimali dei suoi pesi', () => {
+    const peso = (valore: number) => ({ id: String(valore), campione_id: 'c', replica: 1, tipo: 'fresco' as const, valore, lettura: null, misurato_il: '' })
+    expect(precisioneDeiPesi([peso(2), peso(0.412), peso(1.5)])).toBe(3)
+    expect(precisioneDeiPesi([])).toBe(0)
   })
 })

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { arrotondaDecimali } from '@/lib/numeri'
 import {
   RIGHE_IMMAGINE, TESTO_GRAFICI, costruisciCartella, larghezzaColonna, nomiFogli, type Cartella, type Cella, type DatiCartella,
   type Foglio,
@@ -151,20 +152,22 @@ describe('Dati', () => {
   it('le celle della prima riga, verificate a mano', () => {
     expect(foglio(cartella(), 'Dati').righe[0]).toEqual([
       'Hydrochar prova', '1', 'Controllo', 'No', 'Controllo + No', 'A', { data: D1 },
-      42.5, 2, 12.5, 0.3, 2, 300, 30, null, 31, 'seconda', false,
+      // SPAD: la media del giorno (42 e 43) con i decimali dei dati, interi: 43
+      43, 2, 12.5, 0.3, 2, 300, 30, null, 31, 'seconda', false,
     ])
   })
 
   it('due misure nello stesso giorno: media e N_ = 2; le altre righe con un valore N_ = 1, senza valore vuoto', () => {
     const dati = foglio(cartella(), 'Dati')
-    expect(colonna(dati, 'SPAD')).toEqual([42.5, 38.5, null, null, null, 45.5, 40])
+    // medie del giorno con i decimali dei dati (interi)
+    expect(colonna(dati, 'SPAD')).toEqual([43, 39, null, null, null, 46, 40])
     expect(colonna(dati, 'N_SPAD')).toEqual([2, 1, null, null, null, 1, 1])
   })
 
   it('letture ripetute in una sola misura: la media delle letture non vuote, N_ resta 1', () => {
     const c = cartella({ misure: [misura(p1, sSpad, D1, '09:00', { [spad.id]: [40, 43] }), misura(p2, sSpad, D1, '09:00', { [spad.id]: [null, 39] })] })
     const dati = foglio(c, 'Dati')
-    expect(colonna(dati, 'SPAD')).toEqual([41.5, 39])
+    expect(colonna(dati, 'SPAD')).toEqual([42, 39])
     expect(titoli(dati)).not.toContain('N_SPAD')
   })
 
@@ -309,16 +312,17 @@ describe('Medie', () => {
 
   it('i numeri, verificati a mano: unità la pianta, ES vuoto con n = 1, n = 0 senza valori', () => {
     const [cn1, cs1, , , cn2, sn2] = comeOggetti(foglio(cartella(), 'Medie'))
-    expect(cn1['SPAD media']).toBe(40.5)
-    expect(cn1['SPAD ES']).toBeCloseTo(2, 12)
+    // medie ed ES con i decimali dei dati: lo SPAD è intero (40,5 → 41)
+    expect(cn1['SPAD media']).toBe(41)
+    expect(cn1['SPAD ES']).toBe(2)
     expect(cn1['SPAD n']).toBe(2)
     expect([cn1['A (µmol/m²/s) media'], cn1['A (µmol/m²/s) ES'], cn1['A (µmol/m²/s) n']]).toEqual([12.5, null, 1])
     expect([cn1['Altezza (cm) · Metro media'], cn1['Altezza (cm) · Metro n']]).toEqual([31, 2])
-    expect(cn1['Altezza (cm) · Metro ES']).toBeCloseTo(1, 12)
+    expect(cn1['Altezza (cm) · Metro ES']).toBe(1)
     expect([cs1['SPAD media'], cs1['SPAD ES'], cs1['SPAD n']]).toEqual([null, null, 0])
     expect([cn1['Vecchio media'], cn1['Vecchio n']]).toEqual([null, 0])
-    expect(cn2['SPAD media']).toBe(42.75)
-    expect(cn2['SPAD ES']).toBeCloseTo(2.75, 12)
+    expect(cn2['SPAD media']).toBe(43)
+    expect(cn2['SPAD ES']).toBe(3)
     expect([sn2['Palchi (n. elementi) media'], sn2['Palchi (n. elementi) n']]).toEqual([1, 1])
   })
 
@@ -338,7 +342,9 @@ describe('Medie', () => {
       for (const s of serieTrattamenti(config, par, misure.filter(m => m.strumento_id === strumento.id), config.piante, tutto)) {
         for (const punto of s.punti) {
           const riga = medie.find(r => r.Trattamento === s.trattamento.etichetta && (r.Data as { data: string }).data === punto.data)
-          expect([riga?.[`${titolo} media`], riga?.[`${titolo} ES`], riga?.[`${titolo} n`]]).toEqual([punto.media, punto.es, punto.n])
+          const d = punto.decimali ?? 20
+          const es = punto.es === null ? null : arrotondaDecimali(punto.es, d)
+          expect([riga?.[`${titolo} media`], riga?.[`${titolo} ES`], riga?.[`${titolo} n`]]).toEqual([arrotondaDecimali(punto.media, d), es, punto.n])
         }
       }
     }
@@ -347,7 +353,7 @@ describe('Medie', () => {
   it('piante precise: le medie delle sole piante scelte', () => {
     const c = cartella({ scelta: con({ piante: { modo: 'piante', ids: [p1.id] } }) })
     const [cn1] = comeOggetti(foglio(c, 'Medie'))
-    expect([cn1['SPAD media'], cn1['SPAD ES'], cn1['SPAD n']]).toEqual([42.5, null, 1])
+    expect([cn1['SPAD media'], cn1['SPAD ES'], cn1['SPAD n']]).toEqual([43, null, 1])
     expect(colonna(foglio(c, 'Medie'), 'Trattamento')).toEqual(['Controllo + No', 'Controllo + No'])
   })
 })
@@ -364,7 +370,9 @@ describe('Grafici', () => {
     expect(g.parametroId).toBe(spad.id)
     expect(g.unita).toBeNull()
     expect(g.serie.map(s => s.trattamento.etichetta)).toEqual(['Controllo + No', 'Controllo + Sì', 'S1 + No', 'S1 + Sì'])
-    expect(g.serie[0].punti).toEqual([{ data: D1, media: 40.5, es: g.serie[0].punti[0].es, n: 2 }, { data: D2, media: 42.75, es: g.serie[0].punti[1].es, n: 2 }])
+    expect(g.serie[0].punti).toEqual([
+      { data: D1, media: 40.5, es: g.serie[0].punti[0].es, n: 2, decimali: 0 }, { data: D2, media: 42.75, es: g.serie[0].punti[1].es, n: 2, decimali: 0 },
+    ])
     expect(c.grafici[5].unita).toBe('cm')
     expect(c.grafici[7].unita).toBe('%')
   })
@@ -529,7 +537,7 @@ describe('periodo e piante della scelta su tutti i fogli', () => {
     expect(c.fogli.map(f => f.nome)).toEqual(['Dati', 'Medie', 'Misure', 'Grafici', 'Info'])
     expect(colonna(foglio(c, 'Dati'), 'Pianta')).toEqual(['1', '2'])
     expect(foglio(c, 'Misure').righe).toHaveLength(4)
-    expect(comeOggetti(foglio(c, 'Medie')).map(r => [r.Trattamento, r['SPAD media']])).toEqual([['Controllo + No', 42.75]])
+    expect(comeOggetti(foglio(c, 'Medie')).map(r => [r.Trattamento, r['SPAD media']])).toEqual([['Controllo + No', 43]])
     expect(c.grafici.map(g => g.titolo)).toEqual(['SPAD'])
     expect(c.grafici[0].serie.map(s => s.trattamento.id)).toEqual([tCN.id])
   })

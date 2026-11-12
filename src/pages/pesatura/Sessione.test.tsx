@@ -95,9 +95,17 @@ describe('Sessione', () => {
     const riepilogo = within(screen.getByRole('region', { hidden: false, name: 'Riepilogo' }))
     expect(riepilogo.getByText('P12 · A')).toBeInTheDocument()
     expect(riepilogo.getByText('P12 · B')).toBeInTheDocument()
-    // A: (1,2−0,4)/(1,6−0,4) = 66,67 %; B: 83,33 %; media 75 %
-    expect(riepilogo.getByText('P12 · A').closest('li')).toHaveTextContent('66,67 %')
+    // A: (1,2−0,4)/(1,6−0,4) = 66,67 % con due cifre significative (come 1,2 e 1,6) = 67 %; B: 83 %; media 75 %
+    expect(riepilogo.getByText('P12 · A').closest('li')).toHaveTextContent('67 %')
+    expect(riepilogo.getByText('P12 · B').closest('li')).toHaveTextContent('83 %')
     expect(riepilogo.getByText('P12 · Media').closest('li')).toHaveTextContent('75 %')
+  })
+
+  it('i pesi nel riepilogo sono quelli scritti, senza arrotondare', async () => {
+    dati([sessione({ tipo: 'aliquota', impostazioni: IMPOSTAZIONI_PREDEFINITE })], campioni, [peso('1', 'c12', 1, 'aliquota', 0.0017)])
+    apri()
+    await titolo()
+    expect(screen.getByText('P12').closest('li')).toHaveTextContent('0,0017 g')
   })
 
   it('una replica incompleta mostra un trattino e gli avvisi di coerenza', async () => {
@@ -351,5 +359,16 @@ describe('Sessione: dal riepilogo alla pesata', () => {
     apri()
     await titolo()
     await waitFor(() => expect(screen.queryByRole('link', { name: /^Pesa P12/ })).not.toBeInTheDocument())
+  })
+})
+
+describe('Sessione: cifre significative', () => {
+  it('fresco 2 e secco 0,5 con gli altri pesi a tre decimali: 25,00 %, mai 30 %', async () => {
+    const ss = sessione({ tipo: 'sostanza_secca', impostazioni: IMPOSTAZIONI_PREDEFINITE })
+    const cs = [campione('c12', 1, { pianta_id: 'p12' }), campione('c13', 2, { nome: 'Bianco' })]
+    dati([ss], cs, [peso('1', 'c12', 1, 'fresco', 2), peso('2', 'c12', 1, 'secco', 0.5), peso('3', 'c13', 1, 'fresco', 1.253)])
+    apri()
+    await titolo()
+    expect(screen.getByText('P12').closest('li')).toHaveTextContent('25,00 %')
   })
 })

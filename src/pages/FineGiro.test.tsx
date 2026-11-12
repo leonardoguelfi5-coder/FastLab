@@ -28,6 +28,8 @@ import { misureDelGiorno } from '@/api/misure'
 import { strumentoDaCatalogo } from '@/domain/catalogo'
 import { valoriDiOggi } from '@/domain/giro'
 import { serieTrattamenti } from '@/domain/dataset'
+import { decimaliParametro } from '@/domain/statistiche'
+import { formattaDecimali } from '@/lib/numeri'
 import { bozzaHydrochar } from '@/domain/modelli/hydrochar'
 import { SEMI_CATALOGO } from '@/domain/modelli/semi'
 import type { ConfigEsperimento, Misura, ValoriMisura } from '@/domain/tipi'
@@ -246,7 +248,9 @@ describe('FineGiro', () => {
     const riga = within(sezione).getAllByRole('row')[1]
     expect(within(riga).getByRole('rowheader')).toHaveTextContent(attesi[0].righe[0].trattamento.etichetta)
     const celle = within(riga).getAllByRole('cell')
-    const virgola = (n: number) => String(Math.round(n * 100) / 100).replace('.', ',')
+    // medie ed ES con i decimali dei dati del parametro
+    const decimali = decimaliParametro(attesi[0].parametro, await misureDelGiorno('E', OGGI))
+    const virgola = (n: number) => formattaDecimali(n, decimali)
     expect(celle[0]).toHaveTextContent(virgola(attesi[0].righe[0].media))
     expect(celle[1]).toHaveTextContent(`± ${virgola(attesi[0].righe[0].es!)}`)
     expect(celle[2]).toHaveTextContent(`(${attesi[0].righe[0].n})`)

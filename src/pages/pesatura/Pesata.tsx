@@ -12,7 +12,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { controllaAsciugatura, controllaReplica, mlTampone } from '@/domain/pesatura/calcoli'
+import { controllaAsciugatura, controllaReplica, mlTamponeCalcolato, precisioneDeiPesi } from '@/domain/pesatura/calcoli'
 import {
   etichettaCampione, FASI, letteraReplica, NOMI_FASE, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
@@ -20,7 +20,7 @@ import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domai
 import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
 import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
-import { formattaMedia, formattaNumero } from '@/lib/numeri'
+import { formattaCifre, formattaNumero } from '@/lib/numeri'
 import { percorsoPesata, percorsoPesatura, percorsoSessione } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
@@ -111,6 +111,11 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
   const giro = usePesataSequenziale({ espId, sessione, campioni, pesi, fase, partenza })
   const { passi, indice, finito } = giro
   const mappaPiante = useMemo(() => new Map(piante.map(p => [p.id, p])), [piante])
+  // I decimali della bilancia in questa sessione: le cifre dei pesi che finiscono con degli zeri (vedi precisioneDeiPesi).
+  const precisione = useMemo(() => {
+    const ids = new Set(campioni.map(c => c.id))
+    return precisioneDeiPesi(pesi.filter(p => ids.has(p.campione_id)))
+  }, [campioni, pesi])
   const mappaTrattamenti = useMemo(() => new Map(trattamenti.map(t => [t.id, t.etichetta])), [trattamenti])
   const etichetta = (p: Passo) => etichettaCampione(p.campione, mappaPiante)
   const conReplica = (p: Passo) => passi.filter(x => x.campione.id === p.campione.id).length > 1
@@ -199,6 +204,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
       key={`${indice}:${dettatoFallito?.volta ?? 0}`}
       sessione={sessione}
       pesi={pesi}
+      precisione={precisione}
       fase={fase}
       passo={passo}
       etichetta={etichetta(passo)}
@@ -219,10 +225,12 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
  * (o da quello appena dettato, se il salvataggio a voce non è riuscito).
  */
 function SchedaPasso({
-  sessione, pesi, fase, passo, etichetta, trattamento, replica, posizione, giro, ultimo, puoModificare, dettatura, dettato,
+  sessione, pesi, precisione, fase, passo, etichetta, trattamento, replica, posizione, giro, ultimo, puoModificare, dettatura, dettato,
 }: {
   sessione: SessionePesatura
   pesi: Peso[]
+  /** I decimali della bilancia nella sessione. */
+  precisione: number
   fase: FasePesata
   passo: Passo
   etichetta: string
@@ -273,7 +281,7 @@ function SchedaPasso({
       ? (altri.secco !== undefined ? controllaAsciugatura(valore, altri.secco) : null) ?? undefined
       : controllaReplica(sessione.tipo, { ...altri, [fase]: valore }).join(' ') || undefined
   }
-  const ml = fase === 'aliquota' && valoreValido ? mlTampone(valore, sessione.unita, sessione.impostazioni.rapportoTampone) : null
+  const ml = fase === 'aliquota' && valoreValido ? mlTamponeCalcolato(valore, sessione.unita, sessione.impostazioni.rapportoTampone, precisione) : null
 
   async function conferma() {
     setProvato(true)
@@ -325,7 +333,7 @@ function SchedaPasso({
               <p className="text-base text-grafite-tenue">Pesato da un&apos;altra persona.</p>
             </div>
           )}
-          {ml !== null && <p role="status" className="text-title text-grafite">Aggiungi {formattaMedia(ml)} mL di tampone</p>}
+          {ml !== null && <p role="status" className="text-title text-grafite">Aggiungi {formattaCifre(ml.valore, ml.cifre)} mL di tampone</p>}
           {provato && problemi.map(p => <TestoErrore key={p}>{p}</TestoErrore>)}
         </ModuloCampi>
       </div>

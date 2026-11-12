@@ -164,7 +164,7 @@ describe('serieTrattamenti: numeri', () => {
   })
   it('n conta solo le piante con un valore; con n = 1 l\'ES non c\'è', () => {
     const s = serieTrattamenti(config, altezza, [alt(p1, D, 40), alt(p2, D, null), alt(p3, '2026-10-21', 30)], [p1, p2, p3], TUTTO)
-    expect(s[0].punti).toEqual([{ data: '2026-10-21', media: 30, es: null, n: 1 }, { data: D, media: 40, es: null, n: 1 }])
+    expect(s[0].punti).toEqual([{ data: '2026-10-21', media: 30, es: null, n: 1, decimali: 0 }, { data: D, media: 40, es: null, n: 1, decimali: 0 }])
   })
   it('una serie per trattamento con piante tra quelle scelte, in ordine di configurazione; punti in ordine di data', () => {
     const misure = [alt(p35, '2026-10-21', 9), alt(p1, D, 40), alt(p35, D, 10), alt(p12, D, 20)]
@@ -180,11 +180,11 @@ describe('serieTrattamenti: numeri', () => {
   it('le misure di piante non scelte e fuori periodo non contano', () => {
     const misure = [alt(p1, '2026-10-01', 1), alt(p1, D, 40), alt(p2, D, 1000)]
     const s = serieTrattamenti(config, altezza, misure, [p1], { da: '2026-10-10', a: '2026-10-31' })
-    expect(s[0].punti).toEqual([{ data: D, media: 40, es: null, n: 1 }])
+    expect(s[0].punti).toEqual([{ data: D, media: 40, es: null, n: 1, decimali: 0 }])
   })
   it('con "Tutto" una misura con data futura (orologio avanti) entra', () => {
     const s = serieTrattamenti(config, altezza, [alt(p1, '2030-01-01', 7)], [p1], intervalloDelPeriodo({ modo: 'tutto' }, '2026-11-02'))
-    expect(s[0].punti).toEqual([{ data: '2030-01-01', media: 7, es: null, n: 1 }])
+    expect(s[0].punti).toEqual([{ data: '2030-01-01', media: 7, es: null, n: 1, decimali: 0 }])
   })
 })
 
@@ -237,7 +237,7 @@ describe('seriePiante', () => {
       ['pianta', p1.id, 0, false], ['pianta', p12.id, 1, false],
       ['trattamento', tCN.id, 0, true], ['trattamento', tCS.id, 1, true],
     ])
-    expect(r.serie[0].punti).toEqual([{ data: D, media: 42, es: null, n: 1 }])
+    expect(r.serie[0].punti).toEqual([{ data: D, media: 42, es: null, n: 1, decimali: 0 }])
     // riferimento di Controllo + No: le piante 1, 2 e 3 (42, 50, 60), anche se la ricerca ne ha trovata una sola
     expect(r.serie[2].punti[0].media).toBeCloseTo(152 / 3, 12)
     expect(r.serie[2].punti[0].n).toBe(3)
@@ -264,6 +264,16 @@ describe('seriePiante', () => {
   it('testo: nessuna serie', () => expect(seriePiante(config, note, [], [p1], TUTTO)).toEqual({ serie: [], oltre: 0 }))
 })
 
+describe('decimali dei punti', () => {
+  it('medie ed errori standard portano i decimali dei dati del parametro; i sì/no in % nessuno', () => {
+    const D = '2026-10-28'
+    const s = serieTrattamenti(config, altezza, [alt(p1, D, 40.25), alt(p2, D, 41)], [p1, p2], TUTTO)
+    expect(s[0].punti[0].decimali).toBe(2)
+    const v = serieTrattamenti(config, vigore, [mis(p1, sFeno, D, { [vigore.id]: true })], [p1], TUTTO)
+    expect(v[0].punti[0].decimali).toBeUndefined()
+  })
+})
+
 describe('righeTabella', () => {
   it('esattamente i punti delle serie, con gli stessi numeri, dalla data più recente', () => {
     const misure = [alt(p1, '2026-10-21', 30), alt(p1, '2026-10-28', 40), alt(p2, '2026-10-28', 44), alt(p12, '2026-10-21', 20)]
@@ -275,7 +285,7 @@ describe('righeTabella', () => {
     const punti = serie.flatMap(s => s.punti.map(p => ({ ...p, serie: s })))
     expect(righe).toHaveLength(punti.length)
     for (const r of righe) {
-      expect(punti).toContainEqual({ data: r.data, media: r.media, es: r.es, n: r.n, serie: r.serie })
+      expect(punti).toContainEqual({ data: r.data, media: r.media, es: r.es, n: r.n, decimali: r.decimali, serie: r.serie })
     }
   })
   it('vale anche per le serie delle piante e i riferimenti', () => {

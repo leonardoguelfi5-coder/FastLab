@@ -46,7 +46,7 @@ describe('mediePerTrattamento', () => {
   it('le piante senza tutti i pesi, le righe libere e i trattamenti senza valori restano fuori', () => {
     const cs = [campione('c1', 1, 'p1'), campione('c3', 2, 'p3'), campione('Bianco', 3, null)]
     const pesi = [...rwc('c1', 0.9, 1.1, 0.1), peso('c3', 'fresco', 1), ...rwc('Bianco', 0.5, 1.1, 0.1)]
-    expect(mediePerTrattamento(sessione('rwc'), cs, pesi, piante)).toEqual([{ trattamentoId: 'tB', media: expect.closeTo(80), n: 1 }])
+    expect(mediePerTrattamento(sessione('rwc'), cs, pesi, piante)).toEqual([{ trattamentoId: 'tB', media: expect.closeTo(80), n: 1, decimali: 0 }])
   })
 
   it('% di sostanza secca', () => {
@@ -60,5 +60,15 @@ describe('mediePerTrattamento', () => {
     const cs = [campione('c1', 1, 'p1')]
     expect(mediePerTrattamento(sessione('aliquota'), cs, [peso('c1', 'aliquota', 1)], piante)).toEqual([])
     expect(mediePerTrattamento(sessione('vasi'), cs, [], piante)).toEqual([])
+  })
+})
+
+describe('mediePerTrattamento: i decimali', () => {
+  it('quelli dei valori delle piante come si scrivono, con le loro cifre significative', () => {
+    const cs = [campione('d1', 1, 'p1'), campione('d2', 2, 'p2')]
+    // fresco 0,412, turgido 0,445, secco 0,062: tre cifre → 91,4 % (un decimale)
+    const pesi = [...rwc('d1', 0.412, 0.445, 0.062), ...rwc('d2', 0.398, 0.431, 0.058)]
+    const [m] = mediePerTrattamento(sessione('rwc'), cs, pesi, piante)
+    expect(m.decimali).toBe(1)
   })
 })

@@ -186,8 +186,8 @@ describe('ElencoPiante: il valore mostrato e le medie', () => {
       spad(15, 30), spad(16, 31, '2026-10-26'),
     ])
     vaiAllaPagina()
-    // (40 + 42 + 44,5) / 3 = 42,1666... → 42,17, su 3 piante di 14
-    await vi.waitFor(async () => expect(await blocco('Controllo')).toHaveTextContent('14 piante · SPAD 42,17 · 3/14'))
+    // (40 + 42 + 44,5) / 3 = 42,1666... → 42,2 (un decimale, come i dati: 44,5), su 3 piante di 14
+    await vi.waitFor(async () => expect(await blocco('Controllo')).toHaveTextContent('14 piante · SPAD 42,2 · 3/14'))
     // ogni pianta con la sua ultima data: (30 + 31) / 2
     expect(await blocco('Controllo + HC')).toHaveTextContent('6 piante · SPAD 30,5 · 2/6')
   })
@@ -200,14 +200,14 @@ describe('ElencoPiante: il valore mostrato e le medie', () => {
       spad(16, 38, '2026-10-26'),
     ])
     vaiAllaPagina()
-    // pianta 15: 41; pianta 16: 38 → 39,5
-    await vi.waitFor(async () => expect(await blocco('Controllo + HC')).toHaveTextContent('SPAD 39,5 · 2/6'))
+    // pianta 15: 41; pianta 16: 38 → 39,5, che con i decimali dei dati (interi) si scrive 40
+    await vi.waitFor(async () => expect(await blocco('Controllo + HC')).toHaveTextContent('SPAD 40 · 2/6'))
   })
 
   it('con l\'unità di misura, dopo il valore', async () => {
-    vi.mocked(ultimeMisurePiante).mockResolvedValue([temperatura(1, 24), temperatura(2, 25)])
+    vi.mocked(ultimeMisurePiante).mockResolvedValue([temperatura(1, 24.1), temperatura(2, 25)])
     vaiAllaPagina()
-    await vi.waitFor(async () => expect(await blocco('Controllo')).toHaveTextContent('Temp aria 24,5 °C · 2/14'))
+    await vi.waitFor(async () => expect(await blocco('Controllo')).toHaveTextContent('Temp aria 24,6 °C · 2/14'))
   })
 
   it('un trattamento senza valori non inventa una media', async () => {

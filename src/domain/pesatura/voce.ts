@@ -78,24 +78,43 @@ function cifre(parola: string): number | null {
   return null
 }
 
-/** Le cifre dopo "virgola": una cifra per parola ("uno due" → "12") oppure un numero intero ("dodici" → "12"). */
+/**
+ * Le cifre dopo "virgola": i pezzi detti si mettono uno dopo l'altro, nell'ordine, ognuno con le sue cifre. Così
+ * "uno due" → "12", "dodici" → "12", "zero zero diciassette" → "0017", "uno tre cinque 2" → "1352". Le cifre scritte
+ * dal riconoscimento restano come sono, zeri davanti compresi ("05" → "05").
+ */
 function decimali(dopo: string[]): string | null {
   if (dopo.length === 0) return null
-  if (dopo.length === 1) {
-    const n = intero(dopo[0])
-    return n === null ? null : CIFRE.test(dopo[0]) ? dopo[0] : String(n)
-  }
   let risultato = ''
   for (const p of dopo) {
-    const n = intero(p)
-    if (n === null || n > 9 || (CIFRE.test(p) && p.length !== 1)) return null
+    if (CIFRE.test(p)) {
+      risultato += p
+      continue
+    }
+    const n = paroleNumeri().get(p)
+    if (n === undefined) return null
     risultato += String(n)
   }
   return risultato
 }
 
-function senzaSegno(p: string[]): number | null {
-  if (p.length === 0) return null
+/**
+ * Il riconoscimento a volte scrive la virgola dentro le cifre e poi continua a parole o con altre cifre ("0,00 17",
+ * "0, diciassette"): un pezzo "0,00" o "0," diventa "0 virgola 00" o "0 virgola", così i pezzi che seguono si
+ * attaccano ai decimali. Un pezzo da solo ("0,12") resta com'è, e "2.350" resta un numero con le migliaia.
+ */
+function separaVirgola(p: string[]): string[] {
+  if (p.length < 2) return p
+  return p.flatMap(x => {
+    const m = /^(\d+)[,.](\d*)$/.exec(x)
+    if (!m || MIGLIAIA.test(x)) return [x]
+    return m[2] === '' ? [m[1], 'virgola'] : [m[1], 'virgola', m[2]]
+  })
+}
+
+function senzaSegno(parole: string[]): number | null {
+  if (parole.length === 0) return null
+  const p = separaVirgola(parole)
   const virgola = p.indexOf('virgola')
   if (virgola === -1) {
     if (p.length !== 1) return null

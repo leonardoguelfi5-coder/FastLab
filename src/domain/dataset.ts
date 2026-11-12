@@ -1,7 +1,7 @@
 import { eDataValida, spostaGiorni } from '@/lib/date'
 import { eUuid } from '@/lib/percorsi'
 import { trovaPianta } from './piante'
-import { mediaEsN, ordinati, ultimoTestoDelGiorno, valoriGiornalieri, valoriGiornalieriSiNo } from './statistiche'
+import { decimaliParametro, mediaEsN, ordinati, ultimoTestoDelGiorno, valoriGiornalieri, valoriGiornalieriSiNo } from './statistiche'
 import type { ConfigEsperimento, Esperimento, Misura, Nota, Parametro, Pianta, Strumento, Trattamento } from './tipi'
 
 /**
@@ -147,7 +147,8 @@ export function parametriDelloStrumento(config: ConfigEsperimento, strumentoId: 
 }
 
 /** Un punto di una serie: media, errore standard (`null` con n = 1 e per i sì/no) e n = piante con un valore. */
-export interface PuntoSerie { data: string; media: number; es: number | null; n: number }
+/** `decimali`: quelli dei dati del parametro, con cui scrivere media ed errore standard (assente per i sì/no in %). */
+export interface PuntoSerie { data: string; media: number; es: number | null; n: number; decimali?: number }
 /**
  * La media di un trattamento nel tempo. `posto` = indice del trattamento nell'ordine di tutta la configurazione (il
  * colore e il marcatore della tavolozza), `null` dal nono in poi. `riferimento`: la media tenue di tutte le piante del
@@ -183,8 +184,18 @@ function valoriDaDisegnare(
   }
 }
 
+/**
+ * I decimali di medie ed errori standard del grafico: quelli dei dati del parametro (`decimaliParametro`). Un sì/no si
+ * disegna come percentuale di sì, che non viene da dati con decimali: nessuno, e si scrive come prima.
+ */
+function decimaliDelGrafico(parametro: Parametro, misure: Misura[]): number | undefined {
+  return parametro.tipo === 'sino' ? undefined : decimaliParametro(parametro, misure)
+}
+
 /** I punti di un gruppo di piante, in ordine di data: `mediaEsN` dei valori del giorno delle piante che ne hanno uno. */
-function puntiDelGruppo(piantaIds: Set<string>, valori: Map<string, Map<string, number>>, senzaEs: boolean): PuntoSerie[] {
+function puntiDelGruppo(
+  piantaIds: Set<string>, valori: Map<string, Map<string, number>>, senzaEs: boolean, decimali: number | undefined,
+): PuntoSerie[] {
   const perData = new Map<string, number[]>()
   for (const id of piantaIds) {
     for (const [data, x] of valori.get(id) ?? []) perData.set(data, [...(perData.get(data) ?? []), x])
@@ -192,7 +203,7 @@ function puntiDelGruppo(piantaIds: Set<string>, valori: Map<string, Map<string, 
   return [...perData.keys()].sort().flatMap(data => {
     const r = mediaEsN(perData.get(data) ?? [])
     // una percentuale di sì non ha un errore standard da disegnare (spec §6.3): niente barre
-    return r ? [{ data, media: r.media, es: senzaEs ? null : r.es, n: r.n }] : []
+    return r ? [{ data, media: r.media, es: senzaEs ? null : r.es, n: r.n, ...(decimali === undefined ? {} : { decimali }) }] : []
   })
 }
 
@@ -213,7 +224,7 @@ export function serieTrattamenti(
     if (sue.size === 0) return []
     return [{
       tipo: 'trattamento', trattamento, posto: posti.get(trattamento.id) ?? null, riferimento: false,
-      punti: puntiDelGruppo(sue, valori, parametro.tipo === 'sino'),
+      punti: puntiDelGruppo(sue, valori, parametro.tipo === 'sino', decimaliDelGrafico(parametro, misure)),
     }]
   })
 }
@@ -238,7 +249,7 @@ export function seriePiante(
     if (!trattamento) return []
     return [{
       tipo: 'pianta', pianta, trattamento, posto: posti.get(trattamento.id) ?? null, riferimento: false,
-      punti: puntiDelGruppo(new Set([pianta.id]), valori, true),
+      punti: puntiDelGruppo(new Set([pianta.id]), valori, true, decimaliDelGrafico(parametro, misure)),
     }]
   })
   const coinvolti = new Set(disegnate.map(p => p.trattamento_id))
@@ -248,7 +259,7 @@ export function seriePiante(
 }
 
 /** Una riga di "Mostra i valori": un punto di una serie del grafico. */
-export interface RigaTabella { data: string; serie: Serie; media: number; es: number | null; n: number }
+export interface RigaTabella { data: string; serie: Serie; media: number; es: number | null; n: number; decimali?: number }
 
 /**
  * Le righe di "Mostra i valori", prese dai punti delle serie del grafico (gli stessi numeri, non ricalcolati): per
@@ -259,7 +270,7 @@ export function righeTabella(serie: Serie[]): RigaTabella[] {
   const perSerie = serie.map(s => new Map(s.punti.map(p => [p.data, p])))
   return date.flatMap(data => serie.flatMap((s, i): RigaTabella[] => {
     const p = perSerie[i].get(data)
-    return p ? [{ data, serie: s, media: p.media, es: p.es, n: p.n }] : []
+    return p ? [{ data, serie: s, media: p.media, es: p.es, n: p.n, ...(p.decimali === undefined ? {} : { decimali: p.decimali }) }] : []
   }))
 }
 
