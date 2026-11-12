@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { filtraPiante, parametriMostrabili, parametroDiBase, ultimoValorePerPianta } from '@/domain/elencoPiante'
 import { trovaPianta } from '@/domain/piante'
-import { mediaPerTrattamento } from '@/domain/statistiche'
+import { decimaliParametro, mediaPerTrattamento } from '@/domain/statistiche'
 import type { ConfigEsperimento, Parametro } from '@/domain/tipi'
 import { formattaGiornoMese } from '@/lib/date'
 import { formattaConUnita } from '@/lib/numeri'
@@ -59,7 +59,7 @@ function useScorrimentoRicordato(percorso: string) {
  * Lo stato degli ultimi valori per le righe: `caricano` finché non sono arrivati (mai un numero finto), `mancano`
  * se non arrivano (l'elenco si usa lo stesso, senza valori).
  */
-type Ultimi = { stato: 'caricano' } | { stato: 'mancano' } | { stato: 'pronti'; perPianta: ReturnType<typeof ultimoValorePerPianta>; medie: ReturnType<typeof mediaPerTrattamento> }
+type Ultimi = { stato: 'caricano' } | { stato: 'mancano' } | { stato: 'pronti'; perPianta: ReturnType<typeof ultimoValorePerPianta>; medie: ReturnType<typeof mediaPerTrattamento>; decimali: number }
 
 /** Il contenuto a configurazione caricata: ricerca, valore mostrato e un blocco per trattamento. */
 function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperimento }) {
@@ -94,7 +94,11 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
   const ultimi = useMemo((): Ultimi => {
     if (!parametro) return { stato: 'mancano' }
     if (dati === undefined) return { stato: ultime.isError ? 'mancano' : 'caricano' }
-    return { stato: 'pronti', perPianta: ultimoValorePerPianta(parametro, dati), medie: mediaPerTrattamento(config, parametro, dati) }
+    return {
+      stato: 'pronti', perPianta: ultimoValorePerPianta(parametro, dati), medie: mediaPerTrattamento(config, parametro, dati),
+      // valori e medie con i decimali dei dati del parametro (la precisione dello strumento)
+      decimali: decimaliParametro(parametro, dati),
+    }
   }, [config, parametro, dati, ultime.isError])
 
   const blocchi = useMemo(() => {
@@ -219,7 +223,7 @@ function ElencoCaricato({ espId, config }: { espId: string; config: ConfigEsperi
                               : ultimi.stato === 'caricano'
                                 ? '…'
                                 : ultimo
-                                  ? formattaConUnita(ultimo.valore, parametro.unita)
+                                  ? formattaConUnita(ultimo.valore, ultimi.decimali, parametro.unita)
                                   : <span className="font-sans text-grafite-tenue">senza valore</span>}
                           </span>
                           {ultimo && <span className={`shrink-0 text-dato text-grafite-tenue ${NUMERI}`}>{formattaGiornoMese(ultimo.data)}</span>}
@@ -244,7 +248,7 @@ function riepilogo(parametro: Parametro, ultimi: Ultimi, trattamentoId: string, 
   if (ultimi.stato === 'mancano') return parametro.nome
   const m = ultimi.medie.get(trattamentoId)
   if (!m || m.media === null) return `${parametro.nome} senza valori`
-  return `${parametro.nome} ${formattaConUnita(m.media, parametro.unita)} · ${m.n}/${quante}`
+  return `${parametro.nome} ${formattaConUnita(m.media, ultimi.decimali, parametro.unita)} · ${m.n}/${quante}`
 }
 
 /** Le piante di un esperimento per trattamento: la media dell'ultimo valore scelto, e la ricerca di una pianta. */

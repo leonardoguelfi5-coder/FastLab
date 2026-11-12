@@ -351,7 +351,8 @@ describe('SchedaPianta: ultimi valori', () => {
     archivio = [misura(35, 'SPAD', { SPAD: [40, 41, null] }, '2026-10-27')]
     apri('35')
     await pronta()
-    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 40,5')
+    // la media delle letture con i decimali dei dati (interi): 40,5 → 41
+    expect((await righe('SPAD'))[0]).toHaveTextContent('SPAD 41')
   })
 
   it('una lista mostra quanti elementi ha (i palchi), il testo c\'è, i parametri archiviati no', async () => {
@@ -528,7 +529,8 @@ describe('SchedaPianta: confronto con il trattamento', () => {
     apri('35')
     await pronta()
     const riga = await blocco('SPAD')
-    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 40,5'))
+    // (40 + 41) / 2 = 40,5, con i decimali dei dati (interi): 41
+    await waitFor(() => expect(riga).toHaveTextContent('Media del trattamento W1 il 27/10: 41'))
     expect(screen.queryByText('fuori dal gruppo')).not.toBeInTheDocument()
   })
 

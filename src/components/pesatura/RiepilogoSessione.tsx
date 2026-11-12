@@ -1,11 +1,11 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { controllaReplica, mlTampone, rwc, sostanzaSecca } from '@/domain/pesatura/calcoli'
-import { mediePerTrattamento } from '@/domain/pesatura/medie'
+import { controllaReplica, mlTamponeCalcolato, type Calcolato } from '@/domain/pesatura/calcoli'
+import { decimaliDelCalcolato, mediePerTrattamento, valoreReplica } from '@/domain/pesatura/medie'
 import { etichettaCampione, letteraReplica, repliche } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
 import type { Pianta } from '@/domain/tipi'
-import { formattaMedia, formattaNumero } from '@/lib/numeri'
+import { formattaCifre, formattaDecimali, formattaNumero } from '@/lib/numeri'
 
 interface Valore { nome: string; testo: string }
 interface Riga {
@@ -33,8 +33,10 @@ interface RiepilogoSessioneProps {
 }
 
 const TRATTINO = '—'
-/** Un valore calcolato (RWC, %, mL): al massimo due decimali. */
-const numero = (n: number | null, unita = ''): string => (n === null ? TRATTINO : `${formattaMedia(n)}${unita}`)
+/** Un valore calcolato (RWC, %, mL): con le cifre significative del dato che ne ha di più. */
+const calcolato = (c: Calcolato | null, unita: string): string => (c === null ? TRATTINO : `${formattaCifre(c.valore, c.cifre)}${unita}`)
+/** Una media di valori calcolati: con i decimali dei valori come si scrivono. */
+const media = (n: number, decimali: number, unita: string): string => `${formattaDecimali(n, decimali)}${unita}`
 /** Un peso: esattamente com'è stato scritto o detto, senza arrotondare (0,0017 g resta 0,0017 g). */
 const peso = (n: number | null, unita: string): string => (n === null ? TRATTINO : `${formattaNumero(n)}${unita}`)
 
@@ -48,31 +50,31 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
     const pianta = c.pianta_id ? piante.get(c.pianta_id) : undefined
     const dettaglio = pianta ? trattamenti.get(pianta.trattamento_id) ?? null : c.substrato
     const reps = repliche(c, sessione, pesi)
-    const calcolati: number[] = []
+    const calcolati: Calcolato[] = []
 
     for (const replica of reps) {
       const valore: Partial<Record<TipoPeso, number>> = {}
       for (const p of pesi) if (p.campione_id === c.id && p.replica === replica) valore[p.tipo] = p.valore
       const { fresco, turgido, secco } = valore
       const valori: Valore[] = []
-      let calcolato: number | null = null
+      let questo: Calcolato | null = null
 
       if (sessione.tipo === 'aliquota') {
         const a = valore.aliquota ?? null
         valori.push({ nome: 'Peso', testo: peso(a, u) })
-        const ml = a === null ? null : mlTampone(a, sessione.unita, sessione.impostazioni.rapportoTampone)
-        if (sessione.impostazioni.rapportoTampone !== null) valori.push({ nome: 'Tampone', testo: numero(ml, ' mL') })
+        const ml = a === null ? null : mlTamponeCalcolato(a, sessione.unita, sessione.impostazioni.rapportoTampone)
+        if (sessione.impostazioni.rapportoTampone !== null) valori.push({ nome: 'Tampone', testo: calcolato(ml, ' mL') })
       } else if (sessione.tipo === 'rwc') {
-        calcolato = fresco !== undefined && turgido !== undefined && secco !== undefined ? rwc(fresco, turgido, secco) : null
+        questo = valoreReplica(sessione, pesi, c.id, replica)
         valori.push(
           { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Turgido', testo: peso(turgido ?? null, u) },
-          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'RWC', testo: numero(calcolato, ' %') },
+          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'RWC', testo: calcolato(questo, ' %') },
         )
       } else if (sessione.tipo === 'sostanza_secca') {
-        calcolato = fresco !== undefined && secco !== undefined ? sostanzaSecca(fresco, secco) : null
+        questo = valoreReplica(sessione, pesi, c.id, replica)
         valori.push(
           { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Secco', testo: peso(secco ?? null, u) },
-          { nome: 'Sostanza secca', testo: numero(calcolato, ' %') },
+          { nome: 'Sostanza secca', testo: calcolato(questo, ' %') },
         )
       } else {
         const punti = pesi.filter(p => p.campione_id === c.id && p.tipo === 'asciugatura').length
@@ -81,7 +83,7 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
           { nome: 'Asciugatura', testo: punti === 1 ? '1 peso' : `${punti} pesi` },
         )
       }
-      if (calcolato !== null) calcolati.push(calcolato)
+      if (questo !== null) calcolati.push(questo)
       righe.push({
         chiave: `${c.id}/${replica}`,
         titolo: reps.length > 1 ? `${etichetta} · ${letteraReplica(replica)}` : etichetta,
@@ -94,12 +96,13 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
     }
 
     if ((sessione.tipo === 'rwc' || sessione.tipo === 'sostanza_secca') && reps.length > 1 && calcolati.length > 0) {
-      const media = calcolati.reduce((s, x) => s + x, 0) / calcolati.length
+      const valoreMedio = calcolati.reduce((s, x) => s + x.valore, 0) / calcolati.length
+      const decimali = Math.max(...calcolati.map(decimaliDelCalcolato))
       righe.push({
         chiave: `${c.id}/media`,
         titolo: `${etichetta} · Media`,
         dettaglio,
-        valori: [{ nome: sessione.tipo === 'rwc' ? 'RWC' : 'Sostanza secca', testo: numero(media, ' %') }],
+        valori: [{ nome: sessione.tipo === 'rwc' ? 'RWC' : 'Sostanza secca', testo: media(valoreMedio, decimali, ' %') }],
         avvisi: [],
         media: true,
         da: null,
@@ -144,7 +147,7 @@ function MediePerTrattamento({ sessione, campioni, pesi, piante, trattamenti }: 
               <span className="text-sm text-grafite-tenue">{m.n === 1 ? '1 pianta' : `${m.n} piante`}</span>
             </span>
             <span className="font-mono text-title tabular-nums text-grafite">
-              <span className="sr-only">{nome} </span>{numero(m.media, ' %')}
+              <span className="sr-only">{nome} </span>{media(m.media, m.decimali, ' %')}
             </span>
           </li>
         ))}

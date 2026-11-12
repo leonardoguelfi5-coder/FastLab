@@ -1,3 +1,4 @@
+import { arrotondaCifre, cifreMassime, decimaliMassimi } from '@/lib/numeri'
 import type { TipoAnalisi, TipoPeso, UnitaPeso } from './tipi'
 
 /**
@@ -79,4 +80,37 @@ export function controllaReplica(tipo: TipoAnalisi, pesi: Partial<Record<TipoPes
 /** Un vaso in asciugatura non può pesare meno del suo peso secco. */
 export function controllaAsciugatura(peso: number, secco: number): string | null {
   return peso < secco ? 'Il vaso pesa meno del peso secco.' : null
+}
+
+/**
+ * Un valore calcolato con le sue cifre significative. La regola, chiesta dall'utente e valida ovunque: un risultato ha
+ * le cifre significative del dato che ne ha di più fra quelli da cui viene. Così fresco 0,412, turgido 0,445 e secco
+ * 0,062 danno un RWC di 91,4 % (tre cifre, come 0,412), e 0,0017 g per 10 mL/g danno 0,017 mL.
+ */
+export interface Calcolato {
+  valore: number
+  cifre: number
+}
+
+const calcolato = (valore: number | null, dati: number[]): Calcolato | null =>
+  valore === null ? null : { valore, cifre: cifreMassime(dati) }
+
+export const rwcCalcolato = (fresco: number, turgido: number, secco: number): Calcolato | null =>
+  calcolato(rwc(fresco, turgido, secco), [fresco, turgido, secco])
+
+export const sostanzaSeccaCalcolata = (fresco: number, secco: number): Calcolato | null =>
+  calcolato(sostanzaSecca(fresco, secco), [fresco, secco])
+
+export const mlTamponeCalcolato = (valore: number, unita: UnitaPeso, rapporto: number | null): Calcolato | null =>
+  calcolato(mlTampone(valore, unita, rapporto), rapporto === null ? [valore] : [valore, rapporto])
+
+export const percentualeCCCalcolata = (peso: number, secco: number, cc: number): Calcolato | null =>
+  calcolato(percentualeCC(peso, secco, cc), [peso, secco, cc])
+
+/** Il numero da scrivere (nell'Excel, per esempio): il valore arrotondato alle sue cifre significative. */
+export const arrotondato = (c: Calcolato | null): number | null => (c === null ? null : arrotondaCifre(c.valore, c.cifre))
+
+/** Una differenza di pesi (l'acqua nel vaso): con i decimali del peso che ne ha di più, come le medie. */
+export function differenzaPesi(a: number, b: number): { valore: number; decimali: number } {
+  return { valore: a - b, decimali: decimaliMassimi([a, b]) }
 }

@@ -7,7 +7,7 @@ import {
 } from '@/domain/pesatura/curva'
 import { nomeLettura } from '@/domain/pesatura/export'
 import type { Sensore, UnitaPeso } from '@/domain/pesatura/tipi'
-import { formattaMedia } from '@/lib/numeri'
+import { decimaliMassimi, formattaDecimali } from '@/lib/numeri'
 
 type Modo = 'cc' | 'lettura'
 
@@ -19,7 +19,8 @@ interface ConsultaCurvaProps {
 }
 
 const FUORI_CAMPO = 'fuori dai valori misurati'
-const peso = (n: number | null, unita: string): string => (n === null ? '—' : `${formattaMedia(n)} ${unita}`)
+/** Un peso ricavato: con i decimali dei pesi dei vasi (secco e capacità di campo), come le medie. */
+const peso = (n: number | null, decimali: number, unita: string): string => (n === null ? '—' : `${formattaDecimali(n, decimali)} ${unita}`)
 
 function Avviso() {
   return (
@@ -40,6 +41,10 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
   const [modo, setModo] = useState<Modo>('cc')
   const [valore, setValore] = useState<number | null>(null)
   const modello = modelloPer(sensore)
+  const decimali = useMemo(
+    () => decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null)))),
+    [gruppi],
+  )
 
   const risposte: RispostaConsulta[] | null = useMemo(() => {
     if (valore === null || !Number.isFinite(valore)) return null
@@ -83,14 +88,14 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                     <li key={v.vaso} className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-riga py-2 last:border-0">
                       <span className="font-mono tabular-nums text-grafite">{nomeVaso(gruppo, i)}</span>
                       <span className="flex flex-wrap items-center gap-x-3">
-                        <span className="font-mono text-title tabular-nums text-grafite">{peso(v.peso, unita)}</span>
+                        <span className="font-mono text-title tabular-nums text-grafite">{peso(v.peso, decimali, unita)}</span>
                         {v.fuoriCampo && <Avviso />}
                       </span>
                     </li>
                   ))}
                 </ul>
                 <p className="flex flex-wrap items-center gap-x-3 pt-2 font-medium text-grafite">
-                  <span>Media {peso(r.media, unita)}</span>
+                  <span>Media {peso(r.media, decimali, unita)}</span>
                   {r.fuoriCampo && <Avviso />}
                 </p>
               </section>
@@ -120,12 +125,12 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                 {g.vasi.map((v, vi) => (
                   <tr key={v.campione.id}>
                     <th scope="row" className="min-h-11 px-3 py-2.5 text-left font-normal">{nomeVaso(g, vi)}</th>
-                    {tabella.map(({ p, risposte: r }) => <td key={p} className="px-3 py-2.5 text-right">{r[gi].vasi[vi].peso === null ? '—' : formattaMedia(r[gi].vasi[vi].peso as number)}</td>)}
+                    {tabella.map(({ p, risposte: r }) => <td key={p} className="px-3 py-2.5 text-right">{r[gi].vasi[vi].peso === null ? '—' : formattaDecimali(r[gi].vasi[vi].peso as number, decimali)}</td>)}
                   </tr>
                 ))}
                 <tr className="font-semibold">
                   <th scope="row" className="px-3 py-2.5 text-left font-semibold">Media</th>
-                  {tabella.map(({ p, risposte: r }) => <td key={p} className="px-3 py-2.5 text-right">{r[gi].media === null ? '—' : formattaMedia(r[gi].media as number)}</td>)}
+                  {tabella.map(({ p, risposte: r }) => <td key={p} className="px-3 py-2.5 text-right">{r[gi].media === null ? '—' : formattaDecimali(r[gi].media as number, decimali)}</td>)}
                 </tr>
               </tbody>
             ))}

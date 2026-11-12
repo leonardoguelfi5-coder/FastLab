@@ -264,7 +264,8 @@ describe('Pesata', () => {
     const utente = apri('aliquota')
     await salva()
     await utente.type(campoPeso(), '0,34')
-    expect(screen.getByText('Aggiungi 1,02 mL di tampone')).toBeInTheDocument()
+    // 0,34 × 3 = 1,02, con le cifre significative del dato che ne ha di più (0,34: due): 1,0
+    expect(screen.getByText('Aggiungi 1,0 mL di tampone')).toBeInTheDocument()
   })
 
   it('secco di RWC maggiore del fresco: avviso, ma si può salvare', async () => {

@@ -1,10 +1,13 @@
 import { dataLocaleDa } from '@/lib/date'
+import { arrotondaDecimali } from '@/lib/numeri'
 import {
   fineDelleSettimane, intervalloDelPeriodo, nelPeriodo, noteDelGrafico, parametriDelloStrumento, serieTrattamenti, strumentiPerScelta,
   type Intervallo, type NoteDellaData, type PuntoSerie, type ScalaGrafico, type SerieTrattamento,
 } from '../dataset'
 import { descriviCollegamento } from '../note'
-import { ordinati, ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo } from '../statistiche'
+import {
+  decimaliParametro, ordinati, ultimoTestoDelGiorno, valoreNumerico, valoriGiornalieri, valoriGiornalieriSiNo,
+} from '../statistiche'
 import type { ConfigEsperimento, ElementoLista, Misura, Nota, Parametro, Pianta, Strumento, Trattamento } from '../tipi'
 import { nomeFileExcel } from './riepilogo'
 import { applicaAllaConfigurazione, descriviPeriodo, descriviPiante, leggiSceltaExport, type SceltaExport } from './scelte'
@@ -346,7 +349,10 @@ function colonneDellaVoce(c: Contesto, voce: Voce, righe: PerPiantaEData<true>):
     case 'testo': return semplice(ultimoTestoDelGiorno(parametro, misure), 'testo')
     case 'sino': return semplice(valoriGiornalieriSiNo(parametro, misure), 'booleano')
     case 'numero': {
-      const valori = valoriGiornalieri(parametro, misure)
+      // il valore del giorno (media delle letture) con i decimali dei dati del parametro, come nell'app
+      const decimali = decimaliParametro(parametro, misure)
+      const valori = new Map([...valoriGiornalieri(parametro, misure)].map(([pianta, perData]) =>
+        [pianta, new Map([...perData].map(([data, x]) => [data, arrotondaDecimali(x, decimali)]))]))
       segnaRighe(righe, valori)
       // quante misure del giorno hanno dato il valore (le letture ripetute di una misura contano una volta)
       const quante: PerPiantaEData<number> = new Map()
@@ -512,7 +518,10 @@ function foglioMedie(c: Contesto, tutte: SerieDellaVoce[]): Foglio | null {
         ...tutte.flatMap(({ voce }, i): Cella[] => {
           const p = perVoce.get(i)
           if (voce.parametro.tipo === 'sino') return [p?.media ?? null, p?.n ?? 0]
-          return [p?.media ?? null, p?.es ?? null, p?.n ?? 0]
+          // media ed errore standard con i decimali dei dati del parametro, come nell'app
+          const conDecimali = (x: number | null | undefined) =>
+            x === null || x === undefined ? null : p?.decimali === undefined ? x : arrotondaDecimali(x, p.decimali)
+          return [conDecimali(p?.media), conDecimali(p?.es), p?.n ?? 0]
         }),
       ]
     })

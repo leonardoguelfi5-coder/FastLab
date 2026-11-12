@@ -10,7 +10,7 @@ import { VoceStrumento } from '@/components/VoceStrumento'
 import { PromemoriaOggi } from '@/components/note/PromemoriaOggi'
 import { Badge } from '@/components/ui/badge'
 import { righeStrumenti, type Giro } from '@/domain/giro'
-import { daSistemare } from '@/domain/statistiche'
+import { daSistemare, decimaliParametro } from '@/domain/statistiche'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { daQuanto, formattaData, formattaGiornoMese, giorniTra } from '@/lib/date'
 import { formattaConUnita } from '@/lib/numeri'
@@ -163,8 +163,8 @@ function DaSistemare({ espId, config, oggi }: { espId: string; config: ConfigEsp
                     {v.parametro.nome === v.strumento.nome ? v.strumento.nome : `${v.strumento.nome} · ${v.parametro.nome}`}
                   </span>
                   <span className="flex flex-wrap gap-x-3 font-mono text-dato tabular-nums">
-                    <span className="text-grafite">{formattaConUnita(v.valore, v.parametro.unita)}</span>
-                    <span className="text-grafite-tenue">{`media trattamento ${formattaConUnita(v.media, v.parametro.unita)}`}</span>
+                    <span className="text-grafite">{formattaConUnita(v.valore, decimaliParametro(v.parametro, dati ?? []), v.parametro.unita)}</span>
+                    <span className="text-grafite-tenue">{`media trattamento ${formattaConUnita(v.media, decimaliParametro(v.parametro, dati ?? []), v.parametro.unita)}`}</span>
                   </span>
                 </span>
                 <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />

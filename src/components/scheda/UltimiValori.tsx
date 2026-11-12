@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { useMisureGiorno } from '@/api/query'
 import { Badge } from '@/components/ui/badge'
-import { confrontoTrattamento, riepilogoPianta, type BloccoRiepilogo, type RigaRiepilogo } from '@/domain/statistiche'
+import { confrontoTrattamento, decimaliParametro, riepilogoPianta, type BloccoRiepilogo, type RigaRiepilogo } from '@/domain/statistiche'
 import type { ConfigEsperimento, Misura, Pianta } from '@/domain/tipi'
 import { daQuantoBreve, formattaGiornoMese } from '@/lib/date'
 import { formattaConUnita, formattaMedia } from '@/lib/numeri'
@@ -31,6 +31,11 @@ function Confronto({ espId, config, pianta, riga, conNome }: ConfrontoProps) {
     () => (giorno.data ? confrontoTrattamento(config, riga.parametro, giorno.data, pianta.id, riga.ultimo.data) : null),
     [giorno.data, config, riga.parametro, riga.ultimo.data, pianta.id],
   )
+  // La media si scrive con i decimali dei dati del parametro: quelli di tutte le piante quel giorno e quelli della pianta.
+  const decimali = useMemo(
+    () => Math.max(riga.decimali, giorno.data ? decimaliParametro(riga.parametro, giorno.data) : 0),
+    [giorno.data, riga.decimali, riga.parametro],
+  )
   // Senza altre piante con un valore quel giorno non c'è nulla da confrontare.
   if (!confronto || confronto.media === null) return null
   const trattamento = config.trattamenti.find(t => t.id === pianta.trattamento_id)
@@ -40,8 +45,8 @@ function Confronto({ espId, config, pianta, riga, conNome }: ConfrontoProps) {
     <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-label font-normal tabular-nums text-grafite-tenue">
       <span>
         {conNome
-          ? `Media del trattamento${di}, ${riga.parametro.nome}: ${formattaConUnita(confronto.media, riga.parametro.unita)}`
-          : `Media del trattamento${di}: ${formattaConUnita(confronto.media, riga.parametro.unita)}`}
+          ? `Media del trattamento${di}, ${riga.parametro.nome}: ${formattaConUnita(confronto.media, decimali, riga.parametro.unita)}`
+          : `Media del trattamento${di}: ${formattaConUnita(confronto.media, decimali, riga.parametro.unita)}`}
       </span>
       {confronto.fuori && (
         <Badge variant="attenzione" className="font-sans">
@@ -69,7 +74,7 @@ function Variazione({ riga }: { riga: RigaRiepilogo }) {
     )
   }
   const su = riga.tendenza === 'su'
-  const quanto = formattaMedia(Math.abs(riga.differenza))
+  const quanto = formattaMedia(Math.abs(riga.differenza), riga.decimali)
   return (
     <span className="text-right font-mono tabular-nums text-grafite-tenue">
       <span aria-hidden>{`${su ? '▲' : '▼'} ${quanto}`}</span>
@@ -82,8 +87,8 @@ function Variazione({ riga }: { riga: RigaRiepilogo }) {
 function testoValore(riga: RigaRiepilogo): string {
   const { parametro, ultimo } = riga
   switch (parametro.tipo) {
-    case 'numero': return formattaConUnita(ultimo.valore as number, parametro.unita)
-    case 'lista': return formattaMedia(ultimo.valore as number)
+    case 'numero': return formattaConUnita(ultimo.valore as number, riga.decimali, parametro.unita)
+    case 'lista': return formattaMedia(ultimo.valore as number, riga.decimali)
     case 'sino': return ultimo.valore ? 'Sì' : 'No'
     case 'testo': return String(ultimo.valore)
   }

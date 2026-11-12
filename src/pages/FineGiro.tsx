@@ -14,7 +14,7 @@ import { useAttesaArrivo } from '@/components/scheda/useAttesaArrivo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { celleGriglia, riepilogoGiro, statiPiante, valoriDiOggi } from '@/domain/giro'
-import { daSistemare } from '@/domain/statistiche'
+import { daSistemare, decimaliParametro } from '@/domain/statistiche'
 import type { ConfigEsperimento, Misura, Pianta, Strumento } from '@/domain/tipi'
 import { formattaConUnita, formattaMedia } from '@/lib/numeri'
 import { percorsoMisuraPianta, percorsoModificaMisura, percorsoNuovaMisura, type ArrivoMisura } from '@/lib/percorsi'
@@ -33,7 +33,22 @@ function ValoriDiOggi({ config, strumento, misure, data }: { config: ConfigEsper
       {conValori.length === 0 ? (
         <p className="text-grafite-tenue">Ancora nessun valore di oggi.</p>
       ) : conValori.map(({ parametro, righe }) => (
-        <table key={parametro.id} className="w-full text-dato">
+        <TabellaParametro key={parametro.id} parametro={parametro} righe={righe} misure={misure} strumento={strumento} />
+      ))}
+    </section>
+  )
+}
+
+/** Una tabella di "Valori di oggi": medie ed errori standard con i decimali dei dati del parametro. */
+function TabellaParametro({ parametro, righe, misure, strumento }: {
+  parametro: ConfigEsperimento['parametri'][number]
+  righe: ReturnType<typeof valoriDiOggi>[number]['righe']
+  misure: Misura[]
+  strumento: Strumento
+}) {
+  const decimali = decimaliParametro(parametro, misure)
+  return (
+        <table className="w-full text-dato">
           <caption className="pb-1 text-left text-base text-grafite">
             {parametro.nome === strumento.nome ? parametro.unita ?? parametro.nome : `${parametro.nome}${parametro.unita ? ` (${parametro.unita})` : ''}`}
           </caption>
@@ -47,18 +62,16 @@ function ValoriDiOggi({ config, strumento, misure, data }: { config: ConfigEsper
             {righe.map(r => (
               <tr key={r.trattamento.id} className="border-b border-riga">
                 <th scope="row" className="min-h-11 py-2.5 pr-3 text-left font-mono font-[550] text-grafite tabular-nums">{r.trattamento.etichetta}</th>
-                <td className="py-2.5 text-right font-mono text-grafite tabular-nums">{formattaMedia(r.media)}</td>
+                <td className="py-2.5 text-right font-mono text-grafite tabular-nums">{formattaMedia(r.media, decimali)}</td>
                 {/* Con una sola pianta l'errore standard non esiste: la cella resta vuota, e lo dice a chi non vede. */}
                 <td className="py-2.5 pl-2 text-right font-mono text-grafite-tenue tabular-nums">
-                  {r.es === null ? <span className="sr-only">senza errore standard</span> : `± ${formattaMedia(r.es)}`}
+                  {r.es === null ? <span className="sr-only">senza errore standard</span> : `± ${formattaMedia(r.es, decimali)}`}
                 </td>
                 <td className="py-2.5 pl-2 text-right font-mono text-grafite-tenue tabular-nums">{`(${r.n})`}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      ))}
-    </section>
   )
 }
 
@@ -107,8 +120,8 @@ function DaControllare({ espId, config, strumento, misure, data }: {
                     </Badge>
                   </span>
                   <span className="flex flex-wrap gap-x-3 font-mono text-dato tabular-nums">
-                    <span className="text-grafite">{`${v.parametro.nome} ${formattaConUnita(v.valore, v.parametro.unita)}`}</span>
-                    <span className="text-grafite-tenue">{`media trattamento ${formattaConUnita(v.media, v.parametro.unita)}`}</span>
+                    <span className="text-grafite">{`${v.parametro.nome} ${formattaConUnita(v.valore, decimaliParametro(v.parametro, misure), v.parametro.unita)}`}</span>
+                    <span className="text-grafite-tenue">{`media trattamento ${formattaConUnita(v.media, decimaliParametro(v.parametro, misure), v.parametro.unita)}`}</span>
                   </span>
                 </span>
                 <ChevronRight aria-hidden className="size-5 shrink-0 text-grafite-tenue" />

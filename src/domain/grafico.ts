@@ -1,5 +1,5 @@
 import { formattaData, formattaGiornoMese, giorniTra } from '@/lib/date'
-import { formattaMedia, formattaNumero } from '@/lib/numeri'
+import { arrotondaDecimali, formattaDecimali, formattaNumero } from '@/lib/numeri'
 import type { NoteDellaData, ScalaGrafico, Serie } from './dataset'
 import type { Nota } from './tipi'
 
@@ -183,7 +183,7 @@ export interface OpzioniImpagina {
   perImmagine?: boolean
 }
 
-export interface PuntoDisegnato { data: string; x: number; y: number; media: number; es: number | null; n: number }
+export interface PuntoDisegnato { data: string; x: number; y: number; media: number; es: number | null; n: number; decimali?: number }
 /** Una barra dell'errore standard: dal valore più alto al più basso, con un cappuccio alle estremità. */
 export interface BarraErrore { x: number; yAlto: number; yBasso: number }
 export interface SerieDisegnata {
@@ -333,7 +333,10 @@ export function impagina(serie: Serie[], noteDelleDate: NoteDellaData[], opzioni
   const xDi = (data: string) => giorniTotali === 0 ? (sinistra + destra) / 2 : x0 + (giorniTra(primo, data) / giorniTotali) * (x1 - x0)
 
   const disegnate: SerieDisegnata[] = serie.map((s, indice) => {
-    const punti = s.punti.map(p => ({ data: p.data, x: xDi(p.data), y: yDi(p.media), media: p.media, es: p.es, n: p.n }))
+    const punti = s.punti.map(p => ({
+      data: p.data, x: xDi(p.data), y: yDi(p.media), media: p.media, es: p.es, n: p.n,
+      ...(p.decimali === undefined ? {} : { decimali: p.decimali }),
+    }))
     return {
       indice,
       chiave: chiaveSerie(s),
@@ -404,22 +407,25 @@ export interface VoceLettura { indice: number; etichetta: string; stile: StileSe
 export interface LetturaDelGiorno { data: string; voci: VoceLettura[]; note: Nota[] }
 
 /**
- * Un valore del grafico come si scrive: da 1 in su come `formattaMedia` (al più due decimali); sotto 1 in valore assoluto
- * tre cifre significative, perché parametri come la conduttanza stomatica hanno valori di decimi e centesimi e un errore
- * standard di 0,004 non deve diventare «0». Sempre con la virgola, senza zeri inutili e mai in notazione scientifica.
+ * Un valore del grafico come si scrive. Con `decimali` (quelli dei dati del parametro) esattamente con quei decimali,
+ * come chiede l'utente: la media di dati a un decimale ha un decimale. Senza (la percentuale di sì di un sì/no, che non
+ * viene da dati con decimali): da 1 in su al più due decimali; sotto 1 in valore assoluto tre cifre significative, così
+ * un 0,4 % non diventa «0». Sempre con la virgola e mai in notazione scientifica.
  */
-export function formattaDato(n: number): string {
+export function formattaDato(n: number, decimali?: number): string {
+  if (decimali !== undefined) return formattaDecimali(n, decimali)
   const assoluto = Math.abs(n)
-  if (assoluto >= 1 || assoluto === 0 || !Number.isFinite(n)) return formattaMedia(n)
-  const decimali = Math.min(20, 2 - Math.floor(Math.log10(assoluto)))
-  const testo = n.toFixed(decimali).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
+  if (assoluto >= 1 || assoluto === 0 || !Number.isFinite(n)) return formattaNumero(arrotondaDecimali(n, 2))
+  const tre = Math.min(20, 2 - Math.floor(Math.log10(assoluto)))
+  const testo = n.toFixed(tre).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '')
   return testo.replace('.', ',')
 }
 
 /** Il valore di un punto come si scrive: `41,2 ± 0,8`, senza ± quando non c'è errore standard; `62,5%` per i sì/no. */
-export function valoreScritto(punto: { media: number; es: number | null }, scala: ScalaGrafico): string {
-  if (scala === 'percentuale') return `${formattaDato(punto.media)}%`
-  return punto.es === null ? formattaDato(punto.media) : `${formattaDato(punto.media)} ± ${formattaDato(punto.es)}`
+export function valoreScritto(punto: { media: number; es: number | null; decimali?: number }, scala: ScalaGrafico): string {
+  if (scala === 'percentuale') return `${formattaDato(punto.media, punto.decimali)}%`
+  const d = punto.decimali
+  return punto.es === null ? formattaDato(punto.media, d) : `${formattaDato(punto.media, d)} ± ${formattaDato(punto.es, d)}`
 }
 
 /** Che cosa dire di una data: per ogni serie con un punto quel giorno `valore ± ES` e n, e le note segnate quel giorno. */
@@ -444,7 +450,7 @@ export function riassuntoGrafico(imp: Impaginazione, titolo: string): string {
   const date = [...new Set(conPunti.flatMap(s => s.punti.map(p => p.data)))].sort()
   const ultimi = conPunti.map(s => {
     const p = s.punti[s.punti.length - 1]
-    return `${s.etichetta} ${formattaDato(p.media)}${imp.scala === 'percentuale' ? '%' : ''}`
+    return `${s.etichetta} ${formattaDato(p.media, p.decimali)}${imp.scala === 'percentuale' ? '%' : ''}`
   })
   const periodo = date[0] === date[date.length - 1]
     ? `Il ${formattaData(date[0])}`

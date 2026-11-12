@@ -6,7 +6,10 @@ import {
 } from '@/domain/export/fogli'
 import type { ConfigEsperimento, Fattore, Pianta, Trattamento } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
-import { inUnita, mlTampone, percentualeCC, rwc, sostanzaSecca } from './calcoli'
+import { arrotondaDecimali, decimaliMassimi } from '@/lib/numeri'
+import {
+  arrotondato, differenzaPesi, inUnita, mlTamponeCalcolato, percentualeCCCalcolata, rwcCalcolato, sostanzaSeccaCalcolata,
+} from './calcoli'
 import {
   consultaPerCC, curvePerSubstrato, equazione, modelloPer, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
   type CurveSubstrato, type Vaso,
@@ -29,7 +32,6 @@ const NOME_GRAFICO = 'Curve di ritenzione dei vasi'
 /** Sensore di ripiego: un vaso senza sensore nelle impostazioni (non dovrebbe succedere) si legge come una lettura nuda. */
 const SENSORE_NEUTRO: Sensore = { tipo: 'umidita', unita: '' }
 
-const arrotonda = (n: number): number => Math.round(n * 1e6) / 1e6
 
 /** Dalla più vecchia: per data, a parità per creazione. */
 function dallaPiuVecchia(a: SessionePesatura, b: SessionePesatura): number {
@@ -140,13 +142,14 @@ function foglioPesi(sessioni: SessionePesatura[], dati: DatiPesatura, ctx: Conte
         if (tipo === 'aliquota') {
           const a = valore('aliquota')
           riga.push(nellUnita(a))
-          if (conTampone) riga.push(a === null ? null : mlTampone(a, s.unita, s.impostazioni.rapportoTampone))
+          // i valori calcolati con le cifre significative del dato che ne ha di più, come nell'app
+          if (conTampone) riga.push(a === null ? null : arrotondato(mlTamponeCalcolato(a, s.unita, s.impostazioni.rapportoTampone)))
         } else {
           riga.push(nellUnita(fresco))
           if (tipo === 'rwc') riga.push(nellUnita(turgido))
           riga.push(nellUnita(secco))
-          if (tipo === 'rwc') riga.push(fresco !== null && turgido !== null && secco !== null ? rwc(fresco, turgido, secco) : null)
-          riga.push(fresco !== null && secco !== null ? sostanzaSecca(fresco, secco) : null)
+          if (tipo === 'rwc') riga.push(fresco !== null && turgido !== null && secco !== null ? arrotondato(rwcCalcolato(fresco, turgido, secco)) : null)
+          riga.push(fresco !== null && secco !== null ? arrotondato(sostanzaSeccaCalcolata(fresco, secco)) : null)
         }
         righe.push(riga)
       }
@@ -172,10 +175,11 @@ function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
         .filter((p: Peso) => p.campione_id === v.campione.id && p.tipo === 'asciugatura')
         .sort((a, b) => Date.parse(a.misurato_il) - Date.parse(b.misurato_il))
       for (const p of asciugature) {
-        const pcc = v.secco !== null && v.cc !== null ? percentualeCC(p.valore, v.secco, v.cc) : null
+        const pcc = v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc)) : null
+        const acqua = v.secco === null ? null : differenzaPesi(p.valore, v.secco)
         righe.push([
           nomeVaso(v), substratoDi(v), { istante: p.misurato_il }, p.valore, p.lettura,
-          v.secco === null ? null : arrotonda(p.valore - v.secco), pcc,
+          acqua === null ? null : arrotondaDecimali(acqua.valore, acqua.decimali), pcc,
         ])
       }
     }
@@ -189,10 +193,13 @@ function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
     ...PERCENTUALI_TABELLA.map((p): ColonnaGrezza => ({ titolo: `${p} % CC`, tipo: 'numero' })),
   ]
   const consulte = PERCENTUALI_TABELLA.map(p => consultaPerCC(gruppi, p))
+  // i pesi ricavati con i decimali dei pesi dei vasi (secco e capacità di campo), come nell'app
+  const decimali = decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null))))
+  const peso = (x: number | null) => (x === null ? null : arrotondaDecimali(x, decimali))
   const righe: Cella[][] = []
   gruppi.forEach((g, gi) => {
-    g.vasi.forEach((v, vi) => righe.push([g.substrato, nomeVaso(v), ...consulte.map(c => c[gi].vasi[vi].peso)]))
-    righe.push([g.substrato, 'Media', ...consulte.map(c => c[gi].media)])
+    g.vasi.forEach((v, vi) => righe.push([g.substrato, nomeVaso(v), ...consulte.map(c => peso(c[gi].vasi[vi].peso))]))
+    righe.push([g.substrato, 'Media', ...consulte.map(c => peso(c[gi].media))])
   })
   return foglio('Pesi target', 'dati', colonne, righe)
 }

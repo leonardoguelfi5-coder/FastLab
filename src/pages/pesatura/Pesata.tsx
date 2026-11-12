@@ -12,7 +12,7 @@ import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { controllaAsciugatura, controllaReplica, mlTampone } from '@/domain/pesatura/calcoli'
+import { controllaAsciugatura, controllaReplica, mlTamponeCalcolato } from '@/domain/pesatura/calcoli'
 import {
   etichettaCampione, FASI, letteraReplica, NOMI_FASE, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
@@ -20,7 +20,7 @@ import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domai
 import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
 import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
-import { formattaMedia, formattaNumero } from '@/lib/numeri'
+import { formattaCifre, formattaNumero } from '@/lib/numeri'
 import { percorsoPesata, percorsoPesatura, percorsoSessione } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
@@ -273,7 +273,7 @@ function SchedaPasso({
       ? (altri.secco !== undefined ? controllaAsciugatura(valore, altri.secco) : null) ?? undefined
       : controllaReplica(sessione.tipo, { ...altri, [fase]: valore }).join(' ') || undefined
   }
-  const ml = fase === 'aliquota' && valoreValido ? mlTampone(valore, sessione.unita, sessione.impostazioni.rapportoTampone) : null
+  const ml = fase === 'aliquota' && valoreValido ? mlTamponeCalcolato(valore, sessione.unita, sessione.impostazioni.rapportoTampone) : null
 
   async function conferma() {
     setProvato(true)
@@ -325,7 +325,7 @@ function SchedaPasso({
               <p className="text-base text-grafite-tenue">Pesato da un&apos;altra persona.</p>
             </div>
           )}
-          {ml !== null && <p role="status" className="text-title text-grafite">Aggiungi {formattaMedia(ml)} mL di tampone</p>}
+          {ml !== null && <p role="status" className="text-title text-grafite">Aggiungi {formattaCifre(ml.valore, ml.cifre)} mL di tampone</p>}
           {provato && problemi.map(p => <TestoErrore key={p}>{p}</TestoErrore>)}
         </ModuloCampi>
       </div>

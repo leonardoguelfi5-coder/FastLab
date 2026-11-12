@@ -79,8 +79,9 @@ describe('cartellaPesatura: RWC', () => {
     expect(col(pesi, a, 'Sale')).toBe('100 mM')
     expect(col(pesi, a, 'Trattamento')).toBe('Sale 100')
     expect(col(pesi, a, 'Replica')).toBe('A')
-    expect(col(pesi, a, 'RWC (%)')).toBeCloseTo(((1.2 - 0.4) / (1.6 - 0.4)) * 100, 9)
-    expect(col(pesi, a, 'Sostanza secca (%)')).toBeCloseTo((0.4 / 1.2) * 100, 9)
+    // con le cifre significative del peso che ne ha di più (1,2 e 1,6: due): 66,67 → 67 e 33,3 → 33
+    expect(col(pesi, a, 'RWC (%)')).toBe(67)
+    expect(col(pesi, a, 'Sostanza secca (%)')).toBe(33)
   })
 
   it('una replica incompleta ha le celle calcolate a null', () => {
@@ -137,7 +138,8 @@ describe('cartellaPesatura: aliquota e sostanza secca', () => {
     }
     const pesi = foglio('Pesi', cartellaPesatura([s], dati, config, OGGI, ADESSO).fogli)
     expect(titoli(pesi).slice(-3)).toEqual(['Fresco (g)', 'Secco (g)', 'Sostanza secca (%)'])
-    expect(col(pesi, pesi.righe[0], 'Sostanza secca (%)')).toBeCloseTo(25, 9)
+    // 0,5 / 2 = 25 %, ma i dati hanno una cifra significativa sola: 30
+    expect(col(pesi, pesi.righe[0], 'Sostanza secca (%)')).toBe(30)
   })
 
   it('sessioni passate dalla più nuova: tipo, unità e righe seguono la più vecchia', () => {

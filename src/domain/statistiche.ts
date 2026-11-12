@@ -1,4 +1,5 @@
 import { giorniTra } from '@/lib/date'
+import { decimaliDi } from '@/lib/numeri'
 import { eVuoto, formattaValore } from './misure'
 import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, ValoreParametro } from './tipi'
 
@@ -7,6 +8,22 @@ import type { ConfigEsperimento, ElementoLista, Misura, Parametro, Strumento, Va
  * la media giornaliera della pianta, e solo dopo si fanno le medie tra piante. Funzioni pure, senza date "di sistema":
  * le date sono sempre AAAA-MM-GG locali e arrivano dal chiamante.
  */
+
+/**
+ * I decimali dei dati di un parametro: il massimo fra le letture delle misure date, cioè la precisione dello
+ * strumento. Medie, errori standard e differenze del parametro si scrivono con questi decimali. Una lista conta i suoi
+ * elementi (interi): 0. Testo e sì/no: 0.
+ */
+export function decimaliParametro(parametro: Parametro, misure: Misura[]): number {
+  if (parametro.tipo !== 'numero') return 0
+  let d = 0
+  for (const m of misure) {
+    const v = m.valori[parametro.id]
+    if (!Array.isArray(v)) continue
+    for (const x of v) if (typeof x === 'number' && Number.isFinite(x)) d = Math.max(d, decimaliDi(x))
+  }
+  return d
+}
 
 /** Quante altre piante servono per giudicare se una è "molto fuori dal gruppo". */
 const MINIMO_ALTRE_PIANTE = 3
@@ -223,6 +240,8 @@ export interface RigaRiepilogo {
   dataPropria: boolean
   /** Il testo intero (testo lungo) o gli elementi (lista) che la riga apre con "›"; `null` per numeri e sì/no. */
   dettaglio: string | null
+  /** I decimali con cui scrivere valore e differenza: quelli dei dati del parametro (`decimaliParametro`). */
+  decimali: number
 }
 export interface BloccoRiepilogo { strumento: Strumento; data: string; righe: RigaRiepilogo[] }
 
@@ -267,6 +286,7 @@ export function riepilogoPianta(config: ConfigEsperimento, misurePianta: Misura[
         const differenza = r.precedente ? r.ultimo.valore - r.precedente.valore : null
         const base = {
           parametro, differenza, tendenza: r.tendenza, dataPrecedente: r.precedente?.data ?? null,
+          decimali: decimaliParametro(parametro, misure),
         }
         if (parametro.tipo === 'numero') {
           righe.push({ ...base, ultimo: { data: r.ultimo.data, valore: r.ultimo.valore }, dettaglio: null })
@@ -285,7 +305,7 @@ export function riepilogoPianta(config: ConfigEsperimento, misurePianta: Misura[
       if (!ultima) continue
       righe.push({
         parametro, ultimo: { data: ultima.data, valore: ultima.valore }, differenza: null, tendenza: null,
-        dataPrecedente: null, dettaglio: parametro.tipo === 'testo' ? String(ultima.valore) : null,
+        dataPrecedente: null, dettaglio: parametro.tipo === 'testo' ? String(ultima.valore) : null, decimali: 0,
       })
     }
     if (righe.length === 0) continue

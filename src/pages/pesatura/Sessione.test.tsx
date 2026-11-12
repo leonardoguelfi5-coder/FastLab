@@ -95,8 +95,9 @@ describe('Sessione', () => {
     const riepilogo = within(screen.getByRole('region', { hidden: false, name: 'Riepilogo' }))
     expect(riepilogo.getByText('P12 · A')).toBeInTheDocument()
     expect(riepilogo.getByText('P12 · B')).toBeInTheDocument()
-    // A: (1,2−0,4)/(1,6−0,4) = 66,67 %; B: 83,33 %; media 75 %
-    expect(riepilogo.getByText('P12 · A').closest('li')).toHaveTextContent('66,67 %')
+    // A: (1,2−0,4)/(1,6−0,4) = 66,67 % con due cifre significative (come 1,2 e 1,6) = 67 %; B: 83 %; media 75 %
+    expect(riepilogo.getByText('P12 · A').closest('li')).toHaveTextContent('67 %')
+    expect(riepilogo.getByText('P12 · B').closest('li')).toHaveTextContent('83 %')
     expect(riepilogo.getByText('P12 · Media').closest('li')).toHaveTextContent('75 %')
   })
 
