@@ -76,8 +76,30 @@ describe('leggiNumeroParlato: la virgola', () => {
     expect(leggiNumeroParlato(testo)).toBe(atteso)
   })
 
-  it('dopo la virgola, più parole non tutte di una cifra non si capiscono', () => {
-    expect(leggiNumeroParlato('zero virgola dodici tre')).toBeNull()
+  it.each([
+    ['zero virgola zero zero diciassette', 0.0017],
+    ['zero virgola uno tre cinque 2', 0.1352],
+    ['zero virgola dodici tre', 0.123],
+    ['zero virgola zero zero zero cinque', 0.0005],
+    ['zero virgola 00 17', 0.0017],
+    ['1 virgola 0 25', 1.025],
+    ['zero virgola cento', 0.1],
+  ])('dopo la virgola i pezzi si mettono uno dopo l\'altro: %s → %s', (testo, atteso) => {
+    expect(leggiNumeroParlato(testo)).toBe(atteso)
+  })
+
+  it.each([
+    ['0,00 17', 0.0017],
+    ['0, diciassette', 0.17],
+    ['0,0 0 1 7', 0.0017],
+    ['0.00 diciassette', 0.0017],
+  ])('la virgola scritta dal riconoscimento dentro le cifre: %s → %s', (testo, atteso) => {
+    expect(leggiNumeroParlato(testo)).toBe(atteso)
+  })
+
+  it('dopo la virgola, una parola che non è un numero: non si capisce', () => {
+    expect(leggiNumeroParlato('zero virgola zero pippo')).toBeNull()
+    expect(leggiNumeroParlato('zero virgola zero virgola uno')).toBeNull()
   })
 })
 
@@ -115,6 +137,8 @@ describe('leggiComando', () => {
     expect(leggiComando('53 avanti', false)).toEqual({ tipo: 'avanti', valore: 53, lettura: null })
     expect(leggiComando('0,1023 avanti', false)).toEqual({ tipo: 'avanti', valore: 0.1023, lettura: null })
     expect(leggiComando('zero virgola uno due avanti', false)).toEqual({ tipo: 'avanti', valore: 0.12, lettura: null })
+    expect(leggiComando('zero virgola zero zero diciassette avanti', false)).toEqual({ tipo: 'avanti', valore: 0.0017, lettura: null })
+    expect(leggiComando('0,00 17 avanti', false)).toEqual({ tipo: 'avanti', valore: 0.0017, lettura: null })
   })
 
   it('senza distinguere maiuscole', () => {

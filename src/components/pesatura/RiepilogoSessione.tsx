@@ -5,7 +5,7 @@ import { mediePerTrattamento } from '@/domain/pesatura/medie'
 import { etichettaCampione, letteraReplica, repliche } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
 import type { Pianta } from '@/domain/tipi'
-import { formattaMedia } from '@/lib/numeri'
+import { formattaMedia, formattaNumero } from '@/lib/numeri'
 
 interface Valore { nome: string; testo: string }
 interface Riga {
@@ -33,7 +33,10 @@ interface RiepilogoSessioneProps {
 }
 
 const TRATTINO = '—'
+/** Un valore calcolato (RWC, %, mL): al massimo due decimali. */
 const numero = (n: number | null, unita = ''): string => (n === null ? TRATTINO : `${formattaMedia(n)}${unita}`)
+/** Un peso: esattamente com'è stato scritto o detto, senza arrotondare (0,0017 g resta 0,0017 g). */
+const peso = (n: number | null, unita: string): string => (n === null ? TRATTINO : `${formattaNumero(n)}${unita}`)
 
 /** Una riga per campione e replica, e una riga `Media` per campione quando RWC o sostanza secca hanno più repliche. */
 function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSessioneProps): Riga[] {
@@ -56,25 +59,25 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
 
       if (sessione.tipo === 'aliquota') {
         const a = valore.aliquota ?? null
-        valori.push({ nome: 'Peso', testo: numero(a, u) })
+        valori.push({ nome: 'Peso', testo: peso(a, u) })
         const ml = a === null ? null : mlTampone(a, sessione.unita, sessione.impostazioni.rapportoTampone)
         if (sessione.impostazioni.rapportoTampone !== null) valori.push({ nome: 'Tampone', testo: numero(ml, ' mL') })
       } else if (sessione.tipo === 'rwc') {
         calcolato = fresco !== undefined && turgido !== undefined && secco !== undefined ? rwc(fresco, turgido, secco) : null
         valori.push(
-          { nome: 'Fresco', testo: numero(fresco ?? null, u) }, { nome: 'Turgido', testo: numero(turgido ?? null, u) },
-          { nome: 'Secco', testo: numero(secco ?? null, u) }, { nome: 'RWC', testo: numero(calcolato, ' %') },
+          { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Turgido', testo: peso(turgido ?? null, u) },
+          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'RWC', testo: numero(calcolato, ' %') },
         )
       } else if (sessione.tipo === 'sostanza_secca') {
         calcolato = fresco !== undefined && secco !== undefined ? sostanzaSecca(fresco, secco) : null
         valori.push(
-          { nome: 'Fresco', testo: numero(fresco ?? null, u) }, { nome: 'Secco', testo: numero(secco ?? null, u) },
+          { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Secco', testo: peso(secco ?? null, u) },
           { nome: 'Sostanza secca', testo: numero(calcolato, ' %') },
         )
       } else {
         const punti = pesi.filter(p => p.campione_id === c.id && p.tipo === 'asciugatura').length
         valori.push(
-          { nome: 'Secco', testo: numero(secco ?? null, u) }, { nome: 'Capacità di campo', testo: numero(valore.capacita_campo ?? null, u) },
+          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'Capacità di campo', testo: peso(valore.capacita_campo ?? null, u) },
           { nome: 'Asciugatura', testo: punti === 1 ? '1 peso' : `${punti} pesi` },
         )
       }

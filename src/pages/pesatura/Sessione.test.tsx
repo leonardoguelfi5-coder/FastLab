@@ -100,6 +100,13 @@ describe('Sessione', () => {
     expect(riepilogo.getByText('P12 · Media').closest('li')).toHaveTextContent('75 %')
   })
 
+  it('i pesi nel riepilogo sono quelli scritti, senza arrotondare', async () => {
+    dati([sessione({ tipo: 'aliquota', impostazioni: IMPOSTAZIONI_PREDEFINITE })], campioni, [peso('1', 'c12', 1, 'aliquota', 0.0017)])
+    apri()
+    await titolo()
+    expect(screen.getByText('P12').closest('li')).toHaveTextContent('0,0017 g')
+  })
+
   it('una replica incompleta mostra un trattino e gli avvisi di coerenza', async () => {
     dati([sessione()], campioni, [peso('1', 'c12', 1, 'fresco', 1.2), peso('3', 'c12', 1, 'secco', 2)])
     apri()
