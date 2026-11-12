@@ -8,7 +8,8 @@ import type { ConfigEsperimento, Fattore, Pianta, Trattamento } from '@/domain/t
 import { oggiLocale } from '@/lib/date'
 import { arrotondaDecimali, decimaliMassimi } from '@/lib/numeri'
 import {
-  arrotondato, differenzaPesi, inUnita, mlTamponeCalcolato, percentualeCCCalcolata, rwcCalcolato, sostanzaSeccaCalcolata,
+  arrotondato, differenzaPesi, inUnita, mlTamponeCalcolato, percentualeCCCalcolata, precisioneDeiPesi, rwcCalcolato,
+  sostanzaSeccaCalcolata,
 } from './calcoli'
 import {
   consultaPerCC, curvePerSubstrato, equazione, modelloPer, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
@@ -123,6 +124,7 @@ function foglioPesi(sessioni: SessionePesatura[], dati: DatiPesatura, ctx: Conte
   for (const s of [...sessioni].sort(dallaPiuVecchia)) {
     const campioni = campioniDi(s, dati)
     const pesi = dati.pesi.filter(p => campioni.some(c => c.id === p.campione_id))
+    const precisione = precisioneDeiPesi(pesi)
     for (const c of campioni) {
       const t = trattamentoDi(c, ctx)
       for (const replica of repliche(c, s, pesi)) {
@@ -143,13 +145,13 @@ function foglioPesi(sessioni: SessionePesatura[], dati: DatiPesatura, ctx: Conte
           const a = valore('aliquota')
           riga.push(nellUnita(a))
           // i valori calcolati con le cifre significative del dato che ne ha di più, come nell'app
-          if (conTampone) riga.push(a === null ? null : arrotondato(mlTamponeCalcolato(a, s.unita, s.impostazioni.rapportoTampone)))
+          if (conTampone) riga.push(a === null ? null : arrotondato(mlTamponeCalcolato(a, s.unita, s.impostazioni.rapportoTampone, precisione)))
         } else {
           riga.push(nellUnita(fresco))
           if (tipo === 'rwc') riga.push(nellUnita(turgido))
           riga.push(nellUnita(secco))
-          if (tipo === 'rwc') riga.push(fresco !== null && turgido !== null && secco !== null ? arrotondato(rwcCalcolato(fresco, turgido, secco)) : null)
-          riga.push(fresco !== null && secco !== null ? arrotondato(sostanzaSeccaCalcolata(fresco, secco)) : null)
+          if (tipo === 'rwc') riga.push(fresco !== null && turgido !== null && secco !== null ? arrotondato(rwcCalcolato(fresco, turgido, secco, precisione)) : null)
+          riga.push(fresco !== null && secco !== null ? arrotondato(sostanzaSeccaCalcolata(fresco, secco, precisione)) : null)
         }
         righe.push(riga)
       }
@@ -170,13 +172,15 @@ function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
   ]
   const righe: Cella[][] = []
   for (const s of [...sessioni].sort(dallaPiuVecchia)) {
+    const ids = new Set(campioniDi(s, dati).map(c => c.id))
+    const precisione = precisioneDeiPesi(dati.pesi.filter(p => ids.has(p.campione_id)))
     for (const v of vasiDaPesi(campioniDi(s, dati), dati.pesi)) {
       const asciugature = dati.pesi
         .filter((p: Peso) => p.campione_id === v.campione.id && p.tipo === 'asciugatura')
         .sort((a, b) => Date.parse(a.misurato_il) - Date.parse(b.misurato_il))
       for (const p of asciugature) {
-        const pcc = v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc)) : null
-        const acqua = v.secco === null ? null : differenzaPesi(p.valore, v.secco)
+        const pcc = v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc, precisione)) : null
+        const acqua = v.secco === null ? null : differenzaPesi(p.valore, v.secco, precisione)
         righe.push([
           nomeVaso(v), substratoDi(v), { istante: p.misurato_il }, p.valore, p.lettura,
           acqua === null ? null : arrotondaDecimali(acqua.valore, acqua.decimali), pcc,

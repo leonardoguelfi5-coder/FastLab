@@ -46,16 +46,23 @@ describe('numeri', () => {
   it.each([
     [0.412, 3], [0.062, 2], [2350, 4], [0.0017, 2], [91.43, 4], [0, 1], [-5.5, 2],
   ])('cifreSignificativeDi(%s) = %s', (n, c) => expect(cifreSignificativeDi(n)).toBe(c))
+  it('con la precisione dello strumento: 2 letto da una bilancia a tre decimali è 2,000', () => {
+    expect(cifreSignificativeDi(2, 3)).toBe(4)
+    expect(cifreSignificativeDi(0.5, 3)).toBe(3)
+    expect(cifreSignificativeDi(0.4125, 3)).toBe(4)
+    expect(cifreMassime([2, 0.5], 3)).toBe(4)
+  })
   it('cifreMassime: le cifre del dato che ne ha di più', () => {
     expect(cifreMassime([0.412, 0.445, 0.062])).toBe(3)
     expect(cifreMassime([])).toBe(1)
   })
   it.each([
-    [91.428, 3, '91,4'], [90, 3, '90,0'], [0.017, 2, '0,017'], [9.996, 3, '10,0'], [12345, 3, '12300'], [0.0004567, 2, '0,00046'],
+    [91.428, 3, '91,4'], [90, 3, '90,0'], [0.017, 2, '0,017'], [9.996, 3, '10,0'], [12345, 3, '12345'], [0.0004567, 2, '0,00046'],
+    [25, 1, '25'], [24.6, 1, '25'], [66.667, 2, '67'],
     [-3.456, 2, '-3,5'], [0, 3, '0,00'],
   ])('formattaCifre(%s, %s) = %s', (n, c, testo) => expect(formattaCifre(n, c)).toBe(testo))
   it.each([
-    [12345, 3, 12300], [91.428, 3, 91.4], [0.0004567, 2, 0.00046],
+    [12345, 3, 12345], [91.428, 3, 91.4], [0.0004567, 2, 0.00046], [25, 1, 25],
   ])('arrotondaCifre(%s, %s) = %s', (n, c, atteso) => expect(arrotondaCifre(n, c)).toBe(atteso))
   it.each([
     [19.8333, 1, '19,8'], [19.8, 2, '19,80'], [41.2351, 2, '41,24'], [40, 0, '40'], [0.1 + 0.2, 1, '0,3'], [-0.001, 1, '0,0'],

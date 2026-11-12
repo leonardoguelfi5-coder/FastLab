@@ -1,6 +1,6 @@
 import type { Pianta } from '../tipi'
 import { decimaliPerCifre } from '@/lib/numeri'
-import { rwcCalcolato, sostanzaSeccaCalcolata, type Calcolato } from './calcoli'
+import { precisioneDeiPesi, rwcCalcolato, sostanzaSeccaCalcolata, type Calcolato } from './calcoli'
 import { repliche } from './sequenza'
 import type { CampionePesatura, Peso, SessionePesatura } from './tipi'
 
@@ -18,16 +18,21 @@ export interface MediaTrattamento {
 /** I decimali con cui si scrive un valore calcolato (con le sue cifre significative). */
 export const decimaliDelCalcolato = (c: Calcolato): number => decimaliPerCifre(c.valore, c.cifre)
 
-/** Il valore calcolato di una replica (RWC o % di sostanza secca) con le sue cifre; `null` se mancano dei pesi. */
-export function valoreReplica(s: SessionePesatura, pesi: Peso[], campioneId: string, replica: number): Calcolato | null {
+/**
+ * Il valore calcolato di una replica (RWC o % di sostanza secca) con le sue cifre; `null` se mancano dei pesi. `pesi`
+ * sono quelli della sessione: danno anche la precisione della bilancia (`precisioneDeiPesi`).
+ */
+export function valoreReplica(
+  s: SessionePesatura, pesi: Peso[], campioneId: string, replica: number, precisione = precisioneDeiPesi(pesi),
+): Calcolato | null {
   const peso = (tipo: Peso['tipo']) => pesi.find(p => p.campione_id === campioneId && p.replica === replica && p.tipo === tipo)?.valore
   const fresco = peso('fresco')
   const secco = peso('secco')
   if (s.tipo === 'rwc') {
     const turgido = peso('turgido')
-    return fresco !== undefined && turgido !== undefined && secco !== undefined ? rwcCalcolato(fresco, turgido, secco) : null
+    return fresco !== undefined && turgido !== undefined && secco !== undefined ? rwcCalcolato(fresco, turgido, secco, precisione) : null
   }
-  return fresco !== undefined && secco !== undefined ? sostanzaSeccaCalcolata(fresco, secco) : null
+  return fresco !== undefined && secco !== undefined ? sostanzaSeccaCalcolata(fresco, secco, precisione) : null
 }
 
 /**
@@ -40,10 +45,11 @@ export function mediePerTrattamento(
 ): MediaTrattamento[] {
   if (s.tipo !== 'rwc' && s.tipo !== 'sostanza_secca') return []
   const perTrattamento = new Map<string, { medie: number[]; decimali: number }>()
+  const precisione = precisioneDeiPesi(pesi)
   for (const c of [...campioni].sort((a, b) => a.ordine - b.ordine)) {
     const pianta = c.pianta_id ? piante.get(c.pianta_id) : undefined
     if (!pianta) continue
-    const valori = repliche(c, s, pesi).map(r => valoreReplica(s, pesi, c.id, r)).filter((v): v is Calcolato => v !== null)
+    const valori = repliche(c, s, pesi).map(r => valoreReplica(s, pesi, c.id, r, precisione)).filter((v): v is Calcolato => v !== null)
     const gruppo = perTrattamento.get(pianta.trattamento_id) ?? { medie: [], decimali: 0 }
     perTrattamento.set(pianta.trattamento_id, gruppo)
     if (valori.length === 0) continue

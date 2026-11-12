@@ -138,8 +138,8 @@ describe('cartellaPesatura: aliquota e sostanza secca', () => {
     }
     const pesi = foglio('Pesi', cartellaPesatura([s], dati, config, OGGI, ADESSO).fogli)
     expect(titoli(pesi).slice(-3)).toEqual(['Fresco (g)', 'Secco (g)', 'Sostanza secca (%)'])
-    // 0,5 / 2 = 25 %, ma i dati hanno una cifra significativa sola: 30
-    expect(col(pesi, pesi.righe[0], 'Sostanza secca (%)')).toBe(30)
+    // 0,5 / 2 = 25 %: le cifre significative arrotondano solo i decimali, le cifre intere restano (mai 30)
+    expect(col(pesi, pesi.righe[0], 'Sostanza secca (%)')).toBe(25)
   })
 
   it('sessioni passate dalla più nuova: tipo, unità e righe seguono la più vecchia', () => {

@@ -1,6 +1,6 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { controllaReplica, mlTamponeCalcolato, type Calcolato } from '@/domain/pesatura/calcoli'
+import { controllaReplica, mlTamponeCalcolato, precisioneDeiPesi, type Calcolato } from '@/domain/pesatura/calcoli'
 import { decimaliDelCalcolato, mediePerTrattamento, valoreReplica } from '@/domain/pesatura/medie'
 import { etichettaCampione, letteraReplica, repliche } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
@@ -45,6 +45,7 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
   const righe: Riga[] = []
   const u = ` ${sessione.unita}`
   const ordinati = [...campioni].sort((a, b) => a.ordine - b.ordine)
+  const precisione = precisioneDeiPesi(pesi)
   for (const c of ordinati) {
     const etichetta = etichettaCampione(c, piante)
     const pianta = c.pianta_id ? piante.get(c.pianta_id) : undefined
@@ -62,16 +63,16 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
       if (sessione.tipo === 'aliquota') {
         const a = valore.aliquota ?? null
         valori.push({ nome: 'Peso', testo: peso(a, u) })
-        const ml = a === null ? null : mlTamponeCalcolato(a, sessione.unita, sessione.impostazioni.rapportoTampone)
+        const ml = a === null ? null : mlTamponeCalcolato(a, sessione.unita, sessione.impostazioni.rapportoTampone, precisione)
         if (sessione.impostazioni.rapportoTampone !== null) valori.push({ nome: 'Tampone', testo: calcolato(ml, ' mL') })
       } else if (sessione.tipo === 'rwc') {
-        questo = valoreReplica(sessione, pesi, c.id, replica)
+        questo = valoreReplica(sessione, pesi, c.id, replica, precisione)
         valori.push(
           { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Turgido', testo: peso(turgido ?? null, u) },
           { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'RWC', testo: calcolato(questo, ' %') },
         )
       } else if (sessione.tipo === 'sostanza_secca') {
-        questo = valoreReplica(sessione, pesi, c.id, replica)
+        questo = valoreReplica(sessione, pesi, c.id, replica, precisione)
         valori.push(
           { nome: 'Fresco', testo: peso(fresco ?? null, u) }, { nome: 'Secco', testo: peso(secco ?? null, u) },
           { nome: 'Sostanza secca', testo: calcolato(questo, ' %') },

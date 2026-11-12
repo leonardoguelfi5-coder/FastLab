@@ -361,3 +361,14 @@ describe('Sessione: dal riepilogo alla pesata', () => {
     await waitFor(() => expect(screen.queryByRole('link', { name: /^Pesa P12/ })).not.toBeInTheDocument())
   })
 })
+
+describe('Sessione: cifre significative', () => {
+  it('fresco 2 e secco 0,5 con gli altri pesi a tre decimali: 25,00 %, mai 30 %', async () => {
+    const ss = sessione({ tipo: 'sostanza_secca', impostazioni: IMPOSTAZIONI_PREDEFINITE })
+    const cs = [campione('c12', 1, { pianta_id: 'p12' }), campione('c13', 2, { nome: 'Bianco' })]
+    dati([ss], cs, [peso('1', 'c12', 1, 'fresco', 2), peso('2', 'c12', 1, 'secco', 0.5), peso('3', 'c13', 1, 'fresco', 1.253)])
+    apri()
+    await titolo()
+    expect(screen.getByText('P12').closest('li')).toHaveTextContent('25,00 %')
+  })
+})
