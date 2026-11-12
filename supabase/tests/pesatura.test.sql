@@ -1,10 +1,11 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(64);
+select plan(57);
 
--- Pesatura: analisi dell'utente, sessioni dell'esperimento, campioni e pesi, con le loro sicurezze.
+-- Pesatura: sessioni dell'esperimento (ognuna con le sue impostazioni, senza analisi salvate), campioni e pesi,
+-- con le loro sicurezze.
 -- Fixture (superuser): A proprietario di EA, R rilevatore in EA, L lettore in EA, B estraneo (proprietario di EB).
--- In EA il trattamento T1 con le piante 1 e 2; B ha una sua analisi, che A non vede.
+-- In EA il trattamento T1 con le piante 1 e 2.
 
 -- ===== Utenti ed esperimenti =====
 insert into inviti (email, codice) values
@@ -33,18 +34,16 @@ insert into piante (id, esperimento_id, trattamento_id, etichetta, ordine) value
   ('b1100000-0000-0000-0000-000000000001', 'e1100000-0000-0000-0000-000000000001', '71100000-0000-0000-0000-000000000001', '1', 0),
   ('b1100000-0000-0000-0000-000000000002', 'e1100000-0000-0000-0000-000000000001', '71100000-0000-0000-0000-000000000001', '2', 1);
 
-insert into analisi_pesatura (id, creato_da, titolo, tipo) values
-  ('a1200000-0000-0000-0000-000000000001', '01100000-0000-0000-0000-00000000000d', 'Analisi di B', 'aliquota');
-
 -- ===== Struttura =====
-select has_table('public', 'analisi_pesatura', 'la tabella analisi_pesatura esiste');
+select hasnt_table('public', 'analisi_pesatura', 'le analisi salvate non ci sono piu''');
 select has_table('public', 'sessioni_pesatura', 'la tabella sessioni_pesatura esiste');
 select has_table('public', 'campioni_pesatura', 'la tabella campioni_pesatura esiste');
 select has_table('public', 'pesi', 'la tabella pesi esiste');
+select hasnt_column('public', 'sessioni_pesatura', 'analisi_id', 'una sessione non dipende da un''analisi');
 
 select is_empty(
   $$ select t.tabella
-       from unnest(array['analisi_pesatura', 'sessioni_pesatura', 'campioni_pesatura', 'pesi']) as t (tabella)
+       from unnest(array['sessioni_pesatura', 'campioni_pesatura', 'pesi']) as t (tabella)
       where (select array_agg(cmd::text order by cmd) from pg_policies
               where schemaname = 'public' and tablename = t.tabella
                 and roles @> array['authenticated']::name[] and cardinality(roles) = 1)
@@ -54,14 +53,12 @@ select is_empty(
 
 select is_empty(
   $$ select t.tabella
-       from unnest(array['analisi_pesatura', 'sessioni_pesatura', 'campioni_pesatura', 'pesi']) as t (tabella)
+       from unnest(array['sessioni_pesatura', 'campioni_pesatura', 'pesi']) as t (tabella)
       where not exists (
         select 1 from pg_trigger g
          where g.tgrelid = ('public.' || t.tabella)::regclass
            and g.tgfoid = 'public.imposta_aggiornato_il()'::regprocedure) $$,
   'ogni tabella della Pesatura ha il trigger di aggiornato_il');
-
-select has_trigger('public', 'analisi_pesatura', 'guardia_tipo_analisi', 'le analisi hanno la guardia del tipo');
 
 select is_empty(
   $$ select p.proname from pg_proc p
@@ -74,46 +71,23 @@ select is_empty(
        select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = 'puo_gestire_sessione') $$,
   'puo_gestire_sessione e'' security definer, con search_path vuoto, per authenticated e non per anon');
 
--- ===== A: analisi, sessione, campioni, un peso =====
+-- ===== A: sessione, campioni, un peso =====
 set local role authenticated;
 select set_config('request.jwt.claims',
   json_build_object('sub', '01100000-0000-0000-0000-00000000000a', 'role', 'authenticated')::text, true);
 
 select lives_ok(
-  $$ insert into analisi_pesatura (id, titolo, tipo)
-     values ('a1100000-0000-0000-0000-000000000001', 'Antociani foglie', 'aliquota'),
-            ('a1100000-0000-0000-0000-000000000002', 'RWC', 'rwc') $$,
-  'A crea due analisi');
-
-select results_eq(
-  $$ select unita, impostazioni, archiviata, creato_da from analisi_pesatura
-      where id = 'a1100000-0000-0000-0000-000000000001' $$,
-  $$ values ('g'::text, '{}'::jsonb, false, '01100000-0000-0000-0000-00000000000a'::uuid) $$,
-  'un''analisi nuova pesa in grammi, non ha impostazioni, non e'' archiviata ed e'' firmata da chi la crea');
-
-select throws_ok(
-  $$ insert into analisi_pesatura (id, titolo, tipo, creato_da)
-     values ('a1100000-0000-0000-0000-000000000009', 'Finta', 'aliquota', '01100000-0000-0000-0000-00000000000b') $$,
-  '42501', null,
-  'A non crea un''analisi a nome di R');
-
-select is(
-  (select count(*)::int from analisi_pesatura where id = 'a1200000-0000-0000-0000-000000000001'),
-  0,
-  'A non vede l''analisi di B (non e'' sua e nessuna sessione di un suo esperimento la usa)');
-
-select lives_ok(
-  $$ insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data)
+  $$ insert into sessioni_pesatura (id, esperimento_id, titolo, tipo, unita, impostazioni, data)
      values ('51100000-0000-0000-0000-000000000001', 'e1100000-0000-0000-0000-000000000001',
-             'a1100000-0000-0000-0000-000000000001', 'Antociani foglie', 'aliquota', 'g', '{}', '2026-11-11') $$,
-  'A crea una sessione in EA con la sua analisi');
+             'Antociani foglie', 'aliquota', 'g', '{}', '2026-11-11') $$,
+  'A crea una sessione in EA con le sue impostazioni');
 
 select throws_ok(
-  $$ insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data)
+  $$ insert into sessioni_pesatura (id, esperimento_id, titolo, tipo, unita, impostazioni, data, creato_da)
      values ('51100000-0000-0000-0000-000000000009', 'e1100000-0000-0000-0000-000000000001',
-             'a1200000-0000-0000-0000-000000000001', 'Analisi di B', 'aliquota', 'g', '{}', '2026-11-11') $$,
+             'Finta', 'aliquota', 'g', '{}', '2026-11-11', '01100000-0000-0000-0000-00000000000b') $$,
   '42501', null,
-  'A non crea una sessione con un''analisi che non vede');
+  'A non crea una sessione a nome di R');
 
 select lives_ok(
   $$ insert into campioni_pesatura (id, sessione_id, esperimento_id, pianta_id, nome, ordine)
@@ -139,10 +113,10 @@ select set_config('request.jwt.claims',
   json_build_object('sub', '01100000-0000-0000-0000-00000000000b', 'role', 'authenticated')::text, true);
 
 select is(
-  array[(select count(*)::int from sessioni_pesatura), (select count(*)::int from analisi_pesatura),
-        (select count(*)::int from campioni_pesatura), (select count(*)::int from pesi)],
-  array[1, 1, 2, 1],
-  'R vede la sessione di A, la sua analisi (non l''altra di A, senza sessioni), i campioni e il peso');
+  array[(select count(*)::int from sessioni_pesatura), (select count(*)::int from campioni_pesatura),
+        (select count(*)::int from pesi)],
+  array[1, 2, 1],
+  'R vede la sessione di A, i campioni e il peso');
 
 select lives_ok(
   $$ insert into pesi (id, campione_id, sessione_id, esperimento_id, tipo, valore)
@@ -195,15 +169,11 @@ select is_empty(
   $$ update sessioni_pesatura set conclusa = true where id = '51100000-0000-0000-0000-000000000001' returning id $$,
   'R non chiude la sessione di A (0 righe)');
 
-select is_empty(
-  $$ update analisi_pesatura set titolo = 'Rinominata' where id = 'a1100000-0000-0000-0000-000000000001' returning id $$,
-  'R non rinomina l''analisi di A (0 righe)');
-
 select lives_ok(
-  $$ insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data)
+  $$ insert into sessioni_pesatura (id, esperimento_id, titolo, tipo, unita, impostazioni, data)
      values ('51100000-0000-0000-0000-000000000002', 'e1100000-0000-0000-0000-000000000001',
-             'a1100000-0000-0000-0000-000000000001', 'Antociani foglie', 'aliquota', 'g', '{}', '2026-11-12') $$,
-  'R crea una sessione con l''analisi di A, che vede');
+             'Antociani foglie', 'aliquota', 'mg', '{"repliche": 2}', '2026-11-12') $$,
+  'R crea una sua sessione');
 
 select lives_ok(
   $$ insert into campioni_pesatura (id, sessione_id, esperimento_id, pianta_id, nome, ordine)
@@ -239,9 +209,9 @@ select throws_ok(
   'L non inserisce pesi');
 
 select throws_ok(
-  $$ insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data)
+  $$ insert into sessioni_pesatura (id, esperimento_id, titolo, tipo, unita, impostazioni, data)
      values ('51100000-0000-0000-0000-000000000003', 'e1100000-0000-0000-0000-000000000001',
-             'a1100000-0000-0000-0000-000000000001', 'Antociani foglie', 'aliquota', 'g', '{}', '2026-11-12') $$,
+             'Antociani foglie', 'aliquota', 'g', '{}', '2026-11-12') $$,
   '42501', null,
   'L non crea sessioni');
 
@@ -251,10 +221,9 @@ select set_config('request.jwt.claims',
 
 select is(
   array[(select count(*)::int from sessioni_pesatura), (select count(*)::int from campioni_pesatura),
-        (select count(*)::int from pesi),
-        (select count(*)::int from analisi_pesatura where creato_da <> '01100000-0000-0000-0000-00000000000d')],
-  array[0, 0, 0, 0],
-  'B non vede sessioni, campioni, pesi ne'' analisi di EA');
+        (select count(*)::int from pesi)],
+  array[0, 0, 0],
+  'B non vede sessioni, campioni e pesi di EA');
 
 select throws_ok(
   $$ insert into pesi (id, campione_id, sessione_id, esperimento_id, tipo, valore)
@@ -267,13 +236,11 @@ select throws_ok(
 -- Fixture (superuser): due sessioni di R. La 7 ha il campione 7 con un peso di A e il campione 8 con un peso di R;
 -- la 8 ha il campione 9 con un solo peso di R.
 reset role;
-insert into sessioni_pesatura (id, esperimento_id, analisi_id, titolo, tipo, unita, impostazioni, data, creato_da) values
+insert into sessioni_pesatura (id, esperimento_id, titolo, tipo, unita, impostazioni, data, creato_da) values
   ('51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001',
-   'a1100000-0000-0000-0000-000000000001', 'Sessione R mista', 'aliquota', 'g', '{}', '2026-11-13',
-   '01100000-0000-0000-0000-00000000000b'),
+   'Sessione R mista', 'aliquota', 'g', '{}', '2026-11-13', '01100000-0000-0000-0000-00000000000b'),
   ('51100000-0000-0000-0000-000000000008', 'e1100000-0000-0000-0000-000000000001',
-   'a1100000-0000-0000-0000-000000000001', 'Sessione R sola', 'aliquota', 'g', '{}', '2026-11-13',
-   '01100000-0000-0000-0000-00000000000b');
+   'Sessione R sola', 'aliquota', 'g', '{}', '2026-11-13', '01100000-0000-0000-0000-00000000000b');
 insert into campioni_pesatura (id, sessione_id, esperimento_id, nome, ordine) values
   ('c1100000-0000-0000-0000-000000000007', '51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001', 'M1', 0),
   ('c1100000-0000-0000-0000-000000000008', '51100000-0000-0000-0000-000000000007', 'e1100000-0000-0000-0000-000000000001', 'M2', 1),
@@ -382,27 +349,19 @@ select throws_ok(
   '23514', null,
   'un campione senza pianta e senza nome: rifiutato');
 
-select throws_ok(
-  $$ update analisi_pesatura set tipo = 'rwc' where id = 'a1100000-0000-0000-0000-000000000001' $$,
-  '23514', 'il tipo di un''analisi con sessioni non si cambia',
-  'il tipo di un''analisi con sessioni non si cambia');
-
-select lives_ok(
-  $$ update analisi_pesatura set unita = 'mg', titolo = 'Antociani' where id = 'a1100000-0000-0000-0000-000000000001' $$,
-  'unita'' e titolo di un''analisi con sessioni si cambiano');
-
-select lives_ok(
-  $$ update analisi_pesatura set tipo = 'vasi' where id = 'a1100000-0000-0000-0000-000000000002' $$,
-  'il tipo di un''analisi senza sessioni si cambia');
+select isnt_empty(
+  $$ update sessioni_pesatura set unita = 'µg' where id = '51100000-0000-0000-0000-000000000001' returning unita $$,
+  'l''unita'' di peso e'' libera: anche una scritta dall''utente');
 
 select throws_ok(
-  $$ delete from analisi_pesatura where id = 'a1100000-0000-0000-0000-000000000001' $$,
-  '23503', null,
-  'un''analisi con sessioni non si elimina');
+  $$ update sessioni_pesatura set unita = '  ' where id = '51100000-0000-0000-0000-000000000001' $$,
+  '23514', null,
+  'un''unita'' vuota: rifiutata');
 
-select lives_ok(
-  $$ update analisi_pesatura set archiviata = true where id = 'a1100000-0000-0000-0000-000000000001' $$,
-  'un''analisi con sessioni si archivia');
+select throws_ok(
+  $$ update sessioni_pesatura set unita = repeat('x', 21) where id = '51100000-0000-0000-0000-000000000001' $$,
+  '23514', null,
+  'un''unita'' di piu'' di 20 caratteri: rifiutata');
 
 select results_eq(
   $$ select p from piante_non_eliminabili('e1100000-0000-0000-0000-000000000001') as p order by 1 $$,
@@ -421,18 +380,18 @@ select lives_ok(
 reset role;
 select is(
   array[(select count(*)::int from sessioni_pesatura), (select count(*)::int from campioni_pesatura),
-        (select count(*)::int from pesi), (select count(*)::int from analisi_pesatura)],
-  array[0, 0, 0, 3],
-  'l''eliminazione dell''esperimento porta via sessioni, campioni e pesi, e lascia le analisi');
+        (select count(*)::int from pesi)],
+  array[0, 0, 0],
+  'l''eliminazione dell''esperimento porta via sessioni, campioni e pesi');
 
 -- ===== anon =====
 set local role anon;
 select set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 
 select throws_ok(
-  $$ select count(*) from analisi_pesatura $$,
+  $$ select count(*) from sessioni_pesatura $$,
   '42501', null,
-  'anon non legge le analisi');
+  'anon non legge le sessioni');
 
 reset role;
 select * from finish();

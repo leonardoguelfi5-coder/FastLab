@@ -6,16 +6,16 @@ import {
 } from '@/domain/export/fogli'
 import type { ConfigEsperimento, Fattore, Pianta, Trattamento } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
-import { mlTampone, percentualeCC, rwc, sostanzaSecca } from './calcoli'
+import { inUnita, mlTampone, percentualeCC, rwc, sostanzaSecca } from './calcoli'
 import {
   consultaPerCC, curvePerSubstrato, equazione, modelloPer, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
   type CurveSubstrato, type Vaso,
 } from './curva'
 import { etichettaCampione, letteraReplica, repliche } from './sequenza'
-import { NOMI_TIPO, type CampionePesatura, type Peso, type Sensore, type SessionePesatura, type TipoPeso, type UnitaPeso } from './tipi'
+import { NOMI_TIPO, type CampionePesatura, type Peso, type Sensore, type SessionePesatura, type TipoPeso } from './tipi'
 
 /**
- * La cartella Excel della Pesatura: una sessione o tutte quelle di un'analisi. Il modello è lo stesso dell'Excel del
+ * La cartella Excel della Pesatura: una sessione (o più sessioni dello stesso tipo). Il modello è lo stesso dell'Excel del
  * Dataset (`Cartella`), così lo scrive `scriviCartella`. Tutto puro: niente rete, niente DOM.
  *
  * I valori calcolati (RWC, sostanza secca, mL di tampone, acqua, % CC) sono `null` finché mancano i pesi che servono,
@@ -38,12 +38,6 @@ function dallaPiuVecchia(a: SessionePesatura, b: SessionePesatura): number {
 
 const campioniDi = (s: SessionePesatura, dati: DatiPesatura): CampionePesatura[] =>
   dati.campioni.filter(c => c.sessione_id === s.id).sort((a, b) => a.ordine - b.ordine)
-
-/** Un peso in un'altra unità: da g a mg si moltiplica per 1000. */
-function inUnita(valore: number, da: UnitaPeso, a: UnitaPeso): number {
-  if (da === a) return valore
-  return da === 'g' ? valore * 1000 : valore / 1000
-}
 
 /** I vasi di tutte le sessioni, raggruppati per substrato con le loro curve. Le usano la pagina, l'export e il PNG. */
 export function gruppiDeiVasi(sessioni: SessionePesatura[], dati: DatiPesatura): { gruppi: CurveSubstrato[]; sensore: Sensore; vasi: Vaso[] } {

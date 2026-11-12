@@ -90,8 +90,13 @@ export function avanzamentoFase(passi: Passo[]): Avanzamento {
   return { pesati: passi.filter(p => p.peso !== null).length, totali: passi.length }
 }
 
+/**
+ * Lo stato di una pesata. "Conclusa" vale solo per i vasi, la cui asciugatura non ha una fine: la segna l'utente. Gli
+ * altri tipi sono completi quando hanno tutti i pesi (una pesata vecchia segnata conclusa con dei pesi mancanti torna
+ * a dire che mancano).
+ */
 export function statoSessione(s: SessionePesatura, campioni: CampionePesatura[], pesi: Peso[]): 'conclusa' | 'completa' | 'mancano' {
-  if (s.conclusa) return 'conclusa'
+  if (s.conclusa && s.tipo === 'vasi') return 'conclusa'
   if (campioni.length === 0) return 'mancano'
   for (const fase of FASI[s.tipo]) {
     if (fase === 'asciugatura') continue
@@ -103,4 +108,14 @@ export function statoSessione(s: SessionePesatura, campioni: CampionePesatura[],
     }
   }
   return 'completa'
+}
+
+/** Le fasi con un peso per campione (non l'asciugatura), con quanti pesi hanno sul totale. */
+export function avanzamentoFasi(s: SessionePesatura, campioni: CampionePesatura[], pesi: Peso[]): (Avanzamento & { fase: FasePesata })[] {
+  return FASI[s.tipo].filter(f => f !== 'asciugatura').map(fase => ({ fase, ...avanzamentoFase(passiDellaFase(s, campioni, pesi, fase)) }))
+}
+
+/** Una pesata è fra le completate quando ha tutti i pesi; i vasi solo quando l'utente la segna conclusa. */
+export function eCompletata(s: SessionePesatura, campioni: CampionePesatura[], pesi: Peso[]): boolean {
+  return s.tipo === 'vasi' ? s.conclusa : statoSessione(s, campioni, pesi) === 'completa'
 }

@@ -5,15 +5,28 @@ import type { TipoAnalisi, TipoPeso, UnitaPeso } from './tipi'
  * `null`, mai `NaN` né `Infinity`: l'interfaccia mostra un trattino invece di un numero sbagliato.
  */
 
-/** Porta un peso in grammi: il rapporto del tampone è in mL per g, quindi il calcolo parte sempre dai grammi. */
-export function inGrammi(valore: number, unita: UnitaPeso): number {
-  return unita === 'mg' ? valore / 1000 : valore
+/** Quanti grammi vale un'unità di peso conosciuta. Un'unità scritta dall'utente non si converte. */
+const GRAMMI_PER_UNITA: Record<string, number> = { g: 1, mg: 0.001, kg: 1000 }
+
+/** Porta un peso in grammi: il rapporto del tampone è in mL per g. `null` se l'unità non è g, mg o kg. */
+export function inGrammi(valore: number, unita: UnitaPeso): number | null {
+  const fattore = GRAMMI_PER_UNITA[unita.trim()]
+  return fattore === undefined ? null : valore * fattore
 }
 
-/** I mL di tampone da aggiungere a un'aliquota: peso in g × rapporto (mL/g). `null` se il rapporto non è impostato. */
+/** Un peso da un'unità a un'altra; se una delle due non si converte, il valore resta com'è. */
+export function inUnita(valore: number, da: UnitaPeso, a: UnitaPeso): number {
+  const fa = GRAMMI_PER_UNITA[da.trim()]
+  const fb = GRAMMI_PER_UNITA[a.trim()]
+  if (da.trim() === a.trim() || fa === undefined || fb === undefined) return valore
+  return (valore * fa) / fb
+}
+
+/** I mL di tampone da aggiungere a un'aliquota: peso in g × rapporto (mL/g). `null` senza rapporto o con un'unità che non si converte. */
 export function mlTampone(valore: number, unita: UnitaPeso, rapporto: number | null): number | null {
   if (rapporto === null) return null
-  return inGrammi(valore, unita) * rapporto
+  const grammi = inGrammi(valore, unita)
+  return grammi === null ? null : grammi * rapporto
 }
 
 /** RWC % = (fresco − secco) / (turgido − secco) × 100. `null` se turgido e secco non differiscono (o sono invertiti). */

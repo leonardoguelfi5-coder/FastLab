@@ -24,7 +24,7 @@ import { ELEMENTO_NON_TROVATO, SESSIONE_CON_PESI_ALTRUI } from '@/lib/errori'
 import { Sessione } from './Sessione'
 
 const sessione = (extra: Partial<SessionePesatura> = {}): SessionePesatura => ({
-  id: 'S', esperimento_id: 'E', analisi_id: 'a1', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g',
+  id: 'S', esperimento_id: 'E', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g',
   impostazioni: { ...IMPOSTAZIONI_PREDEFINITE, repliche: 2 }, data: '2026-11-11', nota: 'Mattina presto', conclusa: false, creato_da: 'io', ...extra,
 })
 const campione = (id: string, ordine: number, extra: Partial<CampionePesatura> = {}): CampionePesatura => ({
@@ -119,30 +119,63 @@ describe('Sessione', () => {
     expect(await screen.findByText('Pagina di pesata')).toBeInTheDocument()
   })
 
-  it('il proprietario segna la sessione come conclusa', async () => {
-    const u = apri()
+  it('in cima al riepilogo c\'è la media per trattamento (ogni pianta conta una volta)', async () => {
+    apri()
     await titolo()
-    await u.click(screen.getByRole('button', { name: 'Segna come conclusa' }))
-    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith({ id: 'S', data: '2026-11-11', nota: 'Mattina presto', conclusa: true }))
+    const medie = within(screen.getByRole('region', { name: 'RWC medio per trattamento' }))
+    const riga = medie.getByText('Sale').closest('li') as HTMLElement
+    expect(riga).toHaveTextContent('1 pianta')
+    expect(riga).toHaveTextContent('75 %')
   })
 
-  it('una sessione conclusa si riapre', async () => {
-    dati([sessione({ conclusa: true })], campioni, pesiRwc)
-    const u = apri()
+  it('una pesata che non è dei vasi non si segna conclusa: è completa quando ha tutti i pesi', async () => {
+    dati([sessione({ conclusa: true })], campioni, pesiRwc.slice(0, 4))
+    apri()
     await titolo()
-    expect(screen.getByText('Conclusa')).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Riapri' }))
-    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ conclusa: false })))
+    expect(screen.getByText('Mancano dei pesi')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Segna come conclusa' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Riapri' })).not.toBeInTheDocument()
   })
 
-  it('un rilevatore non vede Segna come conclusa né Elimina su una sessione altrui', async () => {
+  it('la nota si modifica sul posto', async () => {
+    const u = apri()
+    await titolo()
+    await u.click(screen.getByRole('button', { name: 'Modifica' }))
+    const campo = screen.getByRole('textbox', { name: 'Nota' })
+    expect(campo).toHaveValue('Mattina presto')
+    await u.clear(campo)
+    await u.type(campo, '  Dischetti da 1 cm  ')
+    await u.click(screen.getByRole('button', { name: 'Salva la nota' }))
+    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith({ id: 'S', data: '2026-11-11', nota: 'Dischetti da 1 cm', conclusa: false }))
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Nota' })).not.toBeInTheDocument())
+  })
+
+  it('una nota svuotata si toglie; un errore lascia il testo nel campo', async () => {
+    vi.mocked(aggiornaSessione).mockRejectedValueOnce(new Error('Rifiutato dal database.'))
+    const u = apri()
+    await titolo()
+    await u.click(screen.getByRole('button', { name: 'Modifica' }))
+    await u.clear(screen.getByRole('textbox', { name: 'Nota' }))
+    await u.click(screen.getByRole('button', { name: 'Salva la nota' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ nota: null }))
+    expect(screen.getByRole('textbox', { name: 'Nota' })).toBeInTheDocument()
+  })
+
+  it('Ripeti questa pesata apre una nuova pesata compilata come questa', async () => {
+    apri()
+    await titolo()
+    expect(screen.getByRole('link', { name: 'Ripeti questa pesata' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura/nuova?da=S')
+  })
+
+  it('un rilevatore non modifica né elimina una sessione altrui', async () => {
     vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
     dati([sessione({ creato_da: 'altro' })], campioni, pesiRwc)
     apri()
     await titolo()
     await waitFor(() => expect(ruoloIn).toHaveBeenCalled())
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Segna come conclusa' })).not.toBeInTheDocument())
-    expect(screen.queryByRole('button', { name: 'Elimina sessione' })).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Modifica' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: 'Elimina pesata' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Scarica Excel' })).toBeInTheDocument()
   })
 
@@ -150,7 +183,8 @@ describe('Sessione', () => {
     vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
     apri()
     await titolo()
-    expect(await screen.findByRole('button', { name: 'Segna come conclusa' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Elimina pesata' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modifica' })).toBeInTheDocument()
   })
 
   it('un rilevatore non elimina la sua sessione se contiene pesi di altre persone', async () => {
@@ -159,15 +193,15 @@ describe('Sessione', () => {
     apri()
     await titolo()
     expect(await screen.findByText(SESSIONE_CON_PESI_ALTRUI)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Elimina sessione' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Segna come conclusa' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Elimina pesata' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Modifica' })).toBeInTheDocument()
   })
 
   it('il proprietario elimina anche una sessione con pesi di altre persone', async () => {
     dati([sessione()], campioni, [...pesiRwc.slice(1), { ...pesiRwc[0], creato_da: 'altro' }])
     apri()
     await titolo()
-    expect(await screen.findByRole('button', { name: 'Elimina sessione' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Elimina pesata' })).toBeInTheDocument()
     expect(screen.queryByText(SESSIONE_CON_PESI_ALTRUI)).not.toBeInTheDocument()
   })
 
@@ -176,23 +210,19 @@ describe('Sessione', () => {
     vi.mocked(eliminaSessione).mockRejectedValue(new Error(ELEMENTO_NON_TROVATO))
     const u = apri()
     await titolo()
-    await u.click(await screen.findByRole('button', { name: 'Elimina sessione' }))
+    await u.click(await screen.findByRole('button', { name: 'Elimina pesata' }))
     await u.click(await screen.findByRole('button', { name: 'Elimina' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(SESSIONE_CON_PESI_ALTRUI)
   })
 
-  it('Scarica Excel scarica la sessione, Scarica tutte quelle dell\'analisi', async () => {
-    const altra = sessione({ id: 'S2', data: '2026-11-04' })
-    const fuori = sessione({ id: 'S3', analisi_id: 'a2' })
-    dati([sessione(), altra, fuori], campioni, pesiRwc)
+  it('Scarica Excel scarica solo questa pesata', async () => {
+    dati([sessione(), sessione({ id: 'S2', data: '2026-11-04' })], campioni, pesiRwc)
     const u = apri()
     await titolo()
     await u.click(screen.getByRole('button', { name: 'Scarica Excel' }))
     await waitFor(() => expect(scaricaPesatura).toHaveBeenCalledTimes(1))
     expect(vi.mocked(scaricaPesatura).mock.calls[0][0].sessioni.map(s => s.id)).toEqual(['S'])
-    await u.click(screen.getByRole('button', { name: 'Scarica tutte le sessioni di questa analisi' }))
-    await waitFor(() => expect(scaricaPesatura).toHaveBeenCalledTimes(2))
-    expect(vi.mocked(scaricaPesatura).mock.calls[1][0].sessioni.map(s => s.id).sort()).toEqual(['S', 'S2'])
+    expect(screen.queryByRole('button', { name: /Scarica tutte/ })).not.toBeInTheDocument()
   })
 
   it('un errore di scaricamento resta sotto i pulsanti', async () => {
@@ -203,14 +233,14 @@ describe('Sessione', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/Non riesco/)
   })
 
-  it('Elimina sessione chiede conferma, poi elimina e torna all\'elenco', async () => {
+  it('Elimina pesata chiede conferma, poi elimina e torna all\'elenco', async () => {
     const u = apri()
     await titolo()
-    await u.click(screen.getByRole('button', { name: 'Elimina sessione' }))
+    await u.click(screen.getByRole('button', { name: 'Elimina pesata' }))
     expect(eliminaSessione).not.toHaveBeenCalled()
-    await u.click(await screen.findByRole('button', { name: 'Tieni la sessione' }))
+    await u.click(await screen.findByRole('button', { name: 'Tieni la pesata' }))
     expect(eliminaSessione).not.toHaveBeenCalled()
-    await u.click(screen.getByRole('button', { name: 'Elimina sessione' }))
+    await u.click(screen.getByRole('button', { name: 'Elimina pesata' }))
     await u.click(await screen.findByRole('button', { name: 'Elimina' }))
     await waitFor(() => expect(eliminaSessione).toHaveBeenCalledWith('S'))
     expect(await screen.findByText('Elenco Pesatura')).toBeInTheDocument()
@@ -220,7 +250,7 @@ describe('Sessione', () => {
     vi.mocked(eliminaSessione).mockRejectedValue(new Error('Rifiutato dal database.'))
     const u = apri()
     await titolo()
-    await u.click(screen.getByRole('button', { name: 'Elimina sessione' }))
+    await u.click(screen.getByRole('button', { name: 'Elimina pesata' }))
     await u.click(await screen.findByRole('button', { name: 'Elimina' }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.queryByText('Elenco Pesatura')).not.toBeInTheDocument()
@@ -237,7 +267,7 @@ describe('Sessione', () => {
     apri()
     await titolo()
     expect(screen.getByText('Sei senza rete: la Pesatura funziona solo online.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Segna come conclusa' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Elimina pesata' })).toBeDisabled()
   })
 })
 
@@ -279,6 +309,22 @@ describe('Sessione con i vasi', () => {
     await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG)' }))
     await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
     expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', sensore: { unita: 'kPa' } })
+  })
+
+  it('il proprietario segna conclusa una taratura', async () => {
+    const u = apri()
+    await titolo()
+    await u.click(screen.getByRole('button', { name: 'Segna come conclusa' }))
+    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith({ id: 'S', data: '2026-11-11', nota: null, conclusa: true }))
+  })
+
+  it('una taratura conclusa si riapre', async () => {
+    dati([{ ...vasiSessione, conclusa: true }], vasi, pesiVasi)
+    const u = apri()
+    await titolo()
+    expect(screen.getByText('Conclusa')).toBeInTheDocument()
+    await u.click(screen.getByRole('button', { name: 'Riapri' }))
+    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ conclusa: false })))
   })
 
   it('l\'asciugatura mostra quanti pesi ci sono, senza una frazione', async () => {

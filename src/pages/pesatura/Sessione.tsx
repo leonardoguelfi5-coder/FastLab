@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { CloudOff } from 'lucide-react'
+import { CloudOff, RotateCcw } from 'lucide-react'
 import { useSessione } from '@/api/auth'
 import { caricaConfig } from '@/api/esperimenti'
 import { aggiornaSessione, eliminaSessione, listaPesatura, type DatiPesatura } from '@/api/pesatura'
@@ -16,6 +16,8 @@ import { RiepilogoSessione } from '@/components/pesatura/RiepilogoSessione'
 import { scaricaGraficoPng, scaricaPesatura } from '@/components/pesatura/scaricaPesatura'
 import { TestoErrore } from '@/components/TestoErrore'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { gruppiDeiVasi } from '@/domain/pesatura/export'
 import { equazione } from '@/domain/pesatura/curva'
 import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, statoSessione } from '@/domain/pesatura/sequenza'
@@ -23,7 +25,7 @@ import { NOMI_TIPO, type SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
 import { ELEMENTO_NON_TROVATO, messaggioErrore, SESSIONE_CON_PESI_ALTRUI } from '@/lib/errori'
-import { percorsoPesata, percorsoPesatura } from '@/lib/percorsi'
+import { percorsoNuovaSessione, percorsoPesata, percorsoPesatura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { SENZA_RETE_PESATURA } from './messaggi'
@@ -140,12 +142,11 @@ function Contenuto({ espId, sessione, dati, config }: {
   }
 
   /** I dati più freschi se arrivano, altrimenti quelli già in pagina: scaricare non deve fallire per un attimo senza rete. */
-  const scarica = (tutte: boolean) => esegui(async () => {
+  const scarica = () => esegui(async () => {
     const freschi = await queryClient.fetchQuery({ queryKey: chiavi.pesatura(espId), queryFn: () => listaPesatura(espId), staleTime: 0 }).catch(() => dati)
     const configurazione: ConfigEsperimento = config ?? await caricaConfig(espId)
     const aggiornata = freschi.sessioni.find(s => s.id === sessione.id) ?? sessione
-    const sessioni = tutte ? freschi.sessioni.filter(s => s.analisi_id === sessione.analisi_id) : [aggiornata]
-    await scaricaPesatura({ sessioni, dati: freschi, config: configurazione })
+    await scaricaPesatura({ sessioni: [aggiornata], dati: freschi, config: configurazione })
   })
 
   const scaricaPng = () => esegui(async () => {
@@ -157,8 +158,16 @@ function Contenuto({ espId, sessione, dati, config }: {
       <header className="flex flex-col gap-1">
         <h1 className="text-headline text-grafite">{sessione.titolo}</h1>
         <p className="text-grafite-tenue">{formattaData(sessione.data)} · {NOMI_TIPO[sessione.tipo]} · {sessione.unita}</p>
-        {sessione.nota && <p className="text-grafite">{sessione.nota}</p>}
         <p className="text-base font-medium text-grafite">{TESTO_STATO[stato]}</p>
+        <Nota
+          nota={sessione.nota}
+          puoModificare={puoGestire}
+          senzaRete={senzaRete}
+          onSalva={async nota => {
+            await aggiornaSessione({ id: sessione.id, data: sessione.data, nota, conclusa: sessione.conclusa })
+            await queryClient.invalidateQueries({ queryKey: chiavi.pesatura(espId) })
+          }}
+        />
       </header>
 
       {permessi.puoMisurare && (
@@ -219,18 +228,22 @@ function Contenuto({ espId, sessione, dati, config }: {
       <section aria-labelledby="titolo-azioni" className="flex flex-col gap-3">
         <h2 id="titolo-azioni" className="text-title text-grafite">Esporta e gestisci</h2>
         <div className="flex flex-col items-stretch gap-2 sm:items-start">
-          <Button type="button" size="lg" disabled={occupato} onClick={() => void scarica(false)}>Scarica Excel</Button>
-          <Button type="button" size="lg" variant="outline" disabled={occupato} onClick={() => void scarica(true)}>
-            Scarica tutte le sessioni di questa analisi
-          </Button>
-          {puoGestire && (
+          <Button type="button" size="lg" disabled={occupato} onClick={() => void scarica()}>Scarica Excel</Button>
+          {permessi.puoMisurare && (
+            <Link to={percorsoNuovaSessione(espId, sessione.id)} className={buttonVariants({ size: 'lg', variant: 'outline' })}>
+              <RotateCcw aria-hidden />
+              Ripeti questa pesata
+            </Link>
+          )}
+          {/* Solo i vasi si chiudono a mano: l'asciugatura non ha una fine. Gli altri tipi sono completi con tutti i pesi. */}
+          {puoGestire && eVasi && (
             <Button type="button" size="lg" variant="outline" disabled={occupato || senzaRete} onClick={() => void cambiaChiusura()}>
               {sessione.conclusa ? 'Riapri' : 'Segna come conclusa'}
             </Button>
           )}
           {puoGestire && !conPesiAltrui && (
             <Button type="button" size="lg" variant="ghost" disabled={occupato || senzaRete} onClick={() => setConfermaElimina(true)}>
-              Elimina sessione
+              Elimina pesata
             </Button>
           )}
         </div>
@@ -240,13 +253,69 @@ function Contenuto({ espId, sessione, dati, config }: {
 
       <Conferma
         aperta={confermaElimina}
-        titolo="Eliminare la sessione?"
+        titolo="Eliminare la pesata?"
         testo="Spariscono anche tutti i suoi campioni e i suoi pesi. Non si può annullare."
-        annulla="Tieni la sessione"
+        annulla="Tieni la pesata"
         conferma="Elimina"
         onAnnulla={() => setConfermaElimina(false)}
         onConferma={() => void elimina()}
       />
+    </div>
+  )
+}
+
+/** La nota della pesata: si legge per intero e, a chi gestisce la pesata, si modifica sul posto. */
+function Nota({ nota, puoModificare, senzaRete, onSalva }: {
+  nota: string | null
+  puoModificare: boolean
+  senzaRete: boolean
+  /** Salva la nota (vuota = nessuna nota). Se non riesce lancia: il testo resta nel campo, con l'errore sotto. */
+  onSalva: (nota: string | null) => Promise<void>
+}) {
+  const id = useId()
+  const [bozza, setBozza] = useState<string | null>(null)
+  const [occupato, setOccupato] = useState(false)
+  const [errore, setErrore] = useState<string | null>(null)
+  if (bozza !== null) {
+    const salva = async () => {
+      if (occupato) return
+      setOccupato(true)
+      setErrore(null)
+      try {
+        await onSalva(bozza.trim() === '' ? null : bozza.trim())
+        setBozza(null)
+      } catch (e) {
+        setErrore(messaggioErrore(e))
+      } finally {
+        setOccupato(false)
+      }
+    }
+    return (
+      <div className="mt-3 flex flex-col gap-2">
+        <Label htmlFor={id}>Nota</Label>
+        <Textarea id={id} value={bozza} onChange={e => setBozza(e.target.value)} autoFocus />
+        {errore && <TestoErrore role="alert" className="text-base">{errore}</TestoErrore>}
+        <div className="flex gap-2">
+          <Button type="button" disabled={occupato || senzaRete} aria-busy={occupato} onClick={() => void salva()}>Salva la nota</Button>
+          <Button type="button" variant="ghost" disabled={occupato} onClick={() => { setBozza(null); setErrore(null) }}>Annulla</Button>
+        </div>
+      </div>
+    )
+  }
+  if (!nota && !puoModificare) return null
+  return (
+    <div className="mt-3 flex flex-col gap-1 rounded-2xl border border-riga bg-foglio px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-label font-medium tracking-wide text-grafite-tenue uppercase">Nota</p>
+        {puoModificare && (
+          <Button type="button" variant="ghost" size="xs" className="-mr-2" onClick={() => setBozza(nota ?? '')}>
+            {nota ? 'Modifica' : 'Aggiungi'}
+          </Button>
+        )}
+      </div>
+      {nota
+        ? <p className="whitespace-pre-line text-base text-grafite">{nota}</p>
+        : <p className="text-base text-grafite-tenue">Nessuna nota.</p>}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { ChevronRight, TriangleAlert } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { controllaReplica, mlTampone, rwc, sostanzaSecca } from '@/domain/pesatura/calcoli'
+import { mediePerTrattamento } from '@/domain/pesatura/medie'
 import { etichettaCampione, letteraReplica, repliche } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
 import type { Pianta } from '@/domain/tipi'
@@ -113,6 +114,44 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
 export function RiepilogoSessione(props: RiepilogoSessioneProps) {
   const righe = righeDi(props)
   if (righe.length === 0) return <p className="text-grafite-tenue">Questa sessione non ha campioni.</p>
+  return (
+    <div className="flex flex-col gap-3">
+      <MediePerTrattamento {...props} />
+      <Righe righe={righe} apri={props.apri} />
+    </div>
+  )
+}
+
+/**
+ * La media per trattamento dell'RWC o della % di sostanza secca, in cima al riepilogo. Ogni pianta conta una volta (la
+ * media delle sue repliche). Non compare per gli altri tipi né finché nessuna pianta ha il valore.
+ */
+function MediePerTrattamento({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSessioneProps) {
+  const medie = mediePerTrattamento(sessione, campioni, pesi, piante)
+  if (medie.length === 0) return null
+  const nome = sessione.tipo === 'rwc' ? 'RWC' : 'Sostanza secca'
+  return (
+    <section aria-label={`${nome} medio per trattamento`} className="overflow-hidden rounded-2xl border border-inchiostro bg-inchiostro-velato">
+      <h3 className="px-4 pt-3 pb-1.5 text-label font-semibold tracking-wide text-inchiostro uppercase">Media per trattamento</h3>
+      <ul>
+        {medie.map(m => (
+          <li key={m.trattamentoId} className="flex items-baseline justify-between gap-3 border-t border-riga px-4 py-2.5">
+            <span className="flex min-w-0 flex-col">
+              <span className="font-semibold text-grafite">{trattamenti.get(m.trattamentoId) ?? '—'}</span>
+              <span className="text-sm text-grafite-tenue">{m.n === 1 ? '1 pianta' : `${m.n} piante`}</span>
+            </span>
+            <span className="font-mono text-title tabular-nums text-grafite">
+              <span className="sr-only">{nome} </span>{numero(m.media, ' %')}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function Righe({ righe, apri }: { righe: Riga[]; apri: RiepilogoSessioneProps['apri'] }) {
+  const props = { apri }
   return (
     <ul className="rounded-2xl border border-riga bg-foglio">
       {righe.map(r => {

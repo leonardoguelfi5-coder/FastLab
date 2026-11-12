@@ -4,16 +4,15 @@ vi.mock('@/lib/supabase', () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }))
 
 import { supabase } from '@/lib/supabase'
 import { simulaSupabase } from '@/test/supabase-mock'
-import type { AnalisiPesatura, CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
+import type { CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
 import { ELEMENTO_NON_TROVATO, ePesoGiaInserito, messaggioErrore, PESO_GIA_INSERITO } from '@/lib/errori'
 import {
-  aggiornaSessione, creaSessione, eliminaPeso, eliminaSessione, listaAnalisi, listaPesatura, salvaAnalisi, salvaCampioni, salvaPeso,
+  aggiornaSessione, creaSessione, eliminaPeso, eliminaSessione, listaPesatura, salvaCampioni, salvaPeso,
 } from './pesatura'
 
 const impostazioni = { repliche: 1, rapportoTampone: null, sensore: null }
-const analisi: AnalisiPesatura = { id: 'a1', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni, archiviata: false }
 const sessione: SessionePesatura = {
-  id: 's1', esperimento_id: 'E', analisi_id: 'a1', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni,
+  id: 's1', esperimento_id: 'E', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni,
   data: '2026-11-11', nota: null, conclusa: false,
 }
 const campione: CampionePesatura = { id: 'c1', sessione_id: 's1', pianta_id: 'p1', nome: null, substrato: null, ordine: 1 }
@@ -47,57 +46,17 @@ const rigaSessione = (i: number) => ({ ...sessione, id: `s${i}`, creato_da: 'u1'
 const rigaCampione = (i: number) => ({ ...campione, id: `c${i}`, esperimento_id: 'E', creato_il: 'x', aggiornato_il: 'x' })
 const rigaPeso = (i: number) => ({ ...peso, id: `w${i}`, sessione_id: 's1', esperimento_id: 'E', creato_da: 'u1', creato_il: 'x', aggiornato_il: 'x' })
 
-describe('listaAnalisi', () => {
-  it('legge tutte le analisi visibili, ordinate per titolo', async () => {
-    mock.risponde('analisi_pesatura', { data: [{ ...analisi, creato_da: 'u1', creato_il: 'x', aggiornato_il: 'x' }] })
-
-    expect(await listaAnalisi('E')).toEqual([{ ...analisi, creato_da: 'u1' }])
-    expect(mock.di('analisi_pesatura').map(c => [c.metodo, ...c.args])).toEqual([['select', '*'], ['order', 'titolo', { ascending: true }]])
-  })
-
-  it('senza analisi dà un elenco vuoto', async () => {
-    mock.risponde('analisi_pesatura', { data: null })
-    expect(await listaAnalisi('E')).toEqual([])
-  })
-
-  it('lancia l\'errore di Supabase', async () => {
-    const e = { code: '42501', message: 'negato' }
-    mock.risponde('analisi_pesatura', { error: e })
-    await expect(listaAnalisi('E')).rejects.toBe(e)
-  })
-})
-
 describe('impostazioni vuote nel database ({})', () => {
   const predefinite = { repliche: 1, rapportoTampone: null, sensore: null }
 
-  it('analisi e sessioni ricevono le impostazioni predefinite', async () => {
-    mock.risponde('analisi_pesatura', { data: [{ ...analisi, impostazioni: {} }] })
-    expect((await listaAnalisi('E'))[0].impostazioni).toEqual(predefinite)
-
+  it('le sessioni ricevono le impostazioni predefinite', async () => {
     pagineDa({ sessioni_pesatura: [[{ ...rigaSessione(1), impostazioni: {} }], []], campioni_pesatura: [[]], pesi: [[]] })
     expect((await listaPesatura('E')).sessioni[0].impostazioni).toEqual(predefinite)
   })
 
   it('i campi presenti restano, quelli mancanti si completano', async () => {
-    mock.risponde('analisi_pesatura', { data: [{ ...analisi, impostazioni: { repliche: 3 } }] })
-    expect((await listaAnalisi('E'))[0].impostazioni).toEqual({ ...predefinite, repliche: 3 })
-  })
-})
-
-describe('salvaAnalisi', () => {
-  it('upsert per id, senza creato_da', async () => {
-    await salvaAnalisi({ ...analisi, creato_da: 'u1' })
-
-    expect(mock.di('analisi_pesatura')).toEqual([{
-      sorgente: 'analisi_pesatura', metodo: 'upsert',
-      args: [{ id: 'a1', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni, archiviata: false }, { onConflict: 'id' }],
-    }])
-  })
-
-  it('lancia l\'errore di Supabase', async () => {
-    const e = { code: '23514', message: 'tipo' }
-    mock.risponde('analisi_pesatura', { error: e })
-    await expect(salvaAnalisi(analisi)).rejects.toBe(e)
+    pagineDa({ sessioni_pesatura: [[{ ...rigaSessione(1), impostazioni: { repliche: 3 } }], []], campioni_pesatura: [[]], pesi: [[]] })
+    expect((await listaPesatura('E')).sessioni[0].impostazioni).toEqual({ ...predefinite, repliche: 3 })
   })
 })
 
@@ -164,7 +123,7 @@ describe('creaSessione', () => {
     expect(mock.chiamate.filter(c => c.metodo === 'upsert').map(c => c.sorgente)).toEqual(['sessioni_pesatura', 'campioni_pesatura'])
     expect(mock.di('sessioni_pesatura')[0].args).toEqual([
       {
-        id: 's1', esperimento_id: 'E', analisi_id: 'a1', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni,
+        id: 's1', esperimento_id: 'E', titolo: 'RWC foglie', tipo: 'rwc', unita: 'g', impostazioni,
         data: '2026-11-11', nota: null, conclusa: false,
       },
       { onConflict: 'id' },

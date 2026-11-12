@@ -19,7 +19,7 @@ const config = {
   esperimento: { id: 'E', nome: 'Prova', data_inizio: null, note: '', stato: 'in_corso' }, fattori: [], trattamenti: [], piante: [], parametri: [], strumenti: [],
 } as ConfigEsperimento
 const sessione = (extra: Partial<SessionePesatura>): SessionePesatura => ({
-  id: 'S', esperimento_id: 'E', analisi_id: 'a1', titolo: 'Curve vasi', tipo: 'vasi', unita: 'g',
+  id: 'S', esperimento_id: 'E', titolo: 'Curve vasi', tipo: 'vasi', unita: 'g',
   impostazioni: { ...IMPOSTAZIONI_PREDEFINITE, sensore: { tipo: 'tensione', unita: 'kPa' } }, data: '2026-11-11', nota: null, conclusa: false, ...extra,
 })
 const peso = (id: string, tipo: Peso['tipo'], valore: number, lettura: number | null = null): Peso => ({
