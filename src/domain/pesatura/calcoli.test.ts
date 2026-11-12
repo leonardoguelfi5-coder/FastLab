@@ -3,6 +3,7 @@ import {
   controllaAsciugatura,
   controllaReplica,
   inGrammi,
+  inUnita,
   mlTampone,
   percentualeCC,
   pesoAPercentualeCC,
@@ -33,6 +34,18 @@ describe('tampone', () => {
     expect(mlTampone(0.1023, 'g', 10)).toBeCloseTo(1.023)
     expect(mlTampone(10, 'mg', 10)).toBeCloseTo(0.1)
     expect(mlTampone(1, 'g', null)).toBeNull()
+  })
+  it('kg si converte; un\'unità scritta dall\'utente no', () => {
+    expect(inGrammi(0.25, 'kg')).toBe(250)
+    expect(inGrammi(3, 'µg')).toBeNull()
+    expect(mlTampone(0.002, 'kg', 10)).toBeCloseTo(20)
+    expect(mlTampone(5, 'lb', 10)).toBeNull()
+  })
+  it('da un\'unità all\'altra; con un\'unità sconosciuta il valore resta com\'è', () => {
+    expect(inUnita(1.5, 'g', 'mg')).toBeCloseTo(1500)
+    expect(inUnita(2500, 'g', 'kg')).toBeCloseTo(2.5)
+    expect(inUnita(7, 'g', 'g')).toBe(7)
+    expect(inUnita(7, 'lb', 'g')).toBe(7)
   })
 })
 

@@ -13,29 +13,24 @@ vi.mock('@/api/inviti', () => ({
   sonoAdmin: vi.fn(), listaInviti: vi.fn(), creaInvito: vi.fn(), revocaInvito: vi.fn(),
 }))
 vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
-vi.mock('@/api/pesatura', () => ({
-  listaAnalisi: vi.fn(), salvaAnalisi: vi.fn(), listaPesatura: vi.fn(),
-}))
+vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { sonoAdmin } from '@/api/inviti'
 import { ruoloIn } from '@/api/persone'
-import { listaAnalisi, listaPesatura } from '@/api/pesatura'
-import { IMPOSTAZIONI_PREDEFINITE, type AnalisiPesatura, type CampionePesatura, type Peso, type SessionePesatura } from '@/domain/pesatura/tipi'
+import { listaPesatura } from '@/api/pesatura'
+import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from '@/domain/pesatura/tipi'
 import { Pesatura } from './Pesatura'
 
-const analisi = (id: string, extra: Partial<AnalisiPesatura> = {}): AnalisiPesatura => ({
-  id, titolo: `Analisi ${id}`, tipo: 'aliquota', unita: 'g', impostazioni: IMPOSTAZIONI_PREDEFINITE, archiviata: false, creato_da: 'io', ...extra,
-})
 const sessione = (id: string, extra: Partial<SessionePesatura> = {}): SessionePesatura => ({
-  id, esperimento_id: 'E', analisi_id: 'a1', titolo: `Sessione ${id}`, tipo: 'aliquota', unita: 'g', impostazioni: IMPOSTAZIONI_PREDEFINITE,
+  id, esperimento_id: 'E', titolo: `Pesata ${id}`, tipo: 'aliquota', unita: 'g', impostazioni: IMPOSTAZIONI_PREDEFINITE,
   data: '2026-11-01', nota: null, conclusa: false, ...extra,
 })
 const campione = (id: string, sessioneId: string, ordine: number): CampionePesatura => ({
   id, sessione_id: sessioneId, pianta_id: null, nome: id, substrato: null, ordine,
 })
-const peso = (id: string, campioneId: string): Peso => ({
-  id, campione_id: campioneId, replica: 1, tipo: 'aliquota', valore: 0.1, lettura: null, misurato_il: '2026-11-01T10:00:00Z',
+const peso = (id: string, campioneId: string, tipo: Peso['tipo'] = 'aliquota'): Peso => ({
+  id, campione_id: campioneId, replica: 1, tipo, valore: 0.1, lettura: null, misurato_il: '2026-11-01T10:00:00Z',
 })
 
 function Posizione() {
@@ -64,7 +59,6 @@ beforeEach(() => {
   vi.mocked(useSessione).mockReturnValue({ sessione: { user: { id: 'io', email: 'giulia@example.it' } } as Session, caricamento: false })
   vi.mocked(sonoAdmin).mockResolvedValue(false)
   vi.mocked(ruoloIn).mockResolvedValue('proprietario')
-  vi.mocked(listaAnalisi).mockResolvedValue([])
   vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [], campioni: [], pesi: [] })
 })
 
@@ -77,101 +71,101 @@ describe('Pesatura', () => {
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/laboratorio')
   })
 
-  it('elenca le analisi non archiviate con il tipo accanto e porta alla nuova sessione', async () => {
-    vi.mocked(listaAnalisi).mockResolvedValue([
-      analisi('a1', { titolo: 'Antociani foglie', tipo: 'aliquota' }),
-      analisi('a2', { titolo: 'Vecchia', archiviata: true }),
-    ])
-    const utente = apri()
-    const voce = await screen.findByRole('link', { name: 'Antociani foglie · Aliquota' })
-    expect(screen.queryByRole('link', { name: /Vecchia/ })).not.toBeInTheDocument()
-    await utente.click(voce)
-    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/pesatura/nuova?analisi=a1')
+  it('Nuova pesata porta al modulo vuoto', async () => {
+    const u = apri()
+    await u.click(await screen.findByRole('link', { name: 'Nuova pesata' }))
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/pesatura/nuova')
   })
 
-  it('mette le analisi archiviate in una sezione comprimibile', async () => {
-    vi.mocked(listaAnalisi).mockResolvedValue([analisi('a2', { titolo: 'Vecchia', archiviata: true })])
-    const utente = apri()
-    const bottone = await screen.findByRole('button', { name: /Archiviate/ })
-    expect(bottone).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('link', { name: 'Vecchia · Aliquota' })).not.toBeInTheDocument()
-    await utente.click(bottone)
-    expect(await screen.findByRole('link', { name: 'Vecchia · Aliquota' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura/analisi?id=a2')
-  })
-
-  it('ha "Nuova analisi" che porta all\'editor, e un link Modifica per ogni analisi', async () => {
-    vi.mocked(listaAnalisi).mockResolvedValue([analisi('a1', { titolo: 'Antociani foglie' })])
-    const utente = apri()
-    expect(await screen.findByRole('link', { name: 'Modifica' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura/analisi?id=a1')
-    await utente.click(screen.getByRole('link', { name: 'Nuova analisi' }))
-    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/pesatura/analisi')
-  })
-
-  it('a un lettore non mostra "Nuova analisi" né Modifica', async () => {
-    vi.mocked(ruoloIn).mockResolvedValue('lettore')
-    vi.mocked(listaAnalisi).mockResolvedValue([analisi('a1', { titolo: 'Antociani foglie' })])
+  it('senza pesate lo dice', async () => {
     apri()
-    await screen.findByText('Antociani foglie · Aliquota')
-    await waitFor(() => expect(screen.queryByRole('link', { name: 'Nuova analisi' })).not.toBeInTheDocument())
-    expect(screen.queryByRole('link', { name: 'Modifica' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Nessuna pesata per ora.')).toBeInTheDocument()
   })
 
-  it('l\'archivio ha le sessioni dalla più recente, con data, titolo e avanzamento', async () => {
+  it('divide le pesate in corso da quelle completate, dalla più recente', async () => {
     vi.mocked(listaPesatura).mockResolvedValue({
       sessioni: [
-        sessione('s1', { titolo: 'Vecchia sessione', data: '2026-10-01' }),
-        sessione('s2', { titolo: 'Sessione a metà', data: '2026-11-05' }),
-        sessione('s3', { titolo: 'Sessione finita', data: '2026-11-02' }),
-        sessione('s4', { titolo: 'Sessione chiusa', data: '2026-10-20', conclusa: true }),
+        sessione('vecchia', { data: '2026-10-28' }),
+        sessione('nuova', { data: '2026-11-05' }),
+        sessione('aperta', { data: '2026-11-03' }),
       ],
-      campioni: [
-        campione('c1', 's1', 1),
-        campione('c2', 's2', 1), campione('c3', 's2', 2), campione('c4', 's2', 3),
-        campione('c5', 's3', 1),
-        campione('c6', 's4', 1),
-      ],
-      pesi: [peso('p1', 'c2'), peso('p2', 'c3'), peso('p3', 'c5'), peso('p4', 'c6')],
+      campioni: [campione('c1', 'vecchia', 1), campione('c2', 'nuova', 1), campione('c3', 'aperta', 1)],
+      pesi: [peso('1', 'c1'), peso('2', 'c2')],
     })
     apri()
-    const elenco = await screen.findByRole('list', { name: 'Archivio' })
-    const voci = within(elenco).getAllByRole('link')
-    expect(voci).toHaveLength(4)
-    expect(voci[0]).toHaveTextContent('05/11/2026')
-    expect(voci[0]).toHaveTextContent('Sessione a metà')
-    expect(voci[0]).toHaveTextContent('2/3 pesati')
-    expect(voci[0]).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura/s2')
-    expect(voci[1]).toHaveTextContent('Sessione finita')
-    expect(voci[1]).toHaveTextContent('Completa')
-    expect(voci[2]).toHaveTextContent('Sessione chiusa')
-    expect(voci[2]).toHaveTextContent('Conclusa')
-    expect(voci[3]).toHaveTextContent('Vecchia sessione')
-    expect(voci[3]).toHaveTextContent('0/1 pesati')
+    const inCorso = within(await screen.findByRole('list', { name: /In corso/ }))
+    const completate = within(screen.getByRole('list', { name: /Completate/ }))
+    expect(inCorso.getAllByRole('link', { name: /Pesata/ }).map(l => l.textContent)).toEqual([expect.stringContaining('Pesata aperta')])
+    expect(completate.getAllByRole('link', { name: /Pesata/ }).map(l => l.textContent)).toEqual([
+      expect.stringContaining('Pesata nuova'), expect.stringContaining('Pesata vecchia'),
+    ])
+    expect(completate.getAllByText(/Completa · 1 peso/)).toHaveLength(2)
   })
 
-  it('i vasi non contano l\'asciugatura nei "pesati"', async () => {
+  it('una pesata in corso mostra le sue fasi: fatte, quella da fare e le successive', async () => {
     vi.mocked(listaPesatura).mockResolvedValue({
-      sessioni: [sessione('s1', { tipo: 'vasi' })],
-      campioni: [campione('c1', 's1', 1), campione('c2', 's1', 2)],
-      pesi: [
-        { ...peso('p1', 'c1'), tipo: 'secco' },
-        { ...peso('p2', 'c1'), tipo: 'capacita_campo' },
-        { ...peso('p3', 'c1'), tipo: 'asciugatura', lettura: 30 },
-      ],
+      sessioni: [sessione('R', { tipo: 'rwc', titolo: 'RWC foglie' })],
+      campioni: [campione('c1', 'R', 1), campione('c2', 'R', 2)],
+      pesi: [peso('1', 'c1', 'fresco'), peso('2', 'c2', 'fresco'), peso('3', 'c1', 'turgido')],
     })
     apri()
-    expect(await screen.findByText('2/4 pesati')).toBeInTheDocument()
+    const riga = (await screen.findByText('RWC foglie')).closest('a') as HTMLElement
+    expect(riga).toHaveTextContent('Fresco')
+    expect(riga).toHaveTextContent('Turgido1/2')
+    expect(riga).toHaveTextContent('Secco0/2')
+    expect(riga).not.toHaveTextContent('Fresco2/2')
+  })
+
+  it('sotto il titolo l\'inizio della nota (la prima riga)', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({
+      sessioni: [sessione('S', { nota: 'Dischetti da 1 cm\nstufa a 70 °C' })], campioni: [], pesi: [],
+    })
+    apri()
+    expect(await screen.findByText('Dischetti da 1 cm')).toBeInTheDocument()
+    expect(screen.queryByText(/stufa/)).not.toBeInTheDocument()
+  })
+
+  it('una taratura dei vasi resta in corso finché non è segnata conclusa', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({
+      sessioni: [sessione('V1', { tipo: 'vasi', titolo: 'Taratura A' }), sessione('V2', { tipo: 'vasi', titolo: 'Taratura B', conclusa: true })],
+      campioni: [], pesi: [],
+    })
+    apri()
+    expect(within(await screen.findByRole('list', { name: /In corso/ })).getByText('Taratura A')).toBeInTheDocument()
+    const completate = within(screen.getByRole('list', { name: /Completate/ }))
+    expect(completate.getByText('Taratura B')).toBeInTheDocument()
+    expect(completate.getByText(/Conclusa/)).toBeInTheDocument()
+  })
+
+  it('la riga apre la pesata, Ripeti apre il modulo compilato come quella', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [sessione('S')], campioni: [], pesi: [] })
+    const u = apri()
+    const ripeti = await screen.findByRole('link', { name: 'Ripeti' })
+    expect(ripeti).toHaveAccessibleDescription('Pesata S')
+    expect(ripeti).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura/nuova?da=S')
+    await u.click(screen.getByText('Pesata S'))
+    expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/pesatura/S')
+  })
+
+  it('un lettore vede le pesate ma non Nuova pesata né Ripeti', async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('lettore')
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [sessione('S')], campioni: [], pesi: [] })
+    apri()
+    expect(await screen.findByText('Pesata S')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Nuova pesata' })).not.toBeInTheDocument())
+    expect(screen.queryByRole('link', { name: 'Ripeti' })).not.toBeInTheDocument()
+  })
+
+  it('un errore di lettura si può riprovare', async () => {
+    vi.mocked(listaPesatura).mockRejectedValueOnce(new Error('Rete assente'))
+    const u = apri()
+    await u.click(await screen.findByRole('button', { name: 'Riprova' }))
+    expect(await screen.findByText('Nessuna pesata per ora.')).toBeInTheDocument()
   })
 
   it('senza rete lo dice', async () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     apri()
     expect(await screen.findByText('Sei senza rete: la Pesatura funziona solo online.')).toBeInTheDocument()
-  })
-
-  it('se la lettura fallisce mostra l\'errore con Riprova', async () => {
-    vi.mocked(listaAnalisi).mockRejectedValue(new Error('boom'))
-    const utente = apri()
-    await utente.click(await screen.findByRole('button', { name: 'Riprova' }))
-    expect(listaAnalisi).toHaveBeenCalledTimes(2)
   })
 })

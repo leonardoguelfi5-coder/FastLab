@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import {
-  IMPOSTAZIONI_PREDEFINITE, type AnalisiPesatura, type CampionePesatura, type ImpostazioniAnalisi, type Peso, type SessionePesatura,
+  IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type ImpostazioniAnalisi, type Peso, type SessionePesatura,
 } from '@/domain/pesatura/tipi'
 import { controllaRighe } from './righe'
 
@@ -24,15 +24,9 @@ const conPredefinite = (i: Partial<ImpostazioniAnalisi> | null | undefined): Imp
 /** Il campo `creato_da` solo se la riga lo ha: nel dominio è facoltativo. */
 const autore = (r: { creato_da?: string | null }) => (r.creato_da ? { creato_da: r.creato_da } : {})
 
-function daRigaAnalisi(r: AnalisiPesatura): AnalisiPesatura {
-  return {
-    id: r.id, titolo: r.titolo, tipo: r.tipo, unita: r.unita, impostazioni: conPredefinite(r.impostazioni), archiviata: r.archiviata, ...autore(r),
-  }
-}
-
 function daRigaSessione(r: SessionePesatura): SessionePesatura {
   return {
-    id: r.id, esperimento_id: r.esperimento_id, analisi_id: r.analisi_id, titolo: r.titolo, tipo: r.tipo, unita: r.unita,
+    id: r.id, esperimento_id: r.esperimento_id, titolo: r.titolo, tipo: r.tipo, unita: r.unita,
     impostazioni: conPredefinite(r.impostazioni), data: r.data, nota: r.nota, conclusa: r.conclusa, ...autore(r),
     ...(r.creato_il ? { creato_il: r.creato_il } : {}),
   }
@@ -47,23 +41,6 @@ function daRigaPeso(r: Peso): Peso {
     id: r.id, campione_id: r.campione_id, replica: r.replica, tipo: r.tipo, valore: Number(r.valore),
     lettura: r.lettura === null ? null : Number(r.lettura), misurato_il: r.misurato_il, ...autore(r),
   }
-}
-
-/** Le analisi che l'utente può vedere (la RLS decide quali), in ordine di titolo. Archiviate comprese: le filtra la pagina. */
-export async function listaAnalisi(espId: string): Promise<AnalisiPesatura[]> {
-  void espId // la firma resta per chi la chiama: le analisi non dipendono dall'esperimento
-  const { data, error } = await supabase.from('analisi_pesatura').select('*').order('titolo', { ascending: true })
-  if (error) throw error
-  return ((data ?? []) as AnalisiPesatura[]).map(daRigaAnalisi)
-}
-
-/** Salva un'analisi (upsert per id: un doppio tocco non la duplica). Mai `creato_da`. */
-export async function salvaAnalisi(a: AnalisiPesatura): Promise<void> {
-  const { error } = await supabase.from('analisi_pesatura').upsert(
-    { id: a.id, titolo: a.titolo, tipo: a.tipo, unita: a.unita, impostazioni: a.impostazioni, archiviata: a.archiviata },
-    { onConflict: 'id' },
-  )
-  if (error) throw error
 }
 
 /**
@@ -112,7 +89,7 @@ function aRigaCampione(espId: string, c: CampionePesatura) {
 export async function creaSessione(s: SessionePesatura, campioni: CampionePesatura[]): Promise<void> {
   const { error } = await supabase.from('sessioni_pesatura').upsert(
     {
-      id: s.id, esperimento_id: s.esperimento_id, analisi_id: s.analisi_id, titolo: s.titolo, tipo: s.tipo, unita: s.unita,
+      id: s.id, esperimento_id: s.esperimento_id, titolo: s.titolo, tipo: s.tipo, unita: s.unita,
       impostazioni: s.impostazioni, data: s.data, nota: s.nota, conclusa: s.conclusa,
     },
     { onConflict: 'id' },
