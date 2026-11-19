@@ -93,11 +93,17 @@ describe('adattaCurva', () => {
     expect(c!.max).toBe(61.2)
   })
 
-  it('potenza: punti esatti y = 200·x^−0,5', () => {
+  it('potenza: punti esatti y = 200·x^−0,5 (nessun passo migliora più: è il minimo e la curva c\'è)', () => {
     const c = adattaCurva(punti([4, 16, 25, 100], (x) => 200 * x ** -0.5), 'potenza')
     expect(c!.a).toBeCloseTo(200, 6)
     expect(c!.b).toBeCloseTo(-0.5, 8)
     expect(c!.r2).toBeCloseTo(1, 9)
+  })
+
+  it('potenza: un adattamento che non converge non dà curva', () => {
+    // dati a gradino: a e b scappano verso l'infinito e la somma dei quadrati continua a calare
+    expect(adattaCurva(coppie([10, 11, 12], [100, 0.01, 0.01]), 'potenza')).toBeNull()
+    expect(adattaCurva(coppie([10, 20, 30, 40], [100, 0.5, -0.5, 0.2]), 'potenza')).toBeNull()
   })
 
   it('potenza: scarta le letture a zero', () => {
@@ -296,6 +302,15 @@ describe('curvePerSubstrato', () => {
     expect(m.n).toBe(11)
     circa(letturaAPercentuale(m, 100), 25.3297)
     circa(pccDaLettura(m, 40), 81.4819)
+  })
+
+  it('un vaso il cui adattamento non converge non ha curva e la media usa gli altri', () => {
+    const gradino = vaso('d', 'HC', { punti: coppie([10, 20, 30, 40], [100, 0.5, -0.5, 0.2]) })
+    const [g] = curvePerSubstrato([vasoA(), gradino], 'potenza')
+    expect(g.curve[1]).toBeNull()
+    circa(g.media!.a, 649.1709)
+    circa(g.media!.b, -0.603303)
+    expect(g.media!.n).toBe(5)
   })
 
   it('un vaso con 2 h distinte non ha curva e la media usa gli altri', () => {

@@ -112,11 +112,18 @@ const sommaQuadrati = (xs: number[], ys: number[], a: number, b: number): number
 
 const ITERAZIONI_MASSIME = 200
 const TOLLERANZA = 1e-12
+const LAMBDA_MASSIMO = 1e10
+
+const finito = (a: number, b: number, ss: number): { a: number; b: number; ss: number } | null =>
+  Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(ss) ? { a, b, ss } : null
 
 /**
  * Levenberg–Marquardt su (a, b) per y = a·x^b, con x > 0: a ogni passo risolve (JᵀJ + λ·diag(JᵀJ))·δ = Jᵀr. Un passo che
- * riduce la somma dei quadrati si accetta e λ cala; uno che non la riduce si scarta e λ cresce. Si ferma quando la somma
- * cala di meno di `TOLLERANZA` in proporzione. null se il risultato non è un numero finito.
+ * riduce la somma dei quadrati si accetta e λ cala; uno che non la riduce si scarta e λ cresce. Converge quando la somma
+ * cala di meno di `TOLLERANZA` in proporzione, oppure quando nemmeno un passo cortissimo la riduce più (λ oltre
+ * `LAMBDA_MASSIMO`: è il minimo, alla precisione dei calcoli, come con i punti esatti). Se dopo `ITERAZIONI_MASSIME`
+ * passi la somma sta ancora calando non converge (con dati a gradino a e b scappano verso l'infinito): null, come per un
+ * risultato non finito.
  */
 function levenbergMarquardt(xs: number[], ys: number[], a0: number, b0: number): { a: number; b: number; ss: number } | null {
   let a = a0
@@ -154,12 +161,13 @@ function levenbergMarquardt(xs: number[], ys: number[], a0: number, b0: number):
       b += db
       ss = nuova
       lambda /= 10
-      if (calo < TOLLERANZA) break
+      if (calo < TOLLERANZA) return finito(a, b, ss)
     } else {
       lambda *= 10
+      if (lambda > LAMBDA_MASSIMO) return finito(a, b, ss)
     }
   }
-  return Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(ss) ? { a, b, ss } : null
+  return null
 }
 
 function adattaPotenza(punti: PuntoCurva[]): Curva | null {
