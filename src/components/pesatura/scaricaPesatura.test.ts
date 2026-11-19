@@ -82,8 +82,8 @@ describe('scaricaGraficoPng', () => {
 
   it('consegna il PNG con un nome pulito', async () => {
     const { gruppi, sensore } = await gruppiEsito()
-    const nome = await scaricaGraficoPng({ gruppi, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
-    expect(nome).toBe('Pesatura_Curve-vasi_curve_2026-11-12.png')
+    const nome = await scaricaGraficoPng({ gruppo: { ...gruppi[0], substrato: 'Torba / fine' }, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
+    expect(nome).toBe('Pesatura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
     const [blob, nomeFile] = vi.mocked(consegna).mock.calls[0]
     expect(nomeFile).toBe(nome)
     expect((blob as Blob).type).toBe('image/png')
@@ -92,7 +92,7 @@ describe('scaricaGraficoPng', () => {
   it('se il browser non disegna il grafico lancia un errore e non consegna', async () => {
     vi.mocked(svgInPng).mockResolvedValue(null)
     const { gruppi, sensore } = await gruppiEsito()
-    await expect(scaricaGraficoPng({ gruppi, sensore, titolo: 'Curve vasi' })).rejects.toEqual(new ErroreApp(GRAFICO_NON_DISEGNATO))
+    await expect(scaricaGraficoPng({ gruppo: gruppi[0], sensore, titolo: 'Curve vasi' })).rejects.toEqual(new ErroreApp(GRAFICO_NON_DISEGNATO))
     expect(consegna).not.toHaveBeenCalled()
   })
 })

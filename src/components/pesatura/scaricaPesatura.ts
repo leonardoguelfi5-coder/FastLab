@@ -89,13 +89,13 @@ export async function scaricaPesatura({ sessioni, dati, config, oggi = oggiLocal
   return esito
 }
 
-/** Scarica il grafico delle curve come PNG. Se il browser non lo disegna lancia un `ErroreApp` che la pagina mostra. */
+/** Scarica il grafico delle curve di un substrato come PNG. Se il browser non lo disegna lancia un `ErroreApp` che la pagina mostra. */
 export async function scaricaGraficoPng(
-  { gruppi, sensore, titolo, oggi = oggiLocale() }: { gruppi: CurveSubstrato[]; sensore: Sensore; titolo: string; oggi?: string },
+  { gruppo, sensore, titolo, oggi = oggiLocale() }: { gruppo: CurveSubstrato; sensore: Sensore; titolo: string; oggi?: string },
 ): Promise<string> {
-  const png = gruppi.length > 0 ? await pngDelleCurve(gruppi[0], sensore, titolo) : null
+  const png = await pngDelleCurve(gruppo, sensore, `${titolo} · ${gruppo.substrato}`)
   if (png === null) throw new ErroreApp(GRAFICO_NON_DISEGNATO)
-  const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_curve_${oggi}.png`
+  const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_curve_${nomeSicuro(gruppo.substrato) || 'substrato'}_${oggi}.png`
   consegna(new Blob([png as BlobPart], { type: 'image/png' }), nomeFile)
   return nomeFile
 }

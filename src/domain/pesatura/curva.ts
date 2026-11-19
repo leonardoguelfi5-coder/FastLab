@@ -235,7 +235,7 @@ const cifre = (n: number, decimali: number): string => Math.abs(n).toFixed(decim
 const negativo = (n: number, decimali: number): boolean => Number(n.toFixed(decimali)) < 0
 
 /** Un numero con `decimali` cifre, la virgola e il segno meno se serve. */
-const conSegno = (n: number, decimali: number): string => `${negativo(n, decimali) ? MENO : ''}${cifre(n, decimali)}`
+export const conSegno = (n: number, decimali: number): string => `${negativo(n, decimali) ? MENO : ''}${cifre(n, decimali)}`
 
 /**
  * Per esempio `WC = 649,17 · h^−0,6033  (h in hPa; R² 0,966, n 5)` per la potenza, con a a 2 decimali, b a 4 ed R² a 3;

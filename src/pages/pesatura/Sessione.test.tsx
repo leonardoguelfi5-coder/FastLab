@@ -301,7 +301,21 @@ describe('Sessione con i vasi', () => {
     expect(screen.getByRole('img', { name: /Curve di ritenzione/ })).toBeInTheDocument()
     expect(screen.getByText(/WC = .*h in kPa/)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Peso dei vasi' })).toBeInTheDocument()
-    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Torba' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Parametri delle curve del substrato Torba' })).toBeInTheDocument()
+  })
+
+  it('con due substrati mostra due grafici e due tabelle, e ogni PNG scarica il suo', async () => {
+    const tre = [...vasi, campione('v3', 3, { nome: 'V3', substrato: 'Cocco' })]
+    dati([vasiSessione], tre, [...pesiVasi, peso('s3', 'v3', 1, 'secco', 100), peso('c3', 'v3', 1, 'capacita_campo', 250, { lettura: 2 })])
+    const u = apri()
+    await titolo()
+    expect(screen.getAllByRole('img', { name: /Curve di ritenzione/ })).toHaveLength(2)
+    expect(screen.getAllByRole('table', { name: /^Parametri delle curve/ })).toHaveLength(2)
+    expect(screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent).slice(0, 2)).toEqual(['Torba', 'Cocco'])
+    await u.click(screen.getAllByRole('button', { name: 'Scarica grafico (PNG)' })[1])
+    await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0].gruppo.substrato).toBe('Cocco')
   })
 
   it('i vasi non aspettano la configurazione', async () => {
@@ -316,7 +330,7 @@ describe('Sessione con i vasi', () => {
     await titolo()
     await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG)' }))
     await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', sensore: { unita: 'kPa' } })
+    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', gruppo: { substrato: 'Torba' }, sensore: { unita: 'kPa' } })
   })
 
   it('il proprietario segna conclusa una taratura', async () => {
