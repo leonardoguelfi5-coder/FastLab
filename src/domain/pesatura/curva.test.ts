@@ -170,10 +170,10 @@ describe('pccDaLettura, letturaAPercentuale e modelloPer', () => {
 describe('mediaDeiParametri', () => {
   const c = (a: number, b: number, r2: number | null, n: number, min: number, max: number): Curva => ({ modello: 'potenza', a, b, r2, n, min, max })
 
-  it('a, b e R² medi, n sommati, min e max estremi', () => {
+  it('a media geometrica, b e R² medi, n sommati, min e max estremi', () => {
     const m = mediaDeiParametri([c(600, -0.6, 0.9, 5, 20, 60), c(200, -0.2, 0.8, 6, 10, 70)])
     expect(m!.modello).toBe('potenza')
-    expect(m!.a).toBeCloseTo(400)
+    expect(m!.a).toBeCloseTo(Math.sqrt(600 * 200))
     expect(m!.b).toBeCloseTo(-0.4)
     expect(m!.r2).toBeCloseTo(0.85)
     expect(m!.n).toBe(11)
@@ -184,6 +184,17 @@ describe('mediaDeiParametri', () => {
   it('R² medio dei soli R² che ci sono; null se non ce n\'è nessuno', () => {
     expect(mediaDeiParametri([c(600, -0.6, 0.9, 5, 20, 60), c(200, -0.2, null, 6, 10, 70)])!.r2).toBeCloseTo(0.9)
     expect(mediaDeiParametri([c(600, -0.6, null, 5, 20, 60)])!.r2).toBeNull()
+  })
+
+  it('i vasi A–D della tesi: WC = 362 · h^−0,4464, con il 60 % CC a 56 hPa e il 50 % a 84 hPa', () => {
+    const m = mediaDeiParametri([
+      c(660.83, -0.6093, 0.966, 6, 17, 61), c(201.8, -0.2926, 0.965, 6, 9.9, 64),
+      c(332.47, -0.4088, 0.959, 6, 17.8, 50), c(386.85, -0.4752, 0.978, 6, 17.1, 51),
+    ])!
+    expect(m.a).toBeCloseTo(361.89, 2)
+    expect(m.b).toBeCloseTo(-0.446475, 6)
+    expect(letturaAPercentuale(m, 60)).toBeCloseTo(55.97, 2)
+    expect(letturaAPercentuale(m, 50)).toBeCloseTo(84.2, 1)
   })
 
   it('senza curve è null', () => {
@@ -292,16 +303,16 @@ describe('curvePerSubstrato', () => {
     circa(g.curve[1]!.a, 202.2677)
   })
 
-  it('potenza: la curva media è la media dei parametri dei vasi', () => {
+  it('potenza: la curva media è la media in scala logaritmica delle curve dei vasi', () => {
     const [g] = curvePerSubstrato([vasoA(), vasoB()], 'potenza')
     const m = g.media!
     expect(m.modello).toBe('potenza')
-    circa(m.a, 425.7193)
+    circa(m.a, 362.3621)
     circa(m.b, -0.448212)
     circa(m.r2, 0.966055)
     expect(m.n).toBe(11)
-    circa(letturaAPercentuale(m, 100), 25.3297)
-    circa(pccDaLettura(m, 40), 81.4819)
+    circa(letturaAPercentuale(m, 100), 17.6806)
+    circa(pccDaLettura(m, 40), 69.3555)
   })
 
   it('un vaso il cui adattamento non converge non ha curva e la media usa gli altri', () => {
@@ -350,11 +361,11 @@ describe('parametriDelSubstrato', () => {
     expect(a.n).toBe(5)
     circa(a.letturaCCCurva, 22.2085)
     expect(a.letturaCCMisurata).toBe(23.7)
-    circa(media.a, 425.7193)
+    circa(media.a, 362.3621)
     circa(media.b, -0.448212)
     circa(media.r2, 0.966055)
     expect(media.n).toBe(11)
-    circa(media.letturaCCCurva, 25.3297)
+    circa(media.letturaCCCurva, 17.6806)
     expect(media.letturaCCMisurata).toBeNull()
   })
 

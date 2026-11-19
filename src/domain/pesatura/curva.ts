@@ -186,7 +186,8 @@ function adattaPotenza(punti: PuntoCurva[]): Curva | null {
   const partenza = retta(positivi.map((p) => Math.log(p.h)), positivi.map((p) => Math.log(p.y)))
   if (partenza === null) return null
   const finale = levenbergMarquardt(hs, ys, Math.exp(partenza.a), partenza.b)
-  if (finale === null) return null
+  // con a ≤ 0 la curva darebbe WC ≤ 0 a ogni h: non è una curva di ritenzione (e la media geometrica non esisterebbe)
+  if (finale === null || finale.a <= 0) return null
 
   return {
     modello: 'potenza', a: finale.a, b: finale.b, r2: rQuadro(ys, finale.ss), n: validi.length, min: Math.min(...hs), max: Math.max(...hs),
@@ -211,13 +212,17 @@ export function letturaAPercentuale(c: Curva, pcc: number): number | null {
 
 const mediaDi = (valori: number[]): number => valori.reduce((s, v) => s + v, 0) / valori.length
 
-/** La curva media come nella taratura dei vasi: a, b ed R² medi delle curve, n sommati, min e max estremi. */
+/**
+ * La curva media dei vasi, mediata in scala logaritmica: a ogni h, ln WC medio = media(ln a) + media(b)·ln h. Quindi a è
+ * la media geometrica degli a (e^media(ln a)) e b la media dei b; R² è la media degli R², n la somma, min e max gli
+ * estremi. Gli a sono sempre > 0 (`adattaPotenza` scarta le curve con a ≤ 0).
+ */
 export function mediaDeiParametri(curve: Curva[]): Curva | null {
   if (curve.length === 0) return null
   const r2 = curve.flatMap((c) => (c.r2 === null ? [] : [c.r2]))
   return {
     modello: curve[0].modello,
-    a: mediaDi(curve.map((c) => c.a)),
+    a: Math.exp(mediaDi(curve.map((c) => Math.log(c.a)))),
     b: mediaDi(curve.map((c) => c.b)),
     r2: r2.length === 0 ? null : mediaDi(r2),
     n: curve.reduce((s, c) => s + c.n, 0),

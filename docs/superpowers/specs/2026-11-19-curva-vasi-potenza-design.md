@@ -21,8 +21,10 @@ dal tensiometro.
 2. **Modello a legge di potenza** WC = a · h^b per ogni vaso, quando il sensore è un tensiometro. Deciso dall'utente.
 3. **Adattamento con i minimi quadrati non lineari sui valori di WC** (metodo "B", come `curve_fit` di Python). Deciso
    dall'utente. R² = 1 − SSres/SStot calcolato sui valori di WC.
-4. **Curva media del substrato come nel testo**: a medio = media degli a dei vasi, b medio = media dei b, R² = media
-   degli R². Deciso dall'utente (nel testo: a 395, b −0,4464, R² 0,967 sono le medie dei quattro vasi).
+4. **Curva media del substrato in scala logaritmica** (revisione del 2026-11-19, decisa dall'utente con la nuova
+   Figura 5, "log-scale average of pots A–D"): a ogni h, ln WC medio = media(ln a) + media(b)·ln h, quindi
+   a = media geometrica degli a dei vasi (e^media(ln a)), b = media dei b; R² = media degli R². Con i vasi A–D della
+   tesi: WC = 362 · h^−0,4464, 60 % CC a 56 hPa, 50 % a 84 hPa. Prima era la media aritmetica degli a (395).
 5. **Grafico come la Figura 5** (senza soglie): punti misurati, una linea sottile per l'adattamento di ogni vaso, una
    linea spessa per la curva media.
 6. **Tabella dei parametri come la Tabella 4** (senza le colonne delle soglie), nell'app e nell'Excel.
@@ -39,7 +41,7 @@ dal tensiometro.
 
 - Numeri diversi da quelli che darebbe `scipy.optimize.curve_fit` sugli stessi punti: sarebbe un fallimento anche se
   il grafico sembra giusto.
-- Una curva media che non corrisponde alla media dei parametri.
+- Una curva media diversa dalla media in scala logaritmica delle curve dei vasi.
 - Perdere i pesi già salvati: le sessioni esistenti devono continuare ad aprirsi.
 
 ## 5. Approcci considerati per l'adattamento
@@ -68,8 +70,8 @@ dal tensiometro.
   convergenza. Se non converge, il vaso non ha curva (come quando mancano i punti).
 - Uscita per vaso: a, b, R², n, h minimo e massimo misurati, h a CC dalla curva = (100/a)^(1/b), h a CC misurato =
   lettura del peso CC.
-- Curva media per substrato: media di a, di b e di R² dei vasi che hanno una curva; h a CC dalla curva media con la
-  stessa formula; h a CC misurato non c'è ("—").
+- Curva media per substrato, sui vasi che hanno una curva: media geometrica degli a, media dei b e degli R²; h a CC
+  dalla curva media con la stessa formula; h a CC misurato non c'è ("—"). Un adattamento con a ≤ 0 non è una curva.
 
 ### 6.4 Pagina della sessione
 - **Grafico** (`GraficoCurve`), uno per substrato, come la Figura 5: asse x h nell'unità del sensore (lineare, da 0),
