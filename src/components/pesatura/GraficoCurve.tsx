@@ -109,7 +109,8 @@ export function GraficoCurve({ gruppo, sensore, perImmagine = false, titolo = ''
   }
 
   const letture = punti.map(p => ascissa(p.lettura))
-  const asseX = potenza ? tacche(0, Math.max(...letture), 6) : tacche(Math.min(...letture), Math.max(...letture), 6)
+  // l'asse parte da 0 se le letture sono positive (la retta del TDR si legge a partire da lì)
+  const asseX = tacche(Math.min(0, ...letture), Math.max(...letture), 6)
   const asseY = tacche(0, Math.max(100, ...punti.map(p => p.pcc)), 6)
   const xDi = (v: number) => sinistra + ((v - asseX.min) / (asseX.max - asseX.min)) * (destra - sinistra)
   const yDi = (v: number) => basso - ((v - asseY.min) / (asseY.max - asseY.min)) * (basso - alto)

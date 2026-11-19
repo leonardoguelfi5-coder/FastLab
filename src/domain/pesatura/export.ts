@@ -6,14 +6,14 @@ import {
 } from '@/domain/export/fogli'
 import type { ConfigEsperimento, Fattore, Pianta, Trattamento } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
-import { arrotondaDecimali, decimaliMassimi } from '@/lib/numeri'
+import { arrotondaCifre, arrotondaDecimali, decimaliMassimi } from '@/lib/numeri'
 import {
   arrotondato, differenzaPesi, inUnita, mlTamponeCalcolato, percentualeCCCalcolata, precisioneDeiPesi, rwcCalcolato,
   sostanzaSeccaCalcolata,
 } from './calcoli'
 import {
-  consultaPerCC, curvePerSubstrato, equazione, intestazioniLetturaCC, modelloPer, parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
-  type CurveSubstrato, type Vaso,
+  consultaPerCC, curvePerSubstrato, decimaliDeficit, decimaliLetturaTarget, deficitInMl, equazione, intestazioniLetturaCC, modelloPer,
+  parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, sogliaDelSubstrato, vasiDaPesi, type CurveSubstrato, type Vaso,
 } from './curva'
 import { etichettaCampione, letteraReplica, repliche } from './sequenza'
 import { NOMI_TIPO, type CampionePesatura, type Peso, type Sensore, type SessionePesatura, type TipoPeso } from './tipi'
@@ -197,17 +197,22 @@ function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
   return foglio('Punti', 'dati', colonne, righe)
 }
 
-/** Come la Tabella 4 dell'app: a 2 decimali, b 4, R² 3, h 1. Numeri, non testo: Excel li mostra da sé. */
+/**
+ * Come la Tabella 4 dell'app: a 2 decimali, b 4, R² 3, h 1; nel TDR m (è b) e q (è a) a 4 cifre significative.
+ * Numeri, non testo: Excel li mostra da sé.
+ */
 function foglioParametri(gruppi: CurveSubstrato[], sensore: Sensore): Foglio {
   const lettura = intestazioniLetturaCC(sensore)
+  const retta = sensore.tipo === 'tdr'
   const colonne: ColonnaGrezza[] = [
     { titolo: 'Substrato', tipo: 'testo' }, { titolo: 'Vaso', tipo: 'testo' },
-    { titolo: 'a', tipo: 'numero' }, { titolo: 'b', tipo: 'numero' }, { titolo: 'R²', tipo: 'numero' },
+    { titolo: retta ? 'm' : 'a', tipo: 'numero' }, { titolo: retta ? 'q' : 'b', tipo: 'numero' }, { titolo: 'R²', tipo: 'numero' },
     { titolo: lettura.curva, tipo: 'numero' }, { titolo: lettura.misurato, tipo: 'numero' }, { titolo: 'n', tipo: 'numero' },
   ]
   const tondo = (x: number | null, decimali: number): number | null => (x === null || !Number.isFinite(x) ? null : arrotondaDecimali(x, decimali))
+  const cifre4 = (x: number | null): number | null => (x === null || !Number.isFinite(x) ? null : arrotondaCifre(x, 4))
   const righe = gruppi.flatMap(g => parametriDelSubstrato(g).map((r): Cella[] => [
-    g.substrato, r.nome, tondo(r.a, 2), tondo(r.b, 4), tondo(r.r2, 3), tondo(r.letturaCCCurva, 1), tondo(r.letturaCCMisurata, 1), r.n,
+    g.substrato, r.nome, retta ? cifre4(r.b) : tondo(r.a, 2), retta ? cifre4(r.a) : tondo(r.b, 4), tondo(r.r2, 3), tondo(r.letturaCCCurva, 1), tondo(r.letturaCCMisurata, 1), r.n,
   ]))
   return foglio('Parametri', 'dati', colonne, righe)
 }
@@ -227,6 +232,30 @@ function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
     righe.push([g.substrato, 'Media', ...consulte.map(c => peso(c[gi].media))])
   })
   return foglio('Pesi target', 'dati', colonne, righe)
+}
+
+/**
+ * Le soglie di irrigazione del TDR: per ogni substrato e % CC la lettura da impostare sul logger, il peso medio e il deficit
+ * medio (mL se il peso è in g, mg o kg, altrimenti l'unità della sessione). Il TDR target ha i decimali delle letture misurate
+ * più uno, il peso medio quelli dei pesi, il deficit quelli dei pesi (spostati se convertito).
+ */
+function foglioSoglie(gruppi: CurveSubstrato[], unita: string): Foglio {
+  const colonne: ColonnaGrezza[] = [
+    { titolo: 'Substrato', tipo: 'testo' }, { titolo: '% CC', tipo: 'numero' }, { titolo: 'TDR target', tipo: 'numero' },
+    { titolo: 'Peso medio', tipo: 'numero' }, { titolo: `Deficit medio (${deficitInMl(0, unita).unita})`, tipo: 'numero' },
+  ]
+  const decimaliPesi = decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null))))
+  const decimaliTarget = decimaliLetturaTarget(gruppi)
+  const righe = gruppi.flatMap(g => PERCENTUALI_TABELLA.map((p): Cella[] => {
+    const s = sogliaDelSubstrato(g, p)
+    return [
+      g.substrato, p,
+      s.letturaTarget === null ? null : arrotondaDecimali(s.letturaTarget, decimaliTarget),
+      s.pesoMedio === null ? null : arrotondaDecimali(s.pesoMedio, decimaliPesi),
+      s.deficitMedio === null ? null : arrotondaDecimali(deficitInMl(s.deficitMedio, unita).valore, decimaliDeficit(decimaliPesi, unita)),
+    ]
+  }))
+  return foglio('Soglie', 'dati', colonne, righe)
 }
 
 /** Un blocco per substrato: il titolo e le righe che l'immagine copre. */
@@ -311,7 +340,10 @@ export function cartellaPesatura(
   if (sessioni[0].tipo === 'vasi') {
     const vasi = gruppiDeiVasi(sessioni, dati)
     const g = foglioGrafico(vasi.gruppi)
-    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi, vasi.sensore), foglioPesiTarget(vasi.gruppi), g.foglio)
+    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi, vasi.sensore), foglioPesiTarget(vasi.gruppi))
+    // le soglie servono solo al TDR: il tensiometro non ha una retta da cui ricavarle
+    if (vasi.sensore.tipo === 'tdr') fogli.push(foglioSoglie(vasi.gruppi, sessioni[0].unita))
+    fogli.push(g.foglio)
     vasi.gruppi.forEach((gr, i) => grafici.push({
       parametroId: idGraficoCurve(i), titolo: titoloGrafico(gr.substrato), scala: 'valore', unita: vasi.sensore.unita.trim() || null,
       serie: [], note: [], riga: g.righe[i],

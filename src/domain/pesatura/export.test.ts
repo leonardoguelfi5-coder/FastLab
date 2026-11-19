@@ -263,7 +263,7 @@ describe('cartellaPesatura: vasi', () => {
   it("Parametri: con un sensore TDR le intestazioni dicono TDR e l'unità", () => {
     const sU = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tdr' as const, unita: '%' } } })
     const p = foglio('Parametri', cartellaPesatura([sU], { sessioni: [sU], campioni, pesi }, config, OGGI, ADESSO).fogli)
-    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'TDR a CC, retta (%)', 'TDR a CC, misurata (%)', 'n'])
+    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'm', 'q', 'R²', 'TDR a CC, retta (%)', 'TDR a CC, misurata (%)', 'n'])
   })
 
   it('Info: equazione della curva media è in forma potenza', () => {
@@ -321,5 +321,52 @@ describe('nomeLettura', () => {
   it('dice il sensore con la sua unità', () => {
     expect(nomeLettura({ tipo: 'tdr', unita: 'raw' })).toBe('TDR (raw)')
     expect(nomeLettura({ tipo: 'tensione', unita: 'hPa' })).toBe('Tensione (hPa)')
+  })
+})
+
+describe('cartellaPesatura: soglie del TDR', () => {
+  const tdr = { tipo: 'tdr' as const, unita: 'raw' }
+  const tens = { tipo: 'tensione' as const, unita: 'kPa' }
+  const sessioneVasi = (sensore: typeof tdr | typeof tens) => sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore } })
+  const campioni = [campione('t1', 1, { nome: 'T1', substrato: 'Torba' })]
+  const asciuga = (id: string, valore: number, lettura: number, giorno: number) =>
+    peso(id, 't1', 1, 'asciugatura', valore, { lettura, misurato_il: `2026-11-1${giorno}T10:00:00Z` })
+  const pesi: Peso[] = [
+    peso('s', 't1', 1, 'secco', 750), peso('c', 't1', 1, 'capacita_campo', 4850, { lettura: 54 }),
+    asciuga('a1', 4030, 44.8, 1), asciuga('a2', 3210, 35.2, 2), asciuga('a3', 2390, 26.0, 3), asciuga('a4', 1570, 17.5, 4),
+  ]
+  const fogliDi = (s: SessionePesatura) => cartellaPesatura([s], { sessioni: [s], campioni, pesi }, config, OGGI, ADESSO).fogli
+
+  it('il foglio Soglie sta dopo Pesi target', () => {
+    expect(fogliDi(sessioneVasi(tdr)).map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Soglie', 'Grafico', 'Info'])
+  })
+
+  it('una riga per substrato e %, con TDR target, peso medio e deficit medio', () => {
+    const f = foglio('Soglie', fogliDi(sessioneVasi(tdr)))
+    expect(f.tipo).toBe('dati')
+    expect(titoli(f)).toEqual(['Substrato', '% CC', 'TDR target', 'Peso medio', 'Deficit medio (mL)'])
+    expect(f.righe).toHaveLength(PERCENTUALI_TABELLA.length)
+    expect(f.righe.map(r => r[1])).toEqual([...PERCENTUALI_TABELLA])
+    // il 60 %: 35,5 con 2 decimali (le letture ne hanno 1), 3210 g, deficit 1640 mL
+    expect(f.righe[2]).toEqual(['Torba', 60, 35.5, 3210, 1640])
+    expect(f.righe[0][2]).toBe(53.87)
+  })
+
+  it('Parametri ha m e q a 4 cifre significative', () => {
+    const f = foglio('Parametri', fogliDi(sessioneVasi(tdr)))
+    expect(titoli(f).slice(2, 5)).toEqual(['m', 'q', 'R²'])
+    const riga = f.righe.find(r => r[1] === 'T1') as Cella[]
+    expect(riga.slice(2, 5)).toEqual([2.178, -17.31, 1])
+  })
+
+  it('con il tensiometro niente foglio Soglie e a, b come prima', () => {
+    const fogli = fogliDi(sessioneVasi(tens))
+    expect(fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Grafico', 'Info'])
+    expect(titoli(foglio('Parametri', fogli)).slice(2, 5)).toEqual(['a', 'b', 'R²'])
+  })
+
+  it("con un peso non convertibile l'intestazione del deficit porta l'unita della sessione", () => {
+    const s = { ...sessioneVasi(tdr), unita: 'lb' }
+    expect(titoli(foglio('Soglie', fogliDi(s)))[4]).toBe('Deficit medio (lb)')
   })
 })

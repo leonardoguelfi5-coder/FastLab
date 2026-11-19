@@ -1,4 +1,4 @@
-import { formattaCifre, arrotondaCifre } from '@/lib/numeri'
+import { arrotondaCifre, decimaliMassimi, formattaCifre } from '@/lib/numeri'
 import { inGrammi, percentualeCC, pesoAPercentualeCC } from './calcoli'
 import type { CampionePesatura, Peso, Sensore, UnitaPeso } from './tipi'
 
@@ -245,7 +245,7 @@ const negativo = (n: number, decimali: number): boolean => Number(n.toFixed(deci
 export const conSegno = (n: number, decimali: number): string => `${negativo(n, decimali) ? MENO : ''}${cifre(n, decimali)}`
 
 /** Un numero con `cifre` cifre significative, la virgola e il segno meno se serve (−0,5000; 2,178; −17,31). */
-const conCifre = (n: number, cifre: number): string => `${arrotondaCifre(n, cifre) < 0 ? MENO : ''}${formattaCifre(Math.abs(n), cifre)}`
+export const conCifre = (n: number, cifre: number): string => `${arrotondaCifre(n, cifre) < 0 ? MENO : ''}${formattaCifre(Math.abs(n), cifre)}`
 
 /**
  * Per esempio `WC = 649,17 · h^−0,6033  (h in hPa; R² 0,966, n 5)` per la potenza, con a a 2 decimali, b a 4 ed R² a 3;
@@ -458,4 +458,18 @@ export function sogliaDelSubstrato(g: CurveSubstrato, pcc: number): Soglia {
 export function deficitInMl(deficit: number, unita: UnitaPeso): { valore: number; unita: string } {
   const grammi = inGrammi(deficit, unita)
   return grammi === null ? { valore: deficit, unita } : { valore: grammi, unita: 'mL' }
+}
+
+/** I decimali del TDR target: quelli delle letture misurate più uno (minimo 1), perché la retta ne ricava un valore più fine. */
+export function decimaliLetturaTarget(gruppi: CurveSubstrato[]): number {
+  const letture = gruppi.flatMap((g) =>
+    g.vasi.flatMap((v) => [...v.punti.map((p) => p.lettura), ...(v.letturaCC === null ? [] : [v.letturaCC])]),
+  )
+  return Math.max(1, decimaliMassimi(letture) + 1)
+}
+
+/** I decimali del deficit: quelli dei pesi, spostati dell'ordine di grandezza se il deficit è convertito in mL (kg → g, mg → g). */
+export function decimaliDeficit(decimaliPesi: number, unita: UnitaPeso): number {
+  const fattore = inGrammi(1, unita)
+  return fattore === null ? decimaliPesi : Math.max(0, decimaliPesi - Math.round(Math.log10(fattore)))
 }
