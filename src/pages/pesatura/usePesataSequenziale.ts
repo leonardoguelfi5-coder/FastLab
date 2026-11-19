@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { salvaPeso } from '@/api/pesatura'
 import { chiavi } from '@/api/query'
-import { indiceDelPasso, passiDellaFase, primoPassoMancante, type FasePesata, type Passo } from '@/domain/pesatura/sequenza'
+import { indiceDelPasso, passiDellaFase, pesoCompleto, primoPassoMancante, type FasePesata, type Passo } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
 import { ePesoGiaInserito, messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
@@ -28,7 +28,7 @@ export function usePesataSequenziale({ espId, sessione, campioni, pesi, fase, pa
   const queryClient = useQueryClient()
   const [passi, setPassi] = useState<Passo[]>(() => passiDellaFase(sessione, campioni, pesi, fase))
   const [indice, setIndice] = useState(
-    () => (partenza ? indiceDelPasso(passi, partenza.campione, partenza.replica) : null) ?? primoPassoMancante(passi),
+    () => (partenza ? indiceDelPasso(passi, partenza.campione, partenza.replica) : null) ?? primoPassoMancante(passi, p => pesoCompleto(p, sessione.tipo, fase)),
   )
   const [occupato, setOccupato] = useState(false)
   const [errore, setErrore] = useState<{ testo: string; giaInserito: boolean } | null>(null)

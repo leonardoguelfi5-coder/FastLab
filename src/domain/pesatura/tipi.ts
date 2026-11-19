@@ -54,7 +54,7 @@ export interface Peso {
   replica: number
   tipo: TipoPeso
   valore: number
-  /** La lettura del sensore, solo per i vasi in asciugatura. */
+  /** La lettura dello strumento, per i vasi in capacità di campo e in asciugatura. */
   lettura: number | null
   misurato_il: string
   creato_da?: string

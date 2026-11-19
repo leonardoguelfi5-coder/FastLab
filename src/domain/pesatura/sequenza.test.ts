@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   FASI, NOMI_FASE, passiDellaFase, primoPassoMancante, avanzamentoFase, statoSessione, repliche, etichettaCampione, letteraReplica,
-  faseDaAprire, indiceDelPasso, avanzamentoFasi, eCompletata,
+  faseDaAprire, indiceDelPasso, avanzamentoFasi, eCompletata, chiedeLettura, pesoCompleto,
 } from './sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoAnalisi, TipoPeso } from './tipi'
 import type { Pianta } from '../tipi'
@@ -12,8 +12,8 @@ const sessione = (tipo: TipoAnalisi, rep = 1, conclusa = false): SessionePesatur
 })
 const camp = (id: string, ordine: number, extra: Partial<CampionePesatura> = {}): CampionePesatura =>
   ({ id, sessione_id: 's', pianta_id: null, nome: id, substrato: null, ordine, ...extra })
-const peso = (campione_id: string, tipo: TipoPeso, replica = 1): Peso =>
-  ({ id: `${campione_id}${tipo}${replica}`, campione_id, replica, tipo, valore: 1, lettura: null, misurato_il: '2026-01-01T00:00:00Z' })
+const peso = (campione_id: string, tipo: TipoPeso, replica = 1, lettura: number | null = null): Peso =>
+  ({ id: `${campione_id}${tipo}${replica}`, campione_id, replica, tipo, valore: 1, lettura, misurato_il: '2026-01-01T00:00:00Z' })
 
 describe('fasi', () => {
   it('elenca le fasi per tipo', () => {
@@ -49,6 +49,30 @@ describe('passiDellaFase', () => {
   })
 })
 
+describe('la lettura dello strumento', () => {
+  it('chiedeLettura: nei vasi tutto tranne il secco', () => {
+    expect(chiedeLettura('vasi', 'capacita_campo')).toBe(true)
+    expect(chiedeLettura('vasi', 'asciugatura')).toBe(true)
+    expect(chiedeLettura('vasi', 'secco')).toBe(false)
+    expect(chiedeLettura('rwc', 'secco')).toBe(false)
+  })
+  it('pesoCompleto: il peso e, se la fase la chiede, la lettura', () => {
+    expect(pesoCompleto(null, 'vasi', 'capacita_campo')).toBe(false)
+    expect(pesoCompleto(peso('v', 'capacita_campo'), 'vasi', 'capacita_campo')).toBe(false)
+    expect(pesoCompleto(peso('v', 'capacita_campo', 1, 0), 'vasi', 'capacita_campo')).toBe(true)
+    expect(pesoCompleto(peso('v', 'secco'), 'vasi', 'secco')).toBe(true)
+  })
+  it('primoPassoMancante con `completo` punta al vaso senza lettura', () => {
+    const s = sessione('vasi')
+    const cs = [camp('v1', 1), camp('v2', 2), camp('v3', 3)]
+    const pesi = [peso('v1', 'capacita_campo', 1, 21.8), peso('v2', 'capacita_campo'), peso('v3', 'capacita_campo', 1, 20)]
+    const passi = passiDellaFase(s, cs, pesi, 'capacita_campo')
+    expect(primoPassoMancante(passi)).toBe(3)
+    expect(primoPassoMancante(passi, p => pesoCompleto(p, 'vasi', 'capacita_campo'))).toBe(1)
+    expect(avanzamentoFase(passi, p => pesoCompleto(p, 'vasi', 'capacita_campo'))).toEqual({ pesati: 2, totali: 3 })
+  })
+})
+
 describe('repliche', () => {
   it('una replica 3 presente allarga a [1,2,3]', () => {
     expect(repliche(camp('c1', 1), sessione('rwc', 2), [peso('c1', 'fresco', 3)])).toEqual([1, 2, 3])
@@ -73,9 +97,20 @@ describe('statoSessione', () => {
   it('vasi: serve almeno un punto di asciugatura per vaso', () => {
     const s = sessione('vasi')
     const cs = [camp('v1', 1)]
-    const base = [peso('v1', 'secco'), peso('v1', 'capacita_campo')]
+    const base = [peso('v1', 'secco'), peso('v1', 'capacita_campo', 1, 21.8)]
     expect(statoSessione(s, cs, base)).toBe('mancano')
     expect(statoSessione(s, cs, [...base, peso('v1', 'asciugatura')])).toBe('completa')
+  })
+  it('vasi: una capacità di campo senza lettura è un peso che manca', () => {
+    const s = sessione('vasi')
+    const cs = [camp('v1', 1)]
+    const senza = [peso('v1', 'secco'), peso('v1', 'capacita_campo'), peso('v1', 'asciugatura')]
+    expect(statoSessione(s, cs, senza)).toBe('mancano')
+    expect(faseDaAprire(s, 'v1', 1, senza)).toBe('capacita_campo')
+    const con = [peso('v1', 'secco'), peso('v1', 'capacita_campo', 1, 21.8), peso('v1', 'asciugatura')]
+    expect(statoSessione(s, cs, con)).toBe('completa')
+    expect(faseDaAprire(s, 'v1', 1, con)).toBe('asciugatura')
+    expect(avanzamentoFasi(s, cs, senza).find(a => a.fase === 'capacita_campo')).toMatchObject({ pesati: 0, totali: 1 })
   })
   it('senza campioni mancano', () => {
     expect(statoSessione(sessione('aliquota'), [], [])).toBe('mancano')
@@ -103,7 +138,7 @@ describe('aprire la pesata da un campione del riepilogo', () => {
   it('faseDaAprire: un vaso completo apre l\'asciugatura', () => {
     const s = sessione('vasi')
     expect(faseDaAprire(s, 'v', 1, [peso('v', 'secco')])).toBe('capacita_campo')
-    expect(faseDaAprire(s, 'v', 1, [peso('v', 'secco'), peso('v', 'capacita_campo')])).toBe('asciugatura')
+    expect(faseDaAprire(s, 'v', 1, [peso('v', 'secco'), peso('v', 'capacita_campo', 1, 21.8)])).toBe('asciugatura')
   })
 
   it('indiceDelPasso trova campione e replica, null se non c\'è', () => {
@@ -126,7 +161,7 @@ describe('avanzamentoFasi ed eCompletata', () => {
     const cs = [camp('c1', 1)]
     expect(eCompletata(sessione('aliquota'), cs, [peso('c1', 'aliquota')])).toBe(true)
     expect(eCompletata(sessione('aliquota'), cs, [])).toBe(false)
-    const vasi = [peso('c1', 'secco'), peso('c1', 'capacita_campo'), peso('c1', 'asciugatura')]
+    const vasi = [peso('c1', 'secco'), peso('c1', 'capacita_campo', 1, 21.8), peso('c1', 'asciugatura')]
     expect(eCompletata(sessione('vasi'), cs, vasi)).toBe(false)
     expect(eCompletata(sessione('vasi', 1, true), cs, [])).toBe(true)
   })

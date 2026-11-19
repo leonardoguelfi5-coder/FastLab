@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { gruppiDeiVasi } from '@/domain/pesatura/export'
 import { equazione } from '@/domain/pesatura/curva'
-import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, statoSessione } from '@/domain/pesatura/sequenza'
+import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, pesoCompleto, statoSessione } from '@/domain/pesatura/sequenza'
 import { NOMI_TIPO, type SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
@@ -180,7 +180,7 @@ function Contenuto({ espId, sessione, dati, config }: {
                 const n = pesi.filter(p => p.tipo === 'asciugatura').length
                 testo += ` · ${n} ${n === 1 ? 'peso' : 'pesi'}`
               } else {
-                const a = avanzamentoFase(passiDellaFase(sessione, campioni, pesi, fase))
+                const a = avanzamentoFase(passiDellaFase(sessione, campioni, pesi, fase), p => pesoCompleto(p, sessione.tipo, fase))
                 testo += ` · ${a.pesati}/${a.totali}`
               }
               return (

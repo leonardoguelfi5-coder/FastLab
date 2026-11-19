@@ -71,6 +71,10 @@ function apri(fase = 'fresco', ricerca = '') {
   return userEvent.setup({ delay: null })
 }
 
+const vasiConSensore = (tipo: 'umidita' | 'tensione' = 'tensione', unita = 'kPa') =>
+  sessione({ tipo: 'vasi', unita: 'g', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo, unita } } })
+const dueVasi = [campione('v1', 1, { nome: 'V1' }), campione('v2', 2, { nome: 'V2' })]
+
 const salva = () => screen.findByRole('button', { name: 'Salva e vai al prossimo' })
 
 // La dettatura finta: `detta` fa arrivare una frase come se l'avesse riconosciuta il browser.
@@ -302,6 +306,41 @@ describe('Pesata', () => {
     expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'asciugatura', replica: 1, valore: 150, lettura: 35 })
   })
 
+  it('capacità di campo dei vasi: peso e lettura obbligatori', async () => {
+    dati(vasiConSensore(), dueVasi, [peso('s1', 'v1', 1, 'secco', 100)])
+    const utente = apri('capacita_campo')
+    await salva()
+    await utente.type(campoPeso(), '2600')
+    await utente.click(await salva())
+    expect(salvaPeso).not.toHaveBeenCalled()
+    expect(await screen.findByText('Scrivi la lettura del sensore.')).toBeInTheDocument()
+    await utente.type(screen.getByLabelText(/^Tensione \(kPa\)/), '21,8')
+    await utente.click(await salva())
+    await waitFor(() => expect(salvaPeso).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'capacita_campo', valore: 2600, lettura: 21.8 })
+  })
+
+  it('secco dei vasi: nessun campo lettura', async () => {
+    dati(vasiConSensore(), dueVasi, [])
+    const utente = apri('secco')
+    await salva()
+    expect(screen.queryByLabelText(/^Tensione/)).not.toBeInTheDocument()
+    await utente.type(campoPeso(), '100')
+    await utente.click(await salva())
+    await waitFor(() => expect(salvaPeso).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'secco', valore: 100, lettura: null })
+  })
+
+  it('capacità di campo: un peso senza lettura riapre su quel vaso', async () => {
+    dati(vasiConSensore(), dueVasi, [
+      peso('c1', 'v1', 1, 'capacita_campo', 2600, { lettura: 21.8 }), peso('c2', 'v2', 1, 'capacita_campo', 2500),
+    ])
+    apri('capacita_campo')
+    await salva()
+    expect(screen.getByText('V2')).toBeInTheDocument()
+    expect(screen.getByText('Passo 2 di 2')).toBeInTheDocument()
+  })
+
   it('asciugatura: si riparte sempre dal primo vaso e un giro nuovo scrive pesi nuovi', async () => {
     dati(
       sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tensione', unita: 'kPa' } } }),
@@ -473,6 +512,17 @@ describe('Pesata: dettatura a voce', () => {
     await detta('peso 150 umidità 35 avanti')
     await waitFor(() => expect(parla).toHaveBeenCalledWith('150 salvato, prossimo V2'))
     expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'asciugatura', valore: 150, lettura: 35 })
+  })
+
+  it('capacità di campo: «peso 2600 tensione 21 virgola 8 avanti» salva peso e lettura', async () => {
+    dati(vasiConSensore(), dueVasi, [])
+    apri('capacita_campo')
+    await salva()
+    await detta('2600 avanti')
+    expect(suonoErrore).toHaveBeenCalledTimes(1)
+    await detta('peso 2600 tensione 21 virgola 8 avanti')
+    await waitFor(() => expect(parla).toHaveBeenCalledWith('2600 salvato, prossimo V2'))
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ campione_id: 'v1', tipo: 'capacita_campo', valore: 2600, lettura: 21.8 })
   })
 
   it('in ascolto il campione e l\'ultimo valore salvato sono a caratteri molto grandi', async () => {

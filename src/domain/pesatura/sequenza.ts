@@ -22,6 +22,18 @@ export const NOMI_FASE: Record<FasePesata, string> = {
 
 export interface Passo { campione: CampionePesatura; replica: number; peso: Peso | null }
 
+/** Nei vasi ogni peso ha la lettura dello strumento, tranne il secco: la chiedono la capacità di campo e l'asciugatura. */
+export function chiedeLettura(tipo: TipoAnalisi, fase: FasePesata): boolean {
+  return tipo === 'vasi' && (fase === 'capacita_campo' || fase === 'asciugatura')
+}
+
+/** Un peso è completo quando c'è e, se la fase chiede la lettura, ha anche quella (le sessioni vecchie possono non averla). */
+export function pesoCompleto(peso: Peso | null, tipo: TipoAnalisi, fase: FasePesata): boolean {
+  return peso !== null && (!chiedeLettura(tipo, fase) || peso.lettura !== null)
+}
+
+const conPeso = (p: Peso | null): boolean => p !== null
+
 /** Replica 1 = A, 2 = B, ... */
 export function letteraReplica(n: number): string {
   return String.fromCharCode(64 + n)
@@ -58,9 +70,9 @@ export function passiDellaFase(s: SessionePesatura, campioni: CampionePesatura[]
   return passi
 }
 
-/** L'indice del primo passo senza peso; `passi.length` se sono tutti pesati. */
-export function primoPassoMancante(passi: Passo[]): number {
-  const i = passi.findIndex(p => p.peso === null)
+/** L'indice del primo passo il cui peso non è completo (di norma: senza peso); `passi.length` se lo sono tutti. */
+export function primoPassoMancante(passi: Passo[], completo: (p: Peso | null) => boolean = conPeso): number {
+  const i = passi.findIndex(p => !completo(p.peso))
   return i === -1 ? passi.length : i
 }
 
@@ -75,19 +87,19 @@ export function indiceDelPasso(passi: Passo[], campioneId: string, replica: numb
 
 /**
  * La fase da aprire toccando un campione nel riepilogo: la prima in cui a quel campione e a quella replica manca il
- * peso. Se li ha tutti: per i vasi l'asciugatura (si aggiunge un punto), per gli altri la prima fase (per correggere).
+ * peso (o la sua lettura, dove serve). Se li ha tutti: per i vasi l'asciugatura (si aggiunge un punto), per gli altri la prima fase (per correggere).
  */
 export function faseDaAprire(s: SessionePesatura, campioneId: string, replica: number, pesi: Peso[]): FasePesata {
   const fasi = FASI[s.tipo].filter(f => f !== 'asciugatura')
-  const mancante = fasi.find(f => !pesi.some(p => p.campione_id === campioneId && p.replica === replica && p.tipo === f))
+  const mancante = fasi.find(f => !pesi.some(p => p.campione_id === campioneId && p.replica === replica && p.tipo === f && pesoCompleto(p, s.tipo, f)))
   if (mancante) return mancante
   return s.tipo === 'vasi' ? 'asciugatura' : FASI[s.tipo][0]
 }
 
 export interface Avanzamento { pesati: number; totali: number }
 
-export function avanzamentoFase(passi: Passo[]): Avanzamento {
-  return { pesati: passi.filter(p => p.peso !== null).length, totali: passi.length }
+export function avanzamentoFase(passi: Passo[], completo: (p: Peso | null) => boolean = conPeso): Avanzamento {
+  return { pesati: passi.filter(p => completo(p.peso)).length, totali: passi.length }
 }
 
 /**
@@ -100,7 +112,7 @@ export function statoSessione(s: SessionePesatura, campioni: CampionePesatura[],
   if (campioni.length === 0) return 'mancano'
   for (const fase of FASI[s.tipo]) {
     if (fase === 'asciugatura') continue
-    if (passiDellaFase(s, campioni, pesi, fase).some(p => p.peso === null)) return 'mancano'
+    if (passiDellaFase(s, campioni, pesi, fase).some(p => !pesoCompleto(p.peso, s.tipo, fase))) return 'mancano'
   }
   if (s.tipo === 'vasi') {
     for (const c of campioni) {
@@ -112,7 +124,7 @@ export function statoSessione(s: SessionePesatura, campioni: CampionePesatura[],
 
 /** Le fasi con un peso per campione (non l'asciugatura), con quanti pesi hanno sul totale. */
 export function avanzamentoFasi(s: SessionePesatura, campioni: CampionePesatura[], pesi: Peso[]): (Avanzamento & { fase: FasePesata })[] {
-  return FASI[s.tipo].filter(f => f !== 'asciugatura').map(fase => ({ fase, ...avanzamentoFase(passiDellaFase(s, campioni, pesi, fase)) }))
+  return FASI[s.tipo].filter(f => f !== 'asciugatura').map(fase => ({ fase, ...avanzamentoFase(passiDellaFase(s, campioni, pesi, fase), p => pesoCompleto(p, s.tipo, fase)) }))
 }
 
 /** Una pesata è fra le completate quando ha tutti i pesi; i vasi solo quando l'utente la segna conclusa. */

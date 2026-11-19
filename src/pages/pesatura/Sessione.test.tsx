@@ -287,8 +287,8 @@ describe('Sessione con i vasi', () => {
   const asciuga = (id: string, c: string, valore: number, lettura: number, ora: string) =>
     peso(id, c, 1, 'asciugatura', valore, { lettura, misurato_il: `2026-11-11T${ora}:00Z` })
   const pesiVasi = [
-    peso('s1', 'v1', 1, 'secco', 100), peso('c1', 'v1', 1, 'capacita_campo', 200),
-    peso('s2', 'v2', 1, 'secco', 100), peso('c2', 'v2', 1, 'capacita_campo', 300),
+    peso('s1', 'v1', 1, 'secco', 100), peso('c1', 'v1', 1, 'capacita_campo', 200, { lettura: 2 }),
+    peso('s2', 'v2', 1, 'secco', 100), peso('c2', 'v2', 1, 'capacita_campo', 300, { lettura: 3 }),
     asciuga('a1', 'v1', 190, 5, '09'), asciuga('a2', 'v1', 160, 20, '10'), asciuga('a3', 'v1', 130, 60, '11'),
     asciuga('a4', 'v2', 280, 6, '09'),
   ]
@@ -333,6 +333,18 @@ describe('Sessione con i vasi', () => {
     expect(screen.getByText('Conclusa')).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Riapri' }))
     await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ conclusa: false })))
+  })
+
+  it('la capacità di campo mostra la lettura; una vecchia senza lettura dice che manca e si riapre da lì', async () => {
+    dati([vasiSessione], vasi, pesiVasi.map(p => (p.id === 'c2' ? { ...p, lettura: null } : p)))
+    apri()
+    await titolo()
+    expect(screen.getByText('200 g · 2 kPa')).toBeInTheDocument()
+    expect(screen.getByText('300 g · manca la lettura')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Capacità di campo · 1/2' })).toBeInTheDocument()
+    expect(screen.getByText('Mancano dei pesi')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pesa V2' })).toHaveAttribute(
+      'href', '/esperimenti/E/laboratorio/pesatura/S/pesa/capacita_campo?campione=v2&replica=1')
   })
 
   it('l\'asciugatura mostra quanti pesi ci sono, senza una frazione', async () => {

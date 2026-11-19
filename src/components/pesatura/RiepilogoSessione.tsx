@@ -78,9 +78,14 @@ function righeDi({ sessione, campioni, pesi, piante, trattamenti }: RiepilogoSes
           { nome: 'Sostanza secca', testo: calcolato(questo, ' %') },
         )
       } else {
+        const sensore = sessione.impostazioni.sensore
+        const cc = pesi.find(p => p.campione_id === c.id && p.replica === replica && p.tipo === 'capacita_campo')
+        const testoCc = cc === undefined ? TRATTINO
+          : cc.lettura === null ? `${peso(cc.valore, u)} · manca la lettura`
+          : `${peso(cc.valore, u)} · ${formattaNumero(cc.lettura)}${sensore ? ` ${sensore.unita}` : ''}`
         const punti = pesi.filter(p => p.campione_id === c.id && p.tipo === 'asciugatura').length
         valori.push(
-          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'Capacità di campo', testo: peso(valore.capacita_campo ?? null, u) },
+          { nome: 'Secco', testo: peso(secco ?? null, u) }, { nome: 'Capacità di campo', testo: testoCc },
           { nome: 'Asciugatura', testo: punti === 1 ? '1 peso' : `${punti} pesi` },
         )
       }
