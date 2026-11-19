@@ -376,6 +376,14 @@ describe('parametriDelSubstrato', () => {
     expect(parametriDelSubstrato(g)[0].letturaCCMisurata).toBe(23.7)
   })
 
+  it('con il tensiometro e nessuna curva la lettura misurata è comunque in valore assoluto', () => {
+    const [g] = curvePerSubstrato([vaso('c', 'HC', { punti: coppie([10, 20], [100, 80]), letturaCC: -23.7 })], 'potenza')
+    expect(g.media).toBeNull()
+    expect(g.modello).toBe('potenza')
+    expect(parametriDelSubstrato(g)[0].letturaCCMisurata).toBe(23.7)
+  })
+
+
   it('senza nessuna curva non c\'è la riga media', () => {
     const [g] = curvePerSubstrato([vaso('a', 'HC', { punti: [] })], 'potenza')
     const righe = parametriDelSubstrato(g)

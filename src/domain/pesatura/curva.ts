@@ -259,6 +259,8 @@ export interface CurveSubstrato {
   vasi: Vaso[]
   curve: (Curva | null)[]
   media: Curva | null
+  /** Il modello con cui sono state adattate le curve: vale anche quando nessun vaso ne ha una. */
+  modello: ModelloCurva
 }
 
 export const SENZA_SUBSTRATO = 'Senza substrato'
@@ -283,6 +285,7 @@ export function curvePerSubstrato(vasi: Vaso[], modello: ModelloCurva): CurveSub
       substrato,
       vasi: suoi,
       curve,
+      modello,
       media:
         modello === 'potenza'
           ? mediaDeiParametri(curve.filter((c): c is Curva => c !== null))
@@ -307,10 +310,17 @@ export interface RigaParametri {
   media: boolean
 }
 
+/** Le due intestazioni delle colonne "lettura a CC" della tabella dei parametri (app ed Excel): con l'unità del sensore. */
+export function intestazioniLetturaCC(sensore: Sensore): { curva: string; misurato: string } {
+  const unita = sensore.unita.trim()
+  const simbolo = sensore.tipo === 'tensione' ? 'h' : 'Lettura'
+  const colonna = (come: string) => `${simbolo} a CC, ${come}${unita ? ` (${unita})` : ''}`
+  return { curva: colonna('curva'), misurato: colonna('misurato') }
+}
+
 /** Una riga per vaso, poi la "Curva media" se il substrato ne ha una (senza lettura misurata: non c'è un vaso medio). */
 export function parametriDelSubstrato(g: CurveSubstrato): RigaParametri[] {
-  // il modello si legge dalla curva media: senza nessuna curva la lettura misurata resta com'è
-  const potenza = g.media?.modello === 'potenza'
+  const potenza = g.modello === 'potenza'
   const righe = g.vasi.map((v, i): RigaParametri => {
     const c = g.curve[i]
     const misurata = v.letturaCC === null ? null : potenza ? Math.abs(v.letturaCC) : v.letturaCC

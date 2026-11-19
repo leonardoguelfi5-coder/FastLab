@@ -63,6 +63,11 @@ describe('scaricaPesatura', () => {
     const esito = await scaricaPesatura({ sessioni: due.sessioni, dati: due, config, oggi: '2026-11-12' })
     expect(svgInPng).toHaveBeenCalledTimes(2)
     expect([...vi.mocked(scriviCartella).mock.calls[0][1].keys()]).toEqual(['curve-0', 'curve-1'])
+    // il secondo PNG è disegnato dal secondo substrato
+    const [primo, secondo] = vi.mocked(svgInPng).mock.calls.map(c => c[0])
+    expect(primo).toContain('Torba')
+    expect(secondo).toContain('Sabbia')
+    expect(secondo).not.toContain('Torba')
     expect(esito).toMatchObject({ grafici: 2, graficiNelFile: 2 })
   })
 

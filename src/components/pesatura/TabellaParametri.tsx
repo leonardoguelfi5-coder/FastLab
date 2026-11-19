@@ -1,4 +1,4 @@
-import { conSegno, parametriDelSubstrato, type CurveSubstrato } from '@/domain/pesatura/curva'
+import { conSegno, intestazioniLetturaCC, parametriDelSubstrato, type CurveSubstrato } from '@/domain/pesatura/curva'
 import type { Sensore } from '@/domain/pesatura/tipi'
 
 /** Un valore con `decimali` cifre, "—" se manca o non è un numero finito. */
@@ -6,10 +6,8 @@ const valore = (n: number | null, decimali: number): string => (n === null || !N
 
 /** I parametri delle curve di un substrato: una riga per vaso e la curva media, come la Tabella 4 della tesi (senza le soglie). */
 export function TabellaParametri({ gruppo, sensore }: { gruppo: CurveSubstrato; sensore: Sensore }) {
-  const unita = sensore.unita.trim()
-  const simbolo = sensore.tipo === 'tensione' ? 'h' : 'Lettura'
-  const colonna = (come: string) => `${simbolo} a CC, ${come}${unita ? ` (${unita})` : ''}`
-  const intestazioni = ['a', 'b', 'R²', colonna('curva'), colonna('misurato'), 'n']
+  const lettura = intestazioniLetturaCC(sensore)
+  const intestazioni = ['a', 'b', 'R²', lettura.curva, lettura.misurato, 'n']
   return (
     <div className="overflow-x-auto rounded-2xl border border-riga bg-foglio">
       <table className="w-full min-w-max text-left font-mono text-base tabular-nums text-grafite">
@@ -21,8 +19,8 @@ export function TabellaParametri({ gruppo, sensore }: { gruppo: CurveSubstrato; 
           </tr>
         </thead>
         <tbody>
-          {parametriDelSubstrato(gruppo).map(r => (
-            <tr key={r.media ? 'media' : r.nome} className="border-t border-riga">
+          {parametriDelSubstrato(gruppo).map((r, i) => (
+            <tr key={r.media ? 'media' : i} className="border-t border-riga">
               <th scope="row" className={`px-3 py-2.5 text-left ${r.media ? 'font-semibold' : 'font-normal'}`}>{r.nome}</th>
               <td className="px-3 py-2.5 text-right">{valore(r.a, 2)}</td>
               <td className="px-3 py-2.5 text-right">{valore(r.b, 4)}</td>

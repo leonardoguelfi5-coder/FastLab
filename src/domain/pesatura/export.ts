@@ -12,7 +12,7 @@ import {
   sostanzaSeccaCalcolata,
 } from './calcoli'
 import {
-  consultaPerCC, curvePerSubstrato, equazione, modelloPer, parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
+  consultaPerCC, curvePerSubstrato, equazione, intestazioniLetturaCC, modelloPer, parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
   type CurveSubstrato, type Vaso,
 } from './curva'
 import { etichettaCampione, letteraReplica, repliche } from './sequenza'
@@ -184,7 +184,7 @@ function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
         .sort((a, b) => Date.parse(a.misurato_il) - Date.parse(b.misurato_il))
       for (const p of cc ? [cc, ...asciugature] : asciugature) {
         const fase = p.tipo === 'capacita_campo' ? 'Capacità di campo' : 'Asciugatura'
-        const pcc = p.tipo === 'capacita_campo' ? 100
+        const pcc = p.tipo === 'capacita_campo' ? (v.secco !== null && v.cc !== null && v.cc > v.secco ? 100 : null)
           : v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc, precisione)) : null
         const acqua = v.secco === null ? null : differenzaPesi(p.valore, v.secco, precisione)
         righe.push([
@@ -198,11 +198,12 @@ function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
 }
 
 /** Come la Tabella 4 dell'app: a 2 decimali, b 4, R² 3, h 1. Numeri, non testo: Excel li mostra da sé. */
-function foglioParametri(gruppi: CurveSubstrato[]): Foglio {
+function foglioParametri(gruppi: CurveSubstrato[], sensore: Sensore): Foglio {
+  const lettura = intestazioniLetturaCC(sensore)
   const colonne: ColonnaGrezza[] = [
     { titolo: 'Substrato', tipo: 'testo' }, { titolo: 'Vaso', tipo: 'testo' },
     { titolo: 'a', tipo: 'numero' }, { titolo: 'b', tipo: 'numero' }, { titolo: 'R²', tipo: 'numero' },
-    { titolo: 'h a CC, curva', tipo: 'numero' }, { titolo: 'h a CC, misurato', tipo: 'numero' }, { titolo: 'n', tipo: 'numero' },
+    { titolo: lettura.curva, tipo: 'numero' }, { titolo: lettura.misurato, tipo: 'numero' }, { titolo: 'n', tipo: 'numero' },
   ]
   const tondo = (x: number | null, decimali: number): number | null => (x === null || !Number.isFinite(x) ? null : arrotondaDecimali(x, decimali))
   const righe = gruppi.flatMap(g => parametriDelSubstrato(g).map((r): Cella[] => [
@@ -310,7 +311,7 @@ export function cartellaPesatura(
   if (sessioni[0].tipo === 'vasi') {
     const vasi = gruppiDeiVasi(sessioni, dati)
     const g = foglioGrafico(vasi.gruppi)
-    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi), foglioPesiTarget(vasi.gruppi), g.foglio)
+    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi, vasi.sensore), foglioPesiTarget(vasi.gruppi), g.foglio)
     vasi.gruppi.forEach((gr, i) => grafici.push({
       parametroId: idGraficoCurve(i), titolo: titoloGrafico(gr.substrato), scala: 'valore', unita: vasi.sensore.unita.trim() || null,
       serie: [], note: [], riga: g.righe[i],

@@ -180,10 +180,10 @@ export function GraficoCurve({ gruppo, sensore, perImmagine = false, titolo = ''
         />
       )))}
 
-      {legenda.map(({ nome, colore, marcatore, x, riga }) => {
+      {legenda.map(({ nome, colore, marcatore, x, riga }, i) => {
         const y = altezza - altezzaLegenda + 12 + riga * ALTEZZA_RIGA_LEGENDA
         return (
-          <g key={nome} data-legenda={nome}>
+          <g key={i} data-legenda={nome}>
             <line x1={x} x2={x + 16} y1={y - 4} y2={y - 4} stroke={colore} strokeWidth={marcatore ? 1.5 : 3} />
             {marcatore && <path d={marcatore} transform={`translate(${x + 8} ${y - 4})`} fill={colore} />}
             <text x={x + 22} y={y} fill={COLORI_GRAFICO.grafite} fontFamily={FONT_DATI} fontSize={CORPO_TESTO}>{nome}</text>

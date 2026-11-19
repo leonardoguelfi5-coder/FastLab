@@ -313,7 +313,7 @@ describe('Sessione con i vasi', () => {
     expect(screen.getAllByRole('img', { name: /Curve di ritenzione/ })).toHaveLength(2)
     expect(screen.getAllByRole('table', { name: /^Parametri delle curve/ })).toHaveLength(2)
     expect(screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent).slice(0, 2)).toEqual(['Torba', 'Cocco'])
-    await u.click(screen.getAllByRole('button', { name: 'Scarica grafico (PNG)' })[1])
+    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Cocco' }))
     await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
     expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0].gruppo.substrato).toBe('Cocco')
   })
@@ -328,7 +328,7 @@ describe('Sessione con i vasi', () => {
   it('Scarica grafico (PNG) scarica il PNG', async () => {
     const u = apri()
     await titolo()
-    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG)' }))
+    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Torba' }))
     await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
     expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', gruppo: { substrato: 'Torba' }, sensore: { unita: 'kPa' } })
   })

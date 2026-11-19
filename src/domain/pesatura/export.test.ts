@@ -214,7 +214,7 @@ describe('cartellaPesatura: vasi', () => {
 
   it('Parametri: una riga per vaso e la Curva media, arrotondate come la tabella', () => {
     const p = foglio('Parametri', cartella.fogli)
-    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'h a CC, curva', 'h a CC, misurato', 'n'])
+    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'h a CC, curva (kPa)', 'h a CC, misurato (kPa)', 'n'])
     const gruppi = gruppiDeiVasi([s], dati).gruppi
     const attese = gruppi.flatMap(g => parametriDelSubstrato(g).map(r => [g.substrato, r]))
     expect(p.righe).toHaveLength(attese.length)
@@ -251,6 +251,19 @@ describe('cartellaPesatura: vasi', () => {
     expect(col(p, cc, 'Acqua')).toBeCloseTo(100, 9)
     expect(col(p, cc, 'Data e ora')).toEqual({ istante: '2026-11-11T08:30:00Z' })
     expect(p.righe.filter(r => col(p, r, 'Fase') === 'Asciugatura')).toHaveLength(4)
+  })
+
+  it('Punti: senza secco o con CC non sopra il secco la riga CC non ha % CC', () => {
+    const senzaSecco = [...pesi.filter(x => x.id !== 'c1' && x.id !== 's1'), peso('c1', 'v1', 1, 'capacita_campo', 200, { lettura: 2, misurato_il: '2026-11-11T08:30:00Z' })]
+    const p = foglio('Punti', cartellaPesatura([s], { sessioni: [s], campioni, pesi: senzaSecco }, config, OGGI, ADESSO).fogli)
+    const cc = p.righe.find(r => col(p, r, 'Fase') === 'Capacità di campo') as Cella[]
+    expect(col(p, cc, '% CC')).toBeNull()
+  })
+
+  it("Parametri: con un sensore di umidità le intestazioni dicono Lettura e l'unità", () => {
+    const sU = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'umidita' as const, unita: '%' } } })
+    const p = foglio('Parametri', cartellaPesatura([sU], { sessioni: [sU], campioni, pesi }, config, OGGI, ADESSO).fogli)
+    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'Lettura a CC, curva (%)', 'Lettura a CC, misurato (%)', 'n'])
   })
 
   it('Info: equazione della curva media è in forma potenza', () => {

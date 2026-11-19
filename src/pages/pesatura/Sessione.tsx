@@ -216,7 +216,7 @@ function Contenuto({ espId, sessione, dati, config }: {
                 {g.media ? equazione(g.media, vasi.sensore) : 'servono almeno 3 letture diverse per la curva'}
               </p>
               <TabellaParametri gruppo={g} sensore={vasi.sensore} />
-              <Button type="button" variant="outline" className="self-start" disabled={occupato} onClick={() => void scaricaPng(g)}>
+              <Button type="button" variant="outline" className="self-start" disabled={occupato} aria-label={`Scarica grafico (PNG), ${g.substrato}`} onClick={() => void scaricaPng(g)}>
                 Scarica grafico (PNG)
               </Button>
             </section>
