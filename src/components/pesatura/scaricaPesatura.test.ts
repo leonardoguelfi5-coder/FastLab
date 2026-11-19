@@ -48,10 +48,27 @@ describe('scaricaPesatura', () => {
     expect(svg).toContain('<svg')
     expect(svg).toContain('Torba')
     const immagini = vi.mocked(scriviCartella).mock.calls[0][1]
-    expect(immagini.get('curve')).toBe(PNG)
+    expect(immagini.get('curve-0')).toBe(PNG)
     expect(consegna).toHaveBeenCalledWith(BLOB, 'Pesatura_Curve-vasi_2026-11-12.xlsx')
     expect(esito).toEqual({ nomeFile: 'Pesatura_Curve-vasi_2026-11-12.xlsx', grafici: 1, graficiNelFile: 1 })
     expect(toast.success).toHaveBeenCalledWith('Excel scaricato: Pesatura_Curve-vasi_2026-11-12.xlsx')
+  })
+
+  it("con due substrati scrive un'immagine per ciascuno", async () => {
+    const due: DatiPesatura = {
+      ...vasi,
+      campioni: [...vasi.campioni, { id: 'v2', sessione_id: 'S', pianta_id: null, nome: 'V2', substrato: 'Sabbia', ordine: 2 }],
+      pesi: [...vasi.pesi, ...vasi.pesi.map(p => ({ ...p, id: `b${p.id}`, campione_id: 'v2' }))],
+    }
+    const esito = await scaricaPesatura({ sessioni: due.sessioni, dati: due, config, oggi: '2026-11-12' })
+    expect(svgInPng).toHaveBeenCalledTimes(2)
+    expect([...vi.mocked(scriviCartella).mock.calls[0][1].keys()]).toEqual(['curve-0', 'curve-1'])
+    // il secondo PNG è disegnato dal secondo substrato
+    const [primo, secondo] = vi.mocked(svgInPng).mock.calls.map(c => c[0])
+    expect(primo).toContain('Torba')
+    expect(secondo).toContain('Sabbia')
+    expect(secondo).not.toContain('Torba')
+    expect(esito).toMatchObject({ grafici: 2, graficiNelFile: 2 })
   })
 
   it('se il PNG è null il file parte lo stesso e lo dice', async () => {
@@ -82,8 +99,8 @@ describe('scaricaGraficoPng', () => {
 
   it('consegna il PNG con un nome pulito', async () => {
     const { gruppi, sensore } = await gruppiEsito()
-    const nome = await scaricaGraficoPng({ gruppi, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
-    expect(nome).toBe('Pesatura_Curve-vasi_curve_2026-11-12.png')
+    const nome = await scaricaGraficoPng({ gruppo: { ...gruppi[0], substrato: 'Torba / fine' }, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
+    expect(nome).toBe('Pesatura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
     const [blob, nomeFile] = vi.mocked(consegna).mock.calls[0]
     expect(nomeFile).toBe(nome)
     expect((blob as Blob).type).toBe('image/png')
@@ -92,7 +109,7 @@ describe('scaricaGraficoPng', () => {
   it('se il browser non disegna il grafico lancia un errore e non consegna', async () => {
     vi.mocked(svgInPng).mockResolvedValue(null)
     const { gruppi, sensore } = await gruppiEsito()
-    await expect(scaricaGraficoPng({ gruppi, sensore, titolo: 'Curve vasi' })).rejects.toEqual(new ErroreApp(GRAFICO_NON_DISEGNATO))
+    await expect(scaricaGraficoPng({ gruppo: gruppi[0], sensore, titolo: 'Curve vasi' })).rejects.toEqual(new ErroreApp(GRAFICO_NON_DISEGNATO))
     expect(consegna).not.toHaveBeenCalled()
   })
 })

@@ -287,8 +287,8 @@ describe('Sessione con i vasi', () => {
   const asciuga = (id: string, c: string, valore: number, lettura: number, ora: string) =>
     peso(id, c, 1, 'asciugatura', valore, { lettura, misurato_il: `2026-11-11T${ora}:00Z` })
   const pesiVasi = [
-    peso('s1', 'v1', 1, 'secco', 100), peso('c1', 'v1', 1, 'capacita_campo', 200),
-    peso('s2', 'v2', 1, 'secco', 100), peso('c2', 'v2', 1, 'capacita_campo', 300),
+    peso('s1', 'v1', 1, 'secco', 100), peso('c1', 'v1', 1, 'capacita_campo', 200, { lettura: 2 }),
+    peso('s2', 'v2', 1, 'secco', 100), peso('c2', 'v2', 1, 'capacita_campo', 300, { lettura: 3 }),
     asciuga('a1', 'v1', 190, 5, '09'), asciuga('a2', 'v1', 160, 20, '10'), asciuga('a3', 'v1', 130, 60, '11'),
     asciuga('a4', 'v2', 280, 6, '09'),
   ]
@@ -299,9 +299,23 @@ describe('Sessione con i vasi', () => {
     apri()
     await titolo()
     expect(screen.getByRole('img', { name: /Curve di ritenzione/ })).toBeInTheDocument()
-    expect(screen.getByText(/%CC = .*ln\(kPa\)/)).toBeInTheDocument()
+    expect(screen.getByText(/WC = .*h in kPa/)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Peso dei vasi' })).toBeInTheDocument()
-    expect(screen.getByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'Torba' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Parametri delle curve del substrato Torba' })).toBeInTheDocument()
+  })
+
+  it('con due substrati mostra due grafici e due tabelle, e ogni PNG scarica il suo', async () => {
+    const tre = [...vasi, campione('v3', 3, { nome: 'V3', substrato: 'Cocco' })]
+    dati([vasiSessione], tre, [...pesiVasi, peso('s3', 'v3', 1, 'secco', 100), peso('c3', 'v3', 1, 'capacita_campo', 250, { lettura: 2 })])
+    const u = apri()
+    await titolo()
+    expect(screen.getAllByRole('img', { name: /Curve di ritenzione/ })).toHaveLength(2)
+    expect(screen.getAllByRole('table', { name: /^Parametri delle curve/ })).toHaveLength(2)
+    expect(screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent).slice(0, 2)).toEqual(['Torba', 'Cocco'])
+    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Cocco' }))
+    await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0].gruppo.substrato).toBe('Cocco')
   })
 
   it('i vasi non aspettano la configurazione', async () => {
@@ -314,9 +328,9 @@ describe('Sessione con i vasi', () => {
   it('Scarica grafico (PNG) scarica il PNG', async () => {
     const u = apri()
     await titolo()
-    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG)' }))
+    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Torba' }))
     await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', sensore: { unita: 'kPa' } })
+    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', gruppo: { substrato: 'Torba' }, sensore: { unita: 'kPa' } })
   })
 
   it('il proprietario segna conclusa una taratura', async () => {
@@ -333,6 +347,18 @@ describe('Sessione con i vasi', () => {
     expect(screen.getByText('Conclusa')).toBeInTheDocument()
     await u.click(screen.getByRole('button', { name: 'Riapri' }))
     await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ conclusa: false })))
+  })
+
+  it('la capacità di campo mostra la lettura; una vecchia senza lettura dice che manca e si riapre da lì', async () => {
+    dati([vasiSessione], vasi, pesiVasi.map(p => (p.id === 'c2' ? { ...p, lettura: null } : p)))
+    apri()
+    await titolo()
+    expect(screen.getByText('200 g · 2 kPa')).toBeInTheDocument()
+    expect(screen.getByText('300 g · manca la lettura')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Capacità di campo · 1/2' })).toBeInTheDocument()
+    expect(screen.getByText('Mancano dei pesi')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Pesa V2' })).toHaveAttribute(
+      'href', '/esperimenti/E/laboratorio/pesatura/S/pesa/capacita_campo?campione=v2&replica=1')
   })
 
   it('l\'asciugatura mostra quanti pesi ci sono, senza una frazione', async () => {

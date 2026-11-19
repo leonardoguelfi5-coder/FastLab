@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { controllaAsciugatura, controllaReplica, mlTamponeCalcolato, precisioneDeiPesi } from '@/domain/pesatura/calcoli'
 import {
-  etichettaCampione, FASI, letteraReplica, NOMI_FASE, type FasePesata, type Passo,
+  chiedeLettura, etichettaCampione, FASI, letteraReplica, NOMI_FASE, pesoCompleto, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
 import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
@@ -128,7 +128,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
 
   /** Una frase detta: un comando del giro, con la conferma a voce o il bip. Gli stessi salvataggi della tastiera. */
   async function suFrase(testo: string) {
-    const comando = leggiComando(testo, fase === 'asciugatura')
+    const comando = leggiComando(testo, chiedeLettura(sessione.tipo, fase))
     if (comando.tipo === 'non_capito' || finito || giro.occupato) {
       suonoErrore()
       return
@@ -166,7 +166,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
   if (finito) {
     const fasi = FASI[sessione.tipo]
     const prossima = fasi[fasi.indexOf(fase) + 1]
-    const mancanti = passi.filter(p => p.peso === null).length
+    const mancanti = passi.filter(p => !pesoCompleto(p.peso, sessione.tipo, fase)).length
     return (
       <>
         <div className="flex flex-col gap-3">
@@ -253,9 +253,10 @@ function SchedaPasso({
   const [fuocoAlCampo] = useState(!inAscolto)
   const [provato, setProvato] = useState(false)
   const eAsciugatura = fase === 'asciugatura'
+  const conLettura = chiedeLettura(sessione.tipo, fase)
   const sensore = sessione.impostazioni.sensore
   const nomeLettura = !sensore ? 'Lettura del sensore' : `${sensore.tipo === 'umidita' ? 'Umidità' : 'Tensione'} (${sensore.unita})`
-  const comandoDetto = eAsciugatura
+  const comandoDetto = conLettura
     ? `Di' «peso 150 ${sensore?.tipo === 'tensione' ? 'tensione' : 'umidità'} 35 avanti».`
     : "Di' il peso e poi «avanti», per esempio «zero virgola uno due avanti»."
 
@@ -268,7 +269,7 @@ function SchedaPasso({
   const letturaValida = lettura !== null && Number.isFinite(lettura)
   const problemi: string[] = []
   if (!valoreValido) problemi.push('Scrivi il peso.')
-  if (eAsciugatura && !letturaValida) problemi.push('Scrivi la lettura del sensore.')
+  if (conLettura && !letturaValida) problemi.push('Scrivi la lettura del sensore.')
 
   // Avvisi che non bloccano: i pesi della stessa replica non tornano.
   const altri: Partial<Record<TipoPeso, number>> = {}
@@ -286,7 +287,7 @@ function SchedaPasso({
   async function conferma() {
     setProvato(true)
     if (problemi.length > 0 || !puoModificare) return
-    await giro.salva(valore as number, eAsciugatura ? lettura : null)
+    await giro.salva(valore as number, conLettura ? lettura : null)
   }
 
   return (
@@ -324,7 +325,7 @@ function SchedaPasso({
           {puoModificare ? (
             <>
               <NumericField label="Peso" unita={sessione.unita} value={valore} onChange={setValore} avviso={avviso} obbligatorio />
-              {eAsciugatura && <NumericField label={nomeLettura} value={lettura} onChange={setLettura} obbligatorio negativo />}
+              {conLettura && <NumericField label={nomeLettura} value={lettura} onChange={setLettura} obbligatorio negativo />}
             </>
           ) : (
             <div className="flex flex-col gap-1.5">

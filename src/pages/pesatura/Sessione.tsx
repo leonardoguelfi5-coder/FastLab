@@ -12,6 +12,7 @@ import { Conferma } from '@/components/Conferma'
 import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { ConsultaCurva } from '@/components/pesatura/ConsultaCurva'
 import { GraficoCurve } from '@/components/pesatura/GraficoCurve'
+import { TabellaParametri } from '@/components/pesatura/TabellaParametri'
 import { RiepilogoSessione } from '@/components/pesatura/RiepilogoSessione'
 import { scaricaGraficoPng, scaricaPesatura } from '@/components/pesatura/scaricaPesatura'
 import { TestoErrore } from '@/components/TestoErrore'
@@ -19,8 +20,8 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { gruppiDeiVasi } from '@/domain/pesatura/export'
-import { equazione } from '@/domain/pesatura/curva'
-import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, statoSessione } from '@/domain/pesatura/sequenza'
+import { equazione, type CurveSubstrato } from '@/domain/pesatura/curva'
+import { avanzamentoFase, faseDaAprire, FASI, NOMI_FASE, passiDellaFase, pesoCompleto, statoSessione } from '@/domain/pesatura/sequenza'
 import { NOMI_TIPO, type SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { formattaData } from '@/lib/date'
@@ -81,6 +82,7 @@ function Contenuto({ espId, sessione, dati, config }: {
   dati: DatiPesatura
   config: ConfigEsperimento | null
 }) {
+  const idCurve = useId()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const permessi = usePermessi(espId)
@@ -149,8 +151,8 @@ function Contenuto({ espId, sessione, dati, config }: {
     await scaricaPesatura({ sessioni: [aggiornata], dati: freschi, config: configurazione })
   })
 
-  const scaricaPng = () => esegui(async () => {
-    if (vasi) await scaricaGraficoPng({ gruppi: vasi.gruppi, sensore: vasi.sensore, titolo: sessione.titolo })
+  const scaricaPng = (gruppo: CurveSubstrato) => esegui(async () => {
+    if (vasi) await scaricaGraficoPng({ gruppo, sensore: vasi.sensore, titolo: sessione.titolo })
   })
 
   return (
@@ -180,7 +182,7 @@ function Contenuto({ espId, sessione, dati, config }: {
                 const n = pesi.filter(p => p.tipo === 'asciugatura').length
                 testo += ` · ${n} ${n === 1 ? 'peso' : 'pesi'}`
               } else {
-                const a = avanzamentoFase(passiDellaFase(sessione, campioni, pesi, fase))
+                const a = avanzamentoFase(passiDellaFase(sessione, campioni, pesi, fase), p => pesoCompleto(p, sessione.tipo, fase))
                 testo += ` · ${a.pesati}/${a.totali}`
               }
               return (
@@ -206,21 +208,19 @@ function Contenuto({ espId, sessione, dati, config }: {
       {vasi && (
         <section aria-labelledby="titolo-curve" className="flex flex-col gap-4">
           <h2 id="titolo-curve" className="text-title text-grafite">Curve dei vasi</h2>
-          <GraficoCurve gruppi={vasi.gruppi} sensore={vasi.sensore} />
-          <ul className="flex flex-col gap-1">
-            {vasi.gruppi.map(g => (
-              <li key={g.substrato} className="text-base text-grafite">
-                <span className="font-medium">{g.substrato}</span>
-                {': '}
-                <span className="font-mono tabular-nums">
-                  {g.media ? equazione(g.media, vasi.sensore) : 'servono almeno 3 letture diverse per la curva'}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <Button type="button" variant="outline" className="self-start" disabled={occupato} onClick={() => void scaricaPng()}>
-            Scarica grafico (PNG)
-          </Button>
+          {vasi.gruppi.map((g, i) => (
+            <section key={g.substrato} aria-labelledby={`${idCurve}-${i}`} className="flex flex-col gap-3">
+              <h3 id={`${idCurve}-${i}`} className="text-base font-semibold text-grafite">{g.substrato}</h3>
+              <GraficoCurve gruppo={g} sensore={vasi.sensore} />
+              <p className="font-mono text-base tabular-nums text-grafite">
+                {g.media ? equazione(g.media, vasi.sensore) : 'servono almeno 3 letture diverse per la curva'}
+              </p>
+              <TabellaParametri gruppo={g} sensore={vasi.sensore} />
+              <Button type="button" variant="outline" className="self-start" disabled={occupato} aria-label={`Scarica grafico (PNG), ${g.substrato}`} onClick={() => void scaricaPng(g)}>
+                Scarica grafico (PNG)
+              </Button>
+            </section>
+          ))}
           <ConsultaCurva gruppi={vasi.gruppi} sensore={vasi.sensore} unita={sessione.unita} />
         </section>
       )}
