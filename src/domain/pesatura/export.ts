@@ -12,7 +12,7 @@ import {
   sostanzaSeccaCalcolata,
 } from './calcoli'
 import {
-  consultaPerCC, curvePerSubstrato, equazione, modelloPer, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
+  consultaPerCC, curvePerSubstrato, equazione, modelloPer, parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi,
   type CurveSubstrato, type Vaso,
 } from './curva'
 import { etichettaCampione, letteraReplica, repliche } from './sequenza'
@@ -26,9 +26,10 @@ import { NOMI_TIPO, type CampionePesatura, type Peso, type Sensore, type Session
  * come nel riepilogo della pagina: una replica incompleta ha la riga, con le celle vuote.
  */
 
-/** Lo stesso identificativo che `scriviCartella` usa per cercare l'immagine del grafico. */
-export const ID_GRAFICO_CURVE = 'curve'
+/** L'identificativo con cui `scriviCartella` cerca l'immagine del grafico del substrato `indice`. */
+export const idGraficoCurve = (indice: number): string => `curve-${indice}`
 const NOME_GRAFICO = 'Curve di ritenzione dei vasi'
+const titoloGrafico = (substrato: string): string => `Curve di ritenzione — ${substrato}`
 
 /** Sensore di ripiego: un vaso senza sensore nelle impostazioni (non dovrebbe succedere) si legge come una lettura nuda. */
 const SENSORE_NEUTRO: Sensore = { tipo: 'umidita', unita: '' }
@@ -168,27 +169,46 @@ const substratoDi = (v: Vaso): string => v.campione.substrato?.trim() || SENZA_S
 function foglioPunti(sessioni: SessionePesatura[], dati: DatiPesatura): Foglio {
   const colonne: ColonnaGrezza[] = [
     { titolo: 'Vaso', tipo: 'testo' }, { titolo: 'Substrato', tipo: 'testo' }, { titolo: 'Data e ora', tipo: 'istante' },
-    { titolo: 'Peso', tipo: 'numero' }, { titolo: 'Lettura', tipo: 'numero' }, { titolo: 'Acqua', tipo: 'numero' }, { titolo: '% CC', tipo: 'numero' },
+    { titolo: 'Fase', tipo: 'testo' }, { titolo: 'Peso', tipo: 'numero' }, { titolo: 'Lettura', tipo: 'numero' }, { titolo: 'Acqua', tipo: 'numero' }, { titolo: '% CC', tipo: 'numero' },
   ]
   const righe: Cella[][] = []
   for (const s of [...sessioni].sort(dallaPiuVecchia)) {
     const ids = new Set(campioniDi(s, dati).map(c => c.id))
     const precisione = precisioneDeiPesi(dati.pesi.filter(p => ids.has(p.campione_id)))
     for (const v of vasiDaPesi(campioniDi(s, dati), dati.pesi)) {
-      const asciugature = dati.pesi
-        .filter((p: Peso) => p.campione_id === v.campione.id && p.tipo === 'asciugatura')
+      const delVaso = dati.pesi.filter((p: Peso) => p.campione_id === v.campione.id)
+      // la capacità di campo con la sua lettura è il punto al 100 %; senza lettura non è un punto della curva
+      const cc = delVaso.find(p => p.tipo === 'capacita_campo' && p.replica === 1 && p.lettura !== null)
+      const asciugature = delVaso
+        .filter(p => p.tipo === 'asciugatura')
         .sort((a, b) => Date.parse(a.misurato_il) - Date.parse(b.misurato_il))
-      for (const p of asciugature) {
-        const pcc = v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc, precisione)) : null
+      for (const p of cc ? [cc, ...asciugature] : asciugature) {
+        const fase = p.tipo === 'capacita_campo' ? 'Capacità di campo' : 'Asciugatura'
+        const pcc = p.tipo === 'capacita_campo' ? 100
+          : v.secco !== null && v.cc !== null ? arrotondato(percentualeCCCalcolata(p.valore, v.secco, v.cc, precisione)) : null
         const acqua = v.secco === null ? null : differenzaPesi(p.valore, v.secco, precisione)
         righe.push([
-          nomeVaso(v), substratoDi(v), { istante: p.misurato_il }, p.valore, p.lettura,
+          nomeVaso(v), substratoDi(v), { istante: p.misurato_il }, fase, p.valore, p.lettura,
           acqua === null ? null : arrotondaDecimali(acqua.valore, acqua.decimali), pcc,
         ])
       }
     }
   }
   return foglio('Punti', 'dati', colonne, righe)
+}
+
+/** Come la Tabella 4 dell'app: a 2 decimali, b 4, R² 3, h 1. Numeri, non testo: Excel li mostra da sé. */
+function foglioParametri(gruppi: CurveSubstrato[]): Foglio {
+  const colonne: ColonnaGrezza[] = [
+    { titolo: 'Substrato', tipo: 'testo' }, { titolo: 'Vaso', tipo: 'testo' },
+    { titolo: 'a', tipo: 'numero' }, { titolo: 'b', tipo: 'numero' }, { titolo: 'R²', tipo: 'numero' },
+    { titolo: 'h a CC, curva', tipo: 'numero' }, { titolo: 'h a CC, misurato', tipo: 'numero' }, { titolo: 'n', tipo: 'numero' },
+  ]
+  const tondo = (x: number | null, decimali: number): number | null => (x === null || !Number.isFinite(x) ? null : arrotondaDecimali(x, decimali))
+  const righe = gruppi.flatMap(g => parametriDelSubstrato(g).map((r): Cella[] => [
+    g.substrato, r.nome, tondo(r.a, 2), tondo(r.b, 4), tondo(r.r2, 3), tondo(r.letturaCCCurva, 1), tondo(r.letturaCCMisurata, 1), r.n,
+  ]))
+  return foglio('Parametri', 'dati', colonne, righe)
 }
 
 function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
@@ -208,9 +228,16 @@ function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
   return foglio('Pesi target', 'dati', colonne, righe)
 }
 
-function foglioGrafico(): { foglio: Foglio; riga: number } {
-  const righe: Cella[][] = [[NOME_GRAFICO], ...Array.from({ length: RIGHE_IMMAGINE }, (): Cella[] => [])]
-  return { foglio: foglio('Grafico', 'grafici', [{ titolo: 'Grafico', tipo: 'testo' }], righe, { intestazione: false }), riga: 0 }
+/** Un blocco per substrato: il titolo e le righe che l'immagine copre. */
+function foglioGrafico(gruppi: CurveSubstrato[]): { foglio: Foglio; righe: number[] } {
+  const righe: Cella[][] = []
+  const posizioni: number[] = []
+  if (gruppi.length === 0) righe.push([NOME_GRAFICO])
+  for (const g of gruppi) {
+    posizioni.push(righe.length)
+    righe.push([titoloGrafico(g.substrato)], ...Array.from({ length: RIGHE_IMMAGINE }, (): Cella[] => []))
+  }
+  return { foglio: foglio('Grafico', 'grafici', [{ titolo: 'Grafico', tipo: 'testo' }], righe, { intestazione: false }), righe: posizioni }
 }
 
 // ---- Info ----
@@ -282,11 +309,12 @@ export function cartellaPesatura(
 
   if (sessioni[0].tipo === 'vasi') {
     const vasi = gruppiDeiVasi(sessioni, dati)
-    const g = foglioGrafico()
-    fogli.push(foglioPunti(sessioni, dati), foglioPesiTarget(vasi.gruppi), g.foglio)
-    grafici.push({
-      parametroId: ID_GRAFICO_CURVE, titolo: NOME_GRAFICO, scala: 'valore', unita: vasi.sensore.unita.trim() || null, serie: [], note: [], riga: g.riga,
-    })
+    const g = foglioGrafico(vasi.gruppi)
+    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi), foglioPesiTarget(vasi.gruppi), g.foglio)
+    vasi.gruppi.forEach((gr, i) => grafici.push({
+      parametroId: idGraficoCurve(i), titolo: titoloGrafico(gr.substrato), scala: 'valore', unita: vasi.sensore.unita.trim() || null,
+      serie: [], note: [], riga: g.righe[i],
+    }))
     fogli.push(foglioInfo(sessioni, config, adesso, vasi))
   } else {
     fogli.push(foglioPesi(sessioni, dati, contesto(config)), foglioInfo(sessioni, config, adesso, null))

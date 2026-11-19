@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import type { DatiPesatura } from '@/api/pesatura'
 import { nomeSicuro } from '@/domain/archivioFoto'
 import type { Cartella } from '@/domain/export/fogli'
-import { cartellaPesatura, gruppiDeiVasi, ID_GRAFICO_CURVE } from '@/domain/pesatura/export'
+import { cartellaPesatura, gruppiDeiVasi, idGraficoCurve } from '@/domain/pesatura/export'
 import type { CurveSubstrato } from '@/domain/pesatura/curva'
 import type { Sensore, SessionePesatura } from '@/domain/pesatura/tipi'
 import type { ConfigEsperimento } from '@/domain/tipi'
@@ -68,9 +68,11 @@ export async function scaricaPesatura({ sessioni, dati, config, oggi = oggiLocal
   const immagini = new Map<string, Uint8Array>()
   if (cartella.grafici.length > 0) {
     const { gruppi, sensore } = gruppiDeiVasi(sessioni, dati)
-    // provvisorio: un solo grafico, il primo substrato
-    const png = gruppi.length > 0 ? await pngDelleCurve(gruppi[0], sensore, cartella.grafici[0].titolo) : null
-    if (png !== null) immagini.set(ID_GRAFICO_CURVE, png)
+    // un'immagine per substrato: il grafico `i` della cartella è il gruppo `i`
+    for (const [i, grafico] of cartella.grafici.entries()) {
+      const png = await pngDelleCurve(gruppi[i], sensore, grafico.titolo)
+      if (png !== null) immagini.set(idGraficoCurve(i), png)
+    }
   }
 
   let blob: Blob

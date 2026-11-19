@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { DatiPesatura } from '@/api/pesatura'
-import type { Cella, Foglio } from '@/domain/export/fogli'
+import { RIGHE_IMMAGINE, type Cella, type Foglio } from '@/domain/export/fogli'
 import type { ConfigEsperimento } from '@/domain/tipi'
-import { consultaPerCC, curvePerSubstrato, PERCENTUALI_TABELLA, vasiDaPesi } from './curva'
-import { cartellaPesatura, gruppiDeiVasi } from './export'
+import { consultaPerCC, curvePerSubstrato, parametriDelSubstrato, PERCENTUALI_TABELLA, vasiDaPesi } from './curva'
+import { cartellaPesatura, gruppiDeiVasi, idGraficoCurve } from './export'
 import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from './tipi'
 
 const sessione = (extra: Partial<SessionePesatura> = {}): SessionePesatura => ({
@@ -194,24 +194,79 @@ describe('cartellaPesatura: vasi', () => {
   const dati: DatiPesatura = { sessioni: [s], campioni, pesi }
   const cartella = cartellaPesatura([s], dati, config, OGGI, ADESSO)
 
-  it('ha Punti, Pesi target, Grafico e Info (senza Pesi)', () => {
-    expect(cartella.fogli.map(f => f.nome)).toEqual(['Punti', 'Pesi target', 'Grafico', 'Info'])
+  it('ha Punti, Parametri, Pesi target, Grafico e Info (senza Pesi)', () => {
+    expect(cartella.fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Grafico', 'Info'])
     expect(foglio('Punti', cartella.fogli).tipo).toBe('dati')
     expect(foglio('Pesi target', cartella.fogli).tipo).toBe('dati')
     expect(foglio('Grafico', cartella.fogli).tipo).toBe('grafici')
-    expect(cartella.grafici).toHaveLength(1)
-    expect(cartella.grafici[0].parametroId).toBe('curve')
-    expect(cartella.grafici[0].riga).toBe(foglio('Grafico', cartella.fogli).righe.findIndex(r => r.length > 0))
+  })
+
+  it('Grafico: un grafico per substrato, con i titoli e le righe distanziate', () => {
+    expect(idGraficoCurve(1)).toBe('curve-1')
+    expect(cartella.grafici.map(g => g.parametroId)).toEqual(['curve-0', 'curve-1'])
+    expect(cartella.grafici.map(g => g.titolo)).toEqual(['Curve di ritenzione — Torba', 'Curve di ritenzione — Sabbia'])
+    const [a, b] = cartella.grafici
+    const righe = foglio('Grafico', cartella.fogli).righe
+    expect(righe[a.riga]).toEqual(['Curve di ritenzione — Torba'])
+    expect(righe[b.riga]).toEqual(['Curve di ritenzione — Sabbia'])
+    expect(b.riga - a.riga).toBe(RIGHE_IMMAGINE + 1)
+  })
+
+  it('Parametri: una riga per vaso e la Curva media, arrotondate come la tabella', () => {
+    const p = foglio('Parametri', cartella.fogli)
+    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'h a CC, curva', 'h a CC, misurato', 'n'])
+    const gruppi = gruppiDeiVasi([s], dati).gruppi
+    const attese = gruppi.flatMap(g => parametriDelSubstrato(g).map(r => [g.substrato, r]))
+    expect(p.righe).toHaveLength(attese.length)
+    expect(p.righe.map(r => r[1])).toEqual(expect.arrayContaining(['V1', 'V2', 'V3', 'Curva media']))
+    const tondo = (x: number | null, d: number) => (x === null ? null : Number(x.toFixed(d)))
+    attese.forEach(([sub, r], i) => {
+      const riga = p.righe[i]
+      const rp = r as ReturnType<typeof parametriDelSubstrato>[number]
+      expect(riga[0]).toBe(sub)
+      expect(riga[1]).toBe(rp.nome)
+      expect(riga[2]).toBe(tondo(rp.a, 2))
+      expect(riga[3]).toBe(tondo(rp.b, 4))
+      expect(riga[4]).toBe(tondo(rp.r2, 3))
+      expect(riga[5]).toBe(tondo(rp.letturaCCCurva, 1))
+      expect(riga[6]).toBe(tondo(rp.letturaCCMisurata, 1))
+      expect(riga[7]).toBe(rp.n)
+    })
+    // V2 ha un solo punto: nessuna curva, celle vuote
+    const v2 = p.righe.find(r => r[1] === 'V2') as Cella[]
+    expect(col(p, v2, 'a')).toBeNull()
+    expect(col(p, v2, 'R²')).toBeNull()
+  })
+
+  it('Punti: il peso CC con lettura è la riga Capacità di campo al 100 %', () => {
+    const conLettura = [...pesi.filter(x => x.id !== 'c1'), peso('c1', 'v1', 1, 'capacita_campo', 200, { lettura: 2, misurato_il: '2026-11-11T08:30:00Z' })]
+    const d: DatiPesatura = { sessioni: [s], campioni, pesi: conLettura }
+    const p = foglio('Punti', cartellaPesatura([s], d, config, OGGI, ADESSO).fogli)
+    expect(p.righe).toHaveLength(5)
+    const cc = p.righe.find(r => col(p, r, 'Fase') === 'Capacità di campo') as Cella[]
+    expect(col(p, cc, 'Vaso')).toBe('V1')
+    expect(col(p, cc, 'Peso')).toBe(200)
+    expect(col(p, cc, 'Lettura')).toBe(2)
+    expect(col(p, cc, '% CC')).toBe(100)
+    expect(col(p, cc, 'Acqua')).toBeCloseTo(100, 9)
+    expect(col(p, cc, 'Data e ora')).toEqual({ istante: '2026-11-11T08:30:00Z' })
+    expect(p.righe.filter(r => col(p, r, 'Fase') === 'Asciugatura')).toHaveLength(4)
+  })
+
+  it('Info: equazione della curva media è in forma potenza', () => {
+    const info = foglio('Info', cartella.fogli).righe.find(r => r[0] === 'Torba' && typeof r[1] === 'string' && r[1].startsWith('WC = '))
+    expect(info?.[1]).toContain('h^')
   })
 
   it('Punti: una riga per asciugatura con acqua e % CC', () => {
     const p = foglio('Punti', cartella.fogli)
-    expect(titoli(p)).toEqual(['Vaso', 'Substrato', 'Data e ora', 'Peso', 'Lettura', 'Acqua', '% CC'])
+    expect(titoli(p)).toEqual(['Vaso', 'Substrato', 'Data e ora', 'Fase', 'Peso', 'Lettura', 'Acqua', '% CC'])
     expect(p.righe).toHaveLength(4)
     const r = p.righe[0]
     expect(col(p, r, 'Vaso')).toBe('V1')
     expect(col(p, r, 'Substrato')).toBe('Torba')
     expect(col(p, r, 'Data e ora')).toEqual({ istante: '2026-11-11T09:00:00Z' })
+    expect(col(p, r, 'Fase')).toBe('Asciugatura')
     expect(col(p, r, 'Peso')).toBe(190)
     expect(col(p, r, 'Lettura')).toBe(5)
     expect(col(p, r, 'Acqua')).toBeCloseTo(90, 9)
