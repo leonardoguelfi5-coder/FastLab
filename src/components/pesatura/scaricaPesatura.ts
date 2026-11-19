@@ -40,7 +40,7 @@ export interface EsitoPesatura {
 }
 
 /** Il disegno di un grafico come markup SVG, o `null` se `react-dom/server` non arriva (il chunk non si scarica). */
-async function disegna(gruppi: CurveSubstrato[], sensore: Sensore, titolo: string): Promise<string | null> {
+async function disegna(gruppo: CurveSubstrato, sensore: Sensore, titolo: string): Promise<string | null> {
   let render: (typeof import('react-dom/server'))['renderToStaticMarkup']
   try {
     render = (await import('react-dom/server')).renderToStaticMarkup
@@ -48,11 +48,11 @@ async function disegna(gruppi: CurveSubstrato[], sensore: Sensore, titolo: strin
     return null
   }
   const font = await fontDati()
-  return render(createElement(GraficoCurve, { gruppi, sensore, perImmagine: true, titolo, fontIncorporato: font }))
+  return render(createElement(GraficoCurve, { gruppo, sensore, perImmagine: true, titolo, fontIncorporato: font }))
 }
 
-async function pngDelleCurve(gruppi: CurveSubstrato[], sensore: Sensore, titolo: string): Promise<Uint8Array | null> {
-  const svg = await disegna(gruppi, sensore, titolo)
+async function pngDelleCurve(gruppo: CurveSubstrato, sensore: Sensore, titolo: string): Promise<Uint8Array | null> {
+  const svg = await disegna(gruppo, sensore, titolo)
   if (svg === null) return null
   try {
     return await svgInPng(svg, LARGHEZZA_IMMAGINE, ALTEZZA_IMMAGINE)
@@ -68,7 +68,8 @@ export async function scaricaPesatura({ sessioni, dati, config, oggi = oggiLocal
   const immagini = new Map<string, Uint8Array>()
   if (cartella.grafici.length > 0) {
     const { gruppi, sensore } = gruppiDeiVasi(sessioni, dati)
-    const png = await pngDelleCurve(gruppi, sensore, cartella.grafici[0].titolo)
+    // provvisorio: un solo grafico, il primo substrato
+    const png = gruppi.length > 0 ? await pngDelleCurve(gruppi[0], sensore, cartella.grafici[0].titolo) : null
     if (png !== null) immagini.set(ID_GRAFICO_CURVE, png)
   }
 
@@ -92,7 +93,7 @@ export async function scaricaPesatura({ sessioni, dati, config, oggi = oggiLocal
 export async function scaricaGraficoPng(
   { gruppi, sensore, titolo, oggi = oggiLocale() }: { gruppi: CurveSubstrato[]; sensore: Sensore; titolo: string; oggi?: string },
 ): Promise<string> {
-  const png = await pngDelleCurve(gruppi, sensore, titolo)
+  const png = gruppi.length > 0 ? await pngDelleCurve(gruppi[0], sensore, titolo) : null
   if (png === null) throw new ErroreApp(GRAFICO_NON_DISEGNATO)
   const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_curve_${oggi}.png`
   consegna(new Blob([png as BlobPart], { type: 'image/png' }), nomeFile)

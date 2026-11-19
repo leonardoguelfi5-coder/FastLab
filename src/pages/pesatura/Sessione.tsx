@@ -206,7 +206,7 @@ function Contenuto({ espId, sessione, dati, config }: {
       {vasi && (
         <section aria-labelledby="titolo-curve" className="flex flex-col gap-4">
           <h2 id="titolo-curve" className="text-title text-grafite">Curve dei vasi</h2>
-          <GraficoCurve gruppi={vasi.gruppi} sensore={vasi.sensore} />
+          {vasi.gruppi.map(g => <GraficoCurve key={g.substrato} gruppo={g} sensore={vasi.sensore} />)}
           <ul className="flex flex-col gap-1">
             {vasi.gruppi.map(g => (
               <li key={g.substrato} className="text-base text-grafite">
