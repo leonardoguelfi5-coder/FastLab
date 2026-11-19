@@ -325,7 +325,7 @@ describe('NuovaSessione: vasi', () => {
     const u = await sceltiVasi()
     expect(screen.queryByRole('radio', { name: 'Tutte le piante' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Una replica in più' })).not.toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Sensore' })).toHaveValue('umidita')
+    expect(screen.getByRole('combobox', { name: 'Sensore' })).toHaveValue('tdr')
     await u.click(screen.getByRole('button', { name: 'Aggiungi vaso' }))
     expect(screen.getByLabelText('Nome vaso 1')).toBeInTheDocument()
     expect(screen.getByLabelText('Substrato vaso 1')).toBeInTheDocument()

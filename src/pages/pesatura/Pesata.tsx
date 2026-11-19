@@ -16,6 +16,7 @@ import { controllaAsciugatura, controllaReplica, mlTamponeCalcolato, precisioneD
 import {
   chiedeLettura, etichettaCampione, FASI, letteraReplica, NOMI_FASE, pesoCompleto, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
+import { nomeLettura } from '@/domain/pesatura/export'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
 import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
@@ -255,9 +256,9 @@ function SchedaPasso({
   const eAsciugatura = fase === 'asciugatura'
   const conLettura = chiedeLettura(sessione.tipo, fase)
   const sensore = sessione.impostazioni.sensore
-  const nomeLettura = !sensore ? 'Lettura del sensore' : `${sensore.tipo === 'umidita' ? 'Umidità' : 'Tensione'} (${sensore.unita})`
+  const etichettaLettura = !sensore ? 'Lettura del sensore' : nomeLettura(sensore)
   const comandoDetto = conLettura
-    ? `Di' «peso 150 ${sensore?.tipo === 'tensione' ? 'tensione' : 'umidità'} 35 avanti».`
+    ? `Di' «peso 150 lettura 35 avanti».`
     : "Di' il peso e poi «avanti», per esempio «zero virgola uno due avanti»."
 
   // La tastiera è già pronta sul primo campo: si scrive subito.
@@ -325,7 +326,7 @@ function SchedaPasso({
           {puoModificare ? (
             <>
               <NumericField label="Peso" unita={sessione.unita} value={valore} onChange={setValore} avviso={avviso} obbligatorio />
-              {conLettura && <NumericField label={nomeLettura} value={lettura} onChange={setLettura} obbligatorio negativo />}
+              {conLettura && <NumericField label={etichettaLettura} value={lettura} onChange={setLettura} obbligatorio negativo />}
             </>
           ) : (
             <div className="flex flex-col gap-1.5">

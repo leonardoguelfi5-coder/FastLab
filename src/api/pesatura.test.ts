@@ -54,6 +54,14 @@ describe('impostazioni vuote nel database ({})', () => {
     expect((await listaPesatura('E')).sessioni[0].impostazioni).toEqual(predefinite)
   })
 
+  it('un sensore salvato come umidità si legge come TDR, con la stessa unità', async () => {
+    pagineDa({
+      sessioni_pesatura: [[{ ...rigaSessione(1), impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'umidita', unita: '%' } } }], []],
+      campioni_pesatura: [[]], pesi: [[]],
+    })
+    expect((await listaPesatura('E')).sessioni[0].impostazioni.sensore).toEqual({ tipo: 'tdr', unita: '%' })
+  })
+
   it('i campi presenti restano, quelli mancanti si completano', async () => {
     pagineDa({ sessioni_pesatura: [[{ ...rigaSessione(1), impostazioni: { repliche: 3 } }], []], campioni_pesatura: [[]], pesi: [[]] })
     expect((await listaPesatura('E')).sessioni[0].impostazioni).toEqual({ ...predefinite, repliche: 3 })

@@ -3,7 +3,8 @@ import { TriangleAlert } from 'lucide-react'
 import { NumericField } from '@/components/NumericField'
 import { SceltaSingola } from '@/components/SceltaSingola'
 import {
-  consultaPerCC, consultaPerLettura, PERCENTUALI_TABELLA, type CurveSubstrato, type RispostaConsulta,
+  consultaPerCC, consultaPerLettura, decimaliDeficit, decimaliLetturaTarget, deficitInMl, PERCENTUALI_TABELLA, sogliaDelSubstrato,
+  type CurveSubstrato, type RispostaConsulta, type Soglia,
 } from '@/domain/pesatura/curva'
 import { nomeLettura } from '@/domain/pesatura/export'
 import type { Sensore, UnitaPeso } from '@/domain/pesatura/tipi'
@@ -50,6 +51,22 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
     return modo === 'cc' ? consultaPerCC(gruppi, valore) : consultaPerLettura(gruppi, valore)
   }, [gruppi, modo, valore])
   const tabella = useMemo(() => PERCENTUALI_TABELLA.map(p => ({ p, risposte: consultaPerCC(gruppi, p) })), [gruppi])
+  // le soglie di irrigazione si impostano una volta sola sui logger: solo per il TDR
+  const conSoglie = sensore.tipo === 'tdr'
+  const decimaliTarget = useMemo(() => decimaliLetturaTarget(gruppi), [gruppi])
+  const soglie = useMemo(
+    () => (conSoglie ? PERCENTUALI_TABELLA.map(p => gruppi.map(g => sogliaDelSubstrato(g, p))) : []),
+    [conSoglie, gruppi],
+  )
+  const rispostaSoglie = useMemo(
+    () => (conSoglie && modo === 'cc' && valore !== null && Number.isFinite(valore) ? gruppi.map(g => sogliaDelSubstrato(g, valore)) : null),
+    [conSoglie, modo, valore, gruppi],
+  )
+  const unitaDeficit = deficitInMl(0, unita).unita
+  /** Il deficit medio con i decimali dei pesi (spostati se è convertito in mL), "—" se manca. */
+  const deficit = (s: Soglia): string =>
+    s.deficitMedio === null ? '—' : formattaDecimali(deficitInMl(s.deficitMedio, unita).valore, decimaliDeficit(decimali, unita))
+  const target = (s: Soglia): string => (s.letturaTarget === null ? '—' : formattaDecimali(s.letturaTarget, decimaliTarget))
   const nomeVaso = (g: CurveSubstrato, i: number) => g.vasi[i].campione.nome?.trim() || g.vasi[i].campione.id
 
   return (
@@ -77,7 +94,7 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
         {risposte === null ? (
           <p className="text-grafite-tenue">Scrivi un valore per vedere il peso di ogni vaso.</p>
         ) : (
-          risposte.map(r => {
+          risposte.map((r, ri) => {
             const gruppo = gruppi.find(g => g.substrato === r.substrato) as CurveSubstrato
             return (
               <section key={r.substrato} aria-label={`Substrato ${r.substrato}`} className="flex flex-col gap-1 rounded-2xl border border-riga bg-foglio p-4">
@@ -97,6 +114,12 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                   <span>Media {peso(r.media, decimali, unita)}</span>
                   {r.fuoriCampo && <Avviso />}
                 </p>
+                {rispostaSoglie && (
+                  <p className="flex flex-wrap gap-x-4 font-medium text-grafite">
+                    <span>TDR target {target(rispostaSoglie[ri])}</span>
+                    <span>Deficit medio {deficit(rispostaSoglie[ri])} {unitaDeficit}</span>
+                  </p>
+                )}
               </section>
             )
           })
@@ -131,6 +154,18 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                   <th scope="row" className="px-3 py-2.5 text-left font-semibold">Media</th>
                   {tabella.map(({ p, risposte: r }) => <td key={p} className="px-3 py-2.5 text-right">{r[gi].media === null ? '—' : formattaDecimali(r[gi].media as number, decimali)}</td>)}
                 </tr>
+                {conSoglie && (
+                  <>
+                    <tr>
+                      <th scope="row" className="px-3 py-2.5 text-left font-normal">TDR target</th>
+                      {soglie.map((sg, k) => <td key={PERCENTUALI_TABELLA[k]} className="px-3 py-2.5 text-right">{target(sg[gi])}</td>)}
+                    </tr>
+                    <tr>
+                      <th scope="row" className="px-3 py-2.5 text-left font-normal">Deficit medio ({unitaDeficit})</th>
+                      {soglie.map((sg, k) => <td key={PERCENTUALI_TABELLA[k]} className="px-3 py-2.5 text-right">{deficit(sg[gi])}</td>)}
+                    </tr>
+                  </>
+                )}
               </tbody>
             ))}
           </table>

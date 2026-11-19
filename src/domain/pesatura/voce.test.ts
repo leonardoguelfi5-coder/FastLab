@@ -173,10 +173,16 @@ describe('leggiComando', () => {
     expect(leggiComando('peso 2350 tensione 30 avanti', true)).toEqual({ tipo: 'avanti', valore: 2350, lettura: 30 })
   })
 
-  it('con la lettura: umidità o umidita, e la lettura può essere negativa', () => {
-    expect(leggiComando('Peso centocinquanta umidità trentacinque avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: 35 })
-    expect(leggiComando('peso 150 umidita 35,5 avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: 35.5 })
+  it('con la lettura: peso <n> lettura <n> avanti, e la lettura può essere negativa', () => {
+    expect(leggiComando('Peso centocinquanta lettura trentacinque avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: 35 })
+    expect(leggiComando('peso 150 lettura 35,5 avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: 35.5 })
+    expect(leggiComando('peso 150 lettura 35 avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: 35 })
     expect(leggiComando('peso 150 tensione meno trenta avanti', true)).toEqual({ tipo: 'avanti', valore: 150, lettura: -30 })
+  })
+
+  it('umidità non è più un nome di lettura', () => {
+    expect(leggiComando('peso 150 umidità 35 avanti', true)).toEqual({ tipo: 'non_capito' })
+    expect(leggiComando('peso 150 umidita 35 avanti', true)).toEqual({ tipo: 'non_capito' })
   })
 
   it('lo stesso comando senza conLettura non si capisce', () => {

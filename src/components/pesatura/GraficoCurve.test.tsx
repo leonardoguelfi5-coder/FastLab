@@ -94,4 +94,10 @@ describe('GraficoCurve', () => {
     const g = curvePerSubstrato([vaso('V1', 'Vaso A', [])], 'lineare')[0]
     expect(disegna(g).textContent).toContain('Nessun dato da disegnare')
   })
+
+  it('con il TDR e letture positive la x parte da 0', () => {
+    const g = curvePerSubstrato([vaso('T', 'T', [[40, 20], [50, 50], [60, 80]])], 'lineare')[0]
+    const c = render(<GraficoCurve gruppo={g} sensore={{ tipo: 'tdr', unita: 'raw' }} />).container
+    expect([...c.querySelectorAll('line[data-tacca-x]')][0]).toHaveAttribute('data-tacca-x', '0')
+  })
 })

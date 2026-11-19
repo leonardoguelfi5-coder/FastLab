@@ -1,7 +1,7 @@
 import type { Pianta } from '../tipi'
 import {
   MAX_CARATTERI_UNITA, UNITA_COMUNI, type CampionePesatura, type ImpostazioniAnalisi, type SessionePesatura, type TipoAnalisi,
-  type TipoSensore,
+  normalizzaSensore, type TipoSensore,
 } from './tipi'
 
 /**
@@ -30,7 +30,7 @@ export interface BozzaPesata {
 }
 
 export const SENSORI: { valore: TipoSensore; testo: string; unita: string }[] = [
-  { valore: 'umidita', testo: 'Umidità', unita: '%' },
+  { valore: 'tdr', testo: 'TDR', unita: 'raw' },
   { valore: 'tensione', testo: 'Tensione', unita: 'kPa' },
 ]
 
@@ -45,7 +45,7 @@ export const DESCRIZIONI_TIPO: Record<TipoAnalisi, string> = {
 export function bozzaVuota(oggi: string): BozzaPesata {
   return {
     titolo: '', data: oggi, tipo: 'aliquota', sceltaUnita: 'g', unitaLibera: '', repliche: 1,
-    calcolaTampone: false, rapportoTampone: null, sensore: 'umidita', unitaSensore: '%', nota: '',
+    calcolaTampone: false, rapportoTampone: null, sensore: 'tdr', unitaSensore: 'raw', nota: '',
   }
 }
 
@@ -64,8 +64,8 @@ export function bozzaDa(s: SessionePesatura, oggi: string): BozzaPesata {
     repliche: s.tipo === 'vasi' ? 1 : i.repliche,
     calcolaTampone: i.rapportoTampone !== null,
     rapportoTampone: i.rapportoTampone,
-    sensore: i.sensore?.tipo ?? 'umidita',
-    unitaSensore: i.sensore?.unita ?? '%',
+    sensore: normalizzaSensore(i.sensore)?.tipo ?? 'tdr',
+    unitaSensore: i.sensore?.unita ?? 'raw',
     nota: s.nota ?? '',
   }
 }

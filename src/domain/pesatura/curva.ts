@@ -1,5 +1,6 @@
-import { percentualeCC, pesoAPercentualeCC } from './calcoli'
-import type { CampionePesatura, Peso, Sensore } from './tipi'
+import { arrotondaCifre, decimaliMassimi, formattaCifre } from '@/lib/numeri'
+import { inGrammi, percentualeCC, pesoAPercentualeCC } from './calcoli'
+import type { CampionePesatura, Peso, Sensore, UnitaPeso } from './tipi'
 
 /**
  * La curva di ritenzione idrica dei vasi: la % della capacità di campo (y) in funzione della lettura del sensore (x).
@@ -213,16 +214,17 @@ export function letturaAPercentuale(c: Curva, pcc: number): number | null {
 const mediaDi = (valori: number[]): number => valori.reduce((s, v) => s + v, 0) / valori.length
 
 /**
- * La curva media dei vasi, mediata in scala logaritmica: a ogni h, ln WC medio = media(ln a) + media(b)·ln h. Quindi a è
- * la media geometrica degli a (e^media(ln a)) e b la media dei b; R² è la media degli R², n la somma, min e max gli
- * estremi. Gli a sono sempre > 0 (`adattaPotenza` scarta le curve con a ≤ 0).
+ * La curva media dei vasi. Nella potenza si media in scala logaritmica: a ogni h, ln WC medio = media(ln a) + media(b)·ln h,
+ * quindi a è la media geometrica degli a (e^media(ln a); sono sempre > 0, `adattaPotenza` scarta le curve con a ≤ 0).
+ * Nella retta a (l'intercetta q, anche negativa) e b (la pendenza m) sono medie aritmetiche. In tutte e due b è la media
+ * dei b, R² la media degli R², n la somma, min e max gli estremi.
  */
 export function mediaDeiParametri(curve: Curva[]): Curva | null {
   if (curve.length === 0) return null
   const r2 = curve.flatMap((c) => (c.r2 === null ? [] : [c.r2]))
   return {
     modello: curve[0].modello,
-    a: Math.exp(mediaDi(curve.map((c) => Math.log(c.a)))),
+    a: curve[0].modello === 'potenza' ? Math.exp(mediaDi(curve.map((c) => Math.log(c.a)))) : mediaDi(curve.map((c) => c.a)),
     b: mediaDi(curve.map((c) => c.b)),
     r2: r2.length === 0 ? null : mediaDi(r2),
     n: curve.reduce((s, c) => s + c.n, 0),
@@ -242,20 +244,22 @@ const negativo = (n: number, decimali: number): boolean => Number(n.toFixed(deci
 /** Un numero con `decimali` cifre, la virgola e il segno meno se serve. */
 export const conSegno = (n: number, decimali: number): string => `${negativo(n, decimali) ? MENO : ''}${cifre(n, decimali)}`
 
+/** Un numero con `cifre` cifre significative, la virgola e il segno meno se serve (−0,5000; 2,178; −17,31). */
+export const conCifre = (n: number, cifre: number): string => `${arrotondaCifre(n, cifre) < 0 ? MENO : ''}${formattaCifre(Math.abs(n), cifre)}`
+
 /**
  * Per esempio `WC = 649,17 · h^−0,6033  (h in hPa; R² 0,966, n 5)` per la potenza, con a a 2 decimali, b a 4 ed R² a 3;
- * `%CC = 112,4 − 18,3 · %  (R² 0,97, n 14)` per la retta, dove la lettura si indica con l'unità del sensore.
+ * `%CC = 2,178 · TDR − 17,31  (R² 0,999, n 5)` per la retta del TDR, con m e q a 4 cifre significative ed R² a 3 decimali.
  */
 export function equazione(c: Curva, sensore: Sensore): string {
   const unita = sensore.unita.trim()
+  const r2 = c.r2 === null ? '' : `R² ${conSegno(c.r2, 3)}, `
   if (c.modello === 'potenza') {
-    const r2 = c.r2 === null ? '' : `R² ${conSegno(c.r2, 3)}, `
     return `WC = ${conSegno(c.a, 2)} · h^${conSegno(c.b, 4)}  (${unita ? `h in ${unita}; ` : ''}${r2}n ${c.n})`
   }
-  const variabile = unita || 'lettura'
-  const segnoB = negativo(c.b, 1) ? MENO : '+'
-  const r2 = c.r2 === null ? '' : `R² ${cifre(c.r2, 2)}, `
-  return `%CC = ${conSegno(c.a, 1)} ${segnoB} ${cifre(c.b, 1)} · ${variabile}  (${r2}n ${c.n})`
+  const variabile = sensore.tipo === 'tdr' ? 'TDR' : unita || 'lettura'
+  const segnoQ = arrotondaCifre(c.a, 4) < 0 ? MENO : '+'
+  return `%CC = ${conCifre(c.b, 4)} · ${variabile} ${segnoQ} ${formattaCifre(Math.abs(c.a), 4)}  (${r2}n ${c.n})`
 }
 
 /** `curve[i]` è la curva del vaso `vasi[i]`, null se il vaso non ne ha una. */
@@ -273,8 +277,8 @@ export const SENZA_SUBSTRATO = 'Senza substrato'
 const nomeSubstrato = (s: string | null): string => s?.trim() || SENZA_SUBSTRATO
 
 /**
- * I substrati nell'ordine in cui compaiono i vasi, con la curva di ogni vaso. La curva media, nella potenza, è la media
- * dei parametri dei vasi che hanno una curva; nella retta si adatta a tutti i punti dei vasi messi insieme.
+ * I substrati nell'ordine in cui compaiono i vasi, con la curva di ogni vaso. La curva media, nella potenza come nella
+ * retta, è la media dei parametri dei vasi che hanno una curva (`mediaDeiParametri`).
  */
 export function curvePerSubstrato(vasi: Vaso[], modello: ModelloCurva): CurveSubstrato[] {
   const gruppi = new Map<string, Vaso[]>()
@@ -291,10 +295,7 @@ export function curvePerSubstrato(vasi: Vaso[], modello: ModelloCurva): CurveSub
       vasi: suoi,
       curve,
       modello,
-      media:
-        modello === 'potenza'
-          ? mediaDeiParametri(curve.filter((c): c is Curva => c !== null))
-          : adattaCurva(suoi.flatMap((v) => v.punti), modello),
+      media: mediaDeiParametri(curve.filter((c): c is Curva => c !== null)),
     }
   })
 }
@@ -318,9 +319,9 @@ export interface RigaParametri {
 /** Le due intestazioni delle colonne "lettura a CC" della tabella dei parametri (app ed Excel): con l'unità del sensore. */
 export function intestazioniLetturaCC(sensore: Sensore): { curva: string; misurato: string } {
   const unita = sensore.unita.trim()
-  const simbolo = sensore.tipo === 'tensione' ? 'h' : 'Lettura'
-  const colonna = (come: string) => `${simbolo} a CC, ${come}${unita ? ` (${unita})` : ''}`
-  return { curva: colonna('curva'), misurato: colonna('misurato') }
+  const potenza = sensore.tipo === 'tensione'
+  const colonna = (come: string) => `${potenza ? 'h' : 'TDR'} a CC, ${come}${unita ? ` (${unita})` : ''}`
+  return potenza ? { curva: colonna('curva'), misurato: colonna('misurato') } : { curva: colonna('retta'), misurato: colonna('misurata') }
 }
 
 /** Una riga per vaso, poi la "Curva media" se il substrato ne ha una (senza lettura misurata: non c'è un vaso medio). */
@@ -412,3 +413,63 @@ export function consultaPerLettura(gruppi: CurveSubstrato[], lettura: number): R
 
 /** Le % CC della tabella già pronta sotto il riquadro di consultazione. */
 export const PERCENTUALI_TABELLA = [100, 80, 60, 50, 40] as const
+
+/** `deficit` è la CC meno il peso target: l'acqua da togliere al vaso saturo per arrivare alla soglia. */
+export interface SogliaVaso {
+  vaso: string
+  pesoTarget: number | null
+  deficit: number | null
+}
+
+/** La soglia al `pcc` % della CC: la lettura dalla retta media e, per ogni vaso, il peso target e il deficit d'acqua. */
+export interface Soglia {
+  pcc: number
+  letturaTarget: number | null
+  vasi: SogliaVaso[]
+  pesoMedio: number | null
+  deficitMedio: number | null
+}
+
+const mediaOpzionale = (valori: (number | null)[]): number | null => {
+  const presenti = valori.flatMap((v) => (v === null ? [] : [v]))
+  return presenti.length === 0 ? null : mediaDi(presenti)
+}
+
+/**
+ * La lettura target viene dalla curva media; peso e deficit sono del vaso (suo secco, sua CC) e si mediano sui vasi che
+ * li hanno. `letturaTarget` è null senza curva media o se la pendenza è nulla o il risultato non è finito.
+ */
+export function sogliaDelSubstrato(g: CurveSubstrato, pcc: number): Soglia {
+  const lettura = g.media === null ? null : letturaAPercentuale(g.media, pcc)
+  const vasi = g.vasi.map((v): SogliaVaso => {
+    const pesoTarget = pesoDelVaso(v, pcc)
+    return { vaso: v.campione.id, pesoTarget, deficit: pesoTarget === null || v.cc === null ? null : v.cc - pesoTarget }
+  })
+  return {
+    pcc,
+    letturaTarget: lettura !== null && Number.isFinite(lettura) ? lettura : null,
+    vasi,
+    pesoMedio: mediaOpzionale(vasi.map((v) => v.pesoTarget)),
+    deficitMedio: mediaOpzionale(vasi.map((v) => v.deficit)),
+  }
+}
+
+/** Il deficit d'acqua: se il peso è in grammi (o mg, kg) è acqua, 1 g = 1 mL; altrimenti resta nell'unità della sessione. */
+export function deficitInMl(deficit: number, unita: UnitaPeso): { valore: number; unita: string } {
+  const grammi = inGrammi(deficit, unita)
+  return grammi === null ? { valore: deficit, unita } : { valore: grammi, unita: 'mL' }
+}
+
+/** I decimali del TDR target: quelli delle letture misurate più uno (minimo 1), perché la retta ne ricava un valore più fine. */
+export function decimaliLetturaTarget(gruppi: CurveSubstrato[]): number {
+  const letture = gruppi.flatMap((g) =>
+    g.vasi.flatMap((v) => [...v.punti.map((p) => p.lettura), ...(v.letturaCC === null ? [] : [v.letturaCC])]),
+  )
+  return Math.max(1, decimaliMassimi(letture) + 1)
+}
+
+/** I decimali del deficit: quelli dei pesi, spostati dell'ordine di grandezza se il deficit è convertito in mL (kg → g, mg → g). */
+export function decimaliDeficit(decimaliPesi: number, unita: UnitaPeso): number {
+  const fattore = inGrammi(1, unita)
+  return fattore === null ? decimaliPesi : Math.max(0, decimaliPesi - Math.round(Math.log10(fattore)))
+}
