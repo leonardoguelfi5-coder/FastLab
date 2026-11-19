@@ -25,11 +25,11 @@ describe('TabellaParametri', () => {
     }
   })
 
-  it('con un sensore di umidità la lettura è "Lettura"', () => {
+  it('con un sensore TDR la lettura è "TDR"', () => {
     const g = curvePerSubstrato([vaso('A', [[10, 80], [20, 60], [30, 40]], 5)], 'lineare')[0]
     apri(g, { tipo: 'tdr', unita: '%' })
-    expect(screen.getByRole('columnheader', { name: 'Lettura a CC, curva (%)' })).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Lettura a CC, misurato (%)' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'TDR a CC, retta (%)' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'TDR a CC, misurata (%)' })).toBeInTheDocument()
   })
 
   it('scrive la riga del vaso con la virgola e il meno vero, e la curva media in grassetto', () => {

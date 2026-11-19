@@ -260,10 +260,10 @@ describe('cartellaPesatura: vasi', () => {
     expect(col(p, cc, '% CC')).toBeNull()
   })
 
-  it("Parametri: con un sensore TDR le intestazioni dicono Lettura e l'unità", () => {
+  it("Parametri: con un sensore TDR le intestazioni dicono TDR e l'unità", () => {
     const sU = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tdr' as const, unita: '%' } } })
     const p = foglio('Parametri', cartellaPesatura([sU], { sessioni: [sU], campioni, pesi }, config, OGGI, ADESSO).fogli)
-    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'Lettura a CC, curva (%)', 'Lettura a CC, misurato (%)', 'n'])
+    expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'TDR a CC, retta (%)', 'TDR a CC, misurata (%)', 'n'])
   })
 
   it('Info: equazione della curva media è in forma potenza', () => {

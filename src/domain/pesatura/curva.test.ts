@@ -4,13 +4,16 @@ import {
   consultaPerCC,
   consultaPerLettura,
   curvePerSubstrato,
+  deficitInMl,
   equazione,
+  intestazioniLetturaCC,
   letturaAPercentuale,
   mediaDeiParametri,
   modelloPer,
   parametriDelSubstrato,
   PERCENTUALI_TABELLA,
   pccDaLettura,
+  sogliaDelSubstrato,
   vasiDaPesi,
   type Curva,
   type PuntoCurva,
@@ -216,12 +219,12 @@ describe('equazione', () => {
 
   it('lineare con pendenza positiva e R² assente', () => {
     const c = { modello: 'lineare' as const, a: 10, b: 2, r2: null, n: 3, min: 1, max: 3 }
-    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = 10,0 + 2,0 · %  (n 3)')
+    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = 2,000 · TDR + 10,00  (n 3)')
   })
 
   it('lineare con la virgola decimale e il segno meno', () => {
     const c = { modello: 'lineare' as const, a: 112.43, b: -18.27, r2: 0.9712, n: 14, min: 5, max: 70 }
-    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = 112,4 − 18,3 · %  (R² 0,97, n 14)')
+    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = −18,27 · TDR + 112,4  (R² 0,971, n 14)')
   })
 })
 
@@ -281,7 +284,7 @@ describe('vasiDaPesi', () => {
 })
 
 describe('curvePerSubstrato', () => {
-  it('raggruppa due vasi "HC" e un vaso "Ctrl", con la curva media lineare su tutti i punti', () => {
+  it('raggruppa due vasi "HC" e un vaso "Ctrl", con la curva media lineare delle rette dei vasi', () => {
     const vasi = [
       vaso('a', 'HC'),
       vaso('b', 'Ctrl'),
@@ -290,8 +293,10 @@ describe('curvePerSubstrato', () => {
     const gruppi = curvePerSubstrato(vasi, 'lineare')
     expect(gruppi.map((g) => g.substrato)).toEqual(['HC', 'Ctrl'])
     expect(gruppi[0].vasi.map((v) => v.campione.id)).toEqual(['a', 'c'])
-    expect(gruppi[0].media!.n).toBe(6)
-    expect(gruppi[0].media!.max).toBe(6)
+    // il vaso "c" ha solo 2 punti: non ha retta e la media usa quella di "a"
+    expect(gruppi[0].curve[1]).toBeNull()
+    expect(gruppi[0].media!.n).toBe(4)
+    expect(gruppi[0].media!.max).toBe(4)
     expect(gruppi[1].vasi.map((v) => v.campione.id)).toEqual(['b'])
     expect(gruppi[1].media!.n).toBe(4)
   })
@@ -464,7 +469,7 @@ describe('consultaPerLettura', () => {
 
   it('senza curva propria il vaso usa la curva media del substrato', () => {
     const gruppi = curvePerSubstrato(
-      [vaso('a', 'HC', { punti: punti([1, 2], (x) => 10 + 2 * x) }), vaso('b', 'HC', { punti: punti([3, 4], (x) => 10 + 2 * x) })],
+      [vaso('a', 'HC'), vaso('b', 'HC', { punti: punti([3, 4], (x) => 10 + 2 * x) })],
       'lineare',
     )
     const [hc] = consultaPerLettura(gruppi, 2.5)
@@ -509,5 +514,123 @@ describe('consultaPerLettura', () => {
     const [hc] = consultaPerLettura(gruppi, 0)
     expect(hc.vasi[0].peso).toBeNull()
     expect(hc.media).toBeNull()
+  })
+})
+
+// Il TDR: vasi veri, con valori da `numpy.polyfit` (la retta di ogni vaso con la CC al 100 %).
+function vasoTDR(id: string, secco: number, cc: number, letturaCC: number, asciugatura: [number, number][]): Vaso {
+  const pesi = [
+    peso(id, 'secco', secco),
+    peso(id, 'capacita_campo', cc, letturaCC),
+    ...asciugatura.map(([p, l], i) => peso(id, 'asciugatura', p, l, `2026-11-1${i + 1}T10:00:00Z`)),
+  ]
+  return vasiDaPesi([campione(id, 'S')], pesi)[0]
+}
+const T1 = () => vasoTDR('t1', 750, 4850, 54, [[4030, 44.8], [3210, 35.2], [2390, 26.0], [1570, 17.5]])
+const T2 = () => vasoTDR('t2', 1000, 2000, 50, [[1750, 40], [1520, 30], [1300, 20]])
+const TDR_RAW = { tipo: 'tdr' as const, unita: 'raw' }
+
+describe('retta media e soglie del TDR', () => {
+  it('la retta di un vaso: CC al 100 %, m e q dei minimi quadrati', () => {
+    const [g] = curvePerSubstrato([T1()], 'lineare')
+    const c = g.curve[0]!
+    circa(c.b, 2.177729)
+    circa(c.a, -17.309389)
+    circa(c.r2, 0.999578)
+    expect(c.n).toBe(5)
+  })
+
+  it('la retta media è la media delle rette dei vasi (m e q aritmetici, R² medio, n sommato)', () => {
+    const [g] = curvePerSubstrato([T1(), T2()], 'lineare')
+    circa(g.curve[1]!.b, 2.33)
+    circa(g.curve[1]!.a, -17.3)
+    const m = g.media!
+    circa(m.b, 2.253865)
+    circa(m.a, -17.304695)
+    circa(m.r2, 0.999366)
+    expect(m.n).toBe(9)
+  })
+
+  it('la media lineare tiene il segno di q (media aritmetica, non geometrica)', () => {
+    const c = (a: number, b: number): Curva => ({ modello: 'lineare', a, b, r2: 1, n: 3, min: 1, max: 3 })
+    const m = mediaDeiParametri([c(-20, 2), c(-10, 4)])!
+    expect(m.a).toBe(-15)
+    expect(m.b).toBe(3)
+  })
+
+  it('soglia di un vaso: lettura dalla retta, peso e deficit dal suo secco e dalla sua CC', () => {
+    const [g] = curvePerSubstrato([T1()], 'lineare')
+    const s60 = sogliaDelSubstrato(g, 60)
+    circa(s60.letturaTarget, 35.5)
+    expect(s60.pcc).toBe(60)
+    expect(s60.vasi).toEqual([{ vaso: 't1', pesoTarget: 3210, deficit: 1640 }])
+    expect(s60.pesoMedio).toBe(3210)
+    expect(s60.deficitMedio).toBe(1640)
+    const s100 = sogliaDelSubstrato(g, 100)
+    circa(s100.letturaTarget, 53.8678)
+    expect(s100.vasi[0].deficit).toBe(0)
+    const s50 = sogliaDelSubstrato(g, 50)
+    circa(s50.letturaTarget, 30.9081)
+    expect(s50.vasi[0].pesoTarget).toBe(2800)
+    expect(s50.vasi[0].deficit).toBe(2050)
+  })
+
+  it('soglia di due vasi: lettura dalla retta media, peso e deficit medi dei vasi', () => {
+    const [g] = curvePerSubstrato([T1(), T2()], 'lineare')
+    const s = sogliaDelSubstrato(g, 60)
+    circa(s.letturaTarget, 34.2987)
+    expect(s.vasi.map((v) => v.pesoTarget)).toEqual([3210, 1600])
+    expect(s.pesoMedio).toBe(2405)
+    expect(s.deficitMedio).toBe(1020)
+  })
+
+  it('un vaso senza secco e CC non ha peso e non entra nelle medie', () => {
+    const [g] = curvePerSubstrato([T1(), vasoTDR('t3', 1000, 1000, 50, [[1, 1]])], 'lineare')
+    const s = sogliaDelSubstrato(g, 60)
+    expect(s.vasi[1]).toEqual({ vaso: 't3', pesoTarget: null, deficit: null })
+    expect(s.pesoMedio).toBe(3210)
+    expect(s.deficitMedio).toBe(1640)
+  })
+
+  it('un vaso con letture tutte uguali non ha retta: lettura target null', () => {
+    const piatto = vasoTDR('p', 750, 4850, 40, [[4030, 40], [3210, 40], [2390, 40]])
+    const [g] = curvePerSubstrato([piatto], 'lineare')
+    expect(g.media).toBeNull()
+    const s = sogliaDelSubstrato(g, 60)
+    expect(s.letturaTarget).toBeNull()
+    expect(s.pesoMedio).toBe(3210)
+  })
+
+  it('pendenza negativa: la lettura target è finita e corretta', () => {
+    const neg = vasoTDR('n', 1000, 2000, 10, [[1800, 20], [1500, 30], [1200, 40]])
+    const [g] = curvePerSubstrato([neg], 'lineare')
+    expect(g.media!.b).toBeLessThan(0)
+    const t = sogliaDelSubstrato(g, 60).letturaTarget!
+    expect(Number.isFinite(t)).toBe(true)
+    circa(pccDaLettura(g.media!, t), 60)
+  })
+
+  it('pendenza nulla nella media: lettura target null', () => {
+    const g = { ...curvePerSubstrato([T1()], 'lineare')[0], media: { modello: 'lineare' as const, a: 50, b: 0, r2: null, n: 3, min: 1, max: 3 } }
+    expect(sogliaDelSubstrato(g, 60).letturaTarget).toBeNull()
+  })
+
+  it("deficitInMl: in grammi (o kg) è acqua in mL, altrimenti resta l'unità della sessione", () => {
+    expect(deficitInMl(1640, 'g')).toEqual({ valore: 1640, unita: 'mL' })
+    expect(deficitInMl(1.64, 'kg')).toEqual({ valore: 1640, unita: 'mL' })
+    expect(deficitInMl(3.6, 'lb')).toEqual({ valore: 3.6, unita: 'lb' })
+  })
+
+  it('equazione del TDR: m e q a 4 cifre, R² a 3 decimali', () => {
+    const [g] = curvePerSubstrato([T1()], 'lineare')
+    expect(equazione(g.media!, { tipo: 'tdr', unita: 'raw' })).toBe('%CC = 2,178 · TDR − 17,31  (R² 1,000, n 5)')
+    const c = { modello: 'lineare' as const, a: 10, b: 2, r2: null, n: 3, min: 1, max: 3 }
+    expect(equazione(c, TDR_RAW)).toBe('%CC = 2,000 · TDR + 10,00  (n 3)')
+    expect(equazione({ ...c, b: -0.5, a: -3 }, TDR_RAW)).toBe('%CC = −0,5000 · TDR − 3,000  (n 3)')
+  })
+
+  it('intestazioni della lettura a CC del TDR', () => {
+    expect(intestazioniLetturaCC(TDR_RAW)).toEqual({ curva: 'TDR a CC, retta (raw)', misurato: 'TDR a CC, misurata (raw)' })
+    expect(intestazioniLetturaCC({ tipo: 'tensione', unita: 'hPa' })).toEqual({ curva: 'h a CC, curva (hPa)', misurato: 'h a CC, misurato (hPa)' })
   })
 })
