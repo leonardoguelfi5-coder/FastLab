@@ -299,7 +299,7 @@ describe('Sessione con i vasi', () => {
     apri()
     await titolo()
     expect(screen.getByRole('img', { name: /Curve di ritenzione/ })).toBeInTheDocument()
-    expect(screen.getByText(/%CC = .*ln\(kPa\)/)).toBeInTheDocument()
+    expect(screen.getByText(/WC = .*h in kPa/)).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Peso dei vasi' })).toBeInTheDocument()
     expect(screen.getByRole('table')).toBeInTheDocument()
   })

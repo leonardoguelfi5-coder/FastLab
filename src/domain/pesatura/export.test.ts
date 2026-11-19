@@ -221,7 +221,7 @@ describe('cartellaPesatura: vasi', () => {
   it('Pesi target: una colonna per percentuale e la riga Media uguale a consultaPerCC', () => {
     const t = foglio('Pesi target', cartella.fogli)
     expect(titoli(t)).toEqual(['Substrato', 'Vaso', ...PERCENTUALI_TABELLA.map(p => `${p} % CC`)])
-    const gruppi = curvePerSubstrato(vasiDaPesi(campioni, pesi), 'logaritmico')
+    const gruppi = curvePerSubstrato(vasiDaPesi(campioni, pesi), 'potenza')
     const riga = (substrato: string, vaso: string) => t.righe.find(r => r[0] === substrato && r[1] === vaso) as Cella[]
     PERCENTUALI_TABELLA.forEach(p => {
       const r = consultaPerCC(gruppi, p)
@@ -237,14 +237,14 @@ describe('cartellaPesatura: vasi', () => {
 
   it('Info: l\'equazione dei substrati con una curva e secco e CC di ogni vaso', () => {
     const info = JSON.stringify(foglio('Info', cartella.fogli).righe)
-    expect(info).toContain('%CC = ')
-    expect(info).toContain('ln(kPa)')
+    expect(info).toContain('WC = ')
+    expect(info).toContain('h in kPa')
     expect(info).toContain('Sabbia')
     expect(info).toContain('Capacità di campo')
   })
 
   it('gruppiDeiVasi usa il modello del sensore', () => {
     expect(gruppiDeiVasi([s], dati).gruppi.map(g => g.substrato)).toEqual(['Torba', 'Sabbia'])
-    expect(gruppiDeiVasi([s], dati).gruppi[0].media?.modello).toBe('logaritmico')
+    expect(gruppiDeiVasi([s], dati).gruppi[0].media?.modello).toBe('potenza')
   })
 })

@@ -6,13 +6,13 @@ import { GraficoCurve } from './GraficoCurve'
 
 const vaso = (id: string, substrato: string, punti: [number, number][]): Vaso => ({
   campione: { id, sessione_id: 'S', pianta_id: null, nome: id, substrato, ordine: 1 },
-  secco: 100, cc: 200, punti: punti.map(([lettura, pcc]) => ({ lettura, pcc })),
+  secco: 100, cc: 200, letturaCC: null, punti: punti.map(([lettura, pcc]) => ({ lettura, pcc })),
 })
 const gruppi = curvePerSubstrato([
   vaso('V1', 'Torba', [[5, 90], [20, 60], [60, 30]]),
   vaso('V2', 'Torba', [[6, 95], [25, 55], [70, 25]]),
   vaso('V3', 'Sabbia', [[3, 80], [10, 40], [30, 10]]),
-], 'logaritmico')
+], 'potenza')
 const sensore = { tipo: 'tensione' as const, unita: 'kPa' }
 
 describe('GraficoCurve', () => {

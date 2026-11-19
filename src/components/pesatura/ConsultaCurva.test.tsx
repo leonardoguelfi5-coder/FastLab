@@ -6,7 +6,7 @@ import { ConsultaCurva } from './ConsultaCurva'
 
 const vaso = (id: string, substrato: string, secco: number, cc: number, punti: [number, number][]): Vaso => ({
   campione: { id, sessione_id: 'S', pianta_id: null, nome: id, substrato, ordine: 1 },
-  secco, cc, punti: punti.map(([lettura, pcc]) => ({ lettura, pcc })),
+  secco, cc, letturaCC: null, punti: punti.map(([lettura, pcc]) => ({ lettura, pcc })),
 })
 // lineare: pcc = 100 − 2·lettura, letture misurate da 10 a 30
 const gruppi = curvePerSubstrato([

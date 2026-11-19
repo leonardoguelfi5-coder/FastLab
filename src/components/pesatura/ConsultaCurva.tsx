@@ -3,7 +3,7 @@ import { TriangleAlert } from 'lucide-react'
 import { NumericField } from '@/components/NumericField'
 import { SceltaSingola } from '@/components/SceltaSingola'
 import {
-  consultaPerCC, consultaPerLettura, modelloPer, PERCENTUALI_TABELLA, type CurveSubstrato, type RispostaConsulta,
+  consultaPerCC, consultaPerLettura, PERCENTUALI_TABELLA, type CurveSubstrato, type RispostaConsulta,
 } from '@/domain/pesatura/curva'
 import { nomeLettura } from '@/domain/pesatura/export'
 import type { Sensore, UnitaPeso } from '@/domain/pesatura/tipi'
@@ -40,7 +40,6 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
   const idTitolo = useId()
   const [modo, setModo] = useState<Modo>('cc')
   const [valore, setValore] = useState<number | null>(null)
-  const modello = modelloPer(sensore)
   const decimali = useMemo(
     () => decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null)))),
     [gruppi],
@@ -48,8 +47,8 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
 
   const risposte: RispostaConsulta[] | null = useMemo(() => {
     if (valore === null || !Number.isFinite(valore)) return null
-    return modo === 'cc' ? consultaPerCC(gruppi, valore) : consultaPerLettura(gruppi, valore, modello)
-  }, [gruppi, modo, modello, valore])
+    return modo === 'cc' ? consultaPerCC(gruppi, valore) : consultaPerLettura(gruppi, valore)
+  }, [gruppi, modo, valore])
   const tabella = useMemo(() => PERCENTUALI_TABELLA.map(p => ({ p, risposte: consultaPerCC(gruppi, p) })), [gruppi])
   const nomeVaso = (g: CurveSubstrato, i: number) => g.vasi[i].campione.nome?.trim() || g.vasi[i].campione.id
 
