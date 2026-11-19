@@ -344,11 +344,11 @@ describe('cartellaPesatura: soglie del TDR', () => {
   it('una riga per substrato e %, con TDR target, peso medio e deficit medio', () => {
     const f = foglio('Soglie', fogliDi(sessioneVasi(tdr)))
     expect(f.tipo).toBe('dati')
-    expect(titoli(f)).toEqual(['Substrato', '% CC', 'TDR target', 'Peso medio', 'Deficit medio (mL)'])
+    expect(titoli(f)).toEqual(['Substrato', '% CC', 'TDR target', 'Peso medio', 'Deficit medio (mL)', 'Nota'])
     expect(f.righe).toHaveLength(PERCENTUALI_TABELLA.length)
     expect(f.righe.map(r => r[1])).toEqual([...PERCENTUALI_TABELLA])
     // il 60 %: 35,5 con 2 decimali (le letture ne hanno 1), 3210 g, deficit 1640 mL
-    expect(f.righe[2]).toEqual(['Torba', 60, 35.5, 3210, 1640])
+    expect(f.righe[2]).toEqual(['Torba', 60, 35.5, 3210, 1640, null])
     expect(f.righe[0][2]).toBe(53.87)
   })
 

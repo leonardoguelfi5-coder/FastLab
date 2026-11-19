@@ -613,6 +613,17 @@ describe('retta media e soglie del TDR', () => {
   it('pendenza nulla nella media: lettura target null', () => {
     const g = { ...curvePerSubstrato([T1()], 'lineare')[0], media: { modello: 'lineare' as const, a: 50, b: 0, r2: null, n: 3, min: 1, max: 3 } }
     expect(sogliaDelSubstrato(g, 60).letturaTarget).toBeNull()
+    expect(sogliaDelSubstrato(g, 60).fuoriCampo).toBe(false)
+  })
+
+  it('una lettura target oltre le letture misurate (17,5–54) è fuori campo', () => {
+    const [g] = curvePerSubstrato([T1()], 'lineare')
+    expect(sogliaDelSubstrato(g, 60).fuoriCampo).toBe(false)
+    expect(sogliaDelSubstrato(g, 100).fuoriCampo).toBe(false)
+    // 10 % → TDR 12,5, sotto la lettura più secca (17,5)
+    expect(sogliaDelSubstrato(g, 10).fuoriCampo).toBe(true)
+    // 120 % → TDR 63,1, sopra la lettura a CC (54)
+    expect(sogliaDelSubstrato(g, 120).fuoriCampo).toBe(true)
   })
 
   it("deficitInMl: in grammi (o kg) è acqua in mL, altrimenti resta l'unità della sessione", () => {

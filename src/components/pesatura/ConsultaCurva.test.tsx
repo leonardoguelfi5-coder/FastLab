@@ -102,6 +102,36 @@ describe('ConsultaCurva', () => {
       expect(within(screen.getByRole('table')).getByRole('row', { name: /^Deficit medio \(lb\)/ })).toBeInTheDocument()
     })
 
+    it("un TDR target oltre le letture misurate ha l'avviso nella risposta", async () => {
+      render(<ConsultaCurva gruppi={gruppiTdr} sensore={raw} unita="g" />)
+      // nella tabella (100–40 %) i target stanno tra 17,5 e 54: nessun avviso
+      expect(within(screen.getByRole('table')).queryByRole('img', { name: 'fuori dai valori misurati' })).not.toBeInTheDocument()
+      expect(screen.queryByText(/la retta è estrapolata/)).not.toBeInTheDocument()
+      // 10 % → TDR 12,5, sotto la lettura più secca (17,5)
+      await userEvent.setup({ delay: null }).type(screen.getByLabelText(/^% di capacità di campo/), '10')
+      const sezione = risultato().getByText('Torba').closest('section') as HTMLElement
+      expect(within(sezione).getByText(/^TDR target/).parentElement).toHaveTextContent('fuori dai valori misurati')
+    })
+
+    it("nella tabella il TDR target estrapolato ha l'icona di avviso e la nota sotto", () => {
+      // V1 e V2: pcc = 100 − 2·lettura, letture 10–30 → al 100 % TDR 0, fuori; al 60 % TDR 20, dentro
+      render(<ConsultaCurva gruppi={gruppi} sensore={raw} unita="g" />)
+      const riga = within(screen.getByRole('table')).getByRole('row', { name: /^TDR target/ })
+      const celle = within(riga).getAllByRole('cell')
+      expect(within(celle[0]).getByRole('img', { name: 'fuori dai valori misurati' })).toBeInTheDocument()
+      expect(within(celle[2]).queryByRole('img')).not.toBeInTheDocument()
+      expect(screen.getByText(/la retta è estrapolata/)).toBeInTheDocument()
+    })
+
+    it('senza deficit la risposta scrive "—" senza unità', async () => {
+      // senza secco né CC non c'è peso target, quindi neanche deficit
+      const senzaPesi = gruppiTdr.map(g => ({ ...g, vasi: g.vasi.map(v => ({ ...v, secco: null, cc: null })) }))
+      render(<ConsultaCurva gruppi={senzaPesi} sensore={raw} unita="g" />)
+      await userEvent.setup({ delay: null }).type(screen.getByLabelText(/^% di capacità di campo/), '60')
+      const sezione = risultato().getByText('Torba').closest('section') as HTMLElement
+      expect(within(sezione).getByText(/^Deficit medio/)).toHaveTextContent(/^Deficit medio —$/)
+    })
+
     it('con il tensiometro queste righe non ci sono', async () => {
       render(<ConsultaCurva gruppi={gruppi} sensore={{ tipo: 'tensione', unita: 'hPa' }} unita="g" />)
       expect(screen.queryByRole('row', { name: /^TDR target/ })).not.toBeInTheDocument()

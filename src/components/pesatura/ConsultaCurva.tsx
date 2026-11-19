@@ -20,6 +20,8 @@ interface ConsultaCurvaProps {
 }
 
 const FUORI_CAMPO = 'fuori dai valori misurati'
+/** Un valore con la sua unità, ma "—" da solo se manca. */
+const conUnita = (testo: string, unita: string): string => (testo === '—' ? testo : `${testo} ${unita}`)
 /** Un peso ricavato: con i decimali dei pesi dei vasi (secco e capacità di campo), come le medie. */
 const peso = (n: number | null, decimali: number, unita: string): string => (n === null ? '—' : `${formattaDecimali(n, decimali)} ${unita}`)
 
@@ -115,9 +117,12 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                   {r.fuoriCampo && <Avviso />}
                 </p>
                 {rispostaSoglie && (
-                  <p className="flex flex-wrap gap-x-4 font-medium text-grafite">
-                    <span>TDR target {target(rispostaSoglie[ri])}</span>
-                    <span>Deficit medio {deficit(rispostaSoglie[ri])} {unitaDeficit}</span>
+                  <p className="flex flex-wrap items-center gap-x-4 font-medium text-grafite">
+                    <span className="flex flex-wrap items-center gap-x-3">
+                      <span>TDR target {target(rispostaSoglie[ri])}</span>
+                      {rispostaSoglie[ri].fuoriCampo && <Avviso />}
+                    </span>
+                    <span>Deficit medio {conUnita(deficit(rispostaSoglie[ri]), unitaDeficit)}</span>
                   </p>
                 )}
               </section>
@@ -158,7 +163,14 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
                   <>
                     <tr>
                       <th scope="row" className="px-3 py-2.5 text-left font-normal">TDR target</th>
-                      {soglie.map((sg, k) => <td key={PERCENTUALI_TABELLA[k]} className="px-3 py-2.5 text-right">{target(sg[gi])}</td>)}
+                      {soglie.map((sg, k) => (
+                        <td key={PERCENTUALI_TABELLA[k]} className="px-3 py-2.5 text-right">
+                          {sg[gi].fuoriCampo && (
+                            <TriangleAlert role="img" aria-label={FUORI_CAMPO} className="mr-1 inline size-4 align-[-2px] text-attenzione" />
+                          )}
+                          {target(sg[gi])}
+                        </td>
+                      ))}
                     </tr>
                     <tr>
                       <th scope="row" className="px-3 py-2.5 text-left font-normal">Deficit medio ({unitaDeficit})</th>
@@ -170,6 +182,12 @@ export function ConsultaCurva({ gruppi, sensore, unita }: ConsultaCurvaProps) {
             ))}
           </table>
         </div>
+        {soglie.some(sg => sg.some(s => s.fuoriCampo)) && (
+          <p className="flex items-center gap-1 text-sm text-grafite-tenue">
+            <TriangleAlert aria-hidden className="size-4 shrink-0 text-attenzione" />
+            TDR target {FUORI_CAMPO}: la retta è estrapolata, controlla prima di impostarlo sul logger.
+          </p>
+        )}
       </div>
     </section>
   )
