@@ -3,7 +3,7 @@ import type { DatiPesatura } from '@/api/pesatura'
 import { RIGHE_IMMAGINE, type Cella, type Foglio } from '@/domain/export/fogli'
 import type { ConfigEsperimento } from '@/domain/tipi'
 import { consultaPerCC, curvePerSubstrato, parametriDelSubstrato, PERCENTUALI_TABELLA, vasiDaPesi } from './curva'
-import { cartellaPesatura, gruppiDeiVasi, idGraficoCurve } from './export'
+import { cartellaPesatura, gruppiDeiVasi, idGraficoCurve, nomeLettura } from './export'
 import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from './tipi'
 
 const sessione = (extra: Partial<SessionePesatura> = {}): SessionePesatura => ({
@@ -260,8 +260,8 @@ describe('cartellaPesatura: vasi', () => {
     expect(col(p, cc, '% CC')).toBeNull()
   })
 
-  it("Parametri: con un sensore di umidità le intestazioni dicono Lettura e l'unità", () => {
-    const sU = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'umidita' as const, unita: '%' } } })
+  it("Parametri: con un sensore TDR le intestazioni dicono Lettura e l'unità", () => {
+    const sU = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tdr' as const, unita: '%' } } })
     const p = foglio('Parametri', cartellaPesatura([sU], { sessioni: [sU], campioni, pesi }, config, OGGI, ADESSO).fogli)
     expect(titoli(p)).toEqual(['Substrato', 'Vaso', 'a', 'b', 'R²', 'Lettura a CC, curva (%)', 'Lettura a CC, misurato (%)', 'n'])
   })
@@ -314,5 +314,12 @@ describe('cartellaPesatura: vasi', () => {
   it('gruppiDeiVasi usa il modello del sensore', () => {
     expect(gruppiDeiVasi([s], dati).gruppi.map(g => g.substrato)).toEqual(['Torba', 'Sabbia'])
     expect(gruppiDeiVasi([s], dati).gruppi[0].media?.modello).toBe('potenza')
+  })
+})
+
+describe('nomeLettura', () => {
+  it('dice il sensore con la sua unità', () => {
+    expect(nomeLettura({ tipo: 'tdr', unita: 'raw' })).toBe('TDR (raw)')
+    expect(nomeLettura({ tipo: 'tensione', unita: 'hPa' })).toBe('Tensione (hPa)')
   })
 })

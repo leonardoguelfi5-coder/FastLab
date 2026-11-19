@@ -32,7 +32,7 @@ const NOME_GRAFICO = 'Curve di ritenzione dei vasi'
 const titoloGrafico = (substrato: string): string => `Curve di ritenzione — ${substrato}`
 
 /** Sensore di ripiego: un vaso senza sensore nelle impostazioni (non dovrebbe succedere) si legge come una lettura nuda. */
-const SENSORE_NEUTRO: Sensore = { tipo: 'umidita', unita: '' }
+const SENSORE_NEUTRO: Sensore = { tipo: 'tdr', unita: '' }
 
 
 /** Dalla più vecchia: per data, a parità per creazione. */
@@ -246,7 +246,7 @@ function foglioGrafico(gruppi: CurveSubstrato[]): { foglio: Foglio; righe: numbe
 /** Il nome di ciò che si legge sul sensore, con l'unità: `Tensione (kPa)`. Titolo dell'asse X e del campo di consultazione. */
 export function nomeLettura(s: Sensore): string {
   const unita = s.unita.trim()
-  return `${s.tipo === 'umidita' ? 'Umidità' : 'Tensione'}${unita ? ` (${unita})` : ''}`
+  return `${s.tipo === 'tdr' ? 'TDR' : 'Tensione'}${unita ? ` (${unita})` : ''}`
 }
 
 const testoSensore = (s: Sensore | null): string | null => (s ? nomeLettura(s) : null)

@@ -13,7 +13,7 @@ const gruppi = curvePerSubstrato([
   vaso('V1', 'Torba', 100, 200, [[10, 80], [20, 60], [30, 40]]),
   vaso('V2', 'Torba', 100, 300, [[10, 80], [20, 60], [30, 40]]),
 ], 'lineare')
-const sensore = { tipo: 'umidita' as const, unita: '%' }
+const sensore = { tipo: 'tdr' as const, unita: '%' }
 
 function apri() {
   render(<ConsultaCurva gruppi={gruppi} sensore={sensore} unita="g" />)
@@ -35,7 +35,7 @@ describe('ConsultaCurva', () => {
   it('per lettura del sensore, con l\'avviso accanto ai pesi estrapolati', async () => {
     const u = apri()
     await u.click(screen.getByRole('radio', { name: /Lettura/ }))
-    await u.type(screen.getByLabelText(/^Umidità \(%\)/), '40')
+    await u.type(screen.getByLabelText(/^TDR \(%\)/), '40')
     // lettura 40 > 30 misurato: pcc = 20 → V1 120 g, estrapolato
     expect(risultato().getByText('V1').closest('li')).toHaveTextContent('120 g')
     expect(risultato().getByText('V1').closest('li')).toHaveTextContent('fuori dai valori misurati')
@@ -45,7 +45,7 @@ describe('ConsultaCurva', () => {
   it('una lettura dentro il campo misurato non ha avvisi', async () => {
     const u = apri()
     await u.click(screen.getByRole('radio', { name: /Lettura/ }))
-    await u.type(screen.getByLabelText(/^Umidità \(%\)/), '20')
+    await u.type(screen.getByLabelText(/^TDR \(%\)/), '20')
     expect(risultato().getByText('V1').closest('li')).toHaveTextContent('160 g')
     expect(risultato().queryByText('fuori dai valori misurati')).not.toBeInTheDocument()
   })

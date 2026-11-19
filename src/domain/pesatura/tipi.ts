@@ -7,12 +7,21 @@
 export type TipoAnalisi = 'aliquota' | 'rwc' | 'sostanza_secca' | 'vasi'
 /** L'unità di peso è libera: g, mg, kg o quella che scrive l'utente (non vuota, al massimo 20 caratteri). */
 export type UnitaPeso = string
-export type TipoSensore = 'umidita' | 'tensione'
+export type TipoSensore = 'tdr' | 'tensione'
 
-/** Lo strumento letto insieme al peso del vaso in asciugatura, con la sua unità (es. `%` o `kPa`). */
+/** Lo strumento letto insieme al peso del vaso in asciugatura, con la sua unità (es. `raw` o `kPa`). */
 export interface Sensore {
   tipo: TipoSensore
   unita: string
+}
+
+/**
+ * Il sensore come lo legge l'app: le sessioni salvate quando il menu offriva «Umidità» (`tipo: 'umidita'`) si
+ * leggono come TDR, con la stessa unità. Il database non cambia: il sensore sta nel jsonb delle impostazioni.
+ */
+export function normalizzaSensore(s: { tipo: string; unita: string } | null): Sensore | null {
+  if (!s) return null
+  return { tipo: s.tipo === 'tensione' ? 'tensione' : 'tdr', unita: s.unita }
 }
 
 /** `rapportoTampone` è sempre in mL per g di campione, qualunque sia l'unità di peso dell'analisi. */

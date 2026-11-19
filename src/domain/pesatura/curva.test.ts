@@ -163,7 +163,7 @@ describe('pccDaLettura, letturaAPercentuale e modelloPer', () => {
 
   it('tensione → potenza, umidità → lineare', () => {
     expect(modelloPer({ tipo: 'tensione', unita: 'kPa' })).toBe('potenza')
-    expect(modelloPer({ tipo: 'umidita', unita: '%' })).toBe('lineare')
+    expect(modelloPer({ tipo: 'tdr', unita: '%' })).toBe('lineare')
   })
 })
 
@@ -216,12 +216,12 @@ describe('equazione', () => {
 
   it('lineare con pendenza positiva e R² assente', () => {
     const c = { modello: 'lineare' as const, a: 10, b: 2, r2: null, n: 3, min: 1, max: 3 }
-    expect(equazione(c, { tipo: 'umidita', unita: '%' })).toBe('%CC = 10,0 + 2,0 · %  (n 3)')
+    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = 10,0 + 2,0 · %  (n 3)')
   })
 
   it('lineare con la virgola decimale e il segno meno', () => {
     const c = { modello: 'lineare' as const, a: 112.43, b: -18.27, r2: 0.9712, n: 14, min: 5, max: 70 }
-    expect(equazione(c, { tipo: 'umidita', unita: '%' })).toBe('%CC = 112,4 − 18,3 · %  (R² 0,97, n 14)')
+    expect(equazione(c, { tipo: 'tdr', unita: '%' })).toBe('%CC = 112,4 − 18,3 · %  (R² 0,97, n 14)')
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Pianta } from '../tipi'
-import { bozzaDa, bozzaVuota, campioniDa, impostazioniDi, problemiDi, unitaDi, type BozzaPesata } from './modulo'
+import { bozzaDa, bozzaVuota, campioniDa, impostazioniDi, problemiDi, SENSORI, unitaDi, type BozzaPesata } from './modulo'
 import type { CampionePesatura, SessionePesatura } from './tipi'
 
 const OGGI = '2026-11-12'
@@ -29,6 +29,19 @@ describe('bozza', () => {
 
   it('Ripeti con un\'unità scritta a mano la rimette nel campo libero', () => {
     expect(bozzaDa(sessione({ unita: 'µg' }), OGGI)).toMatchObject({ sceltaUnita: 'altra', unitaLibera: 'µg' })
+  })
+
+  it('i sensori sono TDR (raw) e Tensione (kPa); una nuova bozza parte da TDR', () => {
+    expect(SENSORI).toEqual([
+      { valore: 'tdr', testo: 'TDR', unita: 'raw' },
+      { valore: 'tensione', testo: 'Tensione', unita: 'kPa' },
+    ])
+    expect(bozzaVuota(OGGI)).toMatchObject({ sensore: 'tdr', unitaSensore: 'raw' })
+  })
+
+  it('Ripeti di una sessione salvata con Umidità la legge come TDR', () => {
+    const vecchia = sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'umidita', unita: '%' } as never } })
+    expect(bozzaDa(vecchia, OGGI)).toMatchObject({ sensore: 'tdr', unitaSensore: '%' })
   })
 
   it('Ripeti dei vasi riprende il sensore', () => {

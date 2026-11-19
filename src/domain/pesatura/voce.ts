@@ -154,11 +154,12 @@ export type Comando =
   | { tipo: 'non_capito' }
 
 const NON_CAPITO: Comando = { tipo: 'non_capito' }
-const NOMI_LETTURA = ['umidita', 'tensione']
+/** «lettura» vale per ogni sensore (il riconoscimento italiano storpia «TDR»); «tensione» resta per chi lo dice. */
+const NOMI_LETTURA = ['lettura', 'tensione']
 
 /**
  * Il comando di una frase: "indietro" ovunque, "<numero> avanti" e, con la lettura del sensore (asciugatura),
- * "peso <numero> <umidità|tensione> <numero> avanti". Tutto il resto non è capito. Il peso non è mai negativo.
+ * "peso <numero> <lettura|tensione> <numero> avanti". Tutto il resto non è capito. Il peso non è mai negativo.
  */
 export function leggiComando(testo: string, conLettura: boolean): Comando {
   const p = parti(testo.replace(/[.!?]+\s*$/, ''))

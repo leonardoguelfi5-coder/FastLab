@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import {
-  IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type ImpostazioniAnalisi, type Peso, type SessionePesatura,
+  IMPOSTAZIONI_PREDEFINITE, normalizzaSensore, type CampionePesatura, type ImpostazioniAnalisi, type Peso, type SessionePesatura,
 } from '@/domain/pesatura/tipi'
 import { controllaRighe } from './righe'
 
@@ -19,7 +19,11 @@ export interface DatiPesatura {
 }
 
 /** Le impostazioni di una riga: il default del database è `{}`, e i campi mancanti prendono i valori predefiniti. */
-const conPredefinite = (i: Partial<ImpostazioniAnalisi> | null | undefined): ImpostazioniAnalisi => ({ ...IMPOSTAZIONI_PREDEFINITE, ...(i ?? {}) })
+const conPredefinite = (i: Partial<ImpostazioniAnalisi> | null | undefined): ImpostazioniAnalisi => {
+  const impostazioni = { ...IMPOSTAZIONI_PREDEFINITE, ...(i ?? {}) }
+  // Le sessioni salvate con il vecchio sensore «Umidità» si leggono come TDR.
+  return { ...impostazioni, sensore: normalizzaSensore(impostazioni.sensore) }
+}
 
 /** Il campo `creato_da` solo se la riga lo ha: nel dominio è facoltativo. */
 const autore = (r: { creato_da?: string | null }) => (r.creato_da ? { creato_da: r.creato_da } : {})
