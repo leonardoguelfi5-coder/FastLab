@@ -213,7 +213,7 @@ function Contenuto({ espId, sessione, dati, config }: {
               <h3 id={`${idCurve}-${i}`} className="text-base font-semibold text-grafite">{g.substrato}</h3>
               <GraficoCurve gruppo={g} sensore={vasi.sensore} />
               <p className="font-mono text-base tabular-nums text-grafite">
-                {g.media ? equazione(g.media, vasi.sensore) : 'servono almeno 3 letture diverse per la curva'}
+                {g.media ? equazione(g.media, vasi.sensore) : 'servono almeno 3 letture diverse in un vaso per la curva'}
               </p>
               <TabellaParametri gruppo={g} sensore={vasi.sensore} />
               <Button type="button" variant="outline" className="self-start" disabled={occupato} aria-label={`Scarica grafico (PNG), ${g.substrato}`} onClick={() => void scaricaPng(g)}>

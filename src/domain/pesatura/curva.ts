@@ -421,10 +421,14 @@ export interface SogliaVaso {
   deficit: number | null
 }
 
-/** La soglia al `pcc` % della CC: la lettura dalla retta media e, per ogni vaso, il peso target e il deficit d'acqua. */
+/**
+ * La soglia al `pcc` % della CC: la lettura dalla retta media e, per ogni vaso, il peso target e il deficit d'acqua.
+ * `fuoriCampo` dice che la lettura target cade oltre le letture misurate dalla retta media (è estrapolata).
+ */
 export interface Soglia {
   pcc: number
   letturaTarget: number | null
+  fuoriCampo: boolean
   vasi: SogliaVaso[]
   pesoMedio: number | null
   deficitMedio: number | null
@@ -445,9 +449,11 @@ export function sogliaDelSubstrato(g: CurveSubstrato, pcc: number): Soglia {
     const pesoTarget = pesoDelVaso(v, pcc)
     return { vaso: v.campione.id, pesoTarget, deficit: pesoTarget === null || v.cc === null ? null : v.cc - pesoTarget }
   })
+  const letturaTarget = lettura !== null && Number.isFinite(lettura) ? lettura : null
   return {
     pcc,
-    letturaTarget: lettura !== null && Number.isFinite(lettura) ? lettura : null,
+    letturaTarget,
+    fuoriCampo: letturaTarget !== null && g.media !== null && (letturaTarget < g.media.min || letturaTarget > g.media.max),
     vasi,
     pesoMedio: mediaOpzionale(vasi.map((v) => v.pesoTarget)),
     deficitMedio: mediaOpzionale(vasi.map((v) => v.deficit)),

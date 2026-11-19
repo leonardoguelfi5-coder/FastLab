@@ -237,12 +237,14 @@ function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
 /**
  * Le soglie di irrigazione del TDR: per ogni substrato e % CC la lettura da impostare sul logger, il peso medio e il deficit
  * medio (mL se il peso è in g, mg o kg, altrimenti l'unità della sessione). Il TDR target ha i decimali delle letture misurate
- * più uno, il peso medio quelli dei pesi, il deficit quelli dei pesi (spostati se convertito).
+ * più uno, il peso medio quelli dei pesi, il deficit quelli dei pesi (spostati se convertito). La Nota segnala un TDR target
+ * estrapolato oltre le letture misurate.
  */
 function foglioSoglie(gruppi: CurveSubstrato[], unita: string): Foglio {
   const colonne: ColonnaGrezza[] = [
     { titolo: 'Substrato', tipo: 'testo' }, { titolo: '% CC', tipo: 'numero' }, { titolo: 'TDR target', tipo: 'numero' },
     { titolo: 'Peso medio', tipo: 'numero' }, { titolo: `Deficit medio (${deficitInMl(0, unita).unita})`, tipo: 'numero' },
+    { titolo: 'Nota', tipo: 'testo' },
   ]
   const decimaliPesi = decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null))))
   const decimaliTarget = decimaliLetturaTarget(gruppi)
@@ -253,6 +255,7 @@ function foglioSoglie(gruppi: CurveSubstrato[], unita: string): Foglio {
       s.letturaTarget === null ? null : arrotondaDecimali(s.letturaTarget, decimaliTarget),
       s.pesoMedio === null ? null : arrotondaDecimali(s.pesoMedio, decimaliPesi),
       s.deficitMedio === null ? null : arrotondaDecimali(deficitInMl(s.deficitMedio, unita).valore, decimaliDeficit(decimaliPesi, unita)),
+      s.fuoriCampo ? 'TDR target fuori dai valori misurati' : null,
     ]
   }))
   return foglio('Soglie', 'dati', colonne, righe)
@@ -312,7 +315,7 @@ function foglioInfo(
       nomeVaso(v), g.substrato, v.secco, v.cc,
     ])))
     blocco(['Substrato', 'Equazione della curva media'], vasi.gruppi.map((g): Cella[] => [
-      g.substrato, g.media ? equazione(g.media, vasi.sensore) : 'Servono almeno 3 letture diverse per adattare la curva.',
+      g.substrato, g.media ? equazione(g.media, vasi.sensore) : 'Servono almeno 3 letture diverse in un vaso per adattare la curva.',
     ]))
   }
   const larghe = Math.max(...righe.map(r => r.length))
