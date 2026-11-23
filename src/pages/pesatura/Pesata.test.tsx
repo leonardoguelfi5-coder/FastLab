@@ -14,14 +14,14 @@ vi.mock('@/api/inviti', () => ({
 }))
 vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
 vi.mock('@/api/esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), salvaPeso: vi.fn() }))
+vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), salvaPeso: vi.fn(), eliminaPeso: vi.fn() }))
 vi.mock('@/lib/dettatura', () => ({ useDettatura: vi.fn(), parla: vi.fn(), suonoErrore: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { caricaConfig } from '@/api/esperimenti'
 import { sonoAdmin } from '@/api/inviti'
 import { ruoloIn } from '@/api/persone'
-import { listaPesatura, salvaPeso } from '@/api/pesatura'
+import { eliminaPeso, listaPesatura, salvaPeso } from '@/api/pesatura'
 import {
   IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura,
 } from '@/domain/pesatura/tipi'
@@ -93,6 +93,7 @@ beforeEach(() => {
   vi.mocked(ruoloIn).mockResolvedValue('proprietario')
   vi.mocked(caricaConfig).mockResolvedValue({ trattamenti, piante } as never)
   vi.mocked(salvaPeso).mockResolvedValue(undefined)
+  vi.mocked(eliminaPeso).mockResolvedValue(undefined)
   dati(sessione(), campioni, [])
   dettaturaFinta()
   vi.mocked(useDettatura).mockImplementation(onFrase => {
@@ -570,5 +571,68 @@ describe('Pesata: dettatura a voce', () => {
     await salva()
     expect(screen.getByRole('button', { name: 'Detta' })).toBeEnabled()
     expect(screen.getByText('Permesso del microfono negato: attivalo nelle impostazioni del browser.')).toBeInTheDocument()
+  })
+})
+
+describe('Pesata: eliminare un peso', () => {
+  const elimina = () => screen.findByRole('button', { name: 'Elimina questo peso' })
+  const conUnPeso = (extra: Partial<Peso> = {}) =>
+    dati(sessione({ impostazioni: unaRepliche }), [campioni[0]], [peso('1', 'c12', 1, 'fresco', 1.2, extra)])
+  const apriSulPeso = () => apri('fresco', '?campione=c12&replica=1')
+
+  it('si elimina un peso già salvato, dopo la conferma, e il campo torna vuoto', async () => {
+    conUnPeso()
+    const utente = apriSulPeso()
+    await salva()
+    expect(campoPeso()).toHaveValue('1,2')
+    await utente.click(await elimina())
+    expect(screen.getByText('Eliminare questa pesata?')).toBeInTheDocument()
+    expect(screen.getByText('Non si può annullare.')).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Elimina' }))
+    await waitFor(() => expect(eliminaPeso).toHaveBeenCalledWith('1'))
+    await waitFor(() => expect(campoPeso()).toHaveValue(''))
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it('con «Tieni la pesata» non si elimina nulla', async () => {
+    conUnPeso()
+    const utente = apriSulPeso()
+    await utente.click(await elimina())
+    await utente.click(screen.getByRole('button', { name: 'Tieni la pesata' }))
+    expect(eliminaPeso).not.toHaveBeenCalled()
+    expect(campoPeso()).toHaveValue('1,2')
+  })
+
+  it('un passo senza peso non ha il pulsante', async () => {
+    dati(sessione({ impostazioni: unaRepliche }), [campioni[0]], [])
+    apri()
+    await salva()
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it("un rilevatore non lo vede su un peso di un'altra persona", async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
+    conUnPeso({ creato_da: 'altro' })
+    apriSulPeso()
+    expect(await screen.findByText("Pesato da un'altra persona.")).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it('senza rete il pulsante è disattivato', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    conUnPeso()
+    apriSulPeso()
+    expect(await elimina()).toBeDisabled()
+  })
+
+  it("se l'eliminazione fallisce l'errore compare e il peso resta", async () => {
+    vi.mocked(eliminaPeso).mockRejectedValueOnce(new Error('Failed to fetch'))
+    conUnPeso()
+    const utente = apriSulPeso()
+    await utente.click(await elimina())
+    await utente.click(screen.getByRole('button', { name: 'Elimina' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(campoPeso()).toHaveValue('1,2')
+    expect(screen.getByRole('button', { name: 'Elimina questo peso' })).toBeInTheDocument()
   })
 })

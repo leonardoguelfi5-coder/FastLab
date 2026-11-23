@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward } from 'lucide-react'
+import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward, Trash2 } from 'lucide-react'
 import { useConfig, usePesatura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
 import { BarraAzioni } from '@/components/BarraAzioni'
@@ -9,6 +9,7 @@ import { ErroreConRiprova } from '@/components/ErroreConRiprova'
 import { ModuloCampi } from '@/components/ModuloCampi'
 import { NumericField } from '@/components/NumericField'
 import { TestoErrore } from '@/components/TestoErrore'
+import { Conferma } from '@/components/Conferma'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -202,7 +203,7 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
   const dettato = dettatoFallito !== null && dettatoFallito.indice === indice && giro.errore !== null ? dettatoFallito : null
   return (
     <SchedaPasso
-      key={`${indice}:${dettatoFallito?.volta ?? 0}`}
+      key={`${indice}:${dettatoFallito?.volta ?? 0}:${passo.peso?.id ?? ''}`}
       sessione={sessione}
       pesi={pesi}
       precisione={precisione}
@@ -253,6 +254,7 @@ function SchedaPasso({
   // Mentre si detta il campo non prende il fuoco: sul telefono aprirebbe la tastiera sopra i numeri grandi.
   const [fuocoAlCampo] = useState(!inAscolto)
   const [provato, setProvato] = useState(false)
+  const [chiediEliminazione, setChiediEliminazione] = useState(false)
   const eAsciugatura = fase === 'asciugatura'
   const conLettura = chiedeLettura(sessione.tipo, fase)
   const sensore = sessione.impostazioni.sensore
@@ -364,7 +366,25 @@ function SchedaPasso({
             Salta
           </Button>
         </div>
+        {passo.peso !== null && puoModificare && (
+          <Button type="button" variant="ghost" disabled={senzaRete || giro.occupato} onClick={() => setChiediEliminazione(true)}>
+            <Trash2 aria-hidden />
+            Elimina questo peso
+          </Button>
+        )}
       </BarraAzioni>
+      <Conferma
+        aperta={chiediEliminazione}
+        titolo="Eliminare questa pesata?"
+        testo="Non si può annullare."
+        annulla="Tieni la pesata"
+        conferma="Elimina"
+        onAnnulla={() => setChiediEliminazione(false)}
+        onConferma={() => {
+          setChiediEliminazione(false)
+          void giro.elimina()
+        }}
+      />
     </>
   )
 }
