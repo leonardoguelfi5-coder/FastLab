@@ -8,7 +8,8 @@ Data: 2026-11-23. Segue `2026-11-19-curva-vasi-potenza-design.md` (tensiometro) 
 L'utente ha ricontrollato le tarature del TDR e dei tensiometri e le vuole **fuori dalla Pesatura**, in uno strumento di
 Laboratorio loro, **«Taratura e stress idrico»**. Lì le pesate (peso + lettura dello strumento) si inseriscono, si
 correggono e si eliminano sempre, e a schermo resta solo l'essenziale: **il grafico, il riassunto delle pesate e un
-calcolatore «scrivo la % CC → leggo il valore dello strumento»**. Tutto il resto della pagina di oggi è inutile.
+calcolatore nei due versi: «scrivo la % CC → leggo il valore dello strumento» e «scrivo la lettura → leggo la
+% CC»**. Tutto il resto della pagina di oggi è inutile.
 
 ## Obiettivi (decisi dall'utente)
 
@@ -22,8 +23,9 @@ calcolatore «scrivo la % CC → leggo il valore dello strumento»**. Tutto il r
    corregge e si elimina; si aggiungono pesate nuove con la loro lettura in qualsiasi momento. Si elimina anche la
    sessione intera (c'è già). **Anche nelle altre pesature** (Aliquota, RWC, % sostanza secca) un peso già salvato si
    corregge (c'è già) e ora **si elimina**.
-4. **A schermo solo:** grafico, riassunto delle pesate, calcolatore % CC → lettura. Si tolgono la tabella dei parametri,
-   la tabella «Pesi a % CC fisse», i deficit, la consultazione per lettura del sensore e la riga «TDR target» della
+4. **A schermo solo:** grafico, riassunto delle pesate, calcolatore % CC ↔ lettura (nei due versi). Si tolgono la tabella dei parametri,
+   la tabella «Pesi a % CC fisse», i deficit (la vecchia consultazione per lettura, che dava pesi, diventa il verso «lettura → % CC» del
+   calcolatore) e la riga «TDR target» della
    tabella.
 5. **Grafico** costruito come quello di oggi (Figura 5 della tesi): i punti di ogni vaso, la curva di ogni vaso, la curva
    media del substrato in evidenza; un grafico per substrato.
@@ -102,10 +104,14 @@ calcolatore «scrivo la % CC → leggo il valore dello strumento»**. Tutto il r
    - Asciugatura, una riga per punto in ordine di tempo: data e ora, peso, lettura, % CC calcolata.
    Ogni riga ha **Modifica** ed **Elimina**. Ogni vaso ha **«Aggiungi pesata»** (un punto di asciugatura: peso +
    lettura). Se manca il secco o la CC, la riga dice «da pesare» e il tocco apre l'inserimento.
-4. **Calcolatore:** un campo «% di capacità di campo» (0–100, accetta anche oltre). Per ogni substrato la risposta è la
-   **lettura dello strumento** dalla curva media (`letturaAPercentuale` sulla media), e sotto la lettura dalla curva di
-   ogni vaso. Accanto a una lettura estrapolata oltre le letture misurate di quella curva: «fuori dai valori misurati».
-   Senza curva: «—». Nessun peso, nessun deficit.
+4. **Calcolatore, nei due versi.** Una scelta «Che cosa conosci»: «% di capacità di campo» oppure «Lettura dello
+   strumento» (con il nome e l'unità del sensore), e un campo solo.
+   - **% CC → lettura:** per ogni substrato la **lettura dello strumento** dalla curva media (`letturaAPercentuale`
+     sulla media), e sotto la lettura dalla curva di ogni vaso.
+   - **Lettura → % CC:** per ogni substrato la **% CC** dalla curva media (`pccDaLettura` sulla media), e sotto la % CC
+     dalla curva di ogni vaso. Per il tensiometro la lettura si confronta in valore assoluto, come nella curva.
+   In entrambi i versi: accanto a un valore estrapolato oltre le letture misurate di quella curva, «fuori dai valori
+   misurati»; senza curva, «—». Cambiare verso svuota il campo. Nessun peso, nessun deficit.
 5. **Esporta e gestisci:** «Pesa tutti i vasi» (il giro di pesata sotto), «Scarica Excel», «Ripeti questa taratura»,
    «Elimina taratura» (con conferma, come oggi).
 
@@ -165,6 +171,6 @@ calcolatore «scrivo la % CC → leggo il valore dello strumento»**. Tutto il r
 1. Il secco senza lettura (consiglio accettato dall'utente).
 2. Tenere «Scarica Excel», «Scarica grafico (PNG)» e la riga dell'equazione sotto il grafico (l'utente non li ha citati).
 3. Niente «In corso / Conclusa» nella Taratura.
-4. Il calcolatore mostra la lettura della curva media e, sotto, quella di ogni vaso.
+4. Il calcolatore (nei due versi, richiesta dell'utente) mostra il valore della curva media e, sotto, quello di ogni vaso.
 5. Excel: fogli Punti, Parametri, Calcolatore, Grafico, Info.
 6. I vecchi indirizzi delle sessioni vasi in Pesatura reindirizzano alla Taratura.
