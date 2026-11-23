@@ -49,9 +49,9 @@ describe('scaricaPesatura', () => {
     expect(svg).toContain('Torba')
     const immagini = vi.mocked(scriviCartella).mock.calls[0][1]
     expect(immagini.get('curve-0')).toBe(PNG)
-    expect(consegna).toHaveBeenCalledWith(BLOB, 'Pesatura_Curve-vasi_2026-11-12.xlsx')
-    expect(esito).toEqual({ nomeFile: 'Pesatura_Curve-vasi_2026-11-12.xlsx', grafici: 1, graficiNelFile: 1 })
-    expect(toast.success).toHaveBeenCalledWith('Excel scaricato: Pesatura_Curve-vasi_2026-11-12.xlsx')
+    expect(consegna).toHaveBeenCalledWith(BLOB, 'Taratura_Curve-vasi_2026-11-12.xlsx')
+    expect(esito).toEqual({ nomeFile: 'Taratura_Curve-vasi_2026-11-12.xlsx', grafici: 1, graficiNelFile: 1 })
+    expect(toast.success).toHaveBeenCalledWith('Excel scaricato: Taratura_Curve-vasi_2026-11-12.xlsx')
   })
 
   it("con due substrati scrive un'immagine per ciascuno", async () => {
