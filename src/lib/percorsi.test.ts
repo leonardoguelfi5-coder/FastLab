@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { leggiArrivoDiario, percorsoDataset, percorsoEsporta } from './percorsi'
+import {
+  leggiArrivoDiario, percorsoDataset, percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi, percorsoEsporta,
+  percorsoNuovaTaratura, percorsoPesataTaratura, percorsoSessioneTaratura, percorsoTaratura,
+} from './percorsi'
 
 describe('leggiArrivoDiario', () => {
   it('senza stato, o con uno stato che non è un oggetto, non c\'è nulla', () => {
@@ -43,5 +46,46 @@ describe('percorsoDataset e percorsoEsporta', () => {
     expect(percorsoDataset('E', '')).toBe('/esperimenti/E/dataset')
     expect(percorsoDataset('E', '?')).toBe('/esperimenti/E/dataset')
     expect(percorsoEsporta('E', new URLSearchParams())).toBe('/esperimenti/E/esporta')
+  })
+})
+
+describe('percorsi della Taratura', () => {
+  it('la Taratura sta nel Laboratorio', () => {
+    expect(percorsoTaratura('E')).toBe('/esperimenti/E/laboratorio/taratura')
+  })
+
+  it('una nuova taratura, con o senza la sessione da cui ripartire', () => {
+    expect(percorsoNuovaTaratura('E', 'S')).toBe('/esperimenti/E/laboratorio/taratura/nuova?da=S')
+    expect(percorsoNuovaTaratura('E')).toBe('/esperimenti/E/laboratorio/taratura/nuova')
+  })
+
+  it('una sessione di taratura e la pesata di una sua fase, con il campione e la replica da cui ripartire', () => {
+    expect(percorsoSessioneTaratura('E', 'S')).toBe('/esperimenti/E/laboratorio/taratura/S')
+    expect(percorsoPesataTaratura('E', 'S', 'asciugatura', { campione: 'c1', replica: 1 }))
+      .toBe('/esperimenti/E/laboratorio/taratura/S/pesa/asciugatura?campione=c1&replica=1')
+    expect(percorsoPesataTaratura('E', 'S', 'capacita_campo')).toBe('/esperimenti/E/laboratorio/taratura/S/pesa/capacita_campo')
+  })
+
+  it('gli id si codificano come negli altri percorsi', () => {
+    expect(percorsoSessioneTaratura('a/b', 'c/d')).toBe('/esperimenti/a%2Fb/laboratorio/taratura/c%2Fd')
+    expect(percorsoPesataTaratura('E', 'S', 'secco', { campione: 'x/y', replica: 2 }))
+      .toBe('/esperimenti/E/laboratorio/taratura/S/pesa/secco?campione=x%2Fy&replica=2')
+  })
+
+  it('una sessione di tipo vasi va alla Taratura, le altre alla Pesatura', () => {
+    expect(percorsoDellaSessione('E', { id: 'S', tipo: 'vasi' })).toBe('/esperimenti/E/laboratorio/taratura/S')
+    expect(percorsoDellaSessione('E', { id: 'S', tipo: 'rwc' })).toBe('/esperimenti/E/laboratorio/pesatura/S')
+  })
+
+  it('la pesata segue lo stesso criterio della sessione', () => {
+    expect(percorsoDellaPesata('E', { id: 'S', tipo: 'vasi' }, 'fresco')).toBe('/esperimenti/E/laboratorio/taratura/S/pesa/fresco')
+    expect(percorsoDellaPesata('E', { id: 'S', tipo: 'rwc' }, 'fresco', { campione: 'c1', replica: 3 }))
+      .toBe('/esperimenti/E/laboratorio/pesatura/S/pesa/fresco?campione=c1&replica=3')
+  })
+
+  it("l'elenco va alla Taratura per i vasi e alla Pesatura per gli altri tipi", () => {
+    expect(percorsoElencoDi('E', 'vasi')).toBe('/esperimenti/E/laboratorio/taratura')
+    expect(percorsoElencoDi('E', 'aliquota')).toBe('/esperimenti/E/laboratorio/pesatura')
+    expect(percorsoElencoDi('E', 'sostanza_secca')).toBe('/esperimenti/E/laboratorio/pesatura')
   })
 })
