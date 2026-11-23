@@ -411,6 +411,64 @@ export function consultaPerLettura(gruppi: CurveSubstrato[], lettura: number): R
   )
 }
 
+/** Un valore del calcolatore: null se la curva non c'è o il risultato non è finito. */
+export interface ValoreCalcolato {
+  valore: number | null
+  fuoriCampo: boolean
+}
+
+export interface CalcoloSubstrato {
+  substrato: string
+  /** Dalla curva media del substrato. */
+  media: ValoreCalcolato
+  /** Uno per vaso, nell'ordine di `CurveSubstrato.vasi`; `vaso` è l'id del campione. */
+  vasi: (ValoreCalcolato & { vaso: string })[]
+}
+
+const NESSUN_VALORE: ValoreCalcolato = { valore: null, fuoriCampo: false }
+
+/** Il valore di una curva, o null se la curva manca o il risultato non è un numero finito. */
+function valoreCalcolato(curva: Curva | null, valore: number | null, lettura: number): ValoreCalcolato {
+  if (curva === null || valore === null || !Number.isFinite(valore)) return { ...NESSUN_VALORE }
+  const x = curva.modello === 'potenza' ? Math.abs(lettura) : lettura
+  return { valore, fuoriCampo: x < curva.min || x > curva.max }
+}
+
+function calcola(
+  gruppi: CurveSubstrato[],
+  valoreDi: (curva: Curva) => number,
+  letturaDi: (curva: Curva, valore: number) => number,
+): CalcoloSubstrato[] {
+  const uno = (curva: Curva | null): ValoreCalcolato => {
+    if (curva === null) return { ...NESSUN_VALORE }
+    const valore = valoreDi(curva)
+    return valoreCalcolato(curva, valore, letturaDi(curva, valore))
+  }
+  return gruppi.map((g) => ({
+    substrato: g.substrato,
+    media: uno(g.media),
+    vasi: g.vasi.map((v, i) => ({ vaso: v.campione.id, ...uno(g.curve[i] ?? null) })),
+  }))
+}
+
+/** Per ogni substrato, media e vasi: la lettura (|h| nella potenza) a cui la curva dà `pcc` % CC. */
+export function calcolaLettura(gruppi: CurveSubstrato[], pcc: number): CalcoloSubstrato[] {
+  return calcola(
+    gruppi,
+    (curva) => letturaAPercentuale(curva, pcc) ?? Number.NaN,
+    (_curva, valore) => valore,
+  )
+}
+
+/** Per ogni substrato, media e vasi: la % CC che la curva dà alla `lettura` (nella potenza se ne usa il valore assoluto). */
+export function calcolaPercentuale(gruppi: CurveSubstrato[], lettura: number): CalcoloSubstrato[] {
+  return calcola(
+    gruppi,
+    (curva) => pccDaLettura(curva, lettura),
+    () => lettura,
+  )
+}
+
 /** Le % CC della tabella già pronta sotto il riquadro di consultazione. */
 export const PERCENTUALI_TABELLA = [100, 80, 60, 50, 40] as const
 

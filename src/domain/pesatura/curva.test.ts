@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   adattaCurva,
+  calcolaLettura,
+  calcolaPercentuale,
   consultaPerCC,
   consultaPerLettura,
   curvePerSubstrato,
@@ -643,5 +645,64 @@ describe('retta media e soglie del TDR', () => {
   it('intestazioni della lettura a CC del TDR', () => {
     expect(intestazioniLetturaCC(TDR_RAW)).toEqual({ curva: 'TDR a CC, retta (raw)', misurato: 'TDR a CC, misurata (raw)' })
     expect(intestazioniLetturaCC({ tipo: 'tensione', unita: 'hPa' })).toEqual({ curva: 'h a CC, curva (hPa)', misurato: 'h a CC, misurato (hPa)' })
+  })
+})
+
+describe('calcolatore', () => {
+  const nullo = { valore: null, fuoriCampo: false }
+
+  it('TDR: la lettura che dà il 60 % CC dalla retta media, dentro il campo misurato', () => {
+    const g = curvePerSubstrato([T1()], 'lineare')
+    const r = calcolaLettura(g, 60)[0].media
+    circa(r.valore, 35.5)
+    expect(r.fuoriCampo).toBe(false)
+  })
+
+  it('TDR: una lettura sotto le misurate è fuori campo', () => {
+    const g = curvePerSubstrato([T1()], 'lineare')
+    expect(calcolaLettura(g, 10)[0].media.fuoriCampo).toBe(true)
+  })
+
+  it('TDR con due vasi: media e un valore per vaso, con gli id dei campioni', () => {
+    const g = curvePerSubstrato([T1(), T2()], 'lineare')
+    const [s] = calcolaLettura(g, 60)
+    circa(s.media.valore, 34.2987)
+    expect(s.vasi.map((v) => v.vaso)).toEqual(['t1', 't2'])
+  })
+
+  it('TDR: andata e ritorno tra lettura e % CC', () => {
+    const g = curvePerSubstrato([T1()], 'lineare')
+    circa(calcolaPercentuale(g, 35.5)[0].media.valore, 60)
+  })
+
+  it('tensiometro: il segno della lettura non conta', () => {
+    const g = curvePerSubstrato([vasoA(), vasoB()], 'potenza')
+    expect(calcolaPercentuale(g, -250)[0].media.valore).toBe(calcolaPercentuale(g, 250)[0].media.valore)
+  })
+
+  it('tensiometro: la lettura calcolata è in valore assoluto', () => {
+    const g = curvePerSubstrato([vasoA(), vasoB()], 'potenza')
+    expect(calcolaLettura(g, 100)[0].media.valore).toBeGreaterThan(0)
+  })
+
+  it('tensiometro: lettura 0 non dà un valore', () => {
+    const g = curvePerSubstrato([vasoA(), vasoB()], 'potenza')
+    expect(calcolaPercentuale(g, 0)[0].media).toEqual(nullo)
+  })
+
+  it('substrato senza curva: tutti i valori sono null', () => {
+    const piatto = vasoTDR('p', 750, 4850, 40, [[4030, 40], [3210, 40], [2390, 40]])
+    const g = curvePerSubstrato([piatto], 'lineare')
+    for (const [s] of [calcolaLettura(g, 60), calcolaPercentuale(g, 30)]) {
+      expect(s.media).toEqual(nullo)
+      expect(s.vasi).toEqual([{ vaso: 'p', ...nullo }])
+    }
+  })
+
+  it('percentuali non positive non lanciano', () => {
+    const g = curvePerSubstrato([vasoA(), vasoB()], 'potenza')
+    expect(() => calcolaLettura(g, 0)).not.toThrow()
+    expect(() => calcolaLettura(g, -5)).not.toThrow()
+    expect(calcolaLettura(g, 0)[0].media).toEqual(nullo)
   })
 })
