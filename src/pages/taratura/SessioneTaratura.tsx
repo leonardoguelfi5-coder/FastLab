@@ -126,7 +126,9 @@ function Contenuto({ espId, sessione, dati }: { espId: string; sessione: Session
   const scarica = () => esegui(async () => {
     const freschi = await queryClient.fetchQuery({ queryKey: chiavi.pesatura(espId), queryFn: () => listaPesatura(espId), staleTime: 0 }).catch(() => dati)
     // I vasi non usano le piante: la configurazione serve solo al foglio Info dell'Excel, si legge qui.
-    const configurazione = await caricaConfig(espId)
+    // Se non arriva, si usa quella già in memoria.
+    const configurazione = await queryClient.fetchQuery({ queryKey: chiavi.config(espId), queryFn: () => caricaConfig(espId) })
+      .catch(e => queryClient.getQueryData<Awaited<ReturnType<typeof caricaConfig>>>(chiavi.config(espId)) ?? Promise.reject(e))
     const aggiornata = freschi.sessioni.find(s => s.id === sessione.id) ?? sessione
     await scaricaPesatura({ sessioni: [aggiornata], dati: freschi, config: configurazione })
   })
@@ -137,8 +139,12 @@ function Contenuto({ espId, sessione, dati }: { espId: string; sessione: Session
 
   // Lanciano se non riescono: l'errore lo mostra il riassunto, accanto al vaso.
   const salva = async (p: Peso) => {
-    await salvaPeso(espId, sessione.id, p)
-    await rileggi()
+    try {
+      await salvaPeso(espId, sessione.id, p)
+    } finally {
+      // Anche se non riesce (per esempio «peso già inserito»): la pagina mostra com'è davvero.
+      await rileggi()
+    }
   }
   const eliminaUnPeso = async (p: Peso) => {
     await eliminaPeso(p.id)

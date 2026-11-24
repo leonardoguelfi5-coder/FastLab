@@ -2,6 +2,7 @@ import { useId } from 'react'
 import { COLORI_GRAFICO, COLORI_SERIE, CORPO_TESTO, FONT_DATI, LARGHEZZA_CARATTERE, MARCATORI, tacche } from '@/domain/grafico'
 import { modelloPer, pccDaLettura, type Curva, type CurveSubstrato } from '@/domain/pesatura/curva'
 import { nomeLettura } from '@/domain/pesatura/export'
+import { nomeDelVaso } from '@/domain/taratura/pesate'
 import type { Sensore } from '@/domain/pesatura/tipi'
 import { formattaDecimali, formattaNumero } from '@/lib/numeri'
 
@@ -65,7 +66,7 @@ export function GraficoCurve({ gruppo, sensore, perImmagine = false, titolo = ''
   const punti = vasi.flatMap(v => v.punti)
 
   const voci: { nome: string; colore: string; marcatore: string | null }[] = [
-    ...vasi.map((v, i) => ({ nome: v.campione.nome ?? `Vaso ${i + 1}`, colore: COLORI_SERIE[i % COLORI_SERIE.length], marcatore: MARCATORI[i % MARCATORI.length] })),
+    ...vasi.map((v, i) => ({ nome: nomeDelVaso(v.campione), colore: COLORI_SERIE[i % COLORI_SERIE.length], marcatore: MARCATORI[i % MARCATORI.length] })),
     ...(gruppo.media ? [{ nome: etichettaMedia(gruppo.media), colore: COLORI_GRAFICO.grafite, marcatore: null }] : []),
   ]
   const legenda = disponiLegenda(voci.map(v => v.nome), larghezza).map((p, i) => ({ ...voci[i], x: p.x, riga: p.riga }))

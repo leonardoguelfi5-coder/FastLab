@@ -98,4 +98,18 @@ describe('Calcolatore', () => {
     expect(risultato().getByText('Curva media').closest('p, div, li')).toHaveTextContent('—')
     expect(risultato().getByText('X').closest('li')).toHaveTextContent('—')
   })
+
+  it('un vaso senza nome si chiama «Vaso» e la sua posizione, non il suo id', async () => {
+    const senzaNome = curvePerSubstrato(vasiDaPesi(
+      [{ id: 'uuid-1234', sessione_id: 'S', pianta_id: null, nome: null, substrato: 'Torba', ordine: 2 }],
+      [
+        peso('secco', 750, null), peso('capacita_campo', 4850, 54),
+        peso('asciugatura', 4030, 44.8, 1), peso('asciugatura', 3210, 35.2, 2), peso('asciugatura', 2390, 26.0, 3),
+      ].map(p => ({ ...p, campione_id: 'uuid-1234' })),
+    ), 'lineare')
+    const u = apri(senzaNome)
+    await u.type(screen.getByLabelText(/^% di capacità di campo/), '60')
+    expect(risultato().getByText('Vaso 2')).toBeInTheDocument()
+    expect(screen.queryByText('uuid-1234')).not.toBeInTheDocument()
+  })
 })

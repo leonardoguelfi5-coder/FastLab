@@ -49,8 +49,9 @@ function dati(sessioni: SessionePesatura[], c: CampionePesatura[], p: Peso[]) {
   vi.mocked(listaPesatura).mockResolvedValue({ sessioni, campioni: c, pesi: p })
 }
 
-function apri() {
+function apri(prepara?: (client: QueryClient) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  prepara?.(client)
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/esperimenti/E/laboratorio/taratura/S']}>
@@ -197,6 +198,35 @@ describe('SessioneTaratura', () => {
     await u.click(screen.getByRole('button', { name: 'Scarica Excel' }))
     await waitFor(() => expect(scaricaPesatura).toHaveBeenCalledTimes(1))
     expect(vi.mocked(scaricaPesatura).mock.calls[0][0].sessioni.map(s => s.id)).toEqual(['S'])
+  })
+
+  it('Scarica Excel senza poter leggere la configurazione usa quella già in memoria', async () => {
+    vi.mocked(caricaConfig).mockRejectedValue(new Error('rete'))
+    const config = { trattamenti: [], piante: [] }
+    const u = apri(c => c.setQueryData(['config', 'E'], config))
+    await pronta()
+    await u.click(screen.getByRole('button', { name: 'Scarica Excel' }))
+    await waitFor(() => expect(scaricaPesatura).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(scaricaPesatura).mock.calls[0][0].config).toBe(config)
+  })
+
+  it("Scarica Excel senza alcuna configurazione mostra l'errore e non scarica", async () => {
+    vi.mocked(caricaConfig).mockRejectedValue(new Error('rete'))
+    const u = apri()
+    await pronta()
+    await u.click(screen.getByRole('button', { name: 'Scarica Excel' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(scaricaPesatura).not.toHaveBeenCalled()
+  })
+
+  it('un peso che non si salva fa rileggere i dati della pagina', async () => {
+    vi.mocked(salvaPeso).mockRejectedValue(new Error('rete'))
+    const u = apri()
+    await pronta()
+    const prima = vi.mocked(listaPesatura).mock.calls.length
+    await u.click(screen.getByRole('button', { name: 'Modifica Secco, V1' }))
+    await u.click(screen.getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(vi.mocked(listaPesatura).mock.calls.length).toBeGreaterThan(prima))
   })
 
   it('la nota si modifica e conserva conclusa', async () => {

@@ -8,6 +8,7 @@ import {
 } from '@/domain/pesatura/curva'
 import { nomeLettura } from '@/domain/pesatura/export'
 import type { Sensore } from '@/domain/pesatura/tipi'
+import { nomeDelVaso } from '@/domain/taratura/pesate'
 import { formattaDecimali } from '@/lib/numeri'
 
 type Modo = 'cc' | 'lettura'
@@ -48,7 +49,7 @@ export function Calcolatore({ gruppi, sensore }: CalcolatoreProps) {
     if (v.valore === null) return '—'
     return modo === 'cc' ? formattaDecimali(v.valore, decimaliLettura) : `${formattaDecimali(v.valore, 1)} %`
   }
-  const nomeVaso = (g: CurveSubstrato, i: number) => g.vasi[i].campione.nome?.trim() || g.vasi[i].campione.id
+  const nomeVaso = (g: CurveSubstrato, i: number) => nomeDelVaso(g.vasi[i].campione)
 
   return (
     <section aria-labelledby={idTitolo} className="flex flex-col gap-4">

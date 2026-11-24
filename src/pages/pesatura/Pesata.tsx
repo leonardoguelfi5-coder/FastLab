@@ -23,7 +23,7 @@ import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
 import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
 import { formattaCifre, formattaNumero } from '@/lib/numeri'
-import { percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi, percorsoPesataTaratura } from '@/lib/percorsi'
+import { percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi, percorsoPesata, percorsoPesataTaratura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { cn } from '@/lib/utils'
@@ -56,6 +56,11 @@ export function Pesata() {
   // Un vecchio indirizzo della Pesatura di una sessione dei vasi: la stessa pesata nella Taratura, con la stessa coda.
   if (sessione?.tipo === 'vasi' && !dallaTaratura) {
     return <Navigate replace to={`${percorsoPesataTaratura(espId, sessione.id, fase as FasePesata)}${search}`} />
+  }
+
+  // Una sessione di un altro tipo aperta dalla Taratura: la stessa pesata nella Pesatura.
+  if (sessione && sessione.tipo !== 'vasi' && dallaTaratura) {
+    return <Navigate replace to={`${percorsoPesata(espId, sessione.id, fase as FasePesata)}${search}`} />
   }
 
   let corpo

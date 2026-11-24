@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SENZA_SUBSTRATO } from '@/domain/pesatura/curva'
 import type { CampionePesatura, Peso, TipoPeso } from '@/domain/pesatura/tipi'
-import { pesateDeiVasi } from './pesate'
+import { nomeDelVaso, pesateDeiVasi } from './pesate'
 
 const campione = (id: string, substrato: string | null, ordine: number): CampionePesatura => ({
   id, sessione_id: 'S', pianta_id: null, nome: id, substrato, ordine,
@@ -54,5 +54,15 @@ describe('pesateDeiVasi', () => {
     const [{ vasi }] = pesateDeiVasi([campione('V1', 'Torba', 1), campione('V2', 'Torba', 2)], pesi)
     expect(vasi[0].secco).toBeNull()
     expect(vasi[1].secco?.id).toBe('s')
+  })
+})
+
+describe('nomeDelVaso', () => {
+  it('il nome del campione, senza spazi ai lati', () => {
+    expect(nomeDelVaso({ ...campione('V1', 'Torba', 4), nome: '  T1 ' })).toBe('T1')
+  })
+  it('senza nome (assente, vuoto o di soli spazi) è «Vaso» e la posizione', () => {
+    expect(nomeDelVaso({ ...campione('V1', 'Torba', 4), nome: null })).toBe('Vaso 4')
+    expect(nomeDelVaso({ ...campione('V1', 'Torba', 4), nome: '   ' })).toBe('Vaso 4')
   })
 })

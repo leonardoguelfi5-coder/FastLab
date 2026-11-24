@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { percentualeCCCalcolata, precisioneDeiPesi } from '@/domain/pesatura/calcoli'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
@@ -181,6 +181,38 @@ describe('RiepilogoVasi', () => {
     expect(await modulo.findByRole('alert')).toHaveTextContent('Errore imprevisto: qualcosa')
     expect(modulo.getByLabelText(/^TDR \(raw\)/)).toHaveValue('55')
     expect(modulo.getByLabelText(/^Peso/)).toHaveValue('4850')
+  })
+
+
+  it('un nuovo peso che non si salva e si riprova riscrive la stessa riga (stesso id)', async () => {
+    const onSalva = vi.fn<(p: Peso) => Promise<void>>().mockRejectedValueOnce(new Error('rete')).mockResolvedValue(undefined)
+    const { u } = apri({ onSalva })
+    await u.click(screen.getByRole('button', { name: 'Aggiungi pesata, V1' }))
+    const modulo = within(screen.getByRole('form', { name: 'Nuova pesata, V1' }))
+    await u.type(modulo.getByLabelText(/^Peso/), '2500')
+    await u.type(modulo.getByLabelText(/^TDR \(raw\)/), '26')
+    await u.click(modulo.getByRole('button', { name: 'Salva' }))
+    expect(await modulo.findByRole('alert')).toBeInTheDocument()
+    await u.click(modulo.getByRole('button', { name: 'Salva' }))
+    await waitFor(() => expect(onSalva).toHaveBeenCalledTimes(2))
+    expect(onSalva.mock.calls[1][0].id).toBe(onSalva.mock.calls[0][0].id)
+  })
+
+  it("mentre un'eliminazione è in corso i pulsanti sono disattivati", async () => {
+    let finisci: () => void = () => {}
+    const onElimina = vi.fn<(p: Peso) => Promise<void>>().mockReturnValue(new Promise<void>(r => { finisci = r }))
+    const { u } = apri({ onElimina })
+    await u.click(within(riga('3210 g')).getByRole('button', { name: /^Elimina .*, V1$/ }))
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Elimina' }))
+    expect(onElimina).toHaveBeenCalledTimes(1)
+    for (const b of screen.getAllByRole('button', { name: /^(Elimina|Modifica|Aggiungi pesata)/ })) expect(b).toBeDisabled()
+    finisci()
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /^Elimina .*, V1$/ })[0]).toBeEnabled())
+  })
+
+  it('un vaso senza nome si chiama «Vaso» e la sua posizione', () => {
+    apri({ campioni: [{ ...v1, nome: null, ordine: 3 }] })
+    expect(screen.getByRole('heading', { name: 'Vaso 3' })).toBeInTheDocument()
   })
 
   it('senza campioni lo dice', () => {

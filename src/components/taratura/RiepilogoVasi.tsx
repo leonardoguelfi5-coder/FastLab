@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Pencil, Plus, Scale, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Scale, Trash2, TriangleAlert } from 'lucide-react'
 import { Conferma } from '@/components/Conferma'
 import { NumericField } from '@/components/NumericField'
 import { TestoErrore } from '@/components/TestoErrore'
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { percentualeCCCalcolata, precisioneDeiPesi } from '@/domain/pesatura/calcoli'
 import { nomeLettura } from '@/domain/pesatura/export'
 import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
-import { pesateDeiVasi, type PesateDelVaso } from '@/domain/taratura/pesate'
+import { nomeDelVaso, pesateDeiVasi, type PesateDelVaso } from '@/domain/taratura/pesate'
 import { dataLocaleDa, formattaData, oraLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
@@ -31,8 +31,6 @@ const TRATTINO = '—'
 const testoPeso = (n: number, unita: string): string => `${formattaNumero(n)} ${unita}`
 /** Data e ora locali di un istante ISO: GG/MM/AAAA HH:MM. */
 const dataOra = (iso: string): string => `${formattaData(dataLocaleDa(iso))} ${oraLocale(new Date(iso))}`
-/** Il nome del vaso: quello del campione, o la sua posizione se non ne ha uno. */
-const nomeVaso = (c: CampionePesatura): string => c.nome?.trim() || `Vaso ${c.ordine}`
 
 /** Il modulo aperto: su quale vaso e quale riga (`secco`, `cc`, l'id di un punto o `nuova`). */
 interface Aperto {
@@ -40,7 +38,7 @@ interface Aperto {
   riga: string
 }
 
-interface Valore { nome: string; testo: string }
+interface Valore { nome: string; testo: string; manca?: boolean }
 
 /** Una riga del vaso: un peso che c'è (o manca, per secco e CC) con i suoi valori. */
 interface Riga {
@@ -61,17 +59,22 @@ export function RiepilogoVasi(props: RiepilogoVasiProps) {
   const [aperto, setAperto] = useState<Aperto | null>(null)
   const [daEliminare, setDaEliminare] = useState<Peso | null>(null)
   const [erroreEliminazione, setErroreEliminazione] = useState<{ vaso: string; testo: string } | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
   if (campioni.length === 0) return <p className="text-grafite-tenue">Questa sessione non ha vasi.</p>
   const gruppi = pesateDeiVasi(campioni, pesi)
   const precisione = precisioneDeiPesi(pesi)
 
   async function elimina(p: Peso) {
+    if (eliminando) return
     setErroreEliminazione(null)
+    setEliminando(true)
     try {
       await onElimina(p)
     } catch (e) {
       setErroreEliminazione({ vaso: p.campione_id, testo: messaggioErrore(e) })
+    } finally {
+      setEliminando(false)
     }
   }
 
@@ -92,6 +95,7 @@ export function RiepilogoVasi(props: RiepilogoVasiProps) {
               apri={riga => setAperto({ vaso: v.campione.id, riga })}
               chiudi={() => setAperto(null)}
               chiediEliminazione={setDaEliminare}
+              occupato={eliminando}
               erroreEliminazione={erroreEliminazione?.vaso === v.campione.id ? erroreEliminazione.testo : null}
             />
           ))}
@@ -121,6 +125,8 @@ interface SchedaVasoProps extends RiepilogoVasiProps {
   apri: (riga: string) => void
   chiudi: () => void
   chiediEliminazione: (p: Peso) => void
+  /** Un'eliminazione in corso: niente altre scritture finché non finisce. */
+  occupato: boolean
   erroreEliminazione: string | null
 }
 
@@ -128,7 +134,7 @@ function righeDel(v: PesateDelVaso, sessione: SessionePesatura, precisione: numb
   const u = sessione.unita
   const sensore = sessione.impostazioni.sensore
   const nome = sensore ? nomeLettura(sensore) : 'Lettura'
-  const lettura = (p: Peso): Valore => ({ nome, testo: p.lettura === null ? 'manca la lettura' : formattaNumero(p.lettura) })
+  const lettura = (p: Peso): Valore => ({ nome, testo: p.lettura === null ? 'manca la lettura' : formattaNumero(p.lettura), manca: p.lettura === null })
   const righe: Riga[] = [
     {
       chiave: 'secco', titolo: 'Secco', tipo: 'secco', peso: v.secco,
@@ -153,16 +159,17 @@ function righeDel(v: PesateDelVaso, sessione: SessionePesatura, precisione: numb
 }
 
 function SchedaVaso(props: SchedaVasoProps) {
-  const { vaso, sessione, precisione, aperto, apri, chiudi, puoAggiungere, puoCorreggere, senzaRete, onSalva } = props
-  const nome = nomeVaso(vaso.campione)
+  const { vaso, sessione, precisione, aperto, apri, chiudi, puoAggiungere, puoCorreggere, senzaRete: senzaReteProp, onSalva, occupato } = props
+  const senzaRete = senzaReteProp || occupato
+  const nome = nomeDelVaso(vaso.campione)
   const righe = righeDel(vaso, sessione, precisione)
 
   /** Il peso da salvare: quello corretto mantiene id, data e autore; uno nuovo nasce adesso, nella replica 1. */
-  const salva = (r: { tipo: TipoPeso; peso: Peso | null }) => async (valore: number, lettura: number | null) => {
+  const salva = (r: { tipo: TipoPeso; peso: Peso | null }) => async (valore: number, lettura: number | null, idNuovo: string) => {
     const l = r.tipo === 'secco' ? null : lettura
     const p: Peso = r.peso
       ? { ...r.peso, valore, lettura: l }
-      : { id: nuovoId(), campione_id: vaso.campione.id, replica: 1, tipo: r.tipo, valore, lettura: l, misurato_il: new Date().toISOString() }
+      : { id: idNuovo, campione_id: vaso.campione.id, replica: 1, tipo: r.tipo, valore, lettura: l, misurato_il: new Date().toISOString() }
     await onSalva(p)
     chiudi()
   }
@@ -203,7 +210,10 @@ function SchedaVaso(props: SchedaVasoProps) {
                     {r.valori.map(v => (
                       <div key={v.nome} className="flex items-baseline gap-1.5">
                         <dt className="text-sm text-grafite-tenue">{v.nome}</dt>
-                        <dd className="font-mono tabular-nums text-grafite">{v.testo}</dd>
+                        <dd className={v.manca ? 'inline-flex items-center gap-1 text-sm font-medium text-attenzione' : 'font-mono tabular-nums text-grafite'}>
+                          {v.manca && <TriangleAlert aria-hidden className="size-4 shrink-0" />}
+                          {v.testo}
+                        </dd>
                       </div>
                     ))}
                   </dl>
@@ -270,7 +280,7 @@ interface ModuloPesoProps {
   iniziale: Peso | null
   senzaRete: boolean
   /** Lancia se non riesce: il messaggio resta nel modulo, con i campi. */
-  onSalva: (valore: number, lettura: number | null) => Promise<void>
+  onSalva: (valore: number, lettura: number | null, idNuovo: string) => Promise<void>
   onAnnulla: () => void
 }
 
@@ -280,6 +290,8 @@ function ModuloPeso({ nome, sessione, conLettura, iniziale, senzaRete, onSalva, 
   const [lettura, setLettura] = useState<number | null>(iniziale?.lettura ?? null)
   const [provato, setProvato] = useState(false)
   const [occupato, setOccupato] = useState(false)
+  // L'id di un peso nuovo si sceglie una volta per modulo: un nuovo tentativo dopo un errore riscrive la stessa riga.
+  const [idNuovo] = useState(nuovoId)
   const [errore, setErrore] = useState<string | null>(null)
   const sensore = sessione.impostazioni.sensore
 
@@ -296,7 +308,7 @@ function ModuloPeso({ nome, sessione, conLettura, iniziale, senzaRete, onSalva, 
     setOccupato(true)
     setErrore(null)
     try {
-      await onSalva(valore as number, conLettura ? lettura : null)
+      await onSalva(valore as number, conLettura ? lettura : null, idNuovo)
     } catch (err) {
       setErrore(messaggioErrore(err))
       setOccupato(false)

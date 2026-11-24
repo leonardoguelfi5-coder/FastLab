@@ -1,6 +1,9 @@
 import { SENZA_SUBSTRATO } from '@/domain/pesatura/curva'
 import type { CampionePesatura, Peso } from '@/domain/pesatura/tipi'
 
+/** Il nome di un vaso: quello del campione, o «Vaso» e la sua posizione se non ne ha uno. */
+export const nomeDelVaso = (c: CampionePesatura): string => c.nome?.trim() || `Vaso ${c.ordine}`
+
 /** Le pesate di un vaso nella replica 1 (i vasi ne hanno una sola): il secco, la capacità di campo e l'asciugatura. */
 export interface PesateDelVaso {
   campione: CampionePesatura

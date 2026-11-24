@@ -646,6 +646,13 @@ describe('Pesata: eliminare un peso', () => {
 })
 
 describe('Pesata nella Taratura', () => {
+  it('una sessione che non è dei vasi aperta dalla Taratura va alla Pesatura, con la stessa fase e la stessa coda', async () => {
+    dati(sessione(), campioni, [])
+    apri('fresco', '?campione=c13&replica=2', 'taratura')
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(
+      '/esperimenti/E/laboratorio/pesatura/S/pesa/fresco?campione=c13&replica=2'))
+  })
+
   it('una sessione dei vasi aperta dalla Pesatura va alla Taratura, con la stessa fase e la stessa coda', async () => {
     dati(vasiConSensore('tdr', 'raw'), dueVasi, [])
     apri('asciugatura', '?campione=c1&replica=1')
