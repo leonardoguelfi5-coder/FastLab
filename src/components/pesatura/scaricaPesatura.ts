@@ -97,7 +97,7 @@ export async function scaricaGraficoPng(
 ): Promise<string> {
   const png = await pngDelleCurve(gruppo, sensore, `${titolo} · ${gruppo.substrato}`)
   if (png === null) throw new ErroreApp(GRAFICO_NON_DISEGNATO)
-  const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_curve_${nomeSicuro(gruppo.substrato) || 'substrato'}_${oggi}.png`
+  const nomeFile = `Taratura_${nomeSicuro(titolo) || 'analisi'}_curve_${nomeSicuro(gruppo.substrato) || 'substrato'}_${oggi}.png`
   consegna(new Blob([png as BlobPart], { type: 'image/png' }), nomeFile)
   return nomeFile
 }

@@ -29,12 +29,16 @@ import type { Pianta, Trattamento } from '@/domain/tipi'
 import { eDataValida, formattaData, oggiLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
-import { percorsoPesata, percorsoPesatura } from '@/lib/percorsi'
+import { percorsoPesata, percorsoPesatura, percorsoSessioneTaratura, percorsoTaratura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
-import { SENZA_RETE_PESATURA } from './messaggi'
+import { SENZA_RETE_PESATURA, SENZA_RETE_TARATURA } from './messaggi'
 
-const TIPI: TipoAnalisi[] = ['aliquota', 'rwc', 'sostanza_secca', 'vasi']
+/** I tipi della Pesatura: i vasi stanno nella Taratura, che parte già con il tipo scelto. */
+const TIPI: TipoAnalisi[] = ['aliquota', 'rwc', 'sostanza_secca']
+
+/** Da quale sezione si crea la sessione: la Pesatura (con la scelta del tipo) o la Taratura (solo vasi). */
+export type SezioneNuovaSessione = 'pesatura' | 'taratura'
 const UNITA: { valore: SceltaUnita; testo: string }[] = [
   { valore: 'g', testo: 'g (grammi)' },
   { valore: 'mg', testo: 'mg (milligrammi)' },
@@ -54,9 +58,10 @@ const testoPiante = (n: number) => `${n} ${n === 1 ? 'pianta' : 'piante'}`
 
 /**
  * Una nuova pesata: titolo, data, tipo, unità, impostazioni, nota e campioni, tutto in un modulo. Con `?da=` ("Ripeti")
- * parte già compilata come quella pesata. Solo online.
+ * parte già compilata come quella pesata. Con `sezione="taratura"` è una nuova taratura: il tipo è `vasi`, senza
+ * sceglierlo, e al salvataggio si apre la pagina della taratura. Solo online.
  */
-export function NuovaSessione() {
+export function NuovaSessione({ sezione = 'pesatura' }: { sezione?: SezioneNuovaSessione }) {
   const { espId = '' } = useParams()
   const [ricerca] = useSearchParams()
   const idOrigine = ricerca.get('da')
@@ -64,13 +69,16 @@ export function NuovaSessione() {
   const config = useConfig(espId)
   const permessi = usePermessi(espId)
   const senzaRete = useSenzaRete()
-  const indietro = percorsoPesatura(espId)
-  const titolo = idOrigine ? 'Ripeti pesata' : 'Nuova pesata'
+  const eTaratura = sezione === 'taratura'
+  const indietro = eTaratura ? percorsoTaratura(espId) : percorsoPesatura(espId)
+  const titolo = eTaratura
+    ? (idOrigine ? 'Ripeti taratura' : 'Nuova taratura')
+    : (idOrigine ? 'Ripeti pesata' : 'Nuova pesata')
 
   const origine = idOrigine ? (pesatura.data?.sessioni ?? []).find(s => s.id === idOrigine) ?? null : null
   let corpo
   if (!permessi.puoMisurare) {
-    corpo = <p className="text-grafite">Non puoi iniziare una pesata: hai solo la lettura di questo esperimento.</p>
+    corpo = <p className="text-grafite">Non puoi iniziare una {eTaratura ? 'taratura' : 'pesata'}: hai solo la lettura di questo esperimento.</p>
   } else if (idOrigine && pesatura.data === undefined) {
     corpo = pesatura.isError
       ? <ErroreConRiprova errore={pesatura.error} onRiprova={() => void pesatura.refetch()} />
@@ -78,11 +86,14 @@ export function NuovaSessione() {
   } else if (idOrigine && !origine) {
     corpo = (
       <div className="flex flex-col items-start gap-2">
-        <p className="text-grafite">La pesata da ripetere non c&apos;è più.</p>
-        <Link to={indietro} className={buttonVariants({ variant: 'ghost', className: '-ml-3' })}>Torna alla Pesatura</Link>
+        <p className="text-grafite">La {eTaratura ? 'taratura' : 'pesata'} da ripetere non c&apos;è più.</p>
+        <Link to={indietro} className={buttonVariants({ variant: 'ghost', className: '-ml-3' })}>
+          {eTaratura ? 'Torna alla Taratura' : 'Torna alla Pesatura'}
+        </Link>
       </div>
     )
-  } else if (config.data === undefined) {
+  } else if (!eTaratura && config.data === undefined) {
+    // I vasi non usano le piante: la taratura non aspetta la configurazione.
     corpo = config.isError
       ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
       : <RigaStato testo="Caricamento…" />
@@ -91,10 +102,11 @@ export function NuovaSessione() {
       <Modulo
         key={origine?.id ?? 'nuova'}
         espId={espId}
+        sezione={sezione}
         origine={origine}
         campioniOrigine={origine ? (pesatura.data?.campioni ?? []).filter(c => c.sessione_id === origine.id) : []}
-        piante={config.data.piante}
-        trattamenti={config.data.trattamenti}
+        piante={config.data?.piante ?? []}
+        trattamenti={config.data?.trattamenti ?? []}
       />
     )
   }
@@ -105,7 +117,7 @@ export function NuovaSessione() {
       {senzaRete && (
         <p role="status" className="mb-4 flex items-start gap-2 text-base text-grafite-tenue">
           <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0" />
-          {SENZA_RETE_PESATURA}
+          {eTaratura ? SENZA_RETE_TARATURA : SENZA_RETE_PESATURA}
         </p>
       )}
       {corpo}
@@ -113,8 +125,9 @@ export function NuovaSessione() {
   )
 }
 
-function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
+function Modulo({ espId, sezione, origine, campioniOrigine, piante, trattamenti }: {
   espId: string
+  sezione: SezioneNuovaSessione
   origine: SessionePesatura | null
   campioniOrigine: CampionePesatura[]
   piante: Pianta[]
@@ -127,7 +140,12 @@ function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
   // Gli id si scelgono una volta: un nuovo tentativo dopo un errore riscrive le stesse righe (upsert), senza duplicati.
   const [idSessione] = useState(nuovoId)
   const idPiante = useRef(new Map<string, string>())
-  const [bozza, setBozza] = useState<BozzaPesata>(() => (origine ? bozzaDa(origine, oggiLocale()) : bozzaVuota(oggiLocale())))
+  const eTaratura = sezione === 'taratura'
+  const [bozza, setBozza] = useState<BozzaPesata>(() => {
+    const b = origine ? bozzaDa(origine, oggiLocale()) : bozzaVuota(oggiLocale())
+    // Nella Taratura il tipo è sempre `vasi`, anche ripetendo una sessione di un altro tipo.
+    return eTaratura ? { ...b, tipo: 'vasi', repliche: 1 } : b
+  })
   const [scelta] = useState<SceltaCampioni | null>(() => (origine ? campioniDa(campioniOrigine, piante) : null))
   const [modo, setModo] = useState<ModoPiante>(scelta?.modo ?? 'tutte')
   const [trattamentiScelti, setTrattamentiScelti] = useState<ReadonlySet<string>>(new Set())
@@ -195,7 +213,7 @@ function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
         conclusa: false,
       }, campioni)
       await queryClient.invalidateQueries({ queryKey: chiavi.pesatura(espId) })
-      navigate(percorsoPesata(espId, idSessione, FASI[bozza.tipo][0]))
+      navigate(eTaratura ? percorsoSessioneTaratura(espId, idSessione) : percorsoPesata(espId, idSessione, FASI[bozza.tipo][0]))
     } catch (e) {
       setErrore(messaggioErrore(e))
       inCorso.current = false
@@ -236,13 +254,15 @@ function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
           <Input id={`${idCampo}-data`} type="date" variant="campo" value={bozza.data} onChange={e => cambia({ data: e.target.value })} />
         </div>
 
-        <MenuTendina
-          etichetta="Tipo"
-          opzioni={TIPI.map(t => ({ valore: t, testo: NOMI_TIPO[t] }))}
-          valore={bozza.tipo}
-          onCambia={tipo => cambia({ tipo })}
-          aiuto={DESCRIZIONI_TIPO[bozza.tipo]}
-        />
+        {!eTaratura && (
+          <MenuTendina
+            etichetta="Tipo"
+            opzioni={TIPI.map(t => ({ valore: t, testo: NOMI_TIPO[t] }))}
+            valore={bozza.tipo}
+            onCambia={tipo => cambia({ tipo })}
+            aiuto={DESCRIZIONI_TIPO[bozza.tipo]}
+          />
+        )}
 
         <div className="flex flex-col gap-3">
           <MenuTendina etichetta="Unità di misura" opzioni={UNITA} valore={bozza.sceltaUnita} onCambia={sceltaUnita => cambia({ sceltaUnita })} />
@@ -334,7 +354,7 @@ function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
             onChange={e => cambia({ nota: e.target.value })}
           />
           <p id={`${idCampo}-nota-aiuto`} className="text-sm text-grafite-tenue">
-            Le prime parole si vedono nell&apos;elenco delle pesate. Si può modificare anche dopo.
+            Le prime parole si vedono nell&apos;elenco delle {eTaratura ? 'tarature' : 'pesate'}. Si può modificare anche dopo.
           </p>
         </div>
 
@@ -415,7 +435,7 @@ function Modulo({ espId, origine, campioniOrigine, piante, trattamenti }: {
       <BarraAzioni>
         {errore && <TestoErrore role="alert" className="text-base">{errore}</TestoErrore>}
         <Button size="lg" disabled={senzaRete || occupato} onClick={() => void inizia()}>
-          {occupato ? 'Salvataggio…' : 'Inizia la pesata'}
+          {occupato ? 'Salvataggio…' : eTaratura ? 'Inizia la taratura' : 'Inizia la pesata'}
         </Button>
       </BarraAzioni>
     </>

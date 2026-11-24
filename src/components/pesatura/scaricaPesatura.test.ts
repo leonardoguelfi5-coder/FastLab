@@ -100,7 +100,7 @@ describe('scaricaGraficoPng', () => {
   it('consegna il PNG con un nome pulito', async () => {
     const { gruppi, sensore } = await gruppiEsito()
     const nome = await scaricaGraficoPng({ gruppo: { ...gruppi[0], substrato: 'Torba / fine' }, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
-    expect(nome).toBe('Pesatura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
+    expect(nome).toBe('Taratura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
     const [blob, nomeFile] = vi.mocked(consegna).mock.calls[0]
     expect(nomeFile).toBe(nome)
     expect((blob as Blob).type).toBe('image/png')

@@ -46,11 +46,12 @@ describe('Laboratorio', () => {
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E')
   })
 
-  it('ha una sola voce, Pesatura, che porta alla sua sezione', () => {
+  it('ha due voci: Pesatura e Taratura e stress idrico, ognuna verso la sua sezione', () => {
     vaiAllaPagina()
     const elenco = screen.getByRole('navigation', { name: 'Strumenti di laboratorio' })
     const link = within(elenco).getAllByRole('link')
-    expect(link).toHaveLength(1)
+    expect(link.map(l => l.textContent)).toEqual(['Pesatura', 'Taratura e stress idrico'])
     expect(within(elenco).getByRole('link', { name: 'Pesatura' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/pesatura')
+    expect(within(elenco).getByRole('link', { name: 'Taratura e stress idrico' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura')
   })
 })

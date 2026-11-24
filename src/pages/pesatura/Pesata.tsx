@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward, Trash2 } from 'lucide-react'
 import { useConfig, usePesatura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -18,16 +18,16 @@ import {
   chiedeLettura, etichettaCampione, FASI, letteraReplica, NOMI_FASE, pesoCompleto, type FasePesata, type Passo,
 } from '@/domain/pesatura/sequenza'
 import { nomeLettura } from '@/domain/pesatura/export'
-import type { CampionePesatura, Peso, SessionePesatura, TipoPeso } from '@/domain/pesatura/tipi'
+import type { CampionePesatura, Peso, SessionePesatura, TipoAnalisi, TipoPeso } from '@/domain/pesatura/tipi'
 import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
 import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
 import { formattaCifre, formattaNumero } from '@/lib/numeri'
-import { percorsoPesata, percorsoPesatura, percorsoSessione } from '@/lib/percorsi'
+import { percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { cn } from '@/lib/utils'
-import { SENZA_RETE_PESATURA } from './messaggi'
+import { SENZA_RETE_PESATURA, SENZA_RETE_TARATURA } from './messaggi'
 import { usePesataSequenziale } from './usePesataSequenziale'
 
 type StatoGiro = ReturnType<typeof usePesataSequenziale>
@@ -39,13 +39,18 @@ export function Pesata() {
   const campioneDa = ricerca.get('campione')
   const replicaDa = Number(ricerca.get('replica') ?? '1')
   const partenza = campioneDa ? { campione: campioneDa, replica: Number.isInteger(replicaDa) && replicaDa >= 1 ? replicaDa : 1 } : null
+  const { pathname } = useLocation()
   const dati = usePesatura(espId)
   const config = useConfig(espId)
   const senzaRete = useSenzaRete()
   const sessione = (dati.data?.sessioni ?? []).find(s => s.id === sessioneId) ?? null
   // I vasi non usano le piante: non aspettano la configurazione.
   const serveConfig = sessione !== null && sessione.tipo !== 'vasi'
-  const percorsoDellaSessione = percorsoSessione(espId, sessioneId)
+  // La sezione da cui si arriva (finché la sessione non c'è, si legge dal percorso): la Taratura per i vasi.
+  const tipo: TipoAnalisi = sessione?.tipo ?? (pathname.includes('/taratura/') ? 'vasi' : 'aliquota')
+  const eTaratura = tipo === 'vasi'
+  const allaSessione = percorsoDellaSessione(espId, { id: sessioneId, tipo })
+  const allElenco = percorsoElencoDi(espId, tipo)
 
   let corpo
   if (dati.data === undefined) {
@@ -53,9 +58,9 @@ export function Pesata() {
       ? <ErroreConRiprova errore={dati.error} onRiprova={() => void dati.refetch()} />
       : <RigaStato testo="Caricamento…" />
   } else if (!sessione) {
-    corpo = <NonTrovata testo="Sessione non trovata." a={percorsoPesatura(espId)} link="Torna alla Pesatura" />
+    corpo = <NonTrovata testo="Sessione non trovata." a={allElenco} link={eTaratura ? 'Torna alla Taratura' : 'Torna alla Pesatura'} />
   } else if (!(FASI[sessione.tipo] as string[]).includes(fase)) {
-    corpo = <NonTrovata testo="Fase non trovata." a={percorsoDellaSessione} link="Torna alla sessione" />
+    corpo = <NonTrovata testo="Fase non trovata." a={allaSessione} link="Torna alla sessione" />
   } else if (serveConfig && config.data === undefined) {
     corpo = config.isError
       ? <ErroreConRiprova errore={config.error} onRiprova={() => void config.refetch()} />
@@ -77,11 +82,11 @@ export function Pesata() {
   }
 
   return (
-    <AppShell titolo="Pesata" indietro={percorsoDellaSessione}>
+    <AppShell titolo="Pesata" indietro={dati.data !== undefined && !sessione ? allElenco : allaSessione}>
       {senzaRete && (
         <p role="status" className="mb-4 flex items-start gap-2 text-base text-grafite-tenue">
           <CloudOff aria-hidden className="mt-0.5 size-5 shrink-0" />
-          {SENZA_RETE_PESATURA}
+          {eTaratura ? SENZA_RETE_TARATURA : SENZA_RETE_PESATURA}
         </p>
       )}
       {corpo}
@@ -178,11 +183,11 @@ function Giro({ espId, sessione, campioni, pesi, fase, piante, trattamenti, part
         </div>
         <BarraAzioni>
           {prossima && (
-            <Link to={percorsoPesata(espId, sessione.id, prossima)} className={buttonVariants({ size: 'lg' })}>
+            <Link to={percorsoDellaPesata(espId, sessione, prossima)} className={buttonVariants({ size: 'lg' })}>
               Vai a {NOMI_FASE[prossima]}
             </Link>
           )}
-          <Link to={percorsoSessione(espId, sessione.id)} className={buttonVariants({ size: 'lg', variant: prossima ? 'outline' : 'default' })}>
+          <Link to={percorsoDellaSessione(espId, sessione)} className={buttonVariants({ size: 'lg', variant: prossima ? 'outline' : 'default' })}>
             Riepilogo
           </Link>
           {passi.length > 0 && (
