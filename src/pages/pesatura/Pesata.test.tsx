@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
@@ -14,14 +14,14 @@ vi.mock('@/api/inviti', () => ({
 }))
 vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
 vi.mock('@/api/esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
-vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), salvaPeso: vi.fn() }))
+vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), salvaPeso: vi.fn(), eliminaPeso: vi.fn() }))
 vi.mock('@/lib/dettatura', () => ({ useDettatura: vi.fn(), parla: vi.fn(), suonoErrore: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { caricaConfig } from '@/api/esperimenti'
 import { sonoAdmin } from '@/api/inviti'
 import { ruoloIn } from '@/api/persone'
-import { listaPesatura, salvaPeso } from '@/api/pesatura'
+import { eliminaPeso, listaPesatura, salvaPeso } from '@/api/pesatura'
 import {
   IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura,
 } from '@/domain/pesatura/tipi'
@@ -57,14 +57,22 @@ function dati(s: SessionePesatura, c: CampionePesatura[], pesi: Peso[]) {
   vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [s], campioni: c, pesi })
 }
 
-function apri(fase = 'fresco', ricerca = '') {
+function Posizione() {
+  const { pathname, search } = useLocation()
+  return <p data-testid="posizione">{pathname + search}</p>
+}
+
+/** Le sessioni dei vasi si pesano nella Taratura: dalla Pesatura ci si viene reindirizzati. */
+function apri(fase = 'fresco', ricerca = '', sezione: 'pesatura' | 'taratura' = 'pesatura') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/pesatura/S/pesa/${fase}${ricerca}`]}>
+      <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/${sezione}/S/pesa/${fase}${ricerca}`]}>
         <Routes>
           <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId/pesa/:fase" element={<Pesata />} />
+          <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId/pesa/:fase" element={<Pesata />} />
         </Routes>
+        <Posizione />
       </MemoryRouter>
     </QueryClientProvider>,
   )
@@ -93,6 +101,7 @@ beforeEach(() => {
   vi.mocked(ruoloIn).mockResolvedValue('proprietario')
   vi.mocked(caricaConfig).mockResolvedValue({ trattamenti, piante } as never)
   vi.mocked(salvaPeso).mockResolvedValue(undefined)
+  vi.mocked(eliminaPeso).mockResolvedValue(undefined)
   dati(sessione(), campioni, [])
   dettaturaFinta()
   vi.mocked(useDettatura).mockImplementation(onFrase => {
@@ -292,7 +301,7 @@ describe('Pesata', () => {
       [campione('v1', 1, { nome: 'V1', substrato: 'Torba' }), campione('v2', 2, { nome: 'V2' })],
       [peso('s1', 'v1', 1, 'secco', 100)],
     )
-    const utente = apri('asciugatura')
+    const utente = apri('asciugatura', '', 'taratura')
     await salva()
     expect(screen.getByText('V1')).toBeInTheDocument()
     expect(screen.queryByText(/^Replica/)).not.toBeInTheDocument()
@@ -308,7 +317,7 @@ describe('Pesata', () => {
 
   it('capacità di campo dei vasi: peso e lettura obbligatori', async () => {
     dati(vasiConSensore(), dueVasi, [peso('s1', 'v1', 1, 'secco', 100)])
-    const utente = apri('capacita_campo')
+    const utente = apri('capacita_campo', '', 'taratura')
     await salva()
     await utente.type(campoPeso(), '2600')
     await utente.click(await salva())
@@ -322,7 +331,7 @@ describe('Pesata', () => {
 
   it('secco dei vasi: nessun campo lettura', async () => {
     dati(vasiConSensore(), dueVasi, [])
-    const utente = apri('secco')
+    const utente = apri('secco', '', 'taratura')
     await salva()
     expect(screen.queryByLabelText(/^Tensione/)).not.toBeInTheDocument()
     await utente.type(campoPeso(), '100')
@@ -335,7 +344,7 @@ describe('Pesata', () => {
     dati(vasiConSensore(), dueVasi, [
       peso('c1', 'v1', 1, 'capacita_campo', 2600, { lettura: 21.8 }), peso('c2', 'v2', 1, 'capacita_campo', 2500),
     ])
-    apri('capacita_campo')
+    apri('capacita_campo', '', 'taratura')
     await salva()
     expect(screen.getByText('V2')).toBeInTheDocument()
     expect(screen.getByText('Passo 2 di 2')).toBeInTheDocument()
@@ -347,7 +356,7 @@ describe('Pesata', () => {
       [campione('v1', 1, { nome: 'V1' }), campione('v2', 2, { nome: 'V2' })],
       [peso('a0', 'v1', 1, 'asciugatura', 140, { lettura: 30 })],
     )
-    const utente = apri('asciugatura')
+    const utente = apri('asciugatura', '', 'taratura')
     await salva()
     expect(screen.getByText('V1')).toBeInTheDocument()
     expect(screen.getByText('Passo 1 di 2')).toBeInTheDocument()
@@ -502,7 +511,7 @@ describe('Pesata: dettatura a voce', () => {
   it('asciugatura in ascolto: il suggerimento dice «peso 150 lettura 35 avanti», per ogni sensore', async () => {
     dettaturaFinta({ inAscolto: true })
     dati(vasiConSensore('tdr', 'raw'), dueVasi, [peso('s1', 'v1', 1, 'secco', 100)])
-    apri('asciugatura')
+    apri('asciugatura', '', 'taratura')
     await salva()
     expect(screen.getByText(/Di' «peso 150 lettura 35 avanti»/)).toBeInTheDocument()
   })
@@ -513,7 +522,7 @@ describe('Pesata: dettatura a voce', () => {
       [campione('v1', 1, { nome: 'V1' }), campione('v2', 2, { nome: 'V2' })],
       [],
     )
-    apri('asciugatura')
+    apri('asciugatura', '', 'taratura')
     await salva()
     await detta('150 avanti')
     expect(suonoErrore).toHaveBeenCalledTimes(1)
@@ -524,7 +533,7 @@ describe('Pesata: dettatura a voce', () => {
 
   it('capacità di campo: «peso 2600 tensione 21 virgola 8 avanti» salva peso e lettura', async () => {
     dati(vasiConSensore(), dueVasi, [])
-    apri('capacita_campo')
+    apri('capacita_campo', '', 'taratura')
     await salva()
     await detta('2600 avanti')
     expect(suonoErrore).toHaveBeenCalledTimes(1)
@@ -570,5 +579,153 @@ describe('Pesata: dettatura a voce', () => {
     await salva()
     expect(screen.getByRole('button', { name: 'Detta' })).toBeEnabled()
     expect(screen.getByText('Permesso del microfono negato: attivalo nelle impostazioni del browser.')).toBeInTheDocument()
+  })
+})
+
+describe('Pesata: eliminare un peso', () => {
+  const elimina = () => screen.findByRole('button', { name: 'Elimina questo peso' })
+  const conUnPeso = (extra: Partial<Peso> = {}) =>
+    dati(sessione({ impostazioni: unaRepliche }), [campioni[0]], [peso('1', 'c12', 1, 'fresco', 1.2, extra)])
+  const apriSulPeso = () => apri('fresco', '?campione=c12&replica=1')
+
+  it('si elimina un peso già salvato, dopo la conferma, e il campo torna vuoto', async () => {
+    conUnPeso()
+    const utente = apriSulPeso()
+    await salva()
+    expect(campoPeso()).toHaveValue('1,2')
+    await utente.click(await elimina())
+    expect(screen.getByText('Eliminare questa pesata?')).toBeInTheDocument()
+    expect(screen.getByText('Non si può annullare.')).toBeInTheDocument()
+    await utente.click(screen.getByRole('button', { name: 'Elimina' }))
+    await waitFor(() => expect(eliminaPeso).toHaveBeenCalledWith('1'))
+    await waitFor(() => expect(campoPeso()).toHaveValue(''))
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it('con «Tieni la pesata» non si elimina nulla', async () => {
+    conUnPeso()
+    const utente = apriSulPeso()
+    await utente.click(await elimina())
+    await utente.click(screen.getByRole('button', { name: 'Tieni la pesata' }))
+    expect(eliminaPeso).not.toHaveBeenCalled()
+    expect(campoPeso()).toHaveValue('1,2')
+  })
+
+  it('un passo senza peso non ha il pulsante', async () => {
+    dati(sessione({ impostazioni: unaRepliche }), [campioni[0]], [])
+    apri()
+    await salva()
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it("un rilevatore non lo vede su un peso di un'altra persona", async () => {
+    vi.mocked(ruoloIn).mockResolvedValue('rilevatore')
+    conUnPeso({ creato_da: 'altro' })
+    apriSulPeso()
+    expect(await screen.findByText("Pesato da un'altra persona.")).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Elimina questo peso' })).not.toBeInTheDocument()
+  })
+
+  it('senza rete il pulsante è disattivato', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    conUnPeso()
+    apriSulPeso()
+    expect(await elimina()).toBeDisabled()
+  })
+
+  it("se l'eliminazione fallisce l'errore compare e il peso resta", async () => {
+    vi.mocked(eliminaPeso).mockRejectedValueOnce(new Error('Failed to fetch'))
+    conUnPeso()
+    const utente = apriSulPeso()
+    await utente.click(await elimina())
+    await utente.click(screen.getByRole('button', { name: 'Elimina' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(campoPeso()).toHaveValue('1,2')
+    expect(screen.getByRole('button', { name: 'Elimina questo peso' })).toBeInTheDocument()
+  })
+})
+
+describe('Pesata nella Taratura', () => {
+  it('una sessione che non è dei vasi aperta dalla Taratura va alla Pesatura, con la stessa fase e la stessa coda', async () => {
+    dati(sessione(), campioni, [])
+    apri('fresco', '?campione=c13&replica=2', 'taratura')
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(
+      '/esperimenti/E/laboratorio/pesatura/S/pesa/fresco?campione=c13&replica=2'))
+  })
+
+  it('una sessione dei vasi aperta dalla Pesatura va alla Taratura, con la stessa fase e la stessa coda', async () => {
+    dati(vasiConSensore('tdr', 'raw'), dueVasi, [])
+    apri('asciugatura', '?campione=c1&replica=1')
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent(
+      '/esperimenti/E/laboratorio/taratura/S/pesa/asciugatura?campione=c1&replica=1'))
+  })
+
+  function apriTaratura(fase: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/taratura/S/pesa/${fase}`]}>
+          <Routes>
+            <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId/pesa/:fase" element={<Pesata />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    return userEvent.setup({ delay: null })
+  }
+
+  it('indietro porta alla pagina della taratura', async () => {
+    dati(vasiConSensore('tdr', 'raw'), dueVasi, [])
+    apriTaratura('capacita_campo')
+    await salva()
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura/S')
+  })
+
+  it.each([
+    ['tdr', 'raw', /^TDR \(raw\)/],
+    ['tensione', 'hPa', /^Tensione \(hPa\)/],
+  ] as const)('la capacità di campo chiede la lettura (%s)', async (tipo, unita, etichetta) => {
+    dati(vasiConSensore(tipo, unita), dueVasi, [])
+    const utente = apriTaratura('capacita_campo')
+    await salva()
+    await utente.type(campoPeso(), '2600')
+    await utente.click(await salva())
+    expect(salvaPeso).not.toHaveBeenCalled()
+    expect(await screen.findByText('Scrivi la lettura del sensore.')).toBeInTheDocument()
+    await utente.type(screen.getByLabelText(etichetta), '30')
+    await utente.click(await salva())
+    await waitFor(() => expect(salvaPeso).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(salvaPeso).mock.calls[0][2]).toMatchObject({ tipo: 'capacita_campo', valore: 2600, lettura: 30 })
+  })
+
+  it('il secco non chiede la lettura', async () => {
+    dati(vasiConSensore('tdr', 'raw'), dueVasi, [])
+    apriTaratura('secco')
+    await salva()
+    expect(screen.queryByLabelText(/^TDR/)).not.toBeInTheDocument()
+  })
+
+  it('alla fine Riepilogo e la fase successiva restano nella Taratura', async () => {
+    dati(vasiConSensore('tdr', 'raw'), dueVasi, [peso('s1', 'v1', 1, 'secco', 100), peso('s2', 'v2', 1, 'secco', 100)])
+    apriTaratura('secco')
+    expect(await screen.findByText('Pesata finita')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Riepilogo' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura/S')
+    expect(screen.getByRole('link', { name: 'Vai a Capacità di campo' })).toHaveAttribute(
+      'href', '/esperimenti/E/laboratorio/taratura/S/pesa/capacita_campo')
+  })
+
+  it('una fase che non è della sessione torna alla taratura', async () => {
+    dati(vasiConSensore('tdr', 'raw'), dueVasi, [])
+    apriTaratura('fresco')
+    expect(await screen.findByText('Fase non trovata.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Torna alla sessione' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura/S')
+  })
+
+  it('una sessione che non c\'è torna all\'elenco della Taratura', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [], campioni: [], pesi: [] })
+    apriTaratura('secco')
+    expect(await screen.findByText('Sessione non trovata.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Torna alla Taratura' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura')
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura')
   })
 })

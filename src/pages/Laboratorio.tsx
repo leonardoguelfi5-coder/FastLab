@@ -1,14 +1,17 @@
 import { Link, useParams } from 'react-router-dom'
-import { ChevronRight, Scale } from 'lucide-react'
+import { ChevronRight, Droplets, Scale } from 'lucide-react'
 import { AppShell } from '@/components/AppShell'
 import { IconaTonda } from '@/components/IconaTonda'
-import { percorsoHome, percorsoPesatura } from '@/lib/percorsi'
+import { percorsoHome, percorsoPesatura, percorsoTaratura } from '@/lib/percorsi'
 
 /**
  * Gli strumenti di laboratorio. Ne compaiono solo di già costruiti: uno nuovo si aggiunge qui, senza toccare la barra.
  * L'icona è solo decorativa: il nome la dice già.
  */
-const STRUMENTI_LABORATORIO = [{ nome: 'Pesatura', icona: Scale, percorso: percorsoPesatura }]
+const STRUMENTI_LABORATORIO = [
+  { nome: 'Pesatura', icona: Scale, percorso: percorsoPesatura },
+  { nome: 'Taratura e stress idrico', icona: Droplets, percorso: percorsoTaratura },
+]
 
 export function Laboratorio() {
   const { espId = '' } = useParams()

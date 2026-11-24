@@ -125,16 +125,26 @@ describe('Pesatura', () => {
     expect(screen.queryByText(/stufa/)).not.toBeInTheDocument()
   })
 
-  it('una taratura dei vasi resta in corso finché non è segnata conclusa', async () => {
+  it('le tarature dei vasi non compaiono: stanno nella Taratura', async () => {
     vi.mocked(listaPesatura).mockResolvedValue({
-      sessioni: [sessione('V1', { tipo: 'vasi', titolo: 'Taratura A' }), sessione('V2', { tipo: 'vasi', titolo: 'Taratura B', conclusa: true })],
+      sessioni: [
+        sessione('V1', { tipo: 'vasi', titolo: 'Taratura A' }),
+        sessione('V2', { tipo: 'vasi', titolo: 'Taratura B', conclusa: true }),
+        sessione('R', { tipo: 'rwc', titolo: 'RWC foglie' }),
+      ],
       campioni: [], pesi: [],
     })
     apri()
-    expect(within(await screen.findByRole('list', { name: /In corso/ })).getByText('Taratura A')).toBeInTheDocument()
-    const completate = within(screen.getByRole('list', { name: /Completate/ }))
-    expect(completate.getByText('Taratura B')).toBeInTheDocument()
-    expect(completate.getByText(/Conclusa/)).toBeInTheDocument()
+    expect(await screen.findByText('RWC foglie')).toBeInTheDocument()
+    expect(screen.queryByText('Taratura A')).not.toBeInTheDocument()
+    expect(screen.queryByText('Taratura B')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Conclusa/)).not.toBeInTheDocument()
+  })
+
+  it('con solo tarature dei vasi dice che non ci sono pesate', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [sessione('V1', { tipo: 'vasi', titolo: 'Taratura A' })], campioni: [], pesi: [] })
+    apri()
+    expect(await screen.findByText('Nessuna pesata per ora.')).toBeInTheDocument()
   })
 
   it('la riga apre la pesata, Ripeti apre il modulo compilato come quella', async () => {

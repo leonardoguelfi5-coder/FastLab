@@ -313,16 +313,62 @@ describe('NuovaSessione: Ripeti', () => {
   })
 })
 
-describe('NuovaSessione: vasi', () => {
-  async function sceltiVasi() {
-    const u = apri()
+describe('NuovaSessione: la Pesatura non offre i vasi', () => {
+  it('la scelta del tipo ha Aliquota, RWC e % sostanza secca, non Vasi', async () => {
+    apri()
     await inizia()
-    await u.selectOptions(screen.getByRole('combobox', { name: 'Tipo' }), 'vasi')
-    return u
-  }
+    const tipo = screen.getByRole('combobox', { name: 'Tipo' })
+    expect([...tipo.querySelectorAll('option')].map(o => o.textContent)).toEqual(['Aliquota', 'RWC', '% sostanza secca'])
+  })
 
-  it('niente piante né repliche: un elenco di vasi con Nome e Substrato, e il sensore', async () => {
-    const u = await sceltiVasi()
+  it('ripetere una taratura dei vasi dalla Pesatura porta alla nuova taratura', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [taraturaFatta], campioni: vasiFatta, pesi: [] })
+    apri('?da=T0')
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/taratura/nuova?da=T0'))
+  })
+})
+
+/** Una taratura fatta, da ripetere: tensiometro in hPa con due vasi. */
+const taraturaFatta: SessionePesatura = {
+  id: 'T0', esperimento_id: 'E', titolo: 'Taratura torba', tipo: 'vasi', unita: 'g',
+  impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tensione', unita: 'hPa' } }, data: '2026-10-28', nota: null, conclusa: true,
+}
+const vasiFatta: CampionePesatura[] = [
+  { id: 'v1', sessione_id: 'T0', pianta_id: null, nome: 'V1', substrato: 'Torba', ordine: 1 },
+  { id: 'v2', sessione_id: 'T0', pianta_id: null, nome: 'V2', substrato: 'Cocco', ordine: 2 },
+]
+
+function apriTaratura(ricerca = '') {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[`/esperimenti/E/laboratorio/taratura/nuova${ricerca}`]}>
+        <Routes>
+          <Route path="/esperimenti/:espId/laboratorio/taratura/nuova" element={<NuovaSessione sezione="taratura" />} />
+          <Route path="/esperimenti/:espId/laboratorio/taratura" element={<p>Elenco Taratura</p>} />
+          <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId" element={<p>Pagina taratura</p>} />
+        </Routes>
+        <Posizione />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  return userEvent.setup({ delay: null })
+}
+
+describe('NuovaSessione: taratura', () => {
+  const salva = () => screen.findByRole('button', { name: 'Inizia la taratura' })
+
+  it('ha il titolo Nuova taratura e torna alla Taratura', async () => {
+    apriTaratura()
+    await salva()
+    expect(screen.getByRole('heading', { level: 1, name: 'Nuova taratura' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura')
+  })
+
+  it('niente scelta del tipo, niente piante né repliche: il sensore e un elenco di vasi', async () => {
+    const u = apriTaratura()
+    await salva()
+    expect(screen.queryByRole('combobox', { name: 'Tipo' })).not.toBeInTheDocument()
     expect(screen.queryByRole('radio', { name: 'Tutte le piante' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Una replica in più' })).not.toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Sensore' })).toHaveValue('tdr')
@@ -332,15 +378,16 @@ describe('NuovaSessione: vasi', () => {
   })
 
   it('serve almeno un vaso con il nome', async () => {
-    const u = await sceltiVasi()
-    await u.type(titolo(), 'Taratura')
-    await u.click(screen.getByRole('button', { name: 'Inizia la pesata' }))
+    const u = apriTaratura()
+    await u.type(await screen.findByRole('textbox', { name: /^Titolo/ }), 'Taratura')
+    await u.click(await salva())
     expect(creaSessione).not.toHaveBeenCalled()
     expect(await screen.findByText('Aggiungi almeno un vaso.')).toBeInTheDocument()
   })
 
-  it('salva i vasi come righe con substrato, il sensore e una replica', async () => {
-    const u = await sceltiVasi()
+  it('salva una sessione vasi con i vasi, il sensore e una replica, e apre la sua pagina', async () => {
+    const u = apriTaratura()
+    await salva()
     await u.type(titolo(), 'Taratura')
     await u.selectOptions(screen.getByRole('combobox', { name: 'Sensore' }), 'tensione')
     await u.click(screen.getByRole('button', { name: 'Aggiungi vaso' }))
@@ -349,7 +396,7 @@ describe('NuovaSessione: vasi', () => {
     await u.click(screen.getByRole('button', { name: 'Aggiungi vaso' }))
     expect(screen.getByLabelText('Substrato vaso 2')).toHaveValue('Torba')
     await u.type(screen.getByLabelText('Nome vaso 2'), 'V2')
-    await u.click(screen.getByRole('button', { name: 'Inizia la pesata' }))
+    await u.click(screen.getByRole('button', { name: 'Inizia la taratura' }))
     await waitFor(() => expect(creaSessione).toHaveBeenCalled())
     const [s, campioni] = vi.mocked(creaSessione).mock.calls[0]
     expect(s).toMatchObject({ tipo: 'vasi', unita: 'g', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tensione', unita: 'kPa' } } })
@@ -357,6 +404,27 @@ describe('NuovaSessione: vasi', () => {
       { pianta_id: null, nome: 'V1', substrato: 'Torba', ordine: 1 },
       { pianta_id: null, nome: 'V2', substrato: 'Torba', ordine: 2 },
     ])
-    expect(screen.getByTestId('posizione')).toHaveTextContent('/secco')
+    expect(s.id).toMatch(UUID)
+    expect(await screen.findByText('Pagina taratura')).toBeInTheDocument()
+    expect(screen.getByTestId('posizione')).toHaveTextContent(`/esperimenti/E/laboratorio/taratura/${s.id}`)
+  })
+
+  it('Ripeti taratura parte compilata come quella, con sensore e vasi', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [taraturaFatta], campioni: vasiFatta, pesi: [] })
+    apriTaratura('?da=T0')
+    await salva()
+    expect(screen.getByRole('heading', { level: 1, name: 'Ripeti taratura' })).toBeInTheDocument()
+    expect(titolo()).toHaveValue('Taratura torba')
+    expect(screen.getByRole('combobox', { name: 'Sensore' })).toHaveValue('tensione')
+    expect(screen.getByLabelText('Unità del sensore')).toHaveValue('hPa')
+    expect(screen.getByLabelText('Nome vaso 2')).toHaveValue('V2')
+    expect(screen.getByLabelText('Substrato vaso 2')).toHaveValue('Cocco')
+  })
+
+  it('una taratura da ripetere che non c\'è più: lo dice e rimanda alla Taratura', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [], campioni: [], pesi: [] })
+    apriTaratura('?da=T0')
+    expect(await screen.findByText('La taratura da ripetere non c\'è più.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Torna alla Taratura' })).toHaveAttribute('href', '/esperimenti/E/laboratorio/taratura')
   })
 })

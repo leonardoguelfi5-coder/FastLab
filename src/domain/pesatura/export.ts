@@ -6,14 +6,14 @@ import {
 } from '@/domain/export/fogli'
 import type { ConfigEsperimento, Fattore, Pianta, Trattamento } from '@/domain/tipi'
 import { oggiLocale } from '@/lib/date'
-import { arrotondaCifre, arrotondaDecimali, decimaliMassimi } from '@/lib/numeri'
+import { arrotondaCifre, arrotondaDecimali } from '@/lib/numeri'
 import {
   arrotondato, differenzaPesi, inUnita, mlTamponeCalcolato, percentualeCCCalcolata, precisioneDeiPesi, rwcCalcolato,
   sostanzaSeccaCalcolata,
 } from './calcoli'
 import {
-  consultaPerCC, curvePerSubstrato, decimaliDeficit, decimaliLetturaTarget, deficitInMl, equazione, intestazioniLetturaCC, modelloPer,
-  parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, sogliaDelSubstrato, vasiDaPesi, type CurveSubstrato, type Vaso,
+  calcolaLettura, curvePerSubstrato, decimaliLetturaTarget, equazione, intestazioniLetturaCC, modelloPer,
+  parametriDelSubstrato, PERCENTUALI_TABELLA, SENZA_SUBSTRATO, vasiDaPesi, type CurveSubstrato, type Vaso,
 } from './curva'
 import { etichettaCampione, letteraReplica, repliche } from './sequenza'
 import { NOMI_TIPO, type CampionePesatura, type Peso, type Sensore, type SessionePesatura, type TipoPeso } from './tipi'
@@ -217,48 +217,26 @@ function foglioParametri(gruppi: CurveSubstrato[], sensore: Sensore): Foglio {
   return foglio('Parametri', 'dati', colonne, righe)
 }
 
-function foglioPesiTarget(gruppi: CurveSubstrato[]): Foglio {
-  const colonne: ColonnaGrezza[] = [
-    { titolo: 'Substrato', tipo: 'testo' }, { titolo: 'Vaso', tipo: 'testo' },
-    ...PERCENTUALI_TABELLA.map((p): ColonnaGrezza => ({ titolo: `${p} % CC`, tipo: 'numero' })),
-  ]
-  const consulte = PERCENTUALI_TABELLA.map(p => consultaPerCC(gruppi, p))
-  // i pesi ricavati con i decimali dei pesi dei vasi (secco e capacità di campo), come nell'app
-  const decimali = decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null))))
-  const peso = (x: number | null) => (x === null ? null : arrotondaDecimali(x, decimali))
-  const righe: Cella[][] = []
-  gruppi.forEach((g, gi) => {
-    g.vasi.forEach((v, vi) => righe.push([g.substrato, nomeVaso(v), ...consulte.map(c => peso(c[gi].vasi[vi].peso))]))
-    righe.push([g.substrato, 'Media', ...consulte.map(c => peso(c[gi].media))])
-  })
-  return foglio('Pesi target', 'dati', colonne, righe)
-}
-
 /**
- * Le soglie di irrigazione del TDR: per ogni substrato e % CC la lettura da impostare sul logger, il peso medio e il deficit
- * medio (mL se il peso è in g, mg o kg, altrimenti l'unità della sessione). Il TDR target ha i decimali delle letture misurate
- * più uno, il peso medio quelli dei pesi, il deficit quelli dei pesi (spostati se convertito). La Nota segnala un TDR target
- * estrapolato oltre le letture misurate.
+ * Il calcolatore: per ogni substrato e % CC la lettura che la curva media dà (da impostare sul logger o da cercare sul
+ * sensore). La lettura ha i decimali di quelle misurate più uno; la Nota segnala un valore estrapolato oltre le letture misurate.
  */
-function foglioSoglie(gruppi: CurveSubstrato[], unita: string): Foglio {
+function foglioCalcolatore(gruppi: CurveSubstrato[], sensore: Sensore): Foglio {
   const colonne: ColonnaGrezza[] = [
-    { titolo: 'Substrato', tipo: 'testo' }, { titolo: '% CC', tipo: 'numero' }, { titolo: 'TDR target', tipo: 'numero' },
-    { titolo: 'Peso medio', tipo: 'numero' }, { titolo: `Deficit medio (${deficitInMl(0, unita).unita})`, tipo: 'numero' },
-    { titolo: 'Nota', tipo: 'testo' },
+    { titolo: 'Substrato', tipo: 'testo' }, { titolo: '% CC', tipo: 'numero' },
+    { titolo: nomeLettura(sensore), tipo: 'numero' }, { titolo: 'Nota', tipo: 'testo' },
   ]
-  const decimaliPesi = decimaliMassimi(gruppi.flatMap(g => g.vasi.flatMap(v => [v.secco, v.cc].filter((x): x is number => x !== null))))
-  const decimaliTarget = decimaliLetturaTarget(gruppi)
-  const righe = gruppi.flatMap(g => PERCENTUALI_TABELLA.map((p): Cella[] => {
-    const s = sogliaDelSubstrato(g, p)
+  const decimali = decimaliLetturaTarget(gruppi)
+  const calcoli = PERCENTUALI_TABELLA.map(p => calcolaLettura(gruppi, p))
+  const righe = gruppi.flatMap((g, gi) => PERCENTUALI_TABELLA.map((p, pi): Cella[] => {
+    const { valore, fuoriCampo } = calcoli[pi][gi].media
     return [
       g.substrato, p,
-      s.letturaTarget === null ? null : arrotondaDecimali(s.letturaTarget, decimaliTarget),
-      s.pesoMedio === null ? null : arrotondaDecimali(s.pesoMedio, decimaliPesi),
-      s.deficitMedio === null ? null : arrotondaDecimali(deficitInMl(s.deficitMedio, unita).valore, decimaliDeficit(decimaliPesi, unita)),
-      s.fuoriCampo ? 'TDR target fuori dai valori misurati' : null,
+      valore === null ? null : arrotondaDecimali(valore, decimali),
+      fuoriCampo ? 'fuori dai valori misurati' : null,
     ]
   }))
-  return foglio('Soglie', 'dati', colonne, righe)
+  return foglio('Calcolatore', 'dati', colonne, righe)
 }
 
 /** Un blocco per substrato: il titolo e le righe che l'immagine copre. */
@@ -332,7 +310,7 @@ export function cartellaPesatura(
   // Si ordina una volta sola, dalla più vecchia: tipo, unità, titolo e impostazioni vengono tutti dalla prima.
   const sessioni = [...sessioniDate].sort(dallaPiuVecchia)
   const titolo = sessioni[0]?.titolo ?? ''
-  const nomeFile = `Pesatura_${nomeSicuro(titolo) || 'analisi'}_${oggi}.xlsx`
+  const nomeFile = `${sessioni[0]?.tipo === 'vasi' ? 'Taratura' : 'Pesatura'}_${nomeSicuro(titolo) || 'analisi'}_${oggi}.xlsx`
   if (sessioni.length === 0) return { nomeFile, fogli: [], grafici: [], strumenti: [], intervallo: { da: null, a: null } }
 
   const date = sessioni.map(s => s.data).sort()
@@ -343,9 +321,7 @@ export function cartellaPesatura(
   if (sessioni[0].tipo === 'vasi') {
     const vasi = gruppiDeiVasi(sessioni, dati)
     const g = foglioGrafico(vasi.gruppi)
-    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi, vasi.sensore), foglioPesiTarget(vasi.gruppi))
-    // le soglie servono solo al TDR: il tensiometro non ha una retta da cui ricavarle
-    if (vasi.sensore.tipo === 'tdr') fogli.push(foglioSoglie(vasi.gruppi, sessioni[0].unita))
+    fogli.push(foglioPunti(sessioni, dati), foglioParametri(vasi.gruppi, vasi.sensore), foglioCalcolatore(vasi.gruppi, vasi.sensore))
     fogli.push(g.foglio)
     vasi.gruppi.forEach((gr, i) => grafici.push({
       parametroId: idGraficoCurve(i), titolo: titoloGrafico(gr.substrato), scala: 'valore', unita: vasi.sensore.unita.trim() || null,

@@ -1,4 +1,5 @@
 import type { FasePesata } from '../domain/pesatura/sequenza'
+import type { SessionePesatura, TipoAnalisi } from '../domain/pesatura/tipi'
 
 const parte = encodeURIComponent
 
@@ -108,7 +109,7 @@ export interface ArrivoMisura { daScheda?: boolean }
 /** Il catalogo degli strumenti, condiviso tra tutti gli esperimenti. */
 export const percorsoCatalogo = '/catalogo'
 
-/** Il Laboratorio: le pagine degli strumenti di laboratorio (per ora la Pesatura). */
+/** Il Laboratorio: le pagine degli strumenti di laboratorio (la Pesatura e la Taratura). */
 export const percorsoLaboratorio = (espId: string) => `${percorsoHome(espId)}/laboratorio`
 
 /** La Pesatura: le pesate in corso e quelle completate. */
@@ -131,3 +132,34 @@ export const percorsoPesata = (
   const base = `${percorsoSessione(espId, sessioneId)}/pesa/${parte(fase)}`
   return da ? `${base}?campione=${parte(da.campione)}&replica=${da.replica}` : base
 }
+
+/** La Taratura (vasi e stress idrico): l'elenco delle sessioni. */
+export const percorsoTaratura = (espId: string) => `${percorsoLaboratorio(espId)}/taratura`
+
+/** Una nuova sessione di Taratura; con `daSessioneId` ("Ripeti") parte già compilata come quella (nel parametro `da`). */
+export const percorsoNuovaTaratura = (espId: string, daSessioneId?: string) =>
+  `${percorsoTaratura(espId)}/nuova${daSessioneId ? `?da=${parte(daSessioneId)}` : ''}`
+
+/** Una sessione di Taratura: le letture dei vasi e i risultati. */
+export const percorsoSessioneTaratura = (espId: string, sessioneId: string) => `${percorsoTaratura(espId)}/${parte(sessioneId)}`
+
+/** La pesata di una fase di una sessione di Taratura. Con `da` parte da quel campione e da quella replica. */
+export const percorsoPesataTaratura = (
+  espId: string, sessioneId: string, fase: FasePesata, da?: { campione: string; replica: number },
+) => {
+  const base = `${percorsoSessioneTaratura(espId, sessioneId)}/pesa/${parte(fase)}`
+  return da ? `${base}?campione=${parte(da.campione)}&replica=${da.replica}` : base
+}
+
+/** Dove sta una sessione: la Taratura per i vasi, la Pesatura per gli altri tipi. */
+export const percorsoDellaSessione = (espId: string, s: Pick<SessionePesatura, 'id' | 'tipo'>) =>
+  s.tipo === 'vasi' ? percorsoSessioneTaratura(espId, s.id) : percorsoSessione(espId, s.id)
+
+/** Dove sta la pesata di una fase di una sessione: come `percorsoDellaSessione`. */
+export const percorsoDellaPesata = (
+  espId: string, s: Pick<SessionePesatura, 'id' | 'tipo'>, fase: FasePesata, da?: { campione: string; replica: number },
+) => (s.tipo === 'vasi' ? percorsoPesataTaratura(espId, s.id, fase, da) : percorsoPesata(espId, s.id, fase, da))
+
+/** L'elenco delle sessioni di un tipo: la Taratura per i vasi, la Pesatura per gli altri. */
+export const percorsoElencoDi = (espId: string, tipo: TipoAnalisi) =>
+  tipo === 'vasi' ? percorsoTaratura(espId) : percorsoPesatura(espId)

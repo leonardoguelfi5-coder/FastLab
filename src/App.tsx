@@ -16,6 +16,8 @@ import { NuovaSessione } from '@/pages/pesatura/NuovaSessione'
 import { Pesata } from '@/pages/pesatura/Pesata'
 import { Pesatura } from '@/pages/pesatura/Pesatura'
 import { Sessione } from '@/pages/pesatura/Sessione'
+import { SessioneTaratura } from '@/pages/taratura/SessioneTaratura'
+import { Taratura } from '@/pages/taratura/Taratura'
 import { HomeEsperimento } from '@/pages/HomeEsperimento'
 import { Impostazioni } from '@/pages/impostazioni/IndiceImpostazioni'
 import { ImpostazioniSezione } from '@/pages/impostazioni/PaginaSezione'
@@ -54,6 +56,11 @@ export function AppRoutes() {
         <Route path="/esperimenti/:espId/foto" element={<Foto />} />
         <Route path="/esperimenti/:espId/altro" element={<Altro />} />
         <Route path="/esperimenti/:espId/laboratorio" element={<Laboratorio />} />
+        {/* La Taratura (i vasi) prima della Pesatura; anche qui "nuova" è un segmento fisso, prima di `:sessioneId`. */}
+        <Route path="/esperimenti/:espId/laboratorio/taratura" element={<Taratura />} />
+        <Route path="/esperimenti/:espId/laboratorio/taratura/nuova" element={<NuovaSessione sezione="taratura" />} />
+        <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId/pesa/:fase" element={<Pesata />} />
+        <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId" element={<SessioneTaratura />} />
         <Route path="/esperimenti/:espId/laboratorio/pesatura" element={<Pesatura />} />
         {/* Anche "nuova" è un segmento fisso: va dichiarato prima di `:sessioneId`. */}
         <Route path="/esperimenti/:espId/laboratorio/pesatura/nuova" element={<NuovaSessione />} />

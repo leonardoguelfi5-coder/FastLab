@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { DatiPesatura } from '@/api/pesatura'
 import { RIGHE_IMMAGINE, type Cella, type Foglio } from '@/domain/export/fogli'
 import type { ConfigEsperimento } from '@/domain/tipi'
-import { consultaPerCC, curvePerSubstrato, parametriDelSubstrato, PERCENTUALI_TABELLA, vasiDaPesi } from './curva'
+import { parametriDelSubstrato, PERCENTUALI_TABELLA } from './curva'
 import { cartellaPesatura, gruppiDeiVasi, idGraficoCurve, nomeLettura } from './export'
 import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from './tipi'
 
@@ -194,10 +194,10 @@ describe('cartellaPesatura: vasi', () => {
   const dati: DatiPesatura = { sessioni: [s], campioni, pesi }
   const cartella = cartellaPesatura([s], dati, config, OGGI, ADESSO)
 
-  it('ha Punti, Parametri, Pesi target, Grafico e Info (senza Pesi)', () => {
-    expect(cartella.fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Grafico', 'Info'])
+  it('ha Punti, Parametri, Calcolatore, Grafico e Info (senza Pesi)', () => {
+    expect(cartella.fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Calcolatore', 'Grafico', 'Info'])
     expect(foglio('Punti', cartella.fogli).tipo).toBe('dati')
-    expect(foglio('Pesi target', cartella.fogli).tipo).toBe('dati')
+    expect(foglio('Calcolatore', cartella.fogli).tipo).toBe('dati')
     expect(foglio('Grafico', cartella.fogli).tipo).toBe('grafici')
   })
 
@@ -286,23 +286,6 @@ describe('cartellaPesatura: vasi', () => {
     expect(col(p, r, '% CC')).toBeCloseTo(90, 9)
   })
 
-  it('Pesi target: una colonna per percentuale e la riga Media uguale a consultaPerCC', () => {
-    const t = foglio('Pesi target', cartella.fogli)
-    expect(titoli(t)).toEqual(['Substrato', 'Vaso', ...PERCENTUALI_TABELLA.map(p => `${p} % CC`)])
-    const gruppi = curvePerSubstrato(vasiDaPesi(campioni, pesi), 'potenza')
-    const riga = (substrato: string, vaso: string) => t.righe.find(r => r[0] === substrato && r[1] === vaso) as Cella[]
-    PERCENTUALI_TABELLA.forEach(p => {
-      const r = consultaPerCC(gruppi, p)
-      const torba = r.find(x => x.substrato === 'Torba')
-      const sabbia = r.find(x => x.substrato === 'Sabbia')
-      expect(col(t, riga('Torba', 'Media'), `${p} % CC`)).toBeCloseTo(torba?.media as number, 9)
-      expect(col(t, riga('Sabbia', 'Media'), `${p} % CC`)).toBeCloseTo(sabbia?.media as number, 9)
-      expect(col(t, riga('Torba', 'V1'), `${p} % CC`)).toBeCloseTo(torba?.vasi[0].peso as number, 9)
-    })
-    // V1: secco 100, CC 200 → a 60 % pesa 160
-    expect(col(t, riga('Torba', 'V1'), '60 % CC')).toBeCloseTo(160, 9)
-  })
-
   it('Info: l\'equazione dei substrati con una curva e secco e CC di ogni vaso', () => {
     const info = JSON.stringify(foglio('Info', cartella.fogli).righe)
     expect(info).toContain('WC = ')
@@ -324,7 +307,7 @@ describe('nomeLettura', () => {
   })
 })
 
-describe('cartellaPesatura: soglie del TDR', () => {
+describe('cartellaPesatura: Calcolatore', () => {
   const tdr = { tipo: 'tdr' as const, unita: 'raw' }
   const tens = { tipo: 'tensione' as const, unita: 'kPa' }
   const sessioneVasi = (sensore: typeof tdr | typeof tens) => sessione({ tipo: 'vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore } })
@@ -337,18 +320,18 @@ describe('cartellaPesatura: soglie del TDR', () => {
   ]
   const fogliDi = (s: SessionePesatura) => cartellaPesatura([s], { sessioni: [s], campioni, pesi }, config, OGGI, ADESSO).fogli
 
-  it('il foglio Soglie sta dopo Pesi target', () => {
-    expect(fogliDi(sessioneVasi(tdr)).map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Soglie', 'Grafico', 'Info'])
+  it('i fogli del TDR sono Punti, Parametri, Calcolatore, Grafico e Info', () => {
+    expect(fogliDi(sessioneVasi(tdr)).map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Calcolatore', 'Grafico', 'Info'])
   })
 
-  it('una riga per substrato e %, con TDR target, peso medio e deficit medio', () => {
-    const f = foglio('Soglie', fogliDi(sessioneVasi(tdr)))
+  it('Calcolatore del TDR: una riga per substrato e %, con la lettura dalla curva media', () => {
+    const f = foglio('Calcolatore', fogliDi(sessioneVasi(tdr)))
     expect(f.tipo).toBe('dati')
-    expect(titoli(f)).toEqual(['Substrato', '% CC', 'TDR target', 'Peso medio', 'Deficit medio (mL)', 'Nota'])
+    expect(titoli(f)).toEqual(['Substrato', '% CC', 'TDR (raw)', 'Nota'])
     expect(f.righe).toHaveLength(PERCENTUALI_TABELLA.length)
     expect(f.righe.map(r => r[1])).toEqual([...PERCENTUALI_TABELLA])
-    // il 60 %: 35,5 con 2 decimali (le letture ne hanno 1), 3210 g, deficit 1640 mL
-    expect(f.righe[2]).toEqual(['Torba', 60, 35.5, 3210, 1640, null])
+    // il 60 %: 35,5 con 2 decimali (le letture ne hanno 1)
+    expect(f.righe[2]).toEqual(['Torba', 60, 35.5, null])
     expect(f.righe[0][2]).toBe(53.87)
   })
 
@@ -359,14 +342,23 @@ describe('cartellaPesatura: soglie del TDR', () => {
     expect(riga.slice(2, 5)).toEqual([2.178, -17.31, 1])
   })
 
-  it('con il tensiometro niente foglio Soglie e a, b come prima', () => {
+  it('anche il tensiometro ha il Calcolatore, con a, b e R² in Parametri', () => {
     const fogli = fogliDi(sessioneVasi(tens))
-    expect(fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Pesi target', 'Grafico', 'Info'])
+    expect(fogli.map(f => f.nome)).toEqual(['Punti', 'Parametri', 'Calcolatore', 'Grafico', 'Info'])
     expect(titoli(foglio('Parametri', fogli)).slice(2, 5)).toEqual(['a', 'b', 'R²'])
   })
 
-  it("con un peso non convertibile l'intestazione del deficit porta l'unita della sessione", () => {
-    const s = { ...sessioneVasi(tdr), unita: 'lb' }
-    expect(titoli(foglio('Soglie', fogliDi(s)))[4]).toBe('Deficit medio (lb)')
+  it('Calcolatore del tensiometro: la lettura ha il nome del sensore ed è positiva o vuota', () => {
+    const f = foglio('Calcolatore', fogliDi(sessioneVasi(tens)))
+    expect(titoli(f)[2]).toBe('Tensione (kPa)')
+    for (const r of f.righe) {
+      const v = r[2]
+      expect(v === null || (typeof v === 'number' && v > 0)).toBe(true)
+    }
+  })
+
+  it('il nome del file comincia con Taratura_ per i vasi e con Pesatura_ per le altre sessioni', () => {
+    expect(cartellaPesatura([sessioneVasi(tdr)], { sessioni: [sessioneVasi(tdr)], campioni, pesi }, config, OGGI, ADESSO).nomeFile).toMatch(/^Taratura_/)
+    expect(cartellaPesatura([sessione()], { sessioni: [sessione()], campioni: [], pesi: [] }, config, OGGI, ADESSO).nomeFile).toMatch(/^Pesatura_/)
   })
 })

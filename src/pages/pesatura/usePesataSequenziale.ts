@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { salvaPeso } from '@/api/pesatura'
+import { eliminaPeso, salvaPeso } from '@/api/pesatura'
 import { chiavi } from '@/api/query'
 import { indiceDelPasso, passiDellaFase, pesoCompleto, primoPassoMancante, type FasePesata, type Passo } from '@/domain/pesatura/sequenza'
 import type { CampionePesatura, Peso, SessionePesatura } from '@/domain/pesatura/tipi'
@@ -86,5 +86,29 @@ export function usePesataSequenziale({ espId, sessione, campioni, pesi, fase, pa
     return true
   }
 
-  return { passi, indice, finito, vaiA, salva, occupato, errore, ultimo }
+  /** Elimina il peso del passo corrente: il passo resta dov'è, senza peso. Vero se è stato eliminato. */
+  async function elimina(): Promise<boolean> {
+    const passo = passi[indice]
+    if (!passo?.peso || inCorso.current) return false
+    inCorso.current = true
+    setOccupato(true)
+    setErrore(null)
+    try {
+      await eliminaPeso(passo.peso.id)
+    } catch (e) {
+      setErrore({ testo: messaggioErrore(e), giaInserito: false })
+      inCorso.current = false
+      setOccupato(false)
+      return false
+    }
+    setPassi(p => p.map((x, i) => (i === indice ? { ...x, peso: null } : x)))
+    setUltimo(null)
+    idScelti.current.delete(indice)
+    void queryClient.invalidateQueries({ queryKey: chiavi.pesatura(espId) })
+    inCorso.current = false
+    setOccupato(false)
+    return true
+  }
+
+  return { passi, indice, finito, vaiA, salva, elimina, occupato, errore, ultimo }
 }

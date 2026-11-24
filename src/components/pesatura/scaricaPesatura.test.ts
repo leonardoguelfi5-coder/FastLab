@@ -49,9 +49,9 @@ describe('scaricaPesatura', () => {
     expect(svg).toContain('Torba')
     const immagini = vi.mocked(scriviCartella).mock.calls[0][1]
     expect(immagini.get('curve-0')).toBe(PNG)
-    expect(consegna).toHaveBeenCalledWith(BLOB, 'Pesatura_Curve-vasi_2026-11-12.xlsx')
-    expect(esito).toEqual({ nomeFile: 'Pesatura_Curve-vasi_2026-11-12.xlsx', grafici: 1, graficiNelFile: 1 })
-    expect(toast.success).toHaveBeenCalledWith('Excel scaricato: Pesatura_Curve-vasi_2026-11-12.xlsx')
+    expect(consegna).toHaveBeenCalledWith(BLOB, 'Taratura_Curve-vasi_2026-11-12.xlsx')
+    expect(esito).toEqual({ nomeFile: 'Taratura_Curve-vasi_2026-11-12.xlsx', grafici: 1, graficiNelFile: 1 })
+    expect(toast.success).toHaveBeenCalledWith('Excel scaricato: Taratura_Curve-vasi_2026-11-12.xlsx')
   })
 
   it("con due substrati scrive un'immagine per ciascuno", async () => {
@@ -100,7 +100,7 @@ describe('scaricaGraficoPng', () => {
   it('consegna il PNG con un nome pulito', async () => {
     const { gruppi, sensore } = await gruppiEsito()
     const nome = await scaricaGraficoPng({ gruppo: { ...gruppi[0], substrato: 'Torba / fine' }, sensore, titolo: 'Curve vasi', oggi: '2026-11-12' })
-    expect(nome).toBe('Pesatura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
+    expect(nome).toBe('Taratura_Curve-vasi_curve_Torba-fine_2026-11-12.png')
     const [blob, nomeFile] = vi.mocked(consegna).mock.calls[0]
     expect(nomeFile).toBe(nome)
     expect((blob as Blob).type).toBe('image/png')
