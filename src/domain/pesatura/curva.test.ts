@@ -3,10 +3,7 @@ import {
   adattaCurva,
   calcolaLettura,
   calcolaPercentuale,
-  consultaPerCC,
-  consultaPerLettura,
   curvePerSubstrato,
-  deficitInMl,
   equazione,
   intestazioniLetturaCC,
   letturaAPercentuale,
@@ -15,7 +12,6 @@ import {
   parametriDelSubstrato,
   PERCENTUALI_TABELLA,
   pccDaLettura,
-  sogliaDelSubstrato,
   vasiDaPesi,
   type Curva,
   type PuntoCurva,
@@ -410,113 +406,8 @@ describe('parametriDelSubstrato', () => {
   })
 })
 
-describe('consultaPerCC', () => {
-  it('peso di ogni vaso a p % CC e media del substrato', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: 2000, cc: 3000 }), vaso('c', 'Ctrl')], 'lineare')
-    const [hc, ctrl] = consultaPerCC(gruppi, 50)
-    expect(hc.substrato).toBe('HC')
-    expect(hc.vasi).toEqual([
-      { vaso: 'a', peso: 2200, fuoriCampo: false },
-      { vaso: 'b', peso: 2500, fuoriCampo: false },
-    ])
-    expect(hc.media).toBeCloseTo(2350)
-    expect(hc.fuoriCampo).toBe(false)
-    expect(ctrl.media).toBeCloseTo(2200)
-  })
-
-  it('un vaso senza secco dà peso null e resta fuori dalla media', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: null, punti: [] })], 'lineare')
-    const [hc] = consultaPerCC(gruppi, 50)
-    expect(hc.vasi[1]).toEqual({ vaso: 'b', peso: null, fuoriCampo: false })
-    expect(hc.media).toBeCloseTo(2200)
-  })
-
-  it('un vaso con CC non maggiore del secco dà peso null', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: 2600, cc: 2600, punti: [] }), vaso('c', 'HC', { secco: 2600, cc: 2000, punti: [] })], 'lineare')
-    const [hc] = consultaPerCC(gruppi, 50)
-    expect(hc.vasi.map((v) => v.peso)).toEqual([2200, null, null])
-    expect(hc.media).toBeCloseTo(2200)
-  })
-
-  it('media null se nessun vaso ha secco e CC', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC', { cc: null, punti: [] })], 'lineare')
-    expect(consultaPerCC(gruppi, 50)[0].media).toBeNull()
-  })
-
-  it('la tabella usa 100, 80, 60, 50, 40', () => {
-    expect([...PERCENTUALI_TABELLA]).toEqual([100, 80, 60, 50, 40])
-  })
-})
-
-describe('consultaPerLettura', () => {
-  // curva del vaso: pcc = 10 + 2·lettura, su letture 1..4
-  it('usa la curva del vaso dentro i valori misurati', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC')], 'lineare')
-    const [hc] = consultaPerLettura(gruppi, 2.5)
-    // pcc 15 → 1800 + 0,15 × 800 = 1920
-    expect(hc.vasi[0].peso).toBeCloseTo(1920)
-    expect(hc.vasi[0].fuoriCampo).toBe(false)
-    expect(hc.media).toBeCloseTo(1920)
-    expect(hc.fuoriCampo).toBe(false)
-  })
-
-  it('una lettura fuori da [min, max] dà fuoriCampo: true', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC')], 'lineare')
-    const [hc] = consultaPerLettura(gruppi, 10)
-    // pcc 30 → 1800 + 0,30 × 800 = 2040, estrapolato
-    expect(hc.vasi[0].peso).toBeCloseTo(2040)
-    expect(hc.vasi[0].fuoriCampo).toBe(true)
-    expect(hc.fuoriCampo).toBe(true)
-  })
-
-  it('senza curva propria il vaso usa la curva media del substrato', () => {
-    const gruppi = curvePerSubstrato(
-      [vaso('a', 'HC'), vaso('b', 'HC', { punti: punti([3, 4], (x) => 10 + 2 * x) })],
-      'lineare',
-    )
-    const [hc] = consultaPerLettura(gruppi, 2.5)
-    expect(hc.vasi.map((v) => v.peso)).toEqual([expect.closeTo(1920), expect.closeTo(1920)])
-    expect(hc.vasi.every((v) => !v.fuoriCampo)).toBe(true)
-  })
-
-  it('senza curva il peso è null', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC', { punti: [] })], 'lineare')
-    const [hc] = consultaPerLettura(gruppi, 2.5)
-    expect(hc.vasi[0]).toEqual({ vaso: 'a', peso: null, fuoriCampo: false })
-    expect(hc.media).toBeNull()
-  })
-
-  it('un vaso senza secco dà peso null anche con la curva media', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: null, punti: [] })], 'lineare')
-    const [hc] = consultaPerLettura(gruppi, 2.5)
-    expect(hc.vasi[1].peso).toBeNull()
-    expect(hc.media).toBeCloseTo(1920)
-  })
-
-  it('un vaso con CC non maggiore del secco dà peso null anche con la curva media', () => {
-    const gruppi = curvePerSubstrato([vaso('a', 'HC'), vaso('b', 'HC', { secco: 2600, cc: 2000, punti: [] })], 'lineare')
-    const [hc] = consultaPerLettura(gruppi, 10)
-    expect(hc.vasi[1]).toEqual({ vaso: 'b', peso: null, fuoriCampo: false })
-    expect(hc.media).toBeCloseTo(2040)
-  })
-
-  it('tensiometro: una lettura negativa si usa in valore assoluto e non è fuori campo', () => {
-    const gruppi = curvePerSubstrato([vasoA()], 'potenza')
-    const [meno] = consultaPerLettura(gruppi, -40)
-    const [piu] = consultaPerLettura(gruppi, 40)
-    // pcc = 649,17 · 40^−0,6033 ≈ 70,1 → 1800 + 0,701 × 800
-    expect(meno.vasi[0].peso).toBeCloseTo(1800 + (pccDaLettura(gruppi[0].curve[0]!, 40) / 100) * 800)
-    expect(meno.vasi[0].peso).toBeCloseTo(piu.vasi[0].peso as number)
-    expect(meno.vasi[0].fuoriCampo).toBe(false)
-    expect(consultaPerLettura(gruppi, -70)[0].vasi[0].fuoriCampo).toBe(true)
-  })
-
-  it('tensiometro: una lettura a zero non dà un peso infinito', () => {
-    const gruppi = curvePerSubstrato([vasoA()], 'potenza')
-    const [hc] = consultaPerLettura(gruppi, 0)
-    expect(hc.vasi[0].peso).toBeNull()
-    expect(hc.media).toBeNull()
-  })
+it('la tabella del foglio Calcolatore usa 100, 80, 60, 50, 40', () => {
+  expect([...PERCENTUALI_TABELLA]).toEqual([100, 80, 60, 50, 40])
 })
 
 // Il TDR: vasi veri, con valori da `numpy.polyfit` (la retta di ogni vaso con la CC al 100 %).
@@ -532,7 +423,7 @@ const T1 = () => vasoTDR('t1', 750, 4850, 54, [[4030, 44.8], [3210, 35.2], [2390
 const T2 = () => vasoTDR('t2', 1000, 2000, 50, [[1750, 40], [1520, 30], [1300, 20]])
 const TDR_RAW = { tipo: 'tdr' as const, unita: 'raw' }
 
-describe('retta media e soglie del TDR', () => {
+describe('retta media del TDR', () => {
   it('la retta di un vaso: CC al 100 %, m e q dei minimi quadrati', () => {
     const [g] = curvePerSubstrato([T1()], 'lineare')
     const c = g.curve[0]!
@@ -558,80 +449,6 @@ describe('retta media e soglie del TDR', () => {
     const m = mediaDeiParametri([c(-20, 2), c(-10, 4)])!
     expect(m.a).toBe(-15)
     expect(m.b).toBe(3)
-  })
-
-  it('soglia di un vaso: lettura dalla retta, peso e deficit dal suo secco e dalla sua CC', () => {
-    const [g] = curvePerSubstrato([T1()], 'lineare')
-    const s60 = sogliaDelSubstrato(g, 60)
-    circa(s60.letturaTarget, 35.5)
-    expect(s60.pcc).toBe(60)
-    expect(s60.vasi).toEqual([{ vaso: 't1', pesoTarget: 3210, deficit: 1640 }])
-    expect(s60.pesoMedio).toBe(3210)
-    expect(s60.deficitMedio).toBe(1640)
-    const s100 = sogliaDelSubstrato(g, 100)
-    circa(s100.letturaTarget, 53.8678)
-    expect(s100.vasi[0].deficit).toBe(0)
-    const s50 = sogliaDelSubstrato(g, 50)
-    circa(s50.letturaTarget, 30.9081)
-    expect(s50.vasi[0].pesoTarget).toBe(2800)
-    expect(s50.vasi[0].deficit).toBe(2050)
-  })
-
-  it('soglia di due vasi: lettura dalla retta media, peso e deficit medi dei vasi', () => {
-    const [g] = curvePerSubstrato([T1(), T2()], 'lineare')
-    const s = sogliaDelSubstrato(g, 60)
-    circa(s.letturaTarget, 34.2987)
-    expect(s.vasi.map((v) => v.pesoTarget)).toEqual([3210, 1600])
-    expect(s.pesoMedio).toBe(2405)
-    expect(s.deficitMedio).toBe(1020)
-  })
-
-  it('un vaso senza secco e CC non ha peso e non entra nelle medie', () => {
-    const [g] = curvePerSubstrato([T1(), vasoTDR('t3', 1000, 1000, 50, [[1, 1]])], 'lineare')
-    const s = sogliaDelSubstrato(g, 60)
-    expect(s.vasi[1]).toEqual({ vaso: 't3', pesoTarget: null, deficit: null })
-    expect(s.pesoMedio).toBe(3210)
-    expect(s.deficitMedio).toBe(1640)
-  })
-
-  it('un vaso con letture tutte uguali non ha retta: lettura target null', () => {
-    const piatto = vasoTDR('p', 750, 4850, 40, [[4030, 40], [3210, 40], [2390, 40]])
-    const [g] = curvePerSubstrato([piatto], 'lineare')
-    expect(g.media).toBeNull()
-    const s = sogliaDelSubstrato(g, 60)
-    expect(s.letturaTarget).toBeNull()
-    expect(s.pesoMedio).toBe(3210)
-  })
-
-  it('pendenza negativa: la lettura target è finita e corretta', () => {
-    const neg = vasoTDR('n', 1000, 2000, 10, [[1800, 20], [1500, 30], [1200, 40]])
-    const [g] = curvePerSubstrato([neg], 'lineare')
-    expect(g.media!.b).toBeLessThan(0)
-    const t = sogliaDelSubstrato(g, 60).letturaTarget!
-    expect(Number.isFinite(t)).toBe(true)
-    circa(pccDaLettura(g.media!, t), 60)
-  })
-
-  it('pendenza nulla nella media: lettura target null', () => {
-    const g = { ...curvePerSubstrato([T1()], 'lineare')[0], media: { modello: 'lineare' as const, a: 50, b: 0, r2: null, n: 3, min: 1, max: 3 } }
-    expect(sogliaDelSubstrato(g, 60).letturaTarget).toBeNull()
-    expect(sogliaDelSubstrato(g, 60).fuoriCampo).toBe(false)
-  })
-
-  it('una lettura target oltre le letture misurate (17,5–54) è fuori campo', () => {
-    const [g] = curvePerSubstrato([T1()], 'lineare')
-    expect(sogliaDelSubstrato(g, 60).fuoriCampo).toBe(false)
-    expect(sogliaDelSubstrato(g, 100).fuoriCampo).toBe(false)
-    // 10 % → TDR 12,5, sotto la lettura più secca (17,5)
-    expect(sogliaDelSubstrato(g, 10).fuoriCampo).toBe(true)
-    // 120 % → TDR 63,1, sopra la lettura a CC (54)
-    expect(sogliaDelSubstrato(g, 120).fuoriCampo).toBe(true)
-  })
-
-  it("deficitInMl: in grammi (o kg) è acqua in mL, altrimenti resta l'unità della sessione", () => {
-    expect(deficitInMl(1640, 'g')).toEqual({ valore: 1640, unita: 'mL' })
-    expect(deficitInMl(1.64, 'kg')).toEqual({ valore: 1640, unita: 'mL' })
-    expect(deficitInMl(3.6, 'lb')).toEqual({ valore: 3.6, unita: 'lb' })
   })
 
   it('equazione del TDR: m e q a 4 cifre, R² a 3 decimali', () => {

@@ -27,6 +27,7 @@ import { percorsoNuovaTaratura, percorsoPesataTaratura, percorsoSessione, percor
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { SENZA_RETE_TARATURA } from '@/pages/pesatura/messaggi'
+import { permessiSessione } from '@/pages/pesatura/sessioni'
 
 /**
  * Una taratura dei vasi: intestazione con la nota, le curve per substrato con l'equazione, il riassunto delle pesate
@@ -86,11 +87,7 @@ function Contenuto({ espId, sessione, dati }: { espId: string; sessione: Session
   const pesi = useMemo(() => dati.pesi.filter(p => idCampioni.has(p.campione_id)), [dati.pesi, idCampioni])
   const vasi = useMemo(() => gruppiDeiVasi([sessione], dati), [sessione, dati])
 
-  // Come `puo_gestire_sessione` del database: il proprietario, oppure chi ha creato la sessione. Il database ha l'ultima parola.
-  const puoGestire = permessi.puoMisurare && (!permessi.soloProprietario || (sessione.creato_da !== undefined && sessione.creato_da === utente?.user.id))
-  // Come `sessioni_pesatura_delete` (20261111000018): chi non è il proprietario non elimina una sessione con pesi
-  // di altre persone, che sparirebbero con lei.
-  const conPesiAltrui = permessi.soloProprietario && pesi.some(p => p.creato_da !== utente?.user.id)
+  const { puoGestire, conPesiAltrui } = permessiSessione(permessi, utente?.user.id, sessione, pesi)
 
   const rileggi = () => queryClient.invalidateQueries({ queryKey: chiavi.pesatura(espId) })
 

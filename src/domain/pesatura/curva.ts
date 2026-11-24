@@ -1,6 +1,6 @@
 import { arrotondaCifre, decimaliMassimi, formattaCifre } from '@/lib/numeri'
-import { inGrammi, percentualeCC, pesoAPercentualeCC } from './calcoli'
-import type { CampionePesatura, Peso, Sensore, UnitaPeso } from './tipi'
+import { percentualeCC } from './calcoli'
+import type { CampionePesatura, Peso, Sensore } from './tipi'
 
 /**
  * La curva di ritenzione idrica dei vasi: la % della capacità di campo (y) in funzione della lettura del sensore (x).
@@ -349,68 +349,6 @@ export function parametriDelSubstrato(g: CurveSubstrato): RigaParametri[] {
   ]
 }
 
-/** `vaso` è l'id del campione; l'ordine è quello di `CurveSubstrato.vasi`. */
-export interface PesoTarget {
-  vaso: string
-  peso: number | null
-  fuoriCampo: boolean
-}
-
-/** `fuoriCampo` è true se almeno uno dei pesi che fanno la media è estrapolato. */
-export interface RispostaConsulta {
-  substrato: string
-  vasi: PesoTarget[]
-  media: number | null
-  fuoriCampo: boolean
-}
-
-function risposta(substrato: string, vasi: PesoTarget[]): RispostaConsulta {
-  const pesi = vasi.flatMap((v) => (v.peso === null ? [] : [v.peso]))
-  return {
-    substrato,
-    vasi,
-    media: pesi.length === 0 ? null : pesi.reduce((s, p) => s + p, 0) / pesi.length,
-    fuoriCampo: vasi.some((v) => v.fuoriCampo),
-  }
-}
-
-/** Il peso del vaso a p % CC, oppure `null` se mancano secco o CC o se la CC non supera il secco (dati impossibili). */
-function pesoDelVaso(v: Vaso, p: number): number | null {
-  if (v.secco === null || v.cc === null || v.cc <= v.secco) return null
-  const peso = pesoAPercentualeCC(p, v.secco, v.cc)
-  return Number.isFinite(peso) ? peso : null
-}
-
-/** Il peso di ogni vaso a p % della sua capacità di campo: non dipende dalla curva, quindi non è mai fuori campo. */
-export function consultaPerCC(gruppi: CurveSubstrato[], p: number): RispostaConsulta[] {
-  return gruppi.map((g) =>
-    risposta(
-      g.substrato,
-      g.vasi.map((v) => ({ vaso: v.campione.id, peso: pesoDelVaso(v, p), fuoriCampo: false })),
-    ),
-  )
-}
-
-/**
- * Il peso di ogni vaso a una lettura del sensore: la % CC viene dalla curva del vaso o, se il vaso non ne ha una, dalla
- * curva media del suo substrato. `fuoriCampo` segnala un peso estrapolato oltre le letture misurate da quella curva
- * (nella potenza si confronta |lettura|, come le letture della curva).
- */
-export function consultaPerLettura(gruppi: CurveSubstrato[], lettura: number): RispostaConsulta[] {
-  return gruppi.map((g) =>
-    risposta(
-      g.substrato,
-      g.vasi.map((v, i): PesoTarget => {
-        const curva = g.curve[i] ?? g.media
-        const peso = curva === null ? null : pesoDelVaso(v, pccDaLettura(curva, lettura))
-        if (curva === null || peso === null) return { vaso: v.campione.id, peso: null, fuoriCampo: false }
-        const x = curva.modello === 'potenza' ? Math.abs(lettura) : lettura
-        return { vaso: v.campione.id, peso, fuoriCampo: x < curva.min || x > curva.max }
-      }),
-    ),
-  )
-}
-
 /** Un valore del calcolatore: null se la curva non c'è o il risultato non è finito. */
 export interface ValoreCalcolato {
   valore: number | null
@@ -469,60 +407,8 @@ export function calcolaPercentuale(gruppi: CurveSubstrato[], lettura: number): C
   )
 }
 
-/** Le % CC della tabella già pronta sotto il riquadro di consultazione. */
+/** Le % CC della tabella già pronta nel foglio Calcolatore dell'Excel. */
 export const PERCENTUALI_TABELLA = [100, 80, 60, 50, 40] as const
-
-/** `deficit` è la CC meno il peso target: l'acqua da togliere al vaso saturo per arrivare alla soglia. */
-export interface SogliaVaso {
-  vaso: string
-  pesoTarget: number | null
-  deficit: number | null
-}
-
-/**
- * La soglia al `pcc` % della CC: la lettura dalla retta media e, per ogni vaso, il peso target e il deficit d'acqua.
- * `fuoriCampo` dice che la lettura target cade oltre le letture misurate dalla retta media (è estrapolata).
- */
-export interface Soglia {
-  pcc: number
-  letturaTarget: number | null
-  fuoriCampo: boolean
-  vasi: SogliaVaso[]
-  pesoMedio: number | null
-  deficitMedio: number | null
-}
-
-const mediaOpzionale = (valori: (number | null)[]): number | null => {
-  const presenti = valori.flatMap((v) => (v === null ? [] : [v]))
-  return presenti.length === 0 ? null : mediaDi(presenti)
-}
-
-/**
- * La lettura target viene dalla curva media; peso e deficit sono del vaso (suo secco, sua CC) e si mediano sui vasi che
- * li hanno. `letturaTarget` è null senza curva media o se la pendenza è nulla o il risultato non è finito.
- */
-export function sogliaDelSubstrato(g: CurveSubstrato, pcc: number): Soglia {
-  const lettura = g.media === null ? null : letturaAPercentuale(g.media, pcc)
-  const vasi = g.vasi.map((v): SogliaVaso => {
-    const pesoTarget = pesoDelVaso(v, pcc)
-    return { vaso: v.campione.id, pesoTarget, deficit: pesoTarget === null || v.cc === null ? null : v.cc - pesoTarget }
-  })
-  const letturaTarget = lettura !== null && Number.isFinite(lettura) ? lettura : null
-  return {
-    pcc,
-    letturaTarget,
-    fuoriCampo: letturaTarget !== null && g.media !== null && (letturaTarget < g.media.min || letturaTarget > g.media.max),
-    vasi,
-    pesoMedio: mediaOpzionale(vasi.map((v) => v.pesoTarget)),
-    deficitMedio: mediaOpzionale(vasi.map((v) => v.deficit)),
-  }
-}
-
-/** Il deficit d'acqua: se il peso è in grammi (o mg, kg) è acqua, 1 g = 1 mL; altrimenti resta nell'unità della sessione. */
-export function deficitInMl(deficit: number, unita: UnitaPeso): { valore: number; unita: string } {
-  const grammi = inGrammi(deficit, unita)
-  return grammi === null ? { valore: deficit, unita } : { valore: grammi, unita: 'mL' }
-}
 
 /** I decimali del TDR target: quelli delle letture misurate più uno (minimo 1), perché la retta ne ricava un valore più fine. */
 export function decimaliLetturaTarget(gruppi: CurveSubstrato[]): number {
@@ -530,10 +416,4 @@ export function decimaliLetturaTarget(gruppi: CurveSubstrato[]): number {
     g.vasi.flatMap((v) => [...v.punti.map((p) => p.lettura), ...(v.letturaCC === null ? [] : [v.letturaCC])]),
   )
   return Math.max(1, decimaliMassimi(letture) + 1)
-}
-
-/** I decimali del deficit: quelli dei pesi, spostati dell'ordine di grandezza se il deficit è convertito in mL (kg → g, mg → g). */
-export function decimaliDeficit(decimaliPesi: number, unita: UnitaPeso): number {
-  const fattore = inGrammi(1, unita)
-  return fattore === null ? decimaliPesi : Math.max(0, decimaliPesi - Math.round(Math.log10(fattore)))
 }

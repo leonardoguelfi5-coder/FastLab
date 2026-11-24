@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CloudOff, Mic, MicOff, SkipForward, Trash2 } from 'lucide-react'
 import { useConfig, usePesatura } from '@/api/query'
 import { AppShell } from '@/components/AppShell'
@@ -23,7 +23,7 @@ import { fraseSalvato, leggiComando } from '@/domain/pesatura/voce'
 import type { Pianta, Trattamento } from '@/domain/tipi'
 import { parla, suonoErrore, useDettatura, type Dettatura } from '@/lib/dettatura'
 import { formattaCifre, formattaNumero } from '@/lib/numeri'
-import { percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi } from '@/lib/percorsi'
+import { percorsoDellaPesata, percorsoDellaSessione, percorsoElencoDi, percorsoPesataTaratura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { cn } from '@/lib/utils'
@@ -39,7 +39,7 @@ export function Pesata() {
   const campioneDa = ricerca.get('campione')
   const replicaDa = Number(ricerca.get('replica') ?? '1')
   const partenza = campioneDa ? { campione: campioneDa, replica: Number.isInteger(replicaDa) && replicaDa >= 1 ? replicaDa : 1 } : null
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const dati = usePesatura(espId)
   const config = useConfig(espId)
   const senzaRete = useSenzaRete()
@@ -47,10 +47,16 @@ export function Pesata() {
   // I vasi non usano le piante: non aspettano la configurazione.
   const serveConfig = sessione !== null && sessione.tipo !== 'vasi'
   // La sezione da cui si arriva (finché la sessione non c'è, si legge dal percorso): la Taratura per i vasi.
-  const tipo: TipoAnalisi = sessione?.tipo ?? (pathname.includes('/taratura/') ? 'vasi' : 'aliquota')
+  const dallaTaratura = pathname.includes('/taratura/')
+  const tipo: TipoAnalisi = sessione?.tipo ?? (dallaTaratura ? 'vasi' : 'aliquota')
   const eTaratura = tipo === 'vasi'
   const allaSessione = percorsoDellaSessione(espId, { id: sessioneId, tipo })
   const allElenco = percorsoElencoDi(espId, tipo)
+
+  // Un vecchio indirizzo della Pesatura di una sessione dei vasi: la stessa pesata nella Taratura, con la stessa coda.
+  if (sessione?.tipo === 'vasi' && !dallaTaratura) {
+    return <Navigate replace to={`${percorsoPesataTaratura(espId, sessione.id, fase as FasePesata)}${search}`} />
+  }
 
   let corpo
   if (dati.data === undefined) {

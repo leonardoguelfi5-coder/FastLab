@@ -320,6 +320,12 @@ describe('NuovaSessione: la Pesatura non offre i vasi', () => {
     const tipo = screen.getByRole('combobox', { name: 'Tipo' })
     expect([...tipo.querySelectorAll('option')].map(o => o.textContent)).toEqual(['Aliquota', 'RWC', '% sostanza secca'])
   })
+
+  it('ripetere una taratura dei vasi dalla Pesatura porta alla nuova taratura', async () => {
+    vi.mocked(listaPesatura).mockResolvedValue({ sessioni: [taraturaFatta], campioni: vasiFatta, pesi: [] })
+    apri('?da=T0')
+    await waitFor(() => expect(screen.getByTestId('posizione')).toHaveTextContent('/esperimenti/E/laboratorio/taratura/nuova?da=T0'))
+  })
 })
 
 /** Una taratura fatta, da ripetere: tensiometro in hPa con due vasi. */

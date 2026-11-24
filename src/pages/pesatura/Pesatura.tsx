@@ -14,11 +14,7 @@ import { useSenzaRete } from '@/lib/useSenzaRete'
 import { usePermessi } from '@/lib/usePermessi'
 import { cn } from '@/lib/utils'
 import { SENZA_RETE_PESATURA } from './messaggi'
-
-/** Dalla più recente: per data, a parità per quando è stata creata. */
-function dallaPiuRecente(a: SessionePesatura, b: SessionePesatura): number {
-  return b.data.localeCompare(a.data) || (b.creato_il ?? '').localeCompare(a.creato_il ?? '') || a.id.localeCompare(b.id)
-}
+import { dallaPiuRecente } from './sessioni'
 
 /** La prima riga della nota, per l'elenco (il resto lo taglia la riga stessa con i puntini). */
 const inizioNota = (nota: string | null): string | null => nota?.trim().split('\n')[0]?.trim() || null
@@ -32,8 +28,9 @@ interface Voce {
   pesi: number
 }
 
+/** Le sessioni della Pesatura, dalla più recente: i vasi stanno nella Taratura. */
 function vociDi(dati: DatiPesatura): Voce[] {
-  return [...dati.sessioni].sort(dallaPiuRecente).map(s => {
+  return dati.sessioni.filter(s => s.tipo !== 'vasi').sort(dallaPiuRecente).map(s => {
     const campioni = dati.campioni.filter(c => c.sessione_id === s.id)
     const ids = new Set(campioni.map(c => c.id))
     const pesi = dati.pesi.filter(p => ids.has(p.campione_id))
@@ -44,10 +41,6 @@ function vociDi(dati: DatiPesatura): Voce[] {
       if (!fatta) attualeTrovata = true
       return { nome: NOMI_FASE[a.fase], conta: `${a.pesati}/${a.totali}`, stato }
     })
-    if (s.tipo === 'vasi') {
-      const n = pesi.filter(p => p.tipo === 'asciugatura').length
-      fasi.push({ nome: NOMI_FASE.asciugatura, conta: `${n} ${n === 1 ? 'peso' : 'pesi'}`, stato: attualeTrovata ? 'dopo' : 'attuale' })
-    }
     return { sessione: s, completata: eCompletata(s, campioni, pesi), fasi, pesi: pesi.length }
   })
 }
@@ -124,7 +117,7 @@ function Riga({ voce, espId, ripeti }: { voce: Voce; espId: string; ripeti: bool
         {voce.completata ? (
           <span className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-registrato">
             <Check aria-hidden className="size-4" strokeWidth={3} />
-            {s.tipo === 'vasi' ? 'Conclusa' : 'Completa'} · {voce.pesi === 1 ? '1 peso' : `${voce.pesi} pesi`}
+            Completa · {voce.pesi === 1 ? '1 peso' : `${voce.pesi} pesi`}
           </span>
         ) : (
           <span className="mt-2 flex flex-wrap gap-1.5">

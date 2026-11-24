@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
@@ -11,14 +11,14 @@ vi.mock('@/api/inviti', () => ({ sonoAdmin: vi.fn(), listaInviti: vi.fn(), creaI
 vi.mock('@/api/persone', () => ({ ruoloIn: vi.fn(), membriDi: vi.fn() }))
 vi.mock('@/api/esperimenti', () => ({ listaEsperimenti: vi.fn(), caricaConfig: vi.fn() }))
 vi.mock('@/api/pesatura', () => ({ listaPesatura: vi.fn(), aggiornaSessione: vi.fn(), eliminaSessione: vi.fn() }))
-vi.mock('@/components/pesatura/scaricaPesatura', () => ({ scaricaPesatura: vi.fn(), scaricaGraficoPng: vi.fn() }))
+vi.mock('@/components/pesatura/scaricaPesatura', () => ({ scaricaPesatura: vi.fn() }))
 
 import { useSessione } from '@/api/auth'
 import { caricaConfig } from '@/api/esperimenti'
 import { sonoAdmin } from '@/api/inviti'
 import { ruoloIn } from '@/api/persone'
 import { aggiornaSessione, eliminaSessione, listaPesatura } from '@/api/pesatura'
-import { scaricaGraficoPng, scaricaPesatura } from '@/components/pesatura/scaricaPesatura'
+import { scaricaPesatura } from '@/components/pesatura/scaricaPesatura'
 import { IMPOSTAZIONI_PREDEFINITE, type CampionePesatura, type Peso, type SessionePesatura } from '@/domain/pesatura/tipi'
 import { ELEMENTO_NON_TROVATO, SESSIONE_CON_PESI_ALTRUI } from '@/lib/errori'
 import { Sessione } from './Sessione'
@@ -55,11 +55,17 @@ function apri() {
           <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId" element={<Sessione />} />
           <Route path="/esperimenti/:espId/laboratorio/pesatura" element={<p>Elenco Pesatura</p>} />
           <Route path="/esperimenti/:espId/laboratorio/pesatura/:sessioneId/pesa/:fase" element={<p>Pagina di pesata</p>} />
+          <Route path="/esperimenti/:espId/laboratorio/taratura/:sessioneId" element={<PaginaTaratura />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   )
   return userEvent.setup({ delay: null })
+}
+
+function PaginaTaratura() {
+  const { sessioneId } = useParams()
+  return <p>Pagina della Taratura {sessioneId}</p>
 }
 
 const titolo = () => screen.findByRole('heading', { level: 2, name: 'Riepilogo' })
@@ -73,7 +79,6 @@ beforeEach(() => {
   vi.mocked(aggiornaSessione).mockResolvedValue(undefined)
   vi.mocked(eliminaSessione).mockResolvedValue(undefined)
   vi.mocked(scaricaPesatura).mockResolvedValue({ nomeFile: 'x.xlsx', grafici: 0, graficiNelFile: 0 })
-  vi.mocked(scaricaGraficoPng).mockResolvedValue('x.png')
   dati([sessione()], campioni, pesiRwc)
 })
 
@@ -280,91 +285,11 @@ describe('Sessione', () => {
 })
 
 describe('Sessione con i vasi', () => {
-  const vasiSessione = sessione({
-    tipo: 'vasi', titolo: 'Curve vasi', nota: null, impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tensione', unita: 'kPa' } },
-  })
-  const vasi = [campione('v1', 1, { nome: 'V1', substrato: 'Torba' }), campione('v2', 2, { nome: 'V2', substrato: 'Torba' })]
-  const asciuga = (id: string, c: string, valore: number, lettura: number, ora: string) =>
-    peso(id, c, 1, 'asciugatura', valore, { lettura, misurato_il: `2026-11-11T${ora}:00Z` })
-  const pesiVasi = [
-    peso('s1', 'v1', 1, 'secco', 100), peso('c1', 'v1', 1, 'capacita_campo', 200, { lettura: 2 }),
-    peso('s2', 'v2', 1, 'secco', 100), peso('c2', 'v2', 1, 'capacita_campo', 300, { lettura: 3 }),
-    asciuga('a1', 'v1', 190, 5, '09'), asciuga('a2', 'v1', 160, 20, '10'), asciuga('a3', 'v1', 130, 60, '11'),
-    asciuga('a4', 'v2', 280, 6, '09'),
-  ]
-
-  beforeEach(() => dati([vasiSessione], vasi, pesiVasi))
-
-  it('mostra grafico, equazione di ogni substrato e consultazione', async () => {
+  it('una sessione dei vasi porta alla pagina della Taratura', async () => {
+    dati([sessione({ tipo: 'vasi', titolo: 'Curve vasi', impostazioni: { repliche: 1, rapportoTampone: null, sensore: { tipo: 'tdr', unita: 'raw' } } })], [], [])
     apri()
-    await titolo()
-    expect(screen.getByRole('img', { name: /Curve di ritenzione/ })).toBeInTheDocument()
-    expect(screen.getByText(/WC = .*h in kPa/)).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Peso dei vasi' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: 'Torba' })).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: 'Parametri delle curve del substrato Torba' })).toBeInTheDocument()
-  })
-
-  it('con due substrati mostra due grafici e due tabelle, e ogni PNG scarica il suo', async () => {
-    const tre = [...vasi, campione('v3', 3, { nome: 'V3', substrato: 'Cocco' })]
-    dati([vasiSessione], tre, [...pesiVasi, peso('s3', 'v3', 1, 'secco', 100), peso('c3', 'v3', 1, 'capacita_campo', 250, { lettura: 2 })])
-    const u = apri()
-    await titolo()
-    expect(screen.getAllByRole('img', { name: /Curve di ritenzione/ })).toHaveLength(2)
-    expect(screen.getAllByRole('table', { name: /^Parametri delle curve/ })).toHaveLength(2)
-    expect(screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent).slice(0, 2)).toEqual(['Torba', 'Cocco'])
-    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Cocco' }))
-    await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0].gruppo.substrato).toBe('Cocco')
-  })
-
-  it('i vasi non aspettano la configurazione', async () => {
-    vi.mocked(caricaConfig).mockReturnValue(new Promise(() => undefined))
-    apri()
-    await titolo()
-    expect(screen.getByRole('heading', { level: 1, name: 'Curve vasi' })).toBeInTheDocument()
-  })
-
-  it('Scarica grafico (PNG) scarica il PNG', async () => {
-    const u = apri()
-    await titolo()
-    await u.click(screen.getByRole('button', { name: 'Scarica grafico (PNG), Torba' }))
-    await waitFor(() => expect(scaricaGraficoPng).toHaveBeenCalledTimes(1))
-    expect(vi.mocked(scaricaGraficoPng).mock.calls[0][0]).toMatchObject({ titolo: 'Curve vasi', gruppo: { substrato: 'Torba' }, sensore: { unita: 'kPa' } })
-  })
-
-  it('il proprietario segna conclusa una taratura', async () => {
-    const u = apri()
-    await titolo()
-    await u.click(screen.getByRole('button', { name: 'Segna come conclusa' }))
-    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith({ id: 'S', data: '2026-11-11', nota: null, conclusa: true }))
-  })
-
-  it('una taratura conclusa si riapre', async () => {
-    dati([{ ...vasiSessione, conclusa: true }], vasi, pesiVasi)
-    const u = apri()
-    await titolo()
-    expect(screen.getByText('Conclusa')).toBeInTheDocument()
-    await u.click(screen.getByRole('button', { name: 'Riapri' }))
-    await waitFor(() => expect(aggiornaSessione).toHaveBeenCalledWith(expect.objectContaining({ conclusa: false })))
-  })
-
-  it('la capacità di campo mostra la lettura; una vecchia senza lettura dice che manca e si riapre da lì', async () => {
-    dati([vasiSessione], vasi, pesiVasi.map(p => (p.id === 'c2' ? { ...p, lettura: null } : p)))
-    apri()
-    await titolo()
-    expect(screen.getByText('200 g · 2 kPa')).toBeInTheDocument()
-    expect(screen.getByText('300 g · manca la lettura')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Capacità di campo · 1/2' })).toBeInTheDocument()
-    expect(screen.getByText('Mancano dei pesi')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Pesa V2' })).toHaveAttribute(
-      'href', '/esperimenti/E/laboratorio/pesatura/S/pesa/capacita_campo?campione=v2&replica=1')
-  })
-
-  it('l\'asciugatura mostra quanti pesi ci sono, senza una frazione', async () => {
-    apri()
-    await titolo()
-    expect(screen.getByRole('link', { name: 'Asciugatura · 4 pesi' })).toBeInTheDocument()
+    expect(await screen.findByText('Pagina della Taratura S')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Curve vasi' })).not.toBeInTheDocument()
   })
 })
 

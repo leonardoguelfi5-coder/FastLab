@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { CloudOff, Minus, Plus, RotateCcw, X } from 'lucide-react'
 import { creaSessione } from '@/api/pesatura'
@@ -29,7 +29,7 @@ import type { Pianta, Trattamento } from '@/domain/tipi'
 import { eDataValida, formattaData, oggiLocale } from '@/lib/date'
 import { messaggioErrore } from '@/lib/errori'
 import { nuovoId } from '@/lib/id'
-import { percorsoPesata, percorsoPesatura, percorsoSessioneTaratura, percorsoTaratura } from '@/lib/percorsi'
+import { percorsoNuovaTaratura, percorsoPesata, percorsoPesatura, percorsoSessioneTaratura, percorsoTaratura } from '@/lib/percorsi'
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { SENZA_RETE_PESATURA, SENZA_RETE_TARATURA } from './messaggi'
@@ -76,6 +76,9 @@ export function NuovaSessione({ sezione = 'pesatura' }: { sezione?: SezioneNuova
     : (idOrigine ? 'Ripeti pesata' : 'Nuova pesata')
 
   const origine = idOrigine ? (pesatura.data?.sessioni ?? []).find(s => s.id === idOrigine) ?? null : null
+  // «Ripeti» di una sessione dei vasi da un vecchio indirizzo della Pesatura: si ripete nella Taratura.
+  if (!eTaratura && origine?.tipo === 'vasi') return <Navigate replace to={percorsoNuovaTaratura(espId, origine.id)} />
+
   let corpo
   if (!permessi.puoMisurare) {
     corpo = <p className="text-grafite">Non puoi iniziare una {eTaratura ? 'taratura' : 'pesata'}: hai solo la lettura di questo esperimento.</p>

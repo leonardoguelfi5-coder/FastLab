@@ -12,11 +12,7 @@ import { percorsoLaboratorio, percorsoNuovaTaratura, percorsoSessioneTaratura } 
 import { usePermessi } from '@/lib/usePermessi'
 import { useSenzaRete } from '@/lib/useSenzaRete'
 import { SENZA_RETE_TARATURA } from '@/pages/pesatura/messaggi'
-
-/** Dalla più recente: per data, a parità per quando è stata creata (come nella Pesatura). */
-function dallaPiuRecente(a: SessionePesatura, b: SessionePesatura): number {
-  return b.data.localeCompare(a.data) || (b.creato_il ?? '').localeCompare(a.creato_il ?? '') || a.id.localeCompare(b.id)
-}
+import { dallaPiuRecente } from '@/pages/pesatura/sessioni'
 
 /** La prima riga della nota, per l'elenco (il resto lo taglia la riga stessa con i puntini). */
 const inizioNota = (nota: string | null): string | null => nota?.trim().split('\n')[0]?.trim() || null
